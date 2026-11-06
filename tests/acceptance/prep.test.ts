@@ -174,7 +174,7 @@ describe('F-22', () => {
     const sim = createSim(init(12));
     const session = createSession(sim);
     session.send({ a: 'pick', v: [250, 260] });
-    session.send(startInput(sim.state.op, session.queued));
+    session.send(startInput(sim.state, session.queued));
     session.step();
     expect(sim.state.phase).toBe('live');
     expect(sim.state.op).toEqual({ x: 250, y: 260 });
@@ -185,13 +185,24 @@ describe('F-22', () => {
     s2.send({ a: 'pick', v: [250, 260] });
     s2.send({ a: 'pick', v: [300, 310] });
     s2.step();
-    expect(startInput(twice.state.op, s2.queued)).toEqual({ a: 'start', v: [300, 310] });
+    expect(startInput(twice.state, s2.queued)).toEqual({ a: 'start', v: [300, 310] });
     // A pick the simulation ignored (inside the 200 m margin) leaves the post where it was, and start still works.
     s2.send({ a: 'pick', v: [100, 100] });
     s2.step();
-    s2.send(startInput(twice.state.op, s2.queued));
+    s2.send(startInput(twice.state, s2.queued));
     s2.step();
     expect(twice.state.phase).toBe('live');
     expect(twice.state.op).toEqual({ x: 300, y: 310 });
+  });
+
+  test('F-22: 개시는 패널이 늦게 읽은 상태가 아니라 지금의 관측소를 쓴다', () => {
+    const sim = createSim(init(13));
+    const session = createSession(sim);
+    const snapshot = { op: sim.state.op }; // what the panel last read; it refreshes only every 100 ms
+    session.send({ a: 'pick', v: [250, 260] });
+    session.step(); // the simulation has applied the pick, nothing is queued, the panel hasn't caught up
+    expect(snapshot.op).not.toEqual({ x: 250, y: 260 });
+    expect(session.queued).toEqual([]);
+    expect(startInput(sim.state, session.queued)).toEqual({ a: 'start', v: [250, 260] });
   });
 });

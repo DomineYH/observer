@@ -17,6 +17,8 @@ export interface PrepPanelProps {
   send: (input: Input) => void;
   /** Inputs sent and not yet stepped. */
   queued: readonly Input[];
+  /** The simulation's live state, read when 작전 개시 is pressed. */
+  live: Pick<ReadonlySimState, 'op'>;
 }
 
 const pad4 = (n: number) => String(n).padStart(4, '0');
@@ -34,7 +36,7 @@ function weatherText(w: Weather): string {
   return parts.join(' · ');
 }
 
-export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
   const at = (p: Point) => {
     const g = gridOf(grid, p);
     return `찰리호텔 ${pad4(g.e)} ${pad4(g.n)}`;
@@ -85,7 +87,7 @@ export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send
           ? `관측소 후보: ${at(state.op)}`
           : '지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.'}
       </p>
-      <button type="button" onClick={() => send(startInput(state.op, queued))}>
+      <button type="button" onClick={() => send(startInput(live, queued))}>
         관측소 점령 · 작전 개시
       </button>
     </section>
