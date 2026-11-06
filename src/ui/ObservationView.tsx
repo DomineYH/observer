@@ -28,7 +28,7 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [bino, setBino] = useState(state.bino);
   // Made once: it starts from the simulation's aim and remembers the value it sent last.
-  const [aim] = useState(() => createAimControl(state.aim, send));
+  const [aim] = useState(() => createAimControl(state, send));
 
   useEffect(() => {
     const view = ref.current!;
@@ -51,7 +51,7 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
         view.width = W;
         view.height = H;
       }
-      const on = state.bino;
+      const on = aim.bino();
       setBino(on);
       const a = aim.aim();
       const geom = renderView(buf, terrain, colours, eye, a, on, weather);
@@ -72,12 +72,12 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (aim.key(e.key, e.shiftKey, state.bino)) e.preventDefault();
-      else if (e.key === 'b' || e.key === 'B') aim.toggleBino(state.bino);
+      if (aim.key(e.key, e.shiftKey)) e.preventDefault();
+      else if (e.key === 'b' || e.key === 'B') aim.toggleBino();
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [aim, state]);
+  }, [aim]);
 
   const drag = useRef<{ x: number; y: number } | null>(null);
   return (
@@ -94,13 +94,13 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
         onPointerMove={(e) => {
           const d = drag.current;
           if (!d) return;
-          aim.drag(e.clientX - d.x, e.clientY - d.y, e.currentTarget.getBoundingClientRect().width, state.bino);
+          aim.drag(e.clientX - d.x, e.clientY - d.y, e.currentTarget.getBoundingClientRect().width);
           drag.current = { x: e.clientX, y: e.clientY };
         }}
         onPointerUp={() => (drag.current = null)}
         onPointerCancel={() => (drag.current = null)}
       />
-      <button type="button" aria-pressed={bino} onClick={() => aim.toggleBino(state.bino)}>
+      <button type="button" aria-pressed={bino} onClick={() => aim.toggleBino()}>
         쌍안경
       </button>
       <span role="group" aria-label="화질">

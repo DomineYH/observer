@@ -98,27 +98,29 @@ test('입력 기록: 받아들인 입력만 남긴다', () => {
 });
 
 test('F-01: 화질은 결과를 바꾸지 않는다', () => {
-  // The same player actions at each 화질; the view is drawn every tick between them.
+  // The same player actions at each 화질; the view is drawn after every tick that had an action (drawing is the
+  // costly part, and a frame between actions draws the same aim again).
   const play = (w: number) => {
     const sim = createSim(init(11));
     const session = createSession(sim);
-    const aim = createAimControl(sim.state.aim, session.send);
+    const aim = createAimControl(sim.state, session.send);
     const buf = createViewBuffers(w);
-    const actions: ((bino: boolean) => void)[] = [
-      (b) => aim.key('ArrowRight', false, b),
-      (b) => aim.key('ArrowUp', true, b),
-      (b) => aim.drag(37, -12, 800, b),
-      () => aim.toggleBino(sim.state.bino),
-      (b) => aim.key('ArrowLeft', true, b),
-      (b) => aim.drag(-5, 3, 800, b),
-      (b) => aim.key('ArrowDown', false, b),
-      () => aim.toggleBino(sim.state.bino),
+    const actions: (() => void)[] = [
+      () => aim.key('ArrowRight', false),
+      () => aim.key('ArrowUp', true),
+      () => aim.drag(37, -12, 800),
+      () => aim.toggleBino(),
+      () => aim.key('ArrowLeft', true),
+      () => aim.drag(-5, 3, 800),
+      () => aim.key('ArrowDown', false),
+      () => aim.toggleBino(),
     ];
     const hashes: string[] = [];
     for (let tick = 0; tick < 30; tick++) {
-      actions[tick % 4 === 0 ? tick / 4 : -1]?.(sim.state.bino);
+      const action = actions[tick % 4 === 0 ? tick / 4 : -1];
+      action?.();
       session.step();
-      renderView(buf, terrain, colours, EYE, aim.aim(), sim.state.bino, CLEAR_WEATHER);
+      if (action) renderView(buf, terrain, colours, EYE, aim.aim(), aim.bino(), CLEAR_WEATHER);
       hashes.push(sim.hash());
     }
     return { hashes, log: session.log };

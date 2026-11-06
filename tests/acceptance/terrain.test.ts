@@ -18,7 +18,7 @@ describe('F-15', () => {
     expect(hash).toBe(readGolden('0-empty.json').terrainHash);
     expect(terrainHash(await mockTerrain.load(SEED))).toBe(hash);
     expect(terrainHash(await mockTerrain.load(SEED + 1))).not.toBe(hash);
-  });
+  }, 30_000); // about 1.7 s alone: two more 1024×1024 generations, slower when other jobs share the machine
 });
 
 describe('F-25', () => {
