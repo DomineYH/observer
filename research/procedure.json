@@ -1,0 +1,104 @@
+[
+  {
+    "question": "1-A. [방향 — 1차 공개 교범 기준 및 데모 v0.2 비교] 방안좌표(Grid) 사격요구에서 관측자-표적(OT) 방향('방향 ○○○○')은 첫 수정 앞에 보내는가, 아니면 사격요구(표적위치 또는 세 번째 송신)에 넣는 경우가 있는가? 데모 v0.2의 동작과 같은가?",
+    "fact": "미 육군 FM 6-30(§4-4a, §5-5a) 및 미 해병대 MCWP 3-16.6(§2202a, §3103, §3106, §3302b) 기준: (1) 야포·박격포 방안좌표(Grid) 사격요구에서는 최초 3회 송신에 관측자-표적 방향(OT Direction)을 포함하지 않으며, 사격요구 완료 직후·사격지휘통보(MTO) 복창 시·또는 첫 수정(subsequent correction)의 맨 앞 요소로 10밀 단위 4자리('Direction ○○○○')로 송신한다. (2) 반면 극좌표법(Polar Plot)과 기지점 전이(Shift from a Known Point)에서는 사격요구 두 번째 송신(표적위치)의 첫 요소로 방향을 송신하며(함포 사격의 관측자 조정 시에도 표적위치에 포함), 세 번째 송신(표적성질·공격방법·통제방법)에는 관측 방향이 아니라 장방형·선형 표적(200m 이상)의 장축 방위각(attitude)만 들어간다. (3) 데모 v0.2 비교: 방안좌표 사격에서 첫 수정 문장 맨 앞에 '방향 ○○○○'을 붙여 보내고(PRD/OBSERVER_demo_v0.2.html:805-812) 극좌표 두 번째 송신에 방위각을 포함하는 구조(727행)는 교범과 같음(Same). 단, 교범은 사격요구 직후나 MTO 복창 시 사전 송신 및 관측 방향이 100밀 이상 바뀔 때 방향 재송신을 허용하는 반면, 데모 v0.2는 첫 수정 송신 시점에만 1회 입력하도록 강제(`if(m.dir==null)`)하고 극좌표 표적위치에서 '방향' 대신 '방위각'이라는 용어를 쓰는 점은 다름(Different).",
+    "source_url": "https://archive.org/download/milmanual-mcwp-3-16.6-supporting-arms-observer-spotter-and-controller/mcwp_3-16.6_supporting_arms_observer_spotter_and_controller_djvu.txt",
+    "source_title": "MCWP 3-16.6 Supporting Arms Observer, Spotter, and Controller (U.S. Marine Corps) & FM 6-30 Observed Fire (U.S. Army)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "3106. When conducting a grid mission, the observer transmits the direction when reading back the MTO or with the first subsequent correction in adjustment.",
+    "version_or_date_of_source": "15 October 1998 (MCWP 3-16.6) / 16 July 1991 (FM 6-30)",
+    "confidence": "high",
+    "limitations": "2차 자료인 HonestMOS(https://www.honestmos.com/field-manual/call-for-fire) 예문은 2차 송신(Grid) 복창 직후 별도 송신으로 'Direction 5210'을 보내는 방식을 예시하고, 유용원의 군사세계 예문(https://bemil.chosun.com/nbrd/bbs/view.html?b_bbs_id=10040&num=88920)은 대대 효력사 3차 송신에 표적 장축 방향인 '표적크기 200×500m, 방위각 800밀'만 포함하고 첫 수정('우로 50, 줄이기 하나백')에서는 방향을 생략했다.",
+    "conflicts_with_other_sources": [
+      "유용원의 군사세계 게시글(2차 자료, bemil.chosun.com #88920)의 방안좌표 조정사격 예문에서는 첫 수정 앞에 '방향 ○○○○'을 송신하지 않고 바로 '우로 50, 줄이기 하나백'을 송신함(기러기가 관측소 좌표와 표적 좌표를 모두 알고 있어 도상/전산으로 관목선을 계산하는 상황으로 묘사됨)."
+    ]
+  },
+  {
+    "question": "1-B. [방향 — 한국군 실제 절차 확인 가능 여부] 공개 1차 자료 기준 한국군 포병 교범에서 방안좌표 사격 시 '방향 ○○○○'(또는 '관목방위각')의 실제 무선 송신 시점과 문구가 확인되는가?",
+    "fact": null,
+    "source_url": "https://engjournal.kics.or.kr/digital-library/manuscript/file/33792/NODE01552797.pdf",
+    "source_title": "전술적 사격지휘 자동화 절차 및 한국군 포병 공개 학술문헌 검색 결과 (한국통신학회논문지 등)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "포병 사격요구 6대 요소 및 관목방위각 기반 편차 수정 원리는 확인되나, 한국군 야전교범의 실제 음성 무전 문구는 공개 1차 자료에 미수록.",
+    "version_or_date_of_source": "2011 (KICS NODE01552797) / 2026-11-06 검색",
+    "confidence": "low",
+    "limitations": "한국군 육군 야전교범(『대포포술』 야교 6-40, 『관측』, 『합동화력운용』) 원문은 군사자료(대외비)로 공개 웹(dema.mil.kr, mnd.go.kr, army.mil.kr, kci.go.kr, nanet.go.kr)에서 전문 열람이 불가하여 한국군 고유 음성 문구('방향 ○○○○' vs '관목방위각 ○○○○' 또는 BTCS 환경에서의 생략 여부)는 확인 불가(Unverifiable). 2차 자료인 아카라이브 전술 채널(https://arca.live/b/staytactical/83853341)과 암기카드(ankimaker.com)에서는 한국군 포술 용어로 '관목선'·'관목방위각'을 사용하며 극표정(극좌표) 표적위치 결정 및 탄착 판정 기준선으로 설명하고, KH179 사격 시뮬레이터(https://kh179.pages.dev/)는 UI 입력폼에서 좌표(8자리)와 극좌표(방위각·거리)를 선택해 전송한다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "2-A. [표적번호 — 부여 주체·시점·체계·읽는 법 및 데모 v0.2 비교] 표적번호는 누가, 어느 시점(사격지휘통보?)에 부여하며, 번호 체계와 읽는 법은 무엇인가? 데모 v0.2의 동작과 같은가?",
+    "fact": "미 육군 FM 6-30(§4-10d) 및 미 해병대 MCWP 3-16.6(§3107d, §3203c) 기준: (1) 부여 주체 및 시점: 야포·박격포 임기표적(target of opportunity)에서 표적번호는 사격지휘소(FDC)가 사격요구 접수 후 첫 수정 전에 송신하는 사격지휘통보(Message to Observer, MTO)의 4번째(마지막) 요소로 부여한다(예: ① 사격부대, ② 변경사항, ③ 효력사 문당 발수, ④ 표적번호). 단, 사전 계획표적(planned target)은 화력지원계획 단계에서 미리 부여되어 관측자가 경고명령/표적위치에 송신하며, 해군 함포사격(NGF)에서는 관측자(spotter)가 1차 송신에서 부여한다. 한국군 공개 학술논문(한성대 2021 학위논문, 한국군사과학기술학회 논문)에서도 사격요구 접수 후 사격지휘체계(BTCS)가 표적번호를 부여·관리하여 사격명령서를 하달함이 확인된다. (2) 번호 체계와 읽는 법: 상급부대/제대 할당 블록을 뜻하는 영문 2글자 + 4자리 일련번호(예: AA7732, AB1037, AB2135)로 구성되며, 무선교신 규정(FM 24-35 / QSTAG 246)에 따라 알파벳은 NATO 포네틱 코드(ALFA BRAVO), 숫자는 한 자리씩 읽는다. (3) 데모 v0.2 비교: 기러기(FDC)가 사격지휘통보 끝부분에 '표적번호 알파브라보 하나공공하나'(AB1001, AB1002 순차 증가)를 부여하고 포네틱 코드+포병숫자 단자리로 읽는 동작(PRD/OBSERVER_demo_v0.2.html:694-695, 735-737)은 교범과 같음(Same). 단, 교범(MCWP 3-16.6 §3107)은 관측자가 MTO를 복창(read back)하도록 규정하나 데모 v0.2의 표준 모드는 관측자 복창 없이 진행하는 점이 다름(Different).",
+    "source_url": "https://archive.org/download/ost-military-doctrine-fm6_30/fm6_30_djvu.txt",
+    "source_title": "FM 6-30 Tactics, Techniques, and Procedures for Observed Fire (Headquarters, Department of the Army)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "4-10.d. Target Number. A target number is assigned to each mission to facilitate processing of subsequent corrections; for example, AA7732, OVER.",
+    "version_or_date_of_source": "16 July 1991",
+    "confidence": "high",
+    "limitations": "2차 자료인 HonestMOS(https://www.honestmos.com/field-manual/call-for-fire)에서도 MTO 마지막 요소로 'target number Alpha Bravo one-zero-zero-one'을 제시하고, 우만위키(https://tcatmon.com/wiki/%ED%8F%AC%EB%B3%91_%EC%9A%A9%EC%96%B4)와 나무위키(https://namu.wiki/w/%ED%8F%AC%EB%B3%91%20%EC%9A%A9%EC%96%B4)에서 한국군 포병숫자(공, 하나, 둘, 삼, 넷, 오, 여섯, 칠, 팔, 아홉) 읽기 체계를 설명한다.",
+    "conflicts_with_other_sources": [
+      "유용원의 군사세계 예문(2차 자료, bemil.chosun.com #88920)에서는 '사격지휘통보, 포대, 접근신관, 하나발, 지명사, 잠깐대기'로만 되어 있어 사격지휘통보 문장 안에 표적번호가 생략되어 있음."
+    ]
+  },
+  {
+    "question": "2-B. [전이사격과 표적번호 — 1차 공개 교범 기준 및 데모 v0.2 비교] 전이사격(Shift from a Known Point)이 직전 표적번호를 기준점으로 삼는가? 데모 v0.2의 전이사격 구조와 같은가?",
+    "fact": "미 육군 FM 6-30(§4-3c(3), §4-4b, §5-8 Table 5-2) 및 미 해병대 MCWP 3-16.6(§2203, §3102b, §3103c, §3303d(2)) 기준: (1) 기준점 사용: 기지점 전이(Shift from a Known Point)는 사전 보고된 지형 기지점(known point)뿐만 아니라 '이전에 사격하고 기록한 표적'(a target that was previously fired on and recorded)의 표적번호(예: AB1037)를 기준점으로 사용할 수 있으며, FDC는 전이사격 임무의 MTO에서 새 표적번호를 부여한다. (2) 데모 v0.2와의 차이점(Different): 첫째, 교범(MCWP 3-16.6 §3203c, §3303d(2))에서는 MTO에서 부여된 표적번호가 자동 저장되지 않고 임무 종료 시 관측자가 'Record as target'(표적기록)을 요청해야 기지점으로 재사용 가능한 반면, 데모 v0.2(PRD/OBSERVER_demo_v0.2.html:831, 834-847)는 별도 표적기록 절차 없이 직전 완료 임무의 표적번호(`R.lastTn`)와 조준점을 자동으로 기준점으로 삼는다. 둘째, 교범에서 기지점 전이는 표준 사격요구와 동일하게 3회 분할 송신(① 호출 + 경고명령 '조정/효력사, 전이 표적번호 AB1037' → ② 표적위치 '방향 ○○○○, 좌/우 ○○, 늘리기/줄이기 ○○, 고저' → ③ 표적성질·공격방법·통제방법)으로 진행되나, 데모 v0.2는 IDLE 상태에서 단일 송신('전이, 표적번호 ..., 방향 ..., 우로 ..., 줄이기 ..., [표적성질], 포대 삼발, 효력사')으로 한 번에 전송하며 경고명령 위치가 아닌 문장 맨 끝에 '효력사'를 고정 배치한다.",
+    "source_url": "https://archive.org/download/milmanual-mcwp-3-16.6-supporting-arms-observer-spotter-and-controller/mcwp_3-16.6_supporting_arms_observer_spotter_and_controller_djvu.txt",
+    "source_title": "MCWP 3-16.6 Supporting Arms Observer, Spotter, and Controller (U.S. Marine Corps) & FM 6-30 Observed Fire (U.S. Army)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "2203. The known point may be a terrain reference point that was previously reported or a target that was previously fired on and recorded.",
+    "version_or_date_of_source": "15 October 1998 (MCWP 3-16.6) / 16 July 1991 (FM 6-30)",
+    "confidence": "high",
+    "limitations": "2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920)에서는 직전 사격('임무끝, 적 보병소대 파괴') 직후 표적번호와 방향, 표적성질 없이 '전이사격, 우로 둘백, 줄이기 하나백, 포대 삼발, 효력사'를 단일 문장으로 송신하며, 데모 v0.2는 이 단일 송신 형태에 미군 교범의 표적번호·방향·표적성질 요소를 결합해 설계한 형태이다.",
+    "conflicts_with_other_sources": [
+      "미군 1차 교범(FM 6-30 §4-3~4-4, MCWP 3-16.6 §3102~3103)은 기지점 전이를 3회 분할 송신 사격요구로 규정하는 반면, 한국어 2차 자료 예문(bemil.chosun.com #88920)과 데모 v0.2는 직전 표적 임무 종료 직후 1회 압축 송신('전이사격/전이, ...')으로 처리함."
+    ]
+  },
+  {
+    "question": "2-C. [표적번호·전이사격 — 한국군 실제 무전 문형 확인 가능 여부] 한국군 1차 공개 자료에서 사격지휘통보의 표적번호 호창 방식과 전이사격의 실제 무전 문형이 확인되는가?",
+    "fact": null,
+    "source_url": "https://dspace.hansung.ac.kr/bitstream/2024.oak/9207/2/200000360828.pdf",
+    "source_title": "포병 사격 분석 시뮬레이션 개발 및 적용 연구 (한성대학교 국방과학대학원 석사학위논문, 이재언)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "사격요구 접수 시 표적번호 부여 및 BTCS 제원 산출 절차만 기술되어 있으며, 음성 무전 사격지휘통보 및 전이사격 문형은 비공개 교범 영역임.",
+    "version_or_date_of_source": "2021",
+    "confidence": "low",
+    "limitations": "한국군 포병 학술논문(한성대 2021 https://dspace.hansung.ac.kr/bitstream/2024.oak/9207/2/200000360828.pdf, KIMST https://www.kimst.or.kr/electronic_paper/pdf_down_other.kin?stype=journal&idx=12167)에서는 BTCS가 표적번호를 부여·연동한다는 사실만 다루며, 한국군 야전교범의 음성 무선 교신 문형('표적번호 알파브라보 하나공공하나'의 정확한 위치 및 '기지점 전이' vs '전이사격' 약식 단일 송신 허용 여부)은 공개 1차 자료에서 확인 불가(Unverifiable). 2차 자료(bemil.chosun.com #88920, arca.live #83853341, ankimaker.com)에서만 '기지점 전이' 원리와 약식 '전이사격' 예문이 혼재하여 나타난다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "3-A. [위험근접 — 기준 거리 600 m 및 선언 방식, 데모 v0.2 비교] 야포·박격포 사격에서 위험근접(Danger Close) 기준 거리가 600 m인가? 데모 v0.2의 동작과 같은가?",
+    "fact": "미 육군 FM 6-30(§4-6b, §5-5b) 및 미 해병대 MCWP 3-16.6(§3104b(2)) 및 USMC TBS B2C2437 기준: (1) 야포(artillery)와 박격포(mortars) 사격에서 표적(예상 탄착점)이 아군 병력으로부터 600 m 이내일 때 사격요구 5번째 요소(공격방법, 3차 송신)에 'DANGER CLOSE'(위험근접)를 포함해야 한다(5인치 이하 함포는 750 m, 5인치 초과 함포는 1,000 m). (2) 또한 조정사격 진행 중 수정으로 인해 탄착점이 아군 600 m 이내로 들어오면 후속 수정 송신에서 'DANGER CLOSE'를 선언해야 하고, 반대로 수정 결과 탄착점이 600 m 밖으로 나가면 'CANCEL DANGER CLOSE'를 송신한다. (3) 데모 v0.2 비교: 아군 진지 또는 관측소로부터 600 m 이내를 위험근접 기준으로 삼고 사격요구 3차 송신에 '위험근접'을 선언하는 점(PRD/OBSERVER_demo_v0.2.html:740-745)은 교범과 같음(Same). 단, 데모 v0.2는 최초 표적위치(sendDesc)와 전이사격(sendShift) 시점에만 600 m 여부를 검사하고, 이후 수정(sendCorr) 중 탄착점이 600 m 안팎으로 이동할 때의 동적 위험근접 진입/해제('CANCEL DANGER CLOSE') 및 미선언 시 FDC의 자동 감지·감점(-30점) 처리는 게임 고유의 설계라는 점이 다름(Different).",
+    "source_url": "https://archive.org/download/ost-military-doctrine-fm6_30/fm6_30_djvu.txt",
+    "source_title": "FM 6-30 Tactics, Techniques, and Procedures for Observed Fire (Headquarters, Department of the Army)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "4-6.b. DANGER CLOSE is included in the method of engagement when the target is within 600 meters of friendly troops for mortar and artillery.",
+    "version_or_date_of_source": "16 July 1991",
+    "confidence": "high",
+    "limitations": "2차 자료인 HonestMOS(https://www.honestmos.com/field-manual/call-for-fire)와 나무위키(https://namu.wiki/w/%ED%8F%AC%EB%B3%91%20%EC%9A%A9%EC%96%B4)에서도 박격포·야포의 위험근접(위험사격) 기준 거리를 아군 600 m 이내로 동일하게 설명한다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "3-B. [위험근접 — 바로 효력사 금지 여부, 수정량 상한 100 m 및 포복 사격 원칙, 데모 v0.2 비교] 1차 공개 교범에서 위험근접 시 바로 효력사 금지 여부, 수정량 상한(축당 100 m)과 포복 사격(Creeping Fire) 원칙은 어떻게 되어 있으며 데모 v0.2와 같은가?",
+    "fact": "미 육군 FM 6-30(§5-5b, §5-6d, §7-3) 및 미 해병대 MCWP 3-16.6(§3104b(2), §3302e(4), §5402c, §5801-5802) 기준: (1) 포복 사격(Creeping Fire)과 100 m 수정 상한: 위험근접 조정사격에서는 큰 폭으로 좁히는 협차법(bracketing) 대신 반드시 포복 사격법(creeping method of adjustment)을 사용하며, 사거리 수정(특히 아군 쪽으로 탄착을 옮길 때)을 100 m 이하 단위(100 m 또는 50 m)로 점진적으로 이동시켜야 한다. (2) 바로 효력사 금지 여부: 교범은 위험근접 조정사격 시 포복 사격법을 의무화하고 최후방어사격(FPF, 아군 200~400 m 이내)도 가급적 단포로 조정할 것을 권고하며 ICM 사격 시 아군 600 m 밖에서 조정을 시작하도록 규정하지만, 표적 위치가 정확하거나 사전계획·레이저로 지정된 위험근접 FPF(MCWP 3-16.6 §5802 및 Fig 5-28, 5-29)에서는 비조정 효력사(nonadjusted fire for effect)도 명시적으로 허용하며 FDC가 최초 효력사 요구를 일괄 거부하는 규정은 없다. (3) 데모 v0.2 비교: 위험근접 조정 시 100 m 이하 소폭 수정을 강제하는 핵심 원리는 같으나(Same), ① 교범은 사거리 수정(아군 방향 접근)을 100 m 이하로 제한하는 데 비해 데모 v0.2(PRD/OBSERVER_demo_v0.2.html:806-807)는 좌우(편의)와 사거리 양축 모두 방향 무관 100 m 이하(`lv>100||rv>100`)로 제한하고, ② 위험근접 표적에 대한 최초 효력사 요구를 FDC가 무조건 조정사격(`m.phase='adj'`)으로 강제 전환하며, ③ FDC가 '위험근접, 조정 후 효력사' / '위험근접, 수정량 100 이하로 재송신'으로 거부 응답하는 문구는 PRD §4.1이 명시한 게임 설계 규칙이라는 점이 다름(Different).",
+    "source_url": "https://archive.org/download/milmanual-mcwp-3-16.6-supporting-arms-observer-spotter-and-controller/mcwp_3-16.6_supporting_arms_observer_spotter_and_controller_djvu.txt",
+    "source_title": "MCWP 3-16.6 Supporting Arms Observer, Spotter, and Controller (U.S. Marine Corps) & FM 6-30 Observed Fire (U.S. Army)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "3302.e(4)(a) In artillery and mortars, the observer makes corrections for creeping fire in 100-meter increments or less when moving rounds toward friendly forces.",
+    "version_or_date_of_source": "15 October 1998 (MCWP 3-16.6) / 16 July 1991 (FM 6-30)",
+    "confidence": "high",
+    "limitations": "데모 v0.2에서는 아군 진지가 관측-표적선(OT line)의 전후뿐만 아니라 좌우에 놓일 수도 있으므로 양축(`lv>100||rv>100`) 모두 100 m 상한을 둔 것은 2차원 전장 환경을 고려한 합리적 확장이나, 엄밀한 교범 문구(사거리/아군 방향 100 m 이하) 및 비조정 효력사 허용 예외와는 차이가 있다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "3-C. [위험근접 — 한국군 교범 확인 가능 여부] 한국군 1차 공개 자료에서 위험근접(위험사격) 600 m 기준, 바로 효력사 금지 여부, 축당 100 m 상한과 '포복 사격' 원칙 및 FDC 거부 문구가 확인되는가?",
+    "fact": null,
+    "source_url": "https://dl.nanet.go.kr/detail/KINX2025203506",
+    "source_title": "국회도서관·국방부·학술DB 한국군 포병 위험근접/위험사격 공개 문헌 검색 결과",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "한국군 야전교범(화력지원·대포포술) 원문은 대외비/군사자료로 미공개되어 위험사격 세부 수치 및 FDC 거부 교신문은 공개 1차 자료에서 미확인.",
+    "version_or_date_of_source": "2026-11-06 검색",
+    "confidence": "low",
+    "limitations": "국방부·육군·국방일보(dema.mil.kr, mnd.go.kr, army.mil.kr) 및 학술DB(kci.go.kr, nanet.go.kr, dspace.hansung.ac.kr)에서 '위험근접', '위험사격', '600m', '포복사격', '포복법', '점진사격'을 검색했으나 한국군 포병 야전교범 원문이 비공개(군사자료)여서 한국군 고유 규정은 확인 불가(Unverifiable). 2차 자료인 나무위키(https://namu.wiki/w/%ED%8F%AC%EB%B3%91%20%EC%9A%A9%EC%96%B4) 등에서는 한국군도 미군 교범과 동일하게 지상 포병·박격포 600 m 이내를 '위험사격(Danger Close)'으로 분류한다고 서술하나, 한국어 공개 자료에서 '포복사격'은 주로 보병 각개전투의 엎드려 쏘기 자세를 가리키며 포병의 Creeping Fire를 뜻하는 용례나 '위험근접, 조정 후 효력사' / '위험근접, 수정량 100 이하로 재송신' 같은 FDC 거부 문구는 확인되지 않는다(PRD §4.1에서도 해당 문구를 미군 교범 원칙을 옮긴 '설계' 문구로 분류함).",
+    "conflicts_with_other_sources": []
+  }
+]
