@@ -45,3 +45,17 @@ Since workers are very slow, they may fail to submit reports after they terminat
 - Router credentials: env named in `models.json#/router/api_key_env` (default `TYPESAFE_API_KEY`). Never put keys, secrets or unrelated source into the Jev request (SAFE-3).
 - **SHADOW MODE: ON.** Route and record only. Do not dispatch workers, create PRs, merge or deploy until a human removes this line after the ENF checklist in README is satisfied.
 <!-- jev-routing:end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues on DomineYH/observer (gh CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical labels (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
