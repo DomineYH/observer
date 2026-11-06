@@ -17,5 +17,7 @@ export function createSession(sim: Sim) {
       return events;
     },
     log: log as readonly RecordedInput[],
+    /** Inputs sent and not yet stepped, in order. */
+    queued: pending as readonly Input[],
   };
 }

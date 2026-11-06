@@ -3,6 +3,8 @@ import type { Point, TerrainData } from './terrain';
 import type { SimState } from './types';
 
 const EDGE_M = 200; // candidates and move destinations keep this far inside every side of the map (B2)
+// Game rule from the demo (line 1434: moved = distance > 50): within 50 m counts as the planned post. Demo values are
+// canonical where they differ from the PRD without a defect (spec #19 범위), so this is not "any difference".
 const MOVED_M = 50; // farther than this from the planned post, 위치 보고 is required
 
 /** Inside the map with the 200 m margin on all four sides; exactly 200 m is allowed. */

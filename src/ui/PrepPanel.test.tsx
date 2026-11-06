@@ -25,6 +25,7 @@ const text = (seed: number, seedKind: SeedKind, state = PREP) =>
       seedKind={seedKind}
       weather={WEATHER}
       send={() => {}}
+      queued={[]}
     />,
   ).replace(/<[^>]*>/g, '');
 

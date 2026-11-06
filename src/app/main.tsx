@@ -96,6 +96,7 @@ function App() {
         seedKind={seedKind}
         weather={CLEAR_WEATHER}
         send={session.send}
+        queued={session.queued}
       />
       <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={session.send} onFrame={onFrame} />
       <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />

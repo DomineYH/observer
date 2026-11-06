@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { createSim, replay, validateReplay } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
 import { createSession } from '@app/session';
+import { startInput } from '@ui/prep';
 import { init, replayData, START } from './init';
 import { flatTerrain } from './terrain';
 
@@ -166,5 +167,31 @@ describe('F-22', () => {
     expect([...seen.recon].sort()).toEqual(['A', 'B']);
     expect([...seen.inf2].sort()).toEqual(['A', 'C']);
     expect([...seen.apc].sort()).toEqual(['B', 'C']);
+  });
+
+  test('F-22: 고르자마자 개시해도 고른 관측소에 놓인다', () => {
+    // The panel reads state at a low rate: 작전 개시 pressed before the pick is stepped still means the picked post.
+    const sim = createSim(init(12));
+    const session = createSession(sim);
+    session.send({ a: 'pick', v: [250, 260] });
+    session.send(startInput(sim.state.op, session.queued));
+    session.step();
+    expect(sim.state.phase).toBe('live');
+    expect(sim.state.op).toEqual({ x: 250, y: 260 });
+
+    // The last of several picks wins; once stepped, the simulation's post is the intended one.
+    const twice = createSim(init(12));
+    const s2 = createSession(twice);
+    s2.send({ a: 'pick', v: [250, 260] });
+    s2.send({ a: 'pick', v: [300, 310] });
+    s2.step();
+    expect(startInput(twice.state.op, s2.queued)).toEqual({ a: 'start', v: [300, 310] });
+    // A pick the simulation ignored (inside the 200 m margin) leaves the post where it was, and start still works.
+    s2.send({ a: 'pick', v: [100, 100] });
+    s2.step();
+    s2.send(startInput(twice.state.op, s2.queued));
+    s2.step();
+    expect(twice.state.phase).toBe('live');
+    expect(twice.state.op).toEqual({ x: 300, y: 310 });
   });
 });

@@ -3,6 +3,7 @@
 import type { GridRef, Input, Point, ReadonlySimState, Scenario, SeedKind, Weather } from '@sim';
 import { BRIEFING } from '@content/scenario';
 import { gridOf } from '@render/mapView';
+import { startInput } from './prep';
 
 export type PrepState = Pick<ReadonlySimState, 'phase' | 'op' | 'picked' | 'reportDue'>;
 
@@ -14,6 +15,8 @@ export interface PrepPanelProps {
   seedKind: SeedKind;
   weather: Weather;
   send: (input: Input) => void;
+  /** Inputs sent and not yet stepped. */
+  queued: readonly Input[];
 }
 
 const pad4 = (n: number) => String(n).padStart(4, '0');
@@ -31,7 +34,7 @@ function weatherText(w: Weather): string {
   return parts.join(' · ');
 }
 
-export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued }: PrepPanelProps) {
   const at = (p: Point) => {
     const g = gridOf(grid, p);
     return `찰리호텔 ${pad4(g.e)} ${pad4(g.n)}`;
@@ -82,7 +85,7 @@ export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send
           ? `관측소 후보: ${at(state.op)}`
           : '지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.'}
       </p>
-      <button type="button" onClick={() => send({ a: 'start', v: [state.op.x, state.op.y] })}>
+      <button type="button" onClick={() => send(startInput(state.op, queued))}>
         관측소 점령 · 작전 개시
       </button>
     </section>
