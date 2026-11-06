@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import * as det from '@sim/math';
 import { createStreams, next, type Stream } from '@sim/rng';
-import { fromHex, toHex } from './bits';
+import { BITS, evaluate, FNS, fromHex, toHex, type Fn } from './bits';
 
-type Fn = 'exp' | 'log' | 'sin' | 'cos' | 'tan' | 'atan2';
 const BUILTIN: Record<Fn, (...a: number[]) => number> = {
   exp: Math.exp, log: Math.log, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2,
 };
@@ -39,19 +38,24 @@ function samples(fn: Fn): number[][] {
   return out;
 }
 
-const FNS: Fn[] = ['exp', 'log', 'atan2', 'sin', 'cos', 'tan'];
-
 describe('결정적 수학', () => {
   test('결정적 수학: 내장 함수와 1 ULP 이내', () => {
     for (const fn of FNS) {
       const ours = det[fn] as (...a: number[]) => number;
       let exact = 0;
-      for (const args of samples(fn)) {
+      const table = BITS[fn].map(([inputs]) => inputs.map(fromHex));
+      for (const args of [...table, ...samples(fn)]) {
         const d = ulps(ours(...args), BUILTIN[fn](...args));
         if (d > 1) expect.fail(`${fn}(${args.join(', ')}): ${ours(...args)} vs ${BUILTIN[fn](...args)} (${d} ULP)`);
         if (d === 0) exact++;
       }
-      console.log(`${fn}: ${exact}/${N} equal to the built-in`);
+      console.log(`${fn}: ${exact}/${table.length + N} equal to the built-in`);
     }
+  });
+
+  test('결정적 수학: 비트 출력 표', () => {
+    for (const fn of FNS) expect(BITS[fn].length, fn).toBeGreaterThanOrEqual(15);
+    const expected = Object.fromEntries(FNS.map((fn) => [fn, BITS[fn].map(([, out]) => out)]));
+    expect(evaluate(det)).toEqual(expected);
   });
 });
