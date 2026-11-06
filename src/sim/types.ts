@@ -1,4 +1,5 @@
 import type { StreamName } from './rng';
+import type { TerrainData } from './terrain';
 
 export type SeedKind = 'daily' | 'practice';
 export type Mode = 'training' | 'standard';
@@ -30,6 +31,7 @@ export interface SimInit {
   guns: GunData;
   weather: Weather;
   mode: Mode;
+  terrain: TerrainData;
 }
 
 /** 입력. Kinds are added by the slices that use them; until then every kind is unknown. */
@@ -77,7 +79,7 @@ export interface RecordedInput extends Input {
 }
 
 /** 재생 자료, format 1. Terrain and grammar versions are not carried. */
-export interface ReplayData extends SimInit {
+export interface ReplayData extends Omit<SimInit, 'terrain'> {
   format: 1;
   simVersion: number;
   stepMs: 50;

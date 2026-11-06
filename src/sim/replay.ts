@@ -1,5 +1,6 @@
 import { Hasher } from './hash';
 import { createSim } from './sim';
+import type { TerrainData } from './terrain';
 import type { ReplayData, ReplayResult } from './types';
 import { SIM_VERSION } from './version';
 
@@ -85,10 +86,10 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
   }
 }
 
-/** 재생기: a pure test tool. Records of another simVersion are not replayed. */
-export function replay(d: ReplayData): ReplayResult {
+/** 재생기: a pure test tool. Records of another simVersion are not replayed. The terrain is regenerated from the seed by the caller. */
+export function replay(d: ReplayData, terrain: TerrainData): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
-  const sim = createSim(d);
+  const sim = createSim({ ...d, terrain });
   const chain = new Hasher();
   const checkpoints: ReplayResult['checkpoints'] = [];
   let ignored = 0;

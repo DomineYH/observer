@@ -14,3 +14,12 @@ test('골든: 0번 빈 판 (실행 환경)', async ({ page }) => {
     expect(results[file], file).toEqual({ checkpoints, chain, record, ignored });
   }
 });
+
+// The page generates each golden record's terrain in this browser; its hash must equal the golden header.
+test('F-15: 지형 해시는 시드로 정해진다 (실행 환경)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#result, #error')).toBeAttached();
+  await expect(page.locator('#error')).toHaveCount(0);
+  const hashes = JSON.parse((await page.locator('#terrain').textContent()) ?? '{}');
+  for (const file of goldenFiles()) expect(hashes[file], file).toBe(readGolden(file).terrainHash);
+});

@@ -3,10 +3,11 @@ import { createSim, replay, SIM_VERSION, validateReplay } from '@sim';
 import type { ReplayData } from '@sim';
 import { init } from './init';
 
+const { terrain, ...header } = init(20261106); // terrain is not part of 재생 자료
 const replayData = (inputs: ReplayData['inputs'], totalTicks = 10): ReplayData => ({
   format: 1,
   simVersion: SIM_VERSION,
-  ...init(20261106),
+  ...header,
   stepMs: 50,
   inputs,
   totalTicks,
@@ -68,9 +69,9 @@ describe('뼈대', () => {
     expect(errorOf(null)).not.toBeNull();
 
     // Replaying data that holds an input the simulation ignores counts it.
-    const r = replay(replayData([{ t: 2, a: 'zz' }]));
+    const r = replay(replayData([{ t: 2, a: 'zz' }]), terrain);
     expect(r.ignored).toBe(1);
     expect(r.record.ticks).toBe(10);
-    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 })).toThrow(/simVersion/);
+    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 }, terrain)).toThrow(/simVersion/);
   });
 });

@@ -1,7 +1,8 @@
 // npm run golden:update — writes a golden file only when it is missing or this code's SIM_VERSION is newer.
 import { existsSync, writeFileSync } from 'node:fs';
 import { test } from 'vitest';
-import { replay, SIM_VERSION } from '@sim';
+import { replay, SIM_VERSION, terrainHash } from '@sim';
+import { generateTerrain } from '@adapters/mock/terrain';
 import { GOLDEN_DIR, readGolden, type Golden } from './golden';
 import { SCRIPTS } from './scripts';
 
@@ -16,7 +17,8 @@ for (const { file, replay: data } of SCRIPTS) {
         return;
       }
     }
-    const golden: Golden = { replay: data, ...replay(data) };
+    const terrain = generateTerrain(data.seed);
+    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain) };
     writeFileSync(url, JSON.stringify(golden, null, 2) + '\n');
     console.log(`${file}: written for simVersion ${SIM_VERSION}`);
   });

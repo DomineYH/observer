@@ -4,3 +4,6 @@ export { createSim, STEP_MS } from './sim';
 export type { StreamName } from './rng';
 export type * from './types';
 export { replay, validateReplay, CHECKPOINT_TICKS } from './replay';
+export { COVER, heightAt, surfaceAt, lineOfSight, terrainHash } from './terrain';
+export type * from './terrain';
+export { toGrid, fromGrid } from './grid';
