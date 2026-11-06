@@ -1,10 +1,11 @@
 // 탐지와 적정 (F-04): the `id` input carries angles only and the simulation picks the target, then watching it through
 // the binoculars reveals type, activity and size. Through the simulation's public interface only.
 import { describe, expect, test } from 'vitest';
-import { createSim, validateReplay, type Member, type Point, type Scenario, type Sim } from '@sim';
+import { createSim, validateReplay, type Member, type Point, type Scenario, type Sim, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
 import { CLEAR_WEATHER } from '@app/clearWeather';
-import { angleAt, MIL, project, QUALITIES } from '@render/projection';
+import { drawEffects } from '@render/effects';
+import { angleAt, focalOf, MIL, project, QUALITIES } from '@render/projection';
 import { terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { init, replayData } from './init';
@@ -31,6 +32,28 @@ const intel = (sim: Sim, i = 0) => sim.state.platoons[i]!.intel;
 /** The member furthest east (clockwise) of platoon `i`. */
 const eastmost = (sim: Sim, i = 0) =>
   sim.state.platoons[i]!.members.reduce((a, b) => (signed(angleTo(sim, b).az) > signed(angleTo(sim, a).az) ? b : a)) as Member;
+
+/** Centres of the dust and smoke discs the view paints, as `id` angles (0.1 mils), west to east: a 640 px view from
+ * the flat-terrain observer aimed at `h`, `p` mils. */
+function painted(sim: Sim, w: Weather, h: number, p: number): { az: number; el: number }[] {
+  const W = 640;
+  const focal = focalOf(W, sim.state.bino);
+  const geom = { eye: { x: 320, y: 320, z: 103.5 }, h, focal, cx: W / 2, hor: (W * 9) / 32 + Math.tan(p / MIL) * focal };
+  const buf = createViewBuffers(W);
+  drawEffects(buf, geom, sim.state, w);
+  const lit = (x: number, y: number) => buf.pix[(y * W + x) * 4] !== 0;
+  const cols = [...Array(W).keys()].map((x) => [...Array(buf.h).keys()].filter((y) => lit(x, y)));
+  const out: { az: number; el: number }[] = [];
+  for (let x = 0; x < W; x++) {
+    if (!cols[x]!.length || (x > 0 && cols[x - 1]!.length)) continue;
+    let x1 = x;
+    while (x1 + 1 < W && cols[x1 + 1]!.length) x1++;
+    const ys = cols.slice(x, x1 + 1).flat();
+    expect(x > 0 && x1 < W - 1 && Math.min(...ys) > 0 && Math.max(...ys) < buf.h - 1).toBe(true); // wholly in view
+    out.push(angleAt(geom, 1, (x + x1 + 1) / 2, (Math.min(...ys) + Math.max(...ys) + 1) / 2));
+  }
+  return out;
+}
 
 describe('F-04', () => {
   test('F-04: 각도로 누르기', () => {
@@ -190,13 +213,8 @@ describe('F-04', () => {
     // Behind a wall only the smoke of its volley is seen: found by the smoke, and watched at half the rate.
     const walled = found(wallTerrain(400, 6));
     until(walled, () => walled.state.effects.some((e) => e.vis), 5000);
-    const smoke = walled.state.effects.find((e) => e.vis)!;
-    const age = 0.05 * (walled.state.tick - smoke.tick);
-    const downwind = ((CLEAR_WEATHER.windFromDeg + 180) * Math.PI) / 180;
-    const speed = CLEAR_WEATHER.windSpeedTenthMs / 10;
-    const wind = { x: Math.sin(downwind) * speed, y: Math.cos(downwind) * speed };
-    const puff = { kind: 'smoke', prone: false, x: smoke.x + wind.x * age * 0.8, y: smoke.y + wind.y * age * 0.8 };
-    expect(walled.step([idAt(angleTo(walled, puff, smoke.gz + 2 + age * 0.8 - 0.9))]).accepted).toEqual([true]);
+    const [puff] = painted(walled, CLEAR_WEATHER, 0, 10);
+    expect(walled.step([idAt(puff!)]).accepted).toEqual([true]);
     expect(intel(walled)).toMatchObject({ stage: 1, cue: 'muzzle', prog: 1 });
     run(walled, 49);
     expect(intel(walled)).toMatchObject({ stage: 1, prog: 50, seenMax: 0, tubes: 0 });
@@ -238,5 +256,41 @@ describe('F-04', () => {
     expect(recon.step([idAt(angleTo(recon, eastmost(recon)))]).accepted).toEqual([true]);
     until(recon, () => intel(recon).stage === 3, 2000);
     expect(intel(recon).size).toEqual({ unit: 'men', n: 4 });
+  });
+
+  test('F-04: 보이는 연기를 누르고 지켜본다', () => {
+    // The mortar section 1 km north behind a 6 m wall: its crew is hidden, the smoke of its volley rises into view.
+    const behindWall = (w: Weather) => {
+      const sim = started(mortarAt({ x: 320, y: 1320 }), { terrain: wallTerrain(400, 6), weather: w });
+      sim.step([BINO_ON]);
+      until(sim, () => sim.state.effects.length > 0, 5000);
+      expect(sim.state.platoons[0]!.members.some((m) => m.vis)).toBe(false);
+      return sim;
+    };
+    // Pressing the middle of a painted puff 5 s old finds the mortar.
+    const sim = behindWall(CLEAR_WEATHER);
+    run(sim, 99);
+    const puffs = painted(sim, CLEAR_WEATHER, 13, 20);
+    expect(puffs).toHaveLength(3);
+    expect(sim.step([idAt(puffs[1]!)]).accepted).toEqual([true]);
+    expect(intel(sim)).toMatchObject({ stage: 1, cue: 'muzzle' });
+
+    // A 20 m/s wind from the west carries the smoke about 100 m (≈ 100 mils) east in 5 s. Watching counts where the
+    // smoke is seen, at half rate: aimed at the drifted plume it counts, aimed at where it was fired it does not.
+    const gale = { ...CLEAR_WEATHER, windFromDeg: 270, windSpeedTenthMs: 200 };
+    const watched = (aimAt: 'plume' | 'origin') => {
+      const s = behindWall(gale);
+      run(s, 99);
+      const [, mid] = painted(s, gale, 100, 20);
+      expect(signed(mid!.az)).toBeGreaterThan(800);
+      expect(s.step([idAt(mid!)]).accepted).toEqual([true]);
+      const before = intel(s).prog;
+      s.step([cam(aimAt === 'plume' ? mid!.az : 0)]);
+      run(s, 9);
+      expect(intel(s).seenMax).toBe(0);
+      return intel(s).prog - before;
+    };
+    expect(watched('plume')).toBe(10);
+    expect(watched('origin')).toBe(0);
   });
 });

@@ -51,7 +51,7 @@ export function createSim(init: SimInit): Sim {
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
         const all = state.tick % VIS_TICKS === 0 || state.bino !== before.bino || before.phase === 'prep';
         updateVisibility(state, init.terrain, init.weather, all);
-        updateIntel(state);
+        updateIntel(state, init.weather);
         for (const p of state.platoons) p.activity = activityOf(p, state.tick);
       }
       return { events: [], accepted };

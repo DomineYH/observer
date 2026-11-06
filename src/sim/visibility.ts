@@ -1,6 +1,6 @@
 // 가시 여부 (PRD 5.3, demo lines 536–552): the simulation decides what the observer can see, from the line of sight,
 // the angular size and the visibility. Screen size and render quality play no part.
-import { exp } from './math';
+import { cos, exp, sin } from './math';
 import { EYE_HEIGHT, heightAt, lineOfSight, type TerrainData } from './terrain';
 import type { FieldEffect, Member, SimState, Weather } from './types';
 
@@ -11,9 +11,19 @@ const LOS_AT = 0.85; // the sight line must reach this fraction of the target's 
 const HEIGHT: Record<Member['kind'], number> = { man: 1.7, veh: 2.3, tube: 1.0 };
 const PRONE_M = 0.45;
 
-const effSize = (e: FieldEffect, age: number) => (e.kind === 'muzzle' ? (e.small ? 1.5 : 3) : 3) + age * 1.6;
-/** Top of the dust or smoke `age` seconds after it was made: what the sight line must reach, and where it is drawn. */
-export const effectTop = (e: Pick<FieldEffect, 'kind' | 'gz' | 'small'>, age: number) => e.gz + (e.kind === 'muzzle' ? 1 + age * (e.small ? 1.2 : 5) : 3);
+/** Where a dust cloud or smoke puff is at `tick` (demo drawing, lines 1162–1176): its centre, carried downwind
+ * (dust at 80% of the wind) and rising, and its radius, m. It is drawn, seen, pressed and watched there. */
+export function signalAt(e: Pick<FieldEffect, 'kind' | 'x' | 'y' | 'gz' | 'small' | 'tick'>, tick: number, w: Weather) {
+  const age = (tick - e.tick) * 0.05;
+  const to = ((w.windFromDeg + 180) * Math.PI) / 180; // the wind blows towards `windFromDeg` + 180°
+  const drift = (w.windSpeedTenthMs / 10) * age * (e.kind === 'dust' ? 0.8 : 1);
+  return {
+    x: e.x + sin(to) * drift,
+    y: e.y + cos(to) * drift,
+    z: e.kind === 'dust' ? e.gz + 1.5 + age * 0.8 : e.gz + 1 + age * (e.small ? 1.2 : 5),
+    r: (e.kind === 'dust' ? 3 : e.small ? 1.2 : 2.5) + age * 1.6,
+  };
+}
 
 /** Recomputes 보임 for every member (`all`) or only for effects made this tick. */
 export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: boolean): void {
@@ -37,7 +47,7 @@ export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: b
     }
   for (const e of s.effects) {
     if (!all && e.tick !== s.tick) continue;
-    const age = (s.tick - e.tick) * 0.05;
-    e.vis = visOf(e.x, e.y, effSize(e, age), effectTop(e, age));
+    const c = signalAt(e, s.tick, w);
+    e.vis = visOf(c.x, c.y, c.r, c.z); // the radius stands for its size, as in the demo; the sight line ends at its centre
   }
 }

@@ -62,6 +62,15 @@ describe('F-27', () => {
     const phases = (l: Sprite[]) => l.map((s) => s.ph).sort((x, y) => x - y);
     phases(b).forEach((ph, i) => expect(ph - phases(a)[i]!).toBeCloseTo(0.05 * 2 * 3, 9));
 
+    // Running: from 900 m the platoon assaults, and its legs move at the running pace (2.8 × 3 rad/s).
+    until(inf, () => inf.state.platoons[0]!.state === 'assault');
+    run(inf, 6);
+    const c = sprites(inf);
+    expect(c.length).toBeGreaterThan(0);
+    expect(c.every((s) => s.moving && !s.prone)).toBe(true);
+    inf.step([]);
+    phases(sprites(inf)).forEach((ph, i) => expect(ph - phases(c)[i]!).toBeCloseTo(0.05 * 2.8 * 3, 9));
+
     // Lying down comes from the state: the holding recon shows one man up and three prone, standing still.
     const short = [
       { x: 320, y: 1400 },
