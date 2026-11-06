@@ -2,7 +2,7 @@ import { Hasher } from './hash';
 import { validInput } from './inputs';
 import { createSim } from './sim';
 import type { TerrainData } from './terrain';
-import type { ReplayData, ReplayResult } from './types';
+import type { ReplayData, ReplayResult, Scenario } from './types';
 import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
@@ -88,10 +88,13 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
   }
 }
 
-/** 재생기: a pure test tool. Records of another simVersion are not replayed. The terrain is regenerated from the seed by the caller. */
-export function replay(d: ReplayData, terrain: TerrainData): ReplayResult {
+/** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller regenerates the terrain from the
+ * seed and passes the scenario the header names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit at t 0. */
+export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
-  const sim = createSim({ ...d, terrain });
+  if (scenario.id !== d.scenario.id || scenario.version !== d.scenario.version)
+    throw new Error(`scenario ${scenario.id}@${scenario.version} is not the header's ${d.scenario.id}@${d.scenario.version}`);
+  const sim = createSim({ ...d, scenario, terrain });
   const chain = new Hasher();
   const checkpoints: ReplayResult['checkpoints'] = [];
   let ignored = 0;
@@ -100,6 +103,7 @@ export function replay(d: ReplayData, terrain: TerrainData): ReplayResult {
     const start = i;
     while (i < d.inputs.length && d.inputs[i]!.t === t) i++;
     for (const ok of sim.step(d.inputs.slice(start, i)).accepted) if (!ok) ignored++;
+    if (sim.state.tick !== t + 1) throw new Error(`replay: game not started at tick 0 (tick ${t} did not advance)`);
     const hash = sim.hash();
     chain.u32(parseInt(hash.slice(0, 8), 16));
     chain.u32(parseInt(hash.slice(8), 16));

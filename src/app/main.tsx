@@ -1,29 +1,31 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createSim, EYE_HEIGHT, heightAt } from '@sim';
+import { createSim } from '@sim';
 import type { RadioUtterance } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO, PLANNED_OP } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenario';
 import { terrainColours } from '@render/shade';
 import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
+import { PrepPanel } from '@ui/PrepPanel';
 import { RadioLog } from '@ui/RadioLog';
 import { TickCounter } from '@ui/TickCounter';
 import { selectBackend } from './backend';
 import { CLEAR_WEATHER } from './clearWeather';
 import { startLoop } from './loop';
+import { chooseSeed } from './seed';
 import { createSession } from './session';
 
 selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
-// Fixed daily seed until the seed slice brings the KST daily-seed function.
-const seed = 20261106;
+// The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
+const { seed, seedKind } = chooseSeed(location.search, Date.now());
 const terrain = await mockTerrain.load(seed);
 const sim = createSim({
   seed,
-  seedKind: 'daily',
+  seedKind,
   scenario: BASE_SCENARIO,
   guns: BASE_GUNS,
   weather: CLEAR_WEATHER,
@@ -52,8 +54,6 @@ startLoop(session.step, (now) => {
   listeners.forEach((l) => l());
 });
 
-// Until the 작전 준비 slice, the view looks from the planned observation post.
-const eye = { ...PLANNED_OP, z: heightAt(terrain, PLANNED_OP.x, PLANNED_OP.y) + EYE_HEIGHT };
 const colours = terrainColours(terrain, CLEAR_WEATHER);
 const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사람 검수용 fps 표시
 
@@ -71,6 +71,11 @@ const EXAMPLE: RadioUtterance[] = [
 
 function App() {
   const tick = useSyncExternalStore(subscribe, () => sim.state.tick);
+  // The simulation replaces these objects when they change, so their identity is a valid snapshot.
+  const phase = useSyncExternalStore(subscribe, () => sim.state.phase);
+  const op = useSyncExternalStore(subscribe, () => sim.state.op);
+  const picked = useSyncExternalStore(subscribe, () => sim.state.picked);
+  const reportDue = useSyncExternalStore(subscribe, () => sim.state.reportDue);
   return (
     <>
       <TickCounter tick={tick} />
@@ -78,13 +83,21 @@ function App() {
         terrain={terrain}
         colours={colours}
         weather={CLEAR_WEATHER}
-        eye={eye}
         state={sim.state}
         send={session.send}
         onFrame={onFrame}
         showFps={showFps}
       />
-      <MapPanel terrain={terrain} />
+      <PrepPanel
+        state={{ phase, op, picked, reportDue }}
+        scenario={BASE_SCENARIO}
+        grid={terrain.grid}
+        seed={seed}
+        seedKind={seedKind}
+        weather={CLEAR_WEATHER}
+        send={session.send}
+      />
+      <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={session.send} onFrame={onFrame} />
       <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
     </>
   );

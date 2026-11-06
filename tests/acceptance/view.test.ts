@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createSim, replay, SIM_VERSION, validateReplay } from '@sim';
+import { createSim, replay, validateReplay } from '@sim';
 import type { Input } from '@sim';
 import { CLEAR_WEATHER } from '@app/clearWeather';
 import { createSession } from '@app/session';
@@ -7,7 +7,8 @@ import { fovOf, pxToMil, QUALITIES } from '@render/projection';
 import { createAimControl } from '@ui/aim';
 import { terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
-import { init } from './init';
+import { BASE_SCENARIO } from '@content/scenario';
+import { init, replayData, START } from './init';
 import { flatTerrain } from './terrain';
 
 const terrain = flatTerrain();
@@ -68,9 +69,10 @@ test('F-03: 조준과 쌍안경 입력', () => {
 });
 
 test('입력 기록: 받아들인 입력만 남긴다', () => {
-  const { terrain: t, ...header } = init(9);
-  const sim = createSim({ ...header, terrain: t });
+  const { terrain: t, ...rest } = init(9);
+  const sim = createSim({ ...rest, terrain: t });
   const session = createSession(sim);
+  session.send(START);
   session.step();
   session.send({ a: 'cam', v: [500, 10] });
   session.send({ a: 'cam', v: [500, 9999] }); // out of range: ignored
@@ -81,17 +83,18 @@ test('입력 기록: 받아들인 입력만 남긴다', () => {
   session.step();
   session.step();
   expect(session.log).toEqual([
+    { t: 0, ...START },
     { t: 1, a: 'cam', v: [500, 10] },
     { t: 3, a: 'bino', v: [1] },
   ]);
 
   // The log replays with nothing ignored, to the same state.
-  const data = { format: 1, simVersion: SIM_VERSION, ...header, stepMs: 50, inputs: [...session.log], totalTicks: 5 };
+  const data = replayData([...session.log], 5, 9);
   const checked = validateReplay(data);
   if (!checked.ok) throw new Error(checked.error);
-  const r = replay(checked.data, t);
+  const r = replay(checked.data, t, BASE_SCENARIO);
   expect(r.ignored).toBe(0);
-  const twin = createSim({ ...header, terrain: t });
+  const twin = createSim({ ...rest, terrain: t });
   for (let i = 0; i < 5; i++) twin.step(data.inputs.filter((x) => x.t === i));
   expect(twin.hash()).toBe(sim.hash());
   expect(r.record).toEqual(sim.record());

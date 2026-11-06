@@ -1,5 +1,6 @@
 // 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
-import { COVER, fromGrid, toGrid, type TerrainData } from '@sim';
+import { COVER, fromGrid, toGrid, type Point, type Scenario, type TerrainData } from '@sim';
+import { FULL_VIEW, projector, type MapView } from './mapView';
 
 const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
   open: [152, 138, 84],
@@ -39,23 +40,24 @@ export function mapBase(t: TerrainData): Uint8ClampedArray {
 export interface GridLine {
   axis: 'e' | 'n';
   at: number; // 국지 좌표 of the line, m
-  label: string; // the two kilometre digits
+  label: string; // the two kilometre digits; empty on 100 m lines
 }
 
-/** 1 km 방안선 inside the map, placed and labelled with the conversion pair. */
-export function gridLines(t: TerrainData): GridLine[] {
+/** 방안선 every `step` m (1000 or 100) inside the map, placed and labelled with the conversion pair. */
+export function gridLines(t: TerrainData, step: 1000 | 100 = 1000): GridLine[] {
   const size = t.n * t.cell;
   const first = toGrid(0, 0, t.grid);
   const last = toGrid(size, size, t.grid);
   const lines: GridLine[] = [];
-  const label = (km: number) => String(km % 100).padStart(2, '0');
+  const d = step / 10; // in 8자리 digits
+  const label = (digits: number) => (digits % 100 === 0 ? String((digits / 100) % 100).padStart(2, '0') : '');
   // fromGrid gives a 10 m square's centre; the line is its south-west edge.
-  for (let km = Math.ceil(first.e / 100); km <= Math.floor(last.e / 100); km++)
-    lines.push({ axis: 'e', at: fromGrid(km * 100, 0, t.grid).x - 5, label: label(km) });
-  for (let km = Math.ceil(first.n / 100); km <= Math.floor(last.n / 100); km++)
-    lines.push({ axis: 'n', at: fromGrid(0, km * 100, t.grid).y - 5, label: label(km) });
+  for (let g = Math.ceil(first.e / d) * d; g <= last.e; g += d) lines.push({ axis: 'e', at: fromGrid(g, 0, t.grid).x - 5, label: label(g) });
+  for (let g = Math.ceil(first.n / d) * d; g <= last.n; g += d) lines.push({ axis: 'n', at: fromGrid(0, g, t.grid).y - 5, label: label(g) });
   return lines;
 }
+
+const FINE_ZOOM = 3; // 100 m 방안선 from ×3
 
 /** The map panel's size in CSS pixels; the whole terrain fits it. */
 export const MAP_PX = 512;
@@ -65,16 +67,29 @@ export type MapContext = Pick<
   CanvasRenderingContext2D,
   | 'imageSmoothingEnabled' | 'lineCap' | 'lineJoin' | 'lineWidth' | 'strokeStyle' | 'fillStyle' | 'font' | 'textAlign'
   | 'drawImage' | 'beginPath' | 'moveTo' | 'lineTo' | 'stroke' | 'fillText' | 'strokeText'
+  | 'setLineDash' | 'arc' | 'fill' | 'closePath' | 'fillRect' | 'strokeRect'
 >;
 
-/** Draws the map (demo drawMap, lines 1281–1310, units not yet): `base` holds mapBase's pixels, then roads, 방안선, 지명. */
-export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource): void {
+/** What the map marks on top of the terrain: the briefing, the post and where it looks. */
+export interface MapMarks {
+  scenario: Scenario;
+  op: Point;
+  az: number; // line of sight, 0.1 mil
+  fovMil: number;
+  pin: Point | null; // 좌표자
+}
+
+const SIGHT_M = 7000; // the 관측 시야 wedge's reach
+const TAU = Math.PI * 2;
+
+/** Draws the map (demo drawMap, lines 1281–1310) at a zoom and scroll: `base` holds mapBase's pixels, then roads,
+ * 방안선 and 지명. */
+export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, view: MapView = FULL_VIEW, marks?: MapMarks): void {
   const W = MAP_PX;
-  const k = W / (t.n * t.cell);
-  const mx = (x: number) => x * k;
-  const my = (y: number) => W - y * k;
-  c.imageSmoothingEnabled = true;
-  c.drawImage(base, 0, 0, W, W);
+  const { k, x: mx, y: my } = projector(t, view, W);
+  const span = t.n / view.z;
+  c.imageSmoothingEnabled = view.z < 2;
+  c.drawImage(base, view.x0, view.y0, span, span, 0, 0, W, W);
 
   c.lineCap = c.lineJoin = 'round';
   for (const [width, colour] of [[3.2, 'rgba(60,40,20,.75)'], [1.6, 'rgba(250,240,215,.95)']] as const) {
@@ -89,19 +104,20 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource):
 
   c.font = '9px monospace';
   c.lineWidth = 1;
-  c.strokeStyle = 'rgba(20,30,60,.5)';
   c.fillStyle = 'rgba(20,25,40,.85)';
-  for (const l of gridLines(t)) {
+  for (const l of gridLines(t, view.z >= FINE_ZOOM ? 100 : 1000)) {
     const p = Math.round(l.axis === 'e' ? mx(l.at) : my(l.at)) + 0.5;
+    if (p < -1 || p > W + 1) continue; // off the panel; the map's own edges (0.5, 512.5) stay
+    c.strokeStyle = l.label ? 'rgba(20,30,60,.5)' : 'rgba(20,30,60,.18)';
     c.beginPath();
     if (l.axis === 'e') {
       c.moveTo(p, 0);
       c.lineTo(p, W);
-      if (p < W - 12) c.fillText(l.label, p + 2, 9);
+      if (l.label && p < W - 12) c.fillText(l.label, p + 2, 9);
     } else {
       c.moveTo(0, p);
       c.lineTo(W, p);
-      if (p > 12) c.fillText(l.label, 2, p - 3);
+      if (l.label && p > 12) c.fillText(l.label, 2, p - 3);
     }
     c.stroke();
   }
@@ -116,5 +132,109 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource):
     const y = my(v.y + v.r) - 4;
     c.strokeText(v.name, x, y);
     c.fillText(v.name, x, y);
+  }
+  if (marks) drawMarks(c, marks, k, mx, my);
+}
+
+/** The briefing (demo drawIntelOverlay, 1235–1243) and the post (demo 1281–1293). */
+function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => number, my: (y: number) => number): void {
+  const W = MAP_PX;
+  const sc = m.scenario;
+  c.font = '10px monospace';
+  c.textAlign = 'start';
+  c.lineWidth = 1;
+  // 주요 감시 지역
+  sc.nais.forEach((a, i) => {
+    c.strokeStyle = 'rgba(200,90,20,.95)';
+    c.fillStyle = 'rgba(200,90,20,.08)';
+    c.setLineDash([4, 3]);
+    c.beginPath();
+    c.arc(mx(a.x), my(a.y), a.r * k, 0, TAU);
+    c.fill();
+    c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = 'rgba(110,40,0,.95)';
+    c.fillText(`NAI ${i + 1}`, mx(a.x) - 14, my(a.y) - a.r * k - 3);
+  });
+  // 예상 접근로, the likelier one bolder, with an arrowhead at the objective
+  for (const ir of sc.intelRoutes) {
+    const pts = sc.routes[ir.route];
+    c.strokeStyle = c.fillStyle = ir.conf === 'high' ? 'rgba(200,40,30,.8)' : 'rgba(200,40,30,.45)';
+    c.lineWidth = ir.conf === 'high' ? 2 : 1.4;
+    c.setLineDash([7, 4]);
+    c.beginPath();
+    pts.forEach((p, i) => (i ? c.lineTo(mx(p.x), my(p.y)) : c.moveTo(mx(p.x), my(p.y))));
+    c.stroke();
+    c.setLineDash([]);
+    const a = pts[pts.length - 2]!;
+    const b = pts[pts.length - 1]!;
+    const ang = Math.atan2(my(b.y) - my(a.y), mx(b.x) - mx(a.x));
+    c.beginPath();
+    c.moveTo(mx(b.x), my(b.y));
+    c.lineTo(mx(b.x) - 9 * Math.cos(ang - 0.4), my(b.y) - 9 * Math.sin(ang - 0.4));
+    c.lineTo(mx(b.x) - 9 * Math.cos(ang + 0.4), my(b.y) - 9 * Math.sin(ang + 0.4));
+    c.closePath();
+    c.fill();
+  }
+  c.lineWidth = 1;
+  // 아군 전선 (이동 한계선): crossing is allowed, but north of it the post risks being seen
+  const fy = my(sc.frontY);
+  c.fillStyle = 'rgba(226,96,74,.07)';
+  c.fillRect(0, 0, W, fy);
+  c.strokeStyle = 'rgba(60,110,200,.8)';
+  c.setLineDash([8, 4]);
+  c.beginPath();
+  c.moveTo(0, fy);
+  c.lineTo(W, fy);
+  c.stroke();
+  c.setLineDash([]);
+  c.fillStyle = 'rgba(20,40,110,.9)';
+  c.fillText('아군 전선 — 이북은 발각·피격 위험', W - 176, fy - 4);
+  // 관측 시야 부채꼴 and the line of sight
+  const ox = mx(m.op.x);
+  const oy = my(m.op.y);
+  const L = SIGHT_M * k;
+  const h = (m.az / 10 / 3200) * Math.PI;
+  const half = (m.fovMil / 2 / 3200) * Math.PI;
+  c.fillStyle = 'rgba(232,176,74,.16)';
+  c.strokeStyle = 'rgba(232,176,74,.8)';
+  c.beginPath();
+  c.moveTo(ox, oy);
+  c.lineTo(ox + Math.sin(h - half) * L, oy - Math.cos(h - half) * L);
+  c.lineTo(ox + Math.sin(h + half) * L, oy - Math.cos(h + half) * L);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.moveTo(ox, oy);
+  c.lineTo(ox + Math.sin(h) * L, oy - Math.cos(h) * L);
+  c.stroke();
+  // 아군 진지 and the post
+  c.fillStyle = '#62aee6';
+  c.strokeStyle = '#0c1a2a';
+  for (const f of sc.friends) {
+    c.fillRect(mx(f.x) - 7, my(f.y) - 4, 14, 8);
+    c.strokeRect(mx(f.x) - 7, my(f.y) - 4, 14, 8);
+  }
+  c.beginPath();
+  c.moveTo(ox, oy - 7);
+  c.lineTo(ox - 6, oy + 5);
+  c.lineTo(ox + 6, oy + 5);
+  c.closePath();
+  c.fill();
+  c.stroke();
+  c.fillStyle = '#0c1a2a';
+  c.fillText('OP', ox + 8, oy + 4);
+  if (m.pin) {
+    const x = mx(m.pin.x);
+    const y = my(m.pin.y);
+    c.strokeStyle = '#111';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(x - 8, y);
+    c.lineTo(x + 8, y);
+    c.moveTo(x, y - 8);
+    c.lineTo(x, y + 8);
+    c.stroke();
+    c.lineWidth = 1;
   }
 }

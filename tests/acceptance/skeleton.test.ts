@@ -1,17 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, SIM_VERSION, validateReplay } from '@sim';
-import type { ReplayData } from '@sim';
-import { init } from './init';
+import { BASE_SCENARIO } from '@content/scenario';
+import { init, replayData, START } from './init';
 
-const { terrain, ...header } = init(20261106); // terrain is not part of 재생 자료
-const replayData = (inputs: ReplayData['inputs'], totalTicks = 10): ReplayData => ({
-  format: 1,
-  simVersion: SIM_VERSION,
-  ...header,
-  stepMs: 50,
-  inputs,
-  totalTicks,
-});
+const { terrain } = init(20261106); // terrain is not part of 재생 자료
 
 const errorOf = (x: unknown) => {
   const r = validateReplay(x);
@@ -25,9 +17,10 @@ describe('뼈대', () => {
     const other = createSim(init(20261107));
     expect(a.hash()).toBe(b.hash());
     for (let tick = 1; tick <= 50; tick++) {
-      a.step([]);
-      b.step([]);
-      other.step([]);
+      const inputs = tick === 1 ? [START] : [];
+      a.step(inputs);
+      b.step(inputs);
+      other.step(inputs);
       expect(a.state.tick).toBe(tick);
       expect(a.hash()).toBe(b.hash());
       expect(other.hash()).not.toBe(a.hash());
@@ -72,9 +65,9 @@ describe('뼈대', () => {
     expect(errorOf(null)).not.toBeNull();
 
     // Replaying data that holds an input the simulation ignores counts it.
-    const r = replay(replayData([{ t: 2, a: 'zz' }]), terrain);
+    const r = replay(replayData([{ t: 0, ...START }, { t: 2, a: 'zz' }]), terrain, BASE_SCENARIO);
     expect(r.ignored).toBe(1);
     expect(r.record.ticks).toBe(10);
-    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 }, terrain)).toThrow(/simVersion/);
+    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 }, terrain, BASE_SCENARIO)).toThrow(/simVersion/);
   });
 });

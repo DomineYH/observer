@@ -8,6 +8,8 @@ type Range = readonly [min: number, max: number];
 const FORMATS = new Map<string, readonly Range[]>([
   ['cam', [[0, 63999], [-2000, 2000]]], // 조준: 방위 · 고저, 0.1 mil
   ['bino', [[0, 1]]], // 쌍안경: 끔 · 켬
+  ['pick', [[0, 99999], [0, 99999]]], // 관측소 후보 선정: 동 · 북 m (one 방안)
+  ['start', [[0, 99999], [0, 99999]]], // 작전 개시: 동 · 북 m
 ]);
 
 /** A known kind with exactly its values, each an integer in range. Kinds without values carry no `v`. */

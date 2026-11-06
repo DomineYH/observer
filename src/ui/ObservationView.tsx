@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawOverlay } from '@render/overlay';
-import { DEFAULT_QUALITY, QUALITIES, type Eye, type Quality } from '@render/projection';
+import { DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality } from '@render/projection';
 import type { TerrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { createAimControl } from './aim';
@@ -14,7 +14,6 @@ export interface ObservationViewProps {
   terrain: TerrainData;
   colours: TerrainColours;
   weather: Weather;
-  eye: Eye;
   /** The simulation's read-only state, read every frame. */
   state: ReadonlySimState;
   send: (input: Input) => void;
@@ -23,7 +22,7 @@ export interface ObservationViewProps {
   showFps: boolean;
 }
 
-export function ObservationView({ terrain, colours, weather, eye, state, send, onFrame, showFps }: ObservationViewProps) {
+export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps }: ObservationViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [bino, setBino] = useState(state.bino);
@@ -53,8 +52,18 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
       }
       const on = aim.bino();
       setBino(on);
+      if (state.phase === 'prep') {
+        // Before the post is occupied the view stays dark (demo 1194); the candidate preview is a later slice.
+        c.fillStyle = '#0b0e0a';
+        c.fillRect(0, 0, W, H);
+        c.fillStyle = '#8b947c';
+        c.textAlign = 'center';
+        c.font = `${Math.round(14 * dpr)}px monospace`;
+        c.fillText('관측소 점령 전 — 지도와 첩보로 판단하십시오', W / 2, H / 2);
+        return;
+      }
       const a = aim.aim();
-      const geom = renderView(buf, terrain, colours, eye, a, on, weather);
+      const geom = renderView(buf, terrain, colours, eyeAt(terrain, state.op), a, on, weather);
       lctx.putImageData(image, 0, 0);
       c.imageSmoothingEnabled = false;
       c.drawImage(low, 0, 0, W, H);
@@ -68,7 +77,7 @@ export function ObservationView({ terrain, colours, weather, eye, state, send, o
       }
       drawOverlay(c, geom.focal, W / buf.w, a, on, dpr, fps);
     });
-  }, [quality, terrain, colours, weather, eye, state, aim, onFrame, showFps]);
+  }, [quality, terrain, colours, weather, state, aim, onFrame, showFps]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

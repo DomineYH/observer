@@ -1,6 +1,6 @@
 // The observation view's one projection (demo lines 320–327, 377): every pixel ↔ angle conversion, the reticle and
 // the azimuth tape use these functions, so a mil read on the scale is a mil in the drawn terrain.
-import type { Point } from '@sim';
+import { EYE_HEIGHT, heightAt, type Point, type TerrainData } from '@sim';
 
 /** Mils per radian (6400 mils in a circle). */
 export const MIL = 3200 / Math.PI;
@@ -19,6 +19,8 @@ export const milToPx = (mil: number, focal: number): number => Math.tan(mil / MI
 export const pxToMil = (px: number, focal: number): number => Math.atan(px / focal) * MIL;
 
 export type Eye = Point & { z: number };
+/** The observer's eye standing at `p`. */
+export const eyeAt = (t: TerrainData, p: Point): Eye => ({ x: p.x, y: p.y, z: heightAt(t, p.x, p.y) + EYE_HEIGHT });
 /** Where the last frame was drawn from: what `project` needs. Pixels are the view's internal pixels. */
 export interface ViewGeometry {
   eye: Eye;

@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('스모크: 페이지가 뜨고 틱 수가 흐른다', async ({ page }) => {
+test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   await page.goto('/');
   const tick = page.getByRole('status', { name: '틱' });
   await expect(tick).toBeVisible();
-  const first = Number(await tick.textContent());
-  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(first);
+  // 작전 준비: the clock stands still.
+  await expect(tick).toHaveText('0');
+  await page.waitForTimeout(500);
+  await expect(tick).toHaveText('0');
   // 무전 기록 패널에 예시 문장이 보인다.
   await expect(page.getByRole('region', { name: '무전 기록' })).toContainText(
     '방향 넷칠둘공, 우로 여섯십, 줄이기 둘백, 효력사, 이상.',
@@ -21,6 +23,20 @@ test('스모크: 페이지가 뜨고 틱 수가 흐른다', async ({ page }) => 
     return seen.size;
   });
   expect(colours).toBeGreaterThan(8);
+
+  // 관측소 후보: pressing the map's centre picks it, then 작전 개시 starts the clock.
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  await expect(prep).toContainText('일일 ');
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3512');
+  await expect(tick).toHaveText('0');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+  const first = Number(await tick.textContent());
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(first);
+  // Not the planned post: 위치 보고 is required.
+  await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3512 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
 
   // 관측 화면: 화살표가 조준을, B가 쌍안경을 바꾼다
   const view = page.getByRole('img', { name: '관측 화면' });

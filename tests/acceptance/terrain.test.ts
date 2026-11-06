@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { COVER, terrainHash } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
-import { BATTERY } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenario';
 import { readGolden } from '../golden/golden';
 
 const SEED = 20261106;
@@ -55,7 +55,7 @@ describe('좌표', () => {
     const { e0, n0 } = terrain.grid;
     const size = terrain.n * terrain.cell;
     // 전장 전체: the map's corners and the 포대 off the map to the south
-    const battlefield = [{ x: 0, y: 0 }, { x: size, y: 0 }, { x: 0, y: size }, { x: size, y: size }, BATTERY];
+    const battlefield = [{ x: 0, y: 0 }, { x: size, y: 0 }, { x: 0, y: size }, { x: size, y: size }, BASE_SCENARIO.battery];
     for (const p of battlefield) {
       expect(e0 + p.x, `${p.x},${p.y}`).toBeGreaterThanOrEqual(0);
       expect(e0 + p.x, `${p.x},${p.y}`).toBeLessThanOrEqual(99999);

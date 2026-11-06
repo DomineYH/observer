@@ -3,6 +3,7 @@
 import { replay, terrainHash, type ReplayData } from '@sim';
 import { atan2, cos, exp, log, sin, tan } from '@sim/math';
 import { generateTerrain } from '@adapters/mock/terrain';
+import { BASE_SCENARIO } from '@content/scenario';
 import { evaluate } from '../math/bits';
 
 const goldens = import.meta.glob<{ replay: ReplayData }>('../golden/*.json', { eager: true, import: 'default' });
@@ -18,7 +19,7 @@ try {
     const file = path.split('/').pop()!;
     const t = generateTerrain(golden.replay.seed);
     hashes[file] = terrainHash(t);
-    results[file] = replay(golden.replay, t);
+    results[file] = replay(golden.replay, t, BASE_SCENARIO);
   }
   math.textContent = JSON.stringify(evaluate({ exp, log, sin, cos, tan, atan2 }));
   terrain.textContent = JSON.stringify(hashes);

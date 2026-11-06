@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { test } from 'vitest';
 import { replay, SIM_VERSION, terrainHash } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
+import { BASE_SCENARIO } from '@content/scenario';
 import { GOLDEN_DIR, readGolden, type Golden } from './golden';
 import { SCRIPTS } from './scripts';
 
@@ -18,7 +19,7 @@ for (const { file, replay: data } of SCRIPTS) {
       }
     }
     const terrain = generateTerrain(data.seed);
-    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain) };
+    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, BASE_SCENARIO) };
     writeFileSync(url, JSON.stringify(golden, null, 2) + '\n');
     console.log(`${file}: written for simVersion ${SIM_VERSION}`);
   });
