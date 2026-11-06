@@ -35,7 +35,7 @@ export interface SimInit {
   terrain: TerrainData;
 }
 
-/** 입력. Kinds are added by the slices that use them; until then every kind is unknown. */
+/** 입력. The kinds and their values are listed in inputs.ts; anything else is ignored. */
 export interface Input {
   a: string;
   v?: readonly number[];
@@ -53,6 +53,9 @@ export interface SimState {
   tick: number;
   mode: Mode;
   score: number;
+  /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */
+  aim: { az: number; el: number };
+  bino: boolean;
   rng: Record<StreamName, { a: number; count: number }>;
 }
 

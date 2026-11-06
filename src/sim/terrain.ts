@@ -4,6 +4,9 @@ import { Hasher } from './hash';
 export const COVER = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'] as const;
 export type Cover = (typeof COVER)[number];
 
+/** The observer's eye above the ground at the observation post, m (demo `EYE_H`: standing, binoculars on a tripod). */
+export const EYE_HEIGHT = 3.5;
+
 /** 국지 좌표 in meters: x east, y north. */
 export interface Point {
   x: number;

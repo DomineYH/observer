@@ -40,7 +40,7 @@ describe('뼈대', () => {
     const twin = createSim(init(7));
     expect(sim.step([]).accepted).toEqual([]);
     twin.step([]);
-    // No input kinds exist in the skeleton: every input is reported and ignored, and changes nothing.
+    // Unknown kinds are reported and ignored, and change nothing.
     const result = sim.step([{ a: 'zz' }, { a: 'yy', v: [1] }]);
     twin.step([]);
     expect(result.accepted).toEqual([false, false]);
@@ -49,16 +49,19 @@ describe('뼈대', () => {
   });
 
   test('뼈대: 재생 자료 형식 검사', () => {
-    const valid = replayData([{ t: 0, a: 'zz' }, { t: 3, a: 'zz', v: [1, -2] }, { t: 3, a: 'yy' }, { t: 9, a: 'zz' }]);
+    const valid = replayData([{ t: 0, a: 'bino', v: [1] }, { t: 3, a: 'cam', v: [1, -2] }, { t: 3, a: 'bino', v: [0] }, { t: 9, a: 'cam', v: [63999, 2000] }]);
     expect(validateReplay(valid)).toEqual({ ok: true, data: valid });
 
     // Ticks must not decrease and must stay below the total tick count.
-    expect(errorOf(replayData([{ t: 3, a: 'zz' }, { t: 2, a: 'zz' }]))).toMatch(/tick/);
-    expect(errorOf(replayData([{ t: 10, a: 'zz' }]))).toMatch(/tick/);
-    expect(errorOf(replayData([{ t: -1, a: 'zz' }]))).toMatch(/tick/);
+    const bino = { a: 'bino', v: [1] };
+    expect(errorOf(replayData([{ t: 3, ...bino }, { t: 2, ...bino }]))).toMatch(/tick/);
+    expect(errorOf(replayData([{ t: 10, ...bino }]))).toMatch(/tick/);
+    expect(errorOf(replayData([{ t: -1, ...bino }]))).toMatch(/tick/);
 
-    // Integers, enums and integer arrays only.
-    expect(errorOf(replayData([{ t: 1, a: 'zz', v: [0.5] }]))).not.toBeNull();
+    // Integers, enums and integer arrays only; each kind with exactly its values, in range.
+    expect(errorOf(replayData([{ t: 1, a: 'cam', v: [0.5, 0] }]))).not.toBeNull();
+    for (const bad of [{ a: 'zz' }, { a: 'cam', v: [1] }, { a: 'cam', v: [64000, 0] }, { a: 'cam', v: [0, -2001] }, { a: 'bino' }, { a: 'bino', v: [2] }])
+      expect(errorOf(replayData([{ t: 1, ...bad }]))).toMatch(/inputs\[0\]/);
     expect(errorOf({ ...valid, format: 2 })).not.toBeNull();
     expect(errorOf({ ...valid, stepMs: 16 })).not.toBeNull();
     expect(errorOf({ ...valid, mode: 'hard' })).not.toBeNull();

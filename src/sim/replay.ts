@@ -1,4 +1,5 @@
 import { Hasher } from './hash';
+import { validInput } from './inputs';
 import { createSim } from './sim';
 import type { TerrainData } from './terrain';
 import type { ReplayData, ReplayResult } from './types';
@@ -72,10 +73,11 @@ function check(x: unknown): asserts x is ReplayData {
       if (!Array.isArray(input.v)) fail(`${what}.v: integer array expected`);
       (input.v as unknown[]).forEach((n, j) => int(n, INT32_MIN, INT32_MAX, `${what}.v[${j}]`));
     }
+    if (!validInput(input.a as string, input.v)) fail(`${what}: unknown kind or bad value`);
   });
 }
 
-/** 재생 자료 형식 검사. Input kinds are not checked until the first kind exists. */
+/** 재생 자료 형식 검사, including each input's kind and values. */
 export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { ok: false; error: string } {
   try {
     check(x);
