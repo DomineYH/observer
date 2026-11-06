@@ -1,0 +1,46 @@
+{
+  "replay": {
+    "format": 1,
+    "simVersion": 1,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "scenario": {
+      "id": "base",
+      "version": 1
+    },
+    "guns": {
+      "id": "base",
+      "version": 1
+    },
+    "weather": {
+      "visibilityM": 24000,
+      "cloudPct": 15,
+      "windFromDeg": 285,
+      "windSpeedTenthMs": 26,
+      "tempTenthC": 94,
+      "precipTenthMmH": 0,
+      "pressureHpa": 1023,
+      "humidityPct": 48
+    },
+    "mode": "standard",
+    "stepMs": 50,
+    "inputs": [],
+    "totalTicks": 400
+  },
+  "record": {
+    "ticks": 400,
+    "score": 0
+  },
+  "ignored": 0,
+  "chain": "2ee0551778b9d86a",
+  "checkpoints": [
+    {
+      "tick": 200,
+      "hash": "531747bf26624d56"
+    },
+    {
+      "tick": 400,
+      "hash": "996848f8df1c1e9d"
+    }
+  ]
+}
