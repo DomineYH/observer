@@ -1,24 +1,28 @@
-import { STEP_MS, type Sim } from '@sim';
+import { STEP_MS } from '@sim';
 
-const STEP_S = STEP_MS / 1000;
-const MAX_FRAME_S = 0.1; // longer frames lose the extra real time
+const MAX_FRAME_MS = 100; // longer frames lose the extra real time
 const MAX_STEPS = 40; // safety net per frame
 
-/** Fixed-step frame loop (demo lines 1322–1346). Pausing is simply not calling step. Returns a stop function. */
-export function startLoop(sim: Sim, onFrame: (now: number) => void): () => void {
+/** How many ticks this frame runs (demo lines 1336–1338): `acc` carries the real time not yet stepped. */
+export function frameSteps(acc: { ms: number }, dtMs: number): number {
+  acc.ms += Math.max(0, Math.min(MAX_FRAME_MS, dtMs)); // the first frame can be stamped before the loop started
+  let n = 0;
+  while (acc.ms >= STEP_MS && n < MAX_STEPS) {
+    acc.ms -= STEP_MS;
+    n++;
+  }
+  if (n >= MAX_STEPS) acc.ms = 0;
+  return n;
+}
+
+/** Fixed-step frame loop. Pausing is simply not calling step. Returns a stop function. */
+export function startLoop(step: () => void, onFrame: (now: number) => void): () => void {
   let last = performance.now();
-  let acc = 0;
+  const acc = { ms: 0 };
   let id = 0;
   const frame = (now: number) => {
-    acc += Math.min(MAX_FRAME_S, (now - last) / 1000);
+    for (let n = frameSteps(acc, now - last); n > 0; n--) step();
     last = now;
-    let n = 0;
-    while (acc >= STEP_S && n < MAX_STEPS) {
-      sim.step([]);
-      acc -= STEP_S;
-      n++;
-    }
-    if (n >= MAX_STEPS) acc = 0;
     onFrame(now);
     id = requestAnimationFrame(frame);
   };

@@ -21,4 +21,28 @@ test('스모크: 페이지가 뜨고 틱 수가 흐른다', async ({ page }) => 
     return seen.size;
   });
   expect(colours).toBeGreaterThan(8);
+
+  // 관측 화면: 화살표가 조준을, B가 쌍안경을 바꾼다
+  const view = page.getByRole('img', { name: '관측 화면' });
+  await expect(view).toBeVisible();
+  const pixels = () =>
+    view.evaluate((c: HTMLCanvasElement) => {
+      const ctx = c.getContext('2d')!;
+      const out: string[] = [];
+      for (let y = c.height * 0.3; y < c.height; y += c.height / 8)
+        for (let x = c.width / 16; x < c.width; x += c.width / 8) out.push(ctx.getImageData(x | 0, y | 0, 1, 1).data.join());
+      return out.join(';');
+    });
+  await expect.poll(async () => new Set((await pixels()).split(';')).size).toBeGreaterThan(4); // terrain is drawn
+  const before = await pixels();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(pixels).not.toBe(before);
+  const bino = page.getByRole('button', { name: '쌍안경' });
+  await expect(bino).toHaveAttribute('aria-pressed', 'false');
+  const eye = await pixels();
+  await page.keyboard.press('b');
+  await expect(bino).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(pixels).not.toBe(eye);
+  await page.keyboard.press('b');
+  await expect(bino).toHaveAttribute('aria-pressed', 'false');
 });
