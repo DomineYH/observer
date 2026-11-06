@@ -1,6 +1,7 @@
 // 실제 배치 (demo makePlatoons, lines 420–447): the seed decides the enemy's routes, the mortar's spot and every
 // member's place in its formation, all from the scenario stream when the simulation is created.
 // Draw order: route choices in unit order, then the mortar's spot, then each unit's members and route jitter.
+import { layout } from './enemy';
 import { gauss, next, type Stream } from './rng';
 import { heightAt, surfaceAt, type Point, type TerrainData } from './terrain';
 import type { Member, Platoon, RouteKey, Scenario } from './types';
@@ -9,7 +10,8 @@ const TAU = Math.PI * 2;
 const MORTAR_TRIES = 40;
 const CANOPY_M = 3; // the mortar sits in the open: surface no more than this above the ground
 
-const member = (s: Stream, kind: Member['kind'], u: number, v: number, uc = u, vc = v): Member => ({ kind, u, v, uc, vc, ph: next(s) * TAU });
+// `x, y` are placed by `layout` and `vis` by the visibility pass.
+const member = (s: Stream, kind: Member['kind'], u: number, v: number, uc = u, vc = v): Member => ({ kind, u, v, uc, vc, ph: next(s) * TAU, x: 0, y: 0, prone: false, vis: false });
 
 function members(s: Stream, type: Platoon['type']): Member[] {
   const out: Member[] = [];
@@ -54,6 +56,25 @@ export function deploy(sc: Scenario, t: TerrainData, s: Stream): Platoon[] {
     const route = routes[i] ?? null;
     const path = route ? sc.routes[route].map((p) => ({ x: p.x + gauss(s) * 30, y: p.y + gauss(s) * 30 })) : [];
     const at = path[0] ?? spots[i]!;
-    return { type: u.type, route, path, x: at.x, y: at.y, members: ms };
+    const p: Platoon = {
+      type: u.type,
+      route,
+      path,
+      x: at.x,
+      y: at.y,
+      members: ms,
+      state: 'wait',
+      t0: Math.round(u.t0 * 20),
+      wp: 1,
+      dir: u.type === 'mortar' ? Math.PI : 0, // the mortar faces south, the rest north until they move
+      form: u.type === 'inf' ? 0 : 1, // infantry starts in its approach column
+      moving: false,
+      assaultTick: -1,
+      nextFire: 0,
+      lastFire: -1,
+      dustTick: 0,
+    };
+    layout(p, 0, 0);
+    return p;
   });
 }

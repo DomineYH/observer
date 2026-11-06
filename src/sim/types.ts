@@ -40,16 +40,48 @@ export interface Member {
   uc: number;
   vc: number;
   ph: number;
+  x: number; // where it stands now, from the unit's centre, heading and formation
+  y: number;
+  prone: boolean;
+  /** 보임: decided by the simulation every 6 ticks (가시선 · 각크기 · 시정). The renderer draws only these. */
+  vis: boolean;
 }
 
-/** 실제 배치 of one unit, decided by the seed when the simulation is created. */
+/** wait: before its start time · approach/assault: infantry on the move · hold: the recon at its post ·
+ * support: APCs halted and firing · emplaced: the mortar section. */
+export type PlatoonState = 'wait' | 'approach' | 'assault' | 'hold' | 'support' | 'emplaced';
+
+/** 실제 배치 of one unit, decided by the seed when the simulation is created, and how it moves since. */
 export interface Platoon {
   type: UnitType;
   route: RouteKey | null;
   path: Point[]; // the route as this unit walks it; empty for the mortar
-  x: number;
+  x: number; // centre of the unit
   y: number;
   members: Member[];
+  state: PlatoonState;
+  t0: number; // tick it sets off
+  wp: number; // index in `path` it is heading for
+  dir: number; // heading, radians east of north
+  form: number; // 0 approach column … 1 line
+  moving: boolean;
+  assaultTick: number; // tick the assault began, −1 before
+  nextFire: number; // tick of the next shot (APC, mortar)
+  lastFire: number; // tick of the last shot, −1 never
+  dustTick: number; // tick of the last dust cloud
+}
+
+/** 먼지 (a moving vehicle) or 사격 섬광·연기 (APC: `small`, mortar), seen like members. */
+export interface FieldEffect {
+  kind: 'dust' | 'muzzle';
+  x: number;
+  y: number;
+  gz: number; // height it starts from, m
+  tick: number; // made at
+  life: number; // ticks it lasts
+  pid: number; // index of the platoon that made it
+  small: boolean;
+  vis: boolean;
 }
 
 export type Phase = 'prep' | 'live';
@@ -101,6 +133,7 @@ export interface SimState {
   /** 위치 보고 required: the operation started away from the planned observation post. */
   reportDue: boolean;
   platoons: Platoon[];
+  effects: FieldEffect[]; // oldest first
   mode: Mode;
   score: number;
   /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */

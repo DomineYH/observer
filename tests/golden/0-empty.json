@@ -2,7 +2,7 @@
   "terrainHash": "069cd970fa0564a1",
   "replay": {
     "format": 1,
-    "simVersion": 4,
+    "simVersion": 5,
     "seed": 20261106,
     "seedKind": "daily",
     "scenario": {
@@ -42,15 +42,15 @@
     "score": 0
   },
   "ignored": 0,
-  "chain": "53a4d6ff06d48cea",
+  "chain": "dde87104cd1e6dbd",
   "checkpoints": [
     {
       "tick": 200,
-      "hash": "92d9394f5887783a"
+      "hash": "ffdaa8a9aeab8128"
     },
     {
       "tick": 400,
-      "hash": "40d18424029bcf6d"
+      "hash": "6e39153ee904772b"
     }
   ]
 }

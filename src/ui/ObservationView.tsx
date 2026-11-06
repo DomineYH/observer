@@ -2,10 +2,12 @@
 // and the 화질 buttons (demo lines 1185–1234, 1336–1342, 1370–1389). Panels never step the simulation.
 import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
+import { drawEffects } from '@render/effects';
 import { drawOverlay } from '@render/overlay';
-import { DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality } from '@render/projection';
-import type { TerrainColours } from '@render/shade';
-import { createViewBuffers, renderView } from '@render/voxel';
+import { DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
+import { atmosphere, type TerrainColours } from '@render/shade';
+import { drawSprites, spritesOf } from '@render/sprites';
+import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
 
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
@@ -41,6 +43,8 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
     let frames = 0;
     let since = 0;
     let fps: number | null = showFps ? 0 : null;
+    const fog = atmosphere(weather).fog;
+    const under = (b: ViewBuffers, g: ViewGeometry) => drawEffects(b, g, state, weather);
     return onFrame((now) => {
       const dpr = window.devicePixelRatio || 1;
       const r = view.getBoundingClientRect();
@@ -63,10 +67,11 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         return;
       }
       const a = aim.aim();
-      const geom = renderView(buf, terrain, colours, eyeAt(terrain, state.op), a, on, weather);
+      const geom = renderView(buf, terrain, colours, eyeAt(terrain, state.op), a, on, weather, under);
       lctx.putImageData(image, 0, 0);
       c.imageSmoothingEnabled = false;
       c.drawImage(low, 0, 0, W, H);
+      drawSprites(c, spritesOf(state, geom, terrain, weather), W / buf.w, on, dpr, fog); // only what the simulation sees
       if (fps !== null) {
         frames++;
         if (now - since >= 1000) {

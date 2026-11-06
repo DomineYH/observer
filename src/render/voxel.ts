@@ -25,7 +25,8 @@ const Z_MAX = 11500;
 const FOREST = COVER.indexOf('forest');
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
-/** Draws one frame of the observation view into `buf`; `aim` is in mils. Returns what `project` needs. */
+/** Draws one frame of the observation view into `buf`; `aim` is in mils. Returns what `project` needs.
+ * `under` paints into the buffer after the ridge lines and before the dot look, as the demo draws dust and smoke. */
 export function renderView(
   buf: ViewBuffers,
   t: TerrainData,
@@ -34,6 +35,7 @@ export function renderView(
   aim: { h: number; p: number },
   bino: boolean,
   weather: Weather,
+  under?: (buf: ViewBuffers, v: ViewGeometry) => void,
 ): ViewGeometry {
   const { w: VW, h: VH, pix32, ybuf, dbuf } = buf;
   const { n: N, cell: CELL, surface: SURF, ground: GROUND, buildings: BLD } = t;
@@ -127,9 +129,10 @@ export function renderView(
     z += bino ? (z < 9000 ? Math.max(3, Math.min(10, z * 0.0028)) : z * 0.004) : Math.max(1.2, z * 0.0072);
   }
   ridgeLines(buf, atm.sigma);
-  // Sprites (later slices) go here, before the dither.
+  const geom = { eye, h: aim.h, focal, cx: VW / 2, hor };
+  under?.(buf, geom);
   posterize(buf);
-  return { eye, h: aim.h, focal, cx: VW / 2, hor };
+  return geom;
 }
 
 /** A dark line where the distance jumps (ridge outlines). */

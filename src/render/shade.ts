@@ -3,7 +3,7 @@
 import { COVER, type TerrainData, type Weather } from '@sim';
 
 const C = Object.fromEntries(COVER.map((c, i) => [c, i])) as Record<(typeof COVER)[number], number>;
-type RGB = readonly [number, number, number];
+export type RGB = readonly [number, number, number];
 const ROOFS: readonly RGB[] = [[150, 72, 56], [72, 92, 132], [122, 122, 116], [82, 112, 92], [172, 104, 62], [196, 190, 178]];
 const FIELDS: readonly RGB[] = [[182, 162, 104], [164, 150, 92], [148, 126, 78]];
 
