@@ -72,3 +72,30 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await page.keyboard.press('b');
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
 });
+
+test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {
+  await page.goto('/?seed=20261106');
+  // On this seed the enemy mortar section digs in at about (5676, 7520) from the start. From an open post about
+  // 820 m south-east of it, (6450, 7250), six of its crew are seen by eye (found with a Node run of the simulation).
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: (box.width * 6450) / 10240, y: box.height * (1 - 7250 / 10240) } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  const tick = page.getByRole('status', { name: '틱' });
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+
+  // Aim at them by eye: from 20.4 mils, 6 × 200 and 3 × 20 mils left gives 5160.4; one 25 mil step up gives +3.
+  const view = page.getByRole('img', { name: '관측 화면' });
+  await view.focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.waitForTimeout(300); // a frame drawn with the new aim
+  const targets = page.getByRole('region', { name: '표적 목록' });
+  await expect(targets).not.toContainText('표적 1');
+  const v = (await view.boundingBox())!;
+  await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
+  await expect(targets).toContainText('표적 1 미상');
+  await expect(targets).toContainText('탐지 · 최초 탐지');
+});

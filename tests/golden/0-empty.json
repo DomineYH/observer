@@ -42,15 +42,15 @@
     "score": 0
   },
   "ignored": 0,
-  "chain": "dde87104cd1e6dbd",
+  "chain": "377908f373ed60a6",
   "checkpoints": [
     {
       "tick": 200,
-      "hash": "ffdaa8a9aeab8128"
+      "hash": "954242b0ca44c769"
     },
     {
       "tick": 400,
-      "hash": "6e39153ee904772b"
+      "hash": "a11862d7bcc2996a"
     }
   ]
 }

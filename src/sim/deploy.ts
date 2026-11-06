@@ -73,6 +73,8 @@ export function deploy(sc: Scenario, t: TerrainData, s: Stream): Platoon[] {
       nextFire: 0,
       lastFire: -1,
       dustTick: 0,
+      activity: 'halted',
+      intel: { stage: 0, tnum: 0, cue: null, prog: 0, seenMax: 0, tubes: 0, firstTick: -1, seenTick: -1, seenAz: 0, size: null },
     };
     layout(p, 0, 0);
     return p;

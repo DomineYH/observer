@@ -41,3 +41,10 @@ export function project(v: ViewGeometry, p: Eye): { sx: number; sy: number; fwd:
   const lat = rx * c - ry * s;
   return { sx: v.cx + (lat / fwd) * v.focal, sy: v.hor + ((v.eye.z - p.z) / fwd) * v.focal, fwd };
 }
+
+/** 식별 angles of a press `x, y` CSS pixels from the view's corner, `scale` internal pixels per CSS pixel (demo 1077):
+ * azimuth 0–63999 and elevation, in 0.1 mils. */
+export function angleAt(v: ViewGeometry, scale: number, x: number, y: number): { az: number; el: number } {
+  const az = Math.round((v.h + pxToMil(x * scale - v.cx, v.focal)) * 10);
+  return { az: ((az % 64000) + 64000) % 64000, el: Math.round(pxToMil(v.hor - y * scale, v.focal) * 10) };
+}

@@ -1,4 +1,4 @@
-import type { RadioEvent } from './radio';
+import type { Activity, RadioEvent, Unit } from './radio';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
 
@@ -69,6 +69,25 @@ export interface Platoon {
   nextFire: number; // tick of the next shot (APC, mortar)
   lastFire: number; // tick of the last shot, −1 never
   dustTick: number; // tick of the last dust cloud
+  activity: Activity; // what it is doing now, as the observer would report it
+  intel: Intel;
+}
+
+/** What the click that found a unit landed on: a man (tubes count as men), a vehicle, its dust or its fire. */
+export type Cue = 'man' | 'veh' | 'dust' | 'muzzle';
+
+/** 적정: what the observer has learnt about one unit. stage 0 unknown · 1 탐지 · 2 병종·활동 · 3 규모. */
+export interface Intel {
+  stage: 0 | 1 | 2 | 3;
+  tnum: number; // 표적 번호, from 1 in the order found; 0 before
+  cue: Cue | null;
+  prog: number; // time watched through the binoculars, in half-ticks (signals alone count half)
+  seenMax: number; // most men (or vehicles) seen at once; tubes apart
+  tubes: number;
+  firstTick: number; // −1 before it is found
+  seenTick: number; // last seen
+  seenAz: number; // mils from the observation post to the unit's centre when last seen
+  size: { unit: Unit; n: number } | null; // 규모, known from stage 3
 }
 
 /** 먼지 (a moving vehicle) or 사격 섬광·연기 (APC: `small`, mortar), seen like members. */
@@ -134,6 +153,7 @@ export interface SimState {
   reportDue: boolean;
   platoons: Platoon[];
   effects: FieldEffect[]; // oldest first
+  targets: number; // units found so far: the last 표적 번호 given
   mode: Mode;
   score: number;
   /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */

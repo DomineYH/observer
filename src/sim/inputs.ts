@@ -10,6 +10,7 @@ const FORMATS = new Map<string, readonly Range[]>([
   ['bino', [[0, 1]]], // 쌍안경: 끔 · 켬
   ['pick', [[0, 99999], [0, 99999]]], // 관측소 후보 선정: 동 · 북 m (one 방안)
   ['start', [[0, 99999], [0, 99999]]], // 작전 개시: 동 · 북 m
+  ['id', [[0, 63999], [-6000, 6000]]], // 식별: the pressed point's 방위 · 고저, 0.1 mil; the simulation picks the target
 ]);
 
 /** A known kind with exactly its values, each an integer in range. Kinds without values carry no `v`. */

@@ -11,6 +11,7 @@ import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel } from '@ui/PrepPanel';
 import { RadioLog } from '@ui/RadioLog';
+import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { selectBackend } from './backend';
 import { CLEAR_WEATHER } from './clearWeather';
@@ -99,6 +100,7 @@ function App() {
         queued={session.queued}
         live={sim.state}
       />
+      <TargetList platoons={sim.state.platoons} /* re-rendered with the tick above */ />
       <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={session.send} onFrame={onFrame} />
       <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
     </>

@@ -1,7 +1,8 @@
 // 상태 해시: every field of the state in a fixed order, floats as their bits. Never iterate object keys here.
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
-import type { FieldEffect, Member, Mode, Phase, PlatoonState, RouteKey, SimState, UnitType } from './types';
+import { ACTIVITIES, UNITS } from './radio';
+import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
 const PHASES: readonly Phase[] = ['prep', 'live'];
@@ -10,6 +11,7 @@ const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
 const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced'];
 const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle'];
+const CUES: readonly (Cue | null)[] = [null, 'man', 'veh', 'dust', 'muzzle'];
 const bit = (b: boolean) => (b ? 1 : 0);
 
 export function hashState(state: SimState): string {
@@ -53,6 +55,19 @@ export function hashState(state: SimState): string {
     h.i32(p.nextFire);
     h.i32(p.lastFire);
     h.i32(p.dustTick);
+    h.u32(ACTIVITIES.indexOf(p.activity));
+    const I = p.intel;
+    h.u32(I.stage);
+    h.u32(I.tnum);
+    h.u32(CUES.indexOf(I.cue));
+    h.u32(I.prog);
+    h.u32(I.seenMax);
+    h.u32(I.tubes);
+    h.i32(I.firstTick);
+    h.i32(I.seenTick);
+    h.f64(I.seenAz);
+    h.u32(I.size ? UNITS.indexOf(I.size.unit) + 1 : 0);
+    h.u32(I.size ? I.size.n : 0);
   }
   h.u32(state.effects.length);
   for (const e of state.effects) {
@@ -66,6 +81,7 @@ export function hashState(state: SimState): string {
     h.u32(bit(e.small));
     h.u32(bit(e.vis));
   }
+  h.u32(state.targets);
   h.u32(MODES.indexOf(state.mode));
   h.i32(state.aim.az);
   h.i32(state.aim.el);

@@ -6,13 +6,17 @@ import { drawMap, mapBase, MAP_PX, type MapContext, type MapMarks } from '@rende
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain } from './terrain';
+import { angleTo, idAt, oneUnit, started } from './enemy';
 
 type Path = [number, number][];
 
 /** A 2D context that records the strokes and texts drawn on it. */
 function recorder() {
   let path: Path = [];
+  let dashed = false;
   const strokes: Path[] = [];
+  const dashes: Path[] = []; // the strokes drawn dashed
+  const arcs: [number, number][] = [];
   const texts: { text: string; x: number; y: number }[] = [];
   const rects: [number, number, number, number][] = [];
   const ctx: MapContext = {
@@ -30,17 +34,20 @@ function recorder() {
     },
     moveTo: (x, y) => void path.push([x, y]),
     lineTo: (x, y) => void path.push([x, y]),
-    stroke: () => void strokes.push(path),
+    stroke: () => {
+      strokes.push(path);
+      if (dashed) dashes.push(path);
+    },
     fillText: (text, x, y) => void texts.push({ text, x, y }),
     strokeText: () => {},
-    setLineDash: () => {},
-    arc: () => {},
+    setLineDash: (d) => void (dashed = [...d].length > 0),
+    arc: (x, y) => void arcs.push([x, y]),
     fill: () => {},
     closePath: () => {},
     fillRect: () => {},
     strokeRect: (x, y, w, h) => void rects.push([x, y, w, h]),
   };
-  return { ctx, strokes, texts, rects };
+  return { ctx, strokes, dashes, arcs, texts, rects };
 }
 
 const draw = (t: TerrainData, view?: MapView, marks?: MapMarks) => {
@@ -145,7 +152,7 @@ describe('F-06', () => {
 
   test('F-06: 관측 시야 부채꼴과 아군 진지', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m on the whole map
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard' };
     const { strokes, texts, rects } = draw(t, FULL_VIEW, marks);
     // The line of sight, due north 7 km from the post at (256, 422), inside the wedge.
     expect(strokes).toContainEqual([[256, 422], [256, 72]]);
@@ -156,5 +163,55 @@ describe('F-06', () => {
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
+  });
+
+  test('F-06: 표준은 방위각 선만', () => {
+    // A recon team 1 km north of the post, found by a press. 0.05 px/m: the post (320, 320) is drawn at (16, 496).
+    const t = flatTerrain({ n: 1024 });
+    const route = [
+      { x: 320, y: 1320 },
+      { x: 320, y: 2320 },
+      { x: 320, y: 3320 },
+    ];
+    const found = (mode: 'standard' | 'training') => {
+      const sim = started(oneUnit({ type: 'recon', route: 'A', t0: 0 }, route), { terrain: t, mode });
+      expect(sim.step([idAt(angleTo(sim, sim.state.platoons[0]!.members[0]!))]).accepted).toEqual([true]);
+      return sim;
+    };
+    const marks = (sim: ReturnType<typeof found>): MapMarks => ({
+      scenario: BASE_SCENARIO,
+      op: sim.state.op,
+      az: 0,
+      fovMil: 1066,
+      pin: null,
+      platoons: sim.state.platoons,
+      mode: sim.state.mode,
+    });
+
+    // 표준: where it is stays unknown; only the bearing it was last seen on, 7.5 km out from the post, dashed.
+    const std = found('standard');
+    const p = std.state.platoons[0]!;
+    const bearing = Math.atan2(p.x - 320, p.y - 320); // radians east of north
+    const s = draw(t, FULL_VIEW, marks(std));
+    const fromPost = (d: Path) => d.length === 2 && d[0]![0] === 16 && d[0]![1] === 496;
+    const line = s.dashes.find(fromPost)!;
+    expect(line[1]![0]).toBeCloseTo(16 + Math.sin(bearing) * 375, 2); // it walked on a tick after it was seen
+    expect(line[1]![1]).toBeCloseTo(496 - Math.cos(bearing) * 375, 2); // it walked on a tick after it was seen
+    const mils = String(Math.round(((bearing * 3200) / Math.PI + 6400) % 6400) % 6400).padStart(4, '0');
+    const label = s.texts.find((x) => x.text === `T1 ${mils}`)!;
+    expect(label.x).toBeCloseTo(16 + Math.sin(bearing) * 90 + 4, 2); // 1.8 km along the line
+    expect(label.y).toBeCloseTo(496 - Math.cos(bearing) * 90, 2);
+    const near = (x: number, y: number) => Math.hypot(x - p.x * 0.05, y - (512 - p.y * 0.05)) < 12;
+    expect(s.arcs.filter(([x, y]) => near(x, y))).toEqual([]);
+    expect(s.texts.filter((x) => near(x.x, x.y))).toEqual([]);
+
+    // 훈련: the unit where it really is, marked unknown until its type is identified, and no bearing line.
+    const tr = found('training');
+    const q = tr.state.platoons[0]!;
+    const at = [q.x * 0.05, 512 - q.y * 0.05] as const;
+    const r = draw(t, FULL_VIEW, marks(tr));
+    expect(r.arcs).toContainEqual([at[0], at[1]]);
+    expect(r.texts).toEqual(expect.arrayContaining([{ text: '?', x: at[0] - 3, y: at[1] + 3 }, { text: 'T1', x: at[0] + 9, y: at[1] + 3 }]));
+    expect(r.dashes.filter(fromPost)).toEqual([]);
   });
 });

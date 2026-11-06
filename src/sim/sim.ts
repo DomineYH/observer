@@ -1,5 +1,6 @@
 import { deploy } from './deploy';
 import { updatePlatoon } from './enemy';
+import { activityOf, applyId, updateIntel } from './intel';
 import { isValid } from './inputs';
 import { applyPrep } from './prep';
 import { createStreams } from './rng';
@@ -22,6 +23,7 @@ export function createSim(init: SimInit): Sim {
     reportDue: false,
     platoons: deploy(init.scenario, init.terrain, rng.scn),
     effects: [],
+    targets: 0,
     mode: init.mode,
     score: 0,
     aim: { ...INITIAL_AIM },
@@ -38,6 +40,7 @@ export function createSim(init: SimInit): Sim {
         const v = input.v!;
         if (input.a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
         else if (input.a === 'bino') state.bino = v[0] === 1;
+        else if (input.a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
         else if (input.a === 'pick' || input.a === 'start') return applyPrep(state, init.terrain, init.scenario.plannedOp, input.a, v);
         return true;
       });
@@ -48,6 +51,8 @@ export function createSim(init: SimInit): Sim {
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
         const all = state.tick % VIS_TICKS === 0 || state.bino !== before.bino || before.phase === 'prep';
         updateVisibility(state, init.terrain, init.weather, all);
+        updateIntel(state);
+        for (const p of state.platoons) p.activity = activityOf(p, state.tick);
       }
       return { events: [], accepted };
     },

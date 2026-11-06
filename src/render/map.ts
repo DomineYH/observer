@@ -1,5 +1,5 @@
 // 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
-import { COVER, fromGrid, toGrid, type Point, type Scenario, type TerrainData } from '@sim';
+import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType } from '@sim';
 import { FULL_VIEW, projector, type MapView } from './mapView';
 
 const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
@@ -70,16 +70,21 @@ export type MapContext = Pick<
   | 'setLineDash' | 'arc' | 'fill' | 'closePath' | 'fillRect' | 'strokeRect'
 >;
 
-/** What the map marks on top of the terrain: the briefing, the post and where it looks. */
+/** What the map marks on top of the terrain: the briefing, the post, where it looks and the targets found. */
 export interface MapMarks {
   scenario: Scenario;
   op: Point;
   az: number; // line of sight, 0.1 mil
   fovMil: number;
   pin: Point | null; // 좌표자
+  platoons: ReadonlySimState['platoons'];
+  mode: Mode;
 }
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
+const BEARING_M = 7500; // a target's bearing line, and where along it its label sits
+const BEARING_LABEL_M = 1800;
+const TYPE_MARK: Record<UnitType, string> = { inf: '보', recon: '보', apc: '장', mortar: '박' };
 const TAU = Math.PI * 2;
 
 /** Draws the map (demo drawMap, lines 1281–1310) at a zoom and scroll: `base` holds mapBase's pixels, then roads,
@@ -236,5 +241,50 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
     c.lineTo(x, y + 8);
     c.stroke();
     c.lineWidth = 1;
+  }
+  drawTargets(c, m, k, mx, my);
+}
+
+/** 표적 (demo 1294–1301). 표준: the position is unknown, so only the bearing it was last seen on from the post.
+ * 훈련: where it really is, a `?` until its type is identified. */
+function drawTargets(c: MapContext, m: MapMarks, k: number, mx: (x: number) => number, my: (y: number) => number): void {
+  const ox = mx(m.op.x);
+  const oy = my(m.op.y);
+  for (const p of m.platoons) {
+    const I = p.intel;
+    if (!I.stage) continue;
+    if (m.mode === 'standard') {
+      const a = (I.seenAz / 3200) * Math.PI;
+      c.strokeStyle = 'rgba(226,96,74,.75)';
+      c.setLineDash([5, 4]);
+      c.beginPath();
+      c.moveTo(ox, oy);
+      c.lineTo(ox + Math.sin(a) * BEARING_M * k, oy - Math.cos(a) * BEARING_M * k);
+      c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = '#300';
+      const az4 = String(Math.round(I.seenAz) % 6400).padStart(4, '0');
+      c.fillText(`T${I.tnum} ${az4}`, ox + Math.sin(a) * BEARING_LABEL_M * k + 4, oy - Math.cos(a) * BEARING_LABEL_M * k);
+      continue;
+    }
+    const x = mx(p.x);
+    const y = my(p.y);
+    c.fillStyle = '#e2604a';
+    c.strokeStyle = '#300';
+    if (I.stage < 2) {
+      c.beginPath();
+      c.arc(x, y, 5, 0, TAU);
+      c.fill();
+      c.stroke();
+      c.fillStyle = '#fff';
+      c.fillText('?', x - 3, y + 3);
+    } else {
+      c.fillRect(x - 7, y - 5, 14, 10);
+      c.strokeRect(x - 7, y - 5, 14, 10);
+      c.fillStyle = '#fff';
+      c.fillText(TYPE_MARK[p.type], x - 5, y + 4);
+    }
+    c.fillStyle = '#300';
+    c.fillText(`T${I.tnum}`, x + 9, y + 3);
   }
 }

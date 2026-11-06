@@ -1,15 +1,17 @@
 // 관측 화면: the voxel view drawn every frame, aimed by dragging and the arrow keys, 쌍안경 with B or its button,
-// and the 화질 buttons (demo lines 1185–1234, 1336–1342, 1370–1389). Panels never step the simulation.
+// the 화질 buttons, and a tap that names a target by its angles (demo lines 1185–1234, 1336–1342, 1370–1389).
+// Panels never step the simulation.
 import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
 import { drawOverlay } from '@render/overlay';
-import { DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
+import { angleAt, DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
 import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
 
+const TAP_PX = 5;
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 export interface ObservationViewProps {
@@ -30,6 +32,8 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
   const [bino, setBino] = useState(state.bino);
   // Made once: it starts from the simulation's aim and remembers the value it sent last.
   const [aim] = useState(() => createAimControl(state, send));
+  // The last frame drawn and its internal width: a tap is turned into angles against what was on screen.
+  const shown = useRef<{ geom: ViewGeometry; w: number } | null>(null);
 
   useEffect(() => {
     const view = ref.current!;
@@ -68,6 +72,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       }
       const a = aim.aim();
       const geom = renderView(buf, terrain, colours, eyeAt(terrain, state.op), a, on, weather, under);
+      shown.current = { geom, w: buf.w };
       lctx.putImageData(image, 0, 0);
       c.imageSmoothingEnabled = false;
       c.drawImage(low, 0, 0, W, H);
@@ -93,7 +98,8 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
     return () => document.removeEventListener('keydown', down);
   }, [aim]);
 
-  const drag = useRef<{ x: number; y: number } | null>(null);
+  // `travel`: how far the pointer has gone from where it went down, CSS pixels. Under 5 it is a tap, not a drag.
+  const drag = useRef<{ x0: number; y0: number; x: number; y: number; travel: number } | null>(null);
   return (
     <section aria-label="관측">
       <canvas
@@ -103,15 +109,25 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         style={{ display: 'block', width: '100%', maxWidth: 960, aspectRatio: '16 / 9', touchAction: 'none', cursor: 'crosshair', background: '#000' }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
-          drag.current = { x: e.clientX, y: e.clientY };
+          drag.current = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, travel: 0 };
         }}
         onPointerMove={(e) => {
           const d = drag.current;
           if (!d) return;
           aim.drag(e.clientX - d.x, e.clientY - d.y, e.currentTarget.getBoundingClientRect().width);
-          drag.current = { x: e.clientX, y: e.clientY };
+          d.x = e.clientX;
+          d.y = e.clientY;
+          d.travel = Math.max(d.travel, Math.hypot(d.x - d.x0, d.y - d.y0));
         }}
-        onPointerUp={() => (drag.current = null)}
+        onPointerUp={(e) => {
+          const d = drag.current;
+          drag.current = null;
+          const v = shown.current;
+          if (!d || d.travel >= TAP_PX || !v || state.phase !== 'live') return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const { az, el } = angleAt(v.geom, v.w / r.width, e.clientX - r.left, e.clientY - r.top);
+          send({ a: 'id', v: [az, el] }); // the simulation decides what, if anything, was pressed
+        }}
         onPointerCancel={() => (drag.current = null)}
       />
       <button type="button" aria-pressed={bino} onClick={() => aim.toggleBino()}>

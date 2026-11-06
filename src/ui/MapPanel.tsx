@@ -35,7 +35,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelPr
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, az: state.aim.az, fovMil: fovOf(state.bino), pin });
+    drawMap(c, terrain, base, view, { scenario, op: state.op, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode });
   }, [terrain, base, view, scenario, state, pin]);
 
   useEffect(() => {
