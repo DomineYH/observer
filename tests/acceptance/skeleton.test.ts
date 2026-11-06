@@ -63,6 +63,8 @@ describe('뼈대', () => {
     expect(errorOf({ ...valid, mode: 'hard' })).not.toBeNull();
     expect(errorOf({ ...valid, weather: { ...valid.weather, tempTenthC: 9.4 } })).not.toBeNull();
     expect(errorOf({ ...valid, extra: 1 })).not.toBeNull();
+    // The error does not depend on key order.
+    expect(errorOf({ ...valid, b: 1, a: 1 })).toBe(errorOf({ ...valid, a: 1, b: 1 }));
     expect(errorOf(null)).not.toBeNull();
 
     // Replaying data that holds an input the simulation ignores counts it.

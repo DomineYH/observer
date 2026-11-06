@@ -31,6 +31,17 @@ const BANNED: [string, string][] = [
   ['2 ** 3', 'no-restricted-syntax'],
   ['let x = 2; x **= 2', 'no-restricted-syntax'],
   ['for (const k in {}) k', 'no-restricted-syntax'],
+  // Key-order iteration, not only for...in.
+  ['const x = { a: 1 }; for (const k of Object.keys(x)) k', 'no-restricted-syntax'],
+  ['Object.values({ a: 1 }).reduce((s, v) => s + v, 0)', 'no-restricted-syntax'],
+  ['const e = [...Object.entries({})]; e', 'no-restricted-syntax'],
+  ['Object.getOwnPropertyNames({}).forEach(() => 0)', 'no-restricted-syntax'],
+  ['Reflect.ownKeys({}).map(String)', 'no-restricted-syntax'],
+  ['const O = Object; O.keys({})', 'no-restricted-syntax'],
+  // Math through an alias, destructuring or a computed member.
+  ['const m = Math; m.random()', 'no-restricted-syntax'],
+  ['const { random } = Math; random()', 'no-restricted-syntax'],
+  ["const k = 'random'; Math[k]()", 'no-restricted-syntax'],
 ];
 
 describe('린트', () => {
@@ -42,8 +53,13 @@ describe('린트', () => {
       // Outside the simulation the same code is allowed.
       expect(await rulesFor('src/app/__probe__.ts', `export {}; ${code};`), code).not.toContain(rule);
     }
-    const allowed = 'export const f = (a: number) => Math.imul(a, 3) + Math.sqrt(a) + Math.floor(a) + Math.fround(a) + Math.PI;';
-    expect(await rulesFor('src/sim/__probe__.ts', allowed)).toEqual([]);
+    const allowed = [
+      'export const f = (a: number) => Math.imul(a, 3) + Math.sqrt(a) + Math.floor(a) + Math.fround(a) + Math.PI;',
+      'export const g = (a: number) => Math.ceil(a) + Math.round(a) + Math.trunc(a) + Math.abs(a) + Math.min(a, 1) + Math.max(a, 1) + Math.sign(a) + Math.clz32(a);',
+      // Counting keys does not depend on their order.
+      'export const n = (x: object) => Object.keys(x).length + (Object.hasOwn(x, "a") ? 1 : 0);',
+    ];
+    for (const code of allowed) expect(await rulesFor('src/sim/__probe__.ts', code), code).toEqual([]);
   });
 
   test('린트: 모듈 의존 자기 검사', async () => {
@@ -62,6 +78,20 @@ describe('린트', () => {
       ['src/ui/__probe__.ts', "import { x } from '@adapters/mock/account';"],
       ['src/ui/__probe__.ts', "import { createSim } from '@sim';"],
       ['src/ui/__probe__.ts', "import { x } from '../render/x';"],
+      // Non-normalised or deep relative paths that leave the module.
+      ['src/sim/__probe__.ts', "import { x } from '.././content/scenario';"],
+      ['src/sim/__probe__.ts', "import { x } from '../../src/content/scenario';"],
+      ['src/sim/__probe__.ts', "import { x } from './sub/../../content/scenario';"],
+      ['src/sim/sub/__probe__.ts', "import { x } from '../../content/scenario';"],
+      ['src/sim/sub/deep/__probe__.ts', "import { x } from '../../../app/main';"],
+      ['src/ui/sub/__probe__.ts', "import { x } from '../../app/main';"],
+      ['src/ui/__probe__.ts', "import type { X } from '@sim/../app/main';"],
+      // render depends on sim only; content and adapters on sim types only.
+      ['src/render/__probe__.ts', "import { readFile } from 'node:fs';"],
+      ['src/render/__probe__.ts', "import { useState } from 'react';"],
+      ['src/content/__probe__.ts', "import { useState } from 'react';"],
+      ['src/adapters/__probe__.ts', "import { readFile } from 'node:fs';"],
+      ['src/adapters/mock/terrain/__probe__.ts', "import { next } from '@sim/rng';"],
     ];
     for (const [file, code] of forbidden) {
       expect(await rulesFor(file, code), `${file}: ${code}`).toContain('@typescript-eslint/no-restricted-imports');
@@ -71,8 +101,10 @@ describe('린트', () => {
       ['src/sim/radio/__probe__.ts', "import { next } from '../rng'; export { next };"],
       ['src/content/__probe__.ts', "import type { Scenario } from '@sim'; export type { Scenario };"],
       ['src/adapters/mock/terrain/__probe__.ts', "import { x } from '@sim/math'; export { x };"],
-      ['src/render/__probe__.ts', "import { createSim } from '@sim'; export { createSim };"],
-      ['src/ui/__probe__.ts', "import type { Sim } from '@sim'; import { x } from '@render/x'; import { y } from '@content/y'; import type { Account } from '@adapters/account'; export { x, y }; export type { Sim, Account };"],
+      ['src/render/__probe__.ts', "import { createSim } from '@sim'; import type { Sim } from '@sim'; import { y } from './y'; export { createSim, y }; export type { Sim };"],
+      ['src/render/sub/__probe__.ts', "import { y } from '../y'; export { y };"],
+      ['src/sim/sub/deep/__probe__.ts', "import { next } from '../../rng'; export { next };"],
+      ['src/ui/__probe__.ts', "import type { Sim } from '@sim'; import { x } from '@render/x'; import { y } from '@content/y'; import type { Account } from '@adapters/account'; import { useState } from 'react'; export { x, y, useState }; export type { Sim, Account };"],
       ['src/app/__probe__.ts', "import { a } from '@adapters/mock/account'; import { b } from '@ui/b'; import { c } from '@sim'; export { a, b, c };"],
     ];
     for (const [file, code] of allowed) expect(await rulesFor(file, code), `${file}: ${code}`).toEqual([]);

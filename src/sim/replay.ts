@@ -8,16 +8,17 @@ const INT32_MAX = 0x7fffffff;
 const INT32_MIN = -0x80000000;
 
 const HEADER_KEYS = ['format', 'simVersion', 'seed', 'seedKind', 'scenario', 'guns', 'weather', 'mode', 'stepMs', 'inputs', 'totalTicks'];
-const WEATHER_RANGES: Record<string, [number, number]> = {
-  visibilityM: [0, Infinity],
-  cloudPct: [0, 100],
-  windFromDeg: [0, 359],
-  windSpeedTenthMs: [0, Infinity],
-  tempTenthC: [-Infinity, Infinity],
-  precipTenthMmH: [0, Infinity],
-  pressureHpa: [0, Infinity],
-  humidityPct: [0, 100],
-};
+const WEATHER_RANGES: readonly [key: string, min: number, max: number][] = [
+  ['visibilityM', 0, Infinity],
+  ['cloudPct', 0, 100],
+  ['windFromDeg', 0, 359],
+  ['windSpeedTenthMs', 0, Infinity],
+  ['tempTenthC', -Infinity, Infinity],
+  ['precipTenthMmH', 0, Infinity],
+  ['pressureHpa', 0, Infinity],
+  ['humidityPct', 0, 100],
+];
+const WEATHER_KEYS = WEATHER_RANGES.map(([k]) => k);
 
 class FormatError extends Error {}
 
@@ -29,8 +30,10 @@ const int = (x: unknown, min: number, max: number, what: string): void => {
   if (!Number.isInteger(x) || (x as number) < min || (x as number) > max) fail(`${what}: integer in ${min}..${max} expected`);
 };
 const keysExactly = (x: Record<string, unknown>, keys: readonly string[], what: string, optional: readonly string[] = []): void => {
-  for (const k of Object.keys(x)) if (!keys.includes(k) && !optional.includes(k)) fail(`${what}: unknown key ${k}`);
-  for (const k of keys) if (!(k in x)) fail(`${what}: missing ${k}`);
+  // Order-free: every expected key is an own key, and nothing else is there.
+  for (const k of keys) if (!Object.hasOwn(x, k)) fail(`${what}: missing ${k}`);
+  const present = keys.length + optional.filter((k) => Object.hasOwn(x, k)).length;
+  if (Object.keys(x).length !== present) fail(`${what}: unknown key`);
 };
 const ref = (x: unknown, what: string): void => {
   if (!isObject(x)) return fail(`${what}: object expected`);
@@ -50,8 +53,8 @@ function check(x: unknown): asserts x is ReplayData {
   ref(x.guns, 'guns');
   const w = x.weather;
   if (!isObject(w)) return fail('weather: object expected');
-  keysExactly(w, Object.keys(WEATHER_RANGES), 'weather');
-  for (const [k, [min, max]] of Object.entries(WEATHER_RANGES)) int(w[k], min, max, `weather.${k}`);
+  keysExactly(w, WEATHER_KEYS, 'weather');
+  for (const [k, min, max] of WEATHER_RANGES) int(w[k], min, max, `weather.${k}`);
   if (x.mode !== 'training' && x.mode !== 'standard') fail('mode: training | standard expected');
   if (x.stepMs !== 50) fail('stepMs: 50 expected');
   int(x.totalTicks, 0, INT32_MAX, 'totalTicks');
