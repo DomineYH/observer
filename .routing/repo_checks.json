@@ -1,27 +1,44 @@
 {
   "_comment": "Edit for your repository. The host copies these into verification_plan entries with required_by=repository (VER-5). Keep commands exactly as CI runs them.",
-  "generated_by": null,
-  "generated_on": null,
-  "sources": [],
+  "generated_by": "host from wayfinder ticket #10 resolution",
+  "generated_on": "2026-11-06",
+  "sources": [
+    "https://github.com/DomineYH/observer/issues/10#issuecomment-6681015420"
+  ],
   "required_ci": [
+    "typecheck",
+    "lint",
     "test",
-    "lint"
+    "engines",
+    "e2e"
   ],
   "commands": {
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
     "test": "npm test",
-    "lint": "npm run lint"
+    "engines": "npm run test:engines",
+    "e2e": "npm run test:e2e"
   },
   "branch_protection": {
     "require_review": true,
     "required_status_checks": [
+      "typecheck",
+      "lint",
       "test",
-      "lint"
+      "engines",
+      "e2e"
     ],
     "source": null
   },
   "e2e": {
-    "command": null,
-    "critical_flows": []
+    "command": "npm run test:e2e",
+    "critical_flows": [
+      "training-mode full run through the UI in Chromium"
+    ]
   },
-  "unknowns": []
+  "unknowns": [
+    "repo: commands do not exist until the M1 scaffold task creates package.json scripts and the GitHub Actions workflow",
+    "repo: golden regeneration 'npm run golden:update' is a maintenance command, not a check",
+    "repo: branch protection on GitHub is not configured yet"
+  ]
 }
