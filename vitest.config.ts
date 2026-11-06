@@ -5,6 +5,6 @@ export default defineConfig({
   resolve: { alias },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}', 'tests/{acceptance,golden,lint}/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'tests/{acceptance,golden,lint,math}/**/*.test.ts'],
   },
 });

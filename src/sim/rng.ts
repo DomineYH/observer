@@ -1,4 +1,6 @@
 // 난수 스트림: the demo's mulberry32 with its state kept explicit so it can be hashed and counted (B6).
+import { cos, log } from './math';
+
 export const STREAMS = ['scn', 'bal', 'fdc', 'exp', 'ai', 'las'] as const;
 export type StreamName = (typeof STREAMS)[number];
 
@@ -31,4 +33,13 @@ export function next(s: Stream): number {
   let t = Math.imul(s.a ^ (s.a >>> 15), 1 | s.a);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+const TAU = Math.PI * 2;
+
+/** Standard normal from two draws: the demo's Box–Muller (gaussOf, demo line 192) on 결정적 수학. */
+export function gauss(s: Stream): number {
+  let u = 0;
+  while (!u) u = next(s);
+  return Math.sqrt(-2 * log(u)) * cos(TAU * next(s));
 }
