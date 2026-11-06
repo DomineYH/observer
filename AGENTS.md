@@ -1,0 +1,2 @@
+## Rules
+`CLAUDE.md`를 따를 것

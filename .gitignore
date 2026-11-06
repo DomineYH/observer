@@ -1,0 +1,5 @@
+
+# jev_task_routing: local task records
+.routing/tasks/*.json
+.routing/evidence/*.json
+.routing/hook_log.jsonl
