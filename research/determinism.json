@@ -1,0 +1,122 @@
+[
+  {
+    "question": "Are Math.sin, Math.cos, Math.tan, Math.exp, Math.log, Math.atan, Math.atan2, and Math.hypot guaranteed by ECMA-262 to produce identical results across JavaScript engines?",
+    "fact": "No. ECMA-262 defines Math.sin (§21.3.2.31), Math.cos (§21.3.2.12), Math.tan (§21.3.2.35), Math.exp (§21.3.2.15), Math.log (§21.3.2.21), Math.atan (§21.3.2.4), Math.atan2 (§21.3.2.6), and Math.hypot (§21.3.2.19) as implementation-approximated (§4.2). Only boundary inputs (NaN, ±0, ±Infinity) are strictly specified; for finite inputs, ECMA-262 recommends fdlibm but does not require bit-identical rounding across engines.",
+    "source_url": "https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-function-properties-of-the-math-object",
+    "source_title": "ECMAScript® 2027 Language Specification — §21.3.2 Function Properties of the Math Object & §4.2 implementation-approximated",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Although the choice of algorithms is left to the implementation, it is recommended (but not specified by this standard) that implementations use... fdlibm",
+    "version_or_date_of_source": "ECMA-262 Living Standard (Draft 2027, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "ECMA-262 specifies neither a maximum ULP error bound nor a mandatory range-reduction or polynomial algorithm for implementation-approximated Math functions.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "Are Math.pow(x, y) and the exponentiation operator (x ** y), such as (r/R)**2 in OBSERVER_demo_v0.2.html, deterministic across engines?",
+    "fact": "No. Both Math.pow (§21.3.2.27) and the ** operator (§13.6) delegate to Number::exponentiate (§6.1.6.1.3), which returns an implementation-approximated value for non-boundary finite inputs. Even integer powers like (r/R)**2 pass through Number::exponentiate, whereas multiplying x * x uses Number::multiply (§6.1.6.1.4), which is strictly governed by IEEE 754-2019 roundTiesToEven.",
+    "source_url": "https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-numeric-types-number-exponentiate",
+    "source_title": "ECMAScript® 2027 Language Specification — §6.1.6.1.3 Number::exponentiate",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "It returns an implementation-approximated value representing the result of raising base to the exponent power.",
+    "version_or_date_of_source": "ECMA-262 Living Standard (Draft 2027, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "Some engines optimize small integer exponents via repeated multiplication while others invoke libm pow(), creating potential 1-ULP divergence unless x ** 2 is rewritten as x * x.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "Which numeric operations and Math functions in ECMAScript are guaranteed to be bit-exact across all compliant engines?",
+    "fact": "Basic arithmetic (+, -, *, / in §6.1.6.1) and Math.sqrt (§21.3.2.33) are strictly specified by IEEE 754-2019 binary64 arithmetic using roundTiesToEven (0.5 ULP), not implementation-approximated. Math.imul (§21.3.2.20), bitwise operators, Math.fround (§21.3.2.17), Math.abs, Math.round, Math.floor, Math.ceil, and Math.trunc also have exact deterministic semantics across engines, making Math.sqrt(dx*dx + dy*dy) deterministic unlike Math.hypot(dx, dy).",
+    "source_url": "https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-math.sqrt",
+    "source_title": "ECMAScript® 2027 Language Specification — §21.3.2.33 Math.sqrt & §6.1.6.1.7 Number::add",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Return 𝔽(the square root of ℝ(n)).",
+    "version_or_date_of_source": "ECMA-262 Living Standard (Draft 2027, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "Math.sqrt(dx*dx + dy*dy) can overflow if dx*dx + dy*dy exceeds Number.MAX_VALUE (~1.797e308), though on OBSERVER's 10,240m map max dx*dx + dy*dy is ~2.1e8, far below overflow.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "Why do V8 (Chrome/Node/Vercel), SpiderMonkey (Firefox), and JavaScriptCore (Safari/iOS WebKit) produce different results for transcendental functions and Math.hypot?",
+    "fact": "The three engines use different underlying math implementations: (1) V8 (src/base/ieee754.cc & src/builtins/math.tq) uses bundled llvm-libc/fdlibm routines and a Torque scaling formula for 2-arg Math.hypot; (2) SpiderMonkey (js/src/jsmath.cpp) uses bundled fdlibm for exp/log/atan/atan2/hypot but switches sin/cos/tan between fdlibm and native std::sin/cos/tan via UseFdlibmForSinCosTan; (3) JavaScriptCore (MathCommon.h / MathObject.cpp) delegates sin/cos/tan/exp/log/atan/atan2/hypot directly to the host OS <cmath> (Apple system libm on macOS/iOS, glibc on Linux). Even between Chrome and Node/Vercel (both V8), V8 version skew (e.g. V8 migrating ieee754.cc from fdlibm to llvm-libc) can alter 1-ULP results.",
+    "source_url": "https://raw.githubusercontent.com/WebKit/WebKit/main/Source/JavaScriptCore/runtime/MathCommon.h",
+    "source_title": "WebKit Source (MathCommon.h & MathObject.cpp), V8 Source (src/base/ieee754.cc & math.tq), and Gecko Source (js/src/jsmath.cpp)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "#define JSC_DEFINE_VIA_STD(capitalizedName, lowerName) using std::lowerName;",
+    "version_or_date_of_source": "WebKit main, V8 main, and Gecko master branches (retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "Host OS libm behavior in JavaScriptCore additionally varies by OS and CPU architecture (e.g., macOS/iOS ARM64 system libm vs Linux x86_64 glibc in WebKitGTK/Playwright).",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "Where specifically does the OBSERVER v0.2 demo simulation (PRD/OBSERVER_demo_v0.2.html) use nondeterministic math or renderer-coupled state that can break 'same seed + same input = same result'?",
+    "fact": "Audit of PRD/OBSERVER_demo_v0.2.html identifies 7 categories of replay-breaking operations: (1) Box-Muller Gaussian PRNG gaussOf (line 192) calling Math.log and Math.cos on every dispersion/error sample; (2) Terrain generation buildTerrain (lines 201-287) using Math.exp, **2, Math.sin, Math.cos, and Math.hypot; (3) Visibility visOf (line 541) using Math.hypot and Koschmieder 1 - Math.exp(-SIGMA*d) > 0.9; (4) Unit movement & AI (lines 459-478, 578-605, 856) using Math.hypot, Math.atan2, Math.sin, Math.cos, assault decay Math.exp, and Tobler's hiking speed Math.exp(-3.5*Math.abs(grade+0.05)); (5) Artillery lethality & suppression in impact (lines 495, 646-667) using Math.hypot, Math.exp(-((r/R)**2)), and **2; (6) Forward observer raycasting pickAt/lase/identifyAt (lines 1048-1086) using Math.tan, Math.sin, Math.cos, Math.atan2, and Math.atan; and (7) Renderer resolution leakage in identifyAt(ix, iy) (line 1077), which reads V.focal and V.hor derived from client viewport preset VW (480/640/960).",
+    "source_url": "https://github.com/DomineYH/observer/issues/4",
+    "source_title": "PRD/OBSERVER_demo_v0.2.html (lines 182-1086) & PRD/OBSERVER_PRD_v0.2.md (§7.5, §10.4)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const gaussOf = r => () => Math.sqrt(-2*Math.log(Math.max(1e-12,r())))*Math.cos(TAU*r());",
+    "version_or_date_of_source": "OBSERVER Demo v0.2 / PRD v0.2 (commit a2b3c48, 2026)",
+    "confidence": "high",
+    "limitations": "In OBSERVER_demo_v0.2.html line 1081, logIn('id', [best.pid, ...]) logs the resolved target ID best.pid rather than raw pixel (ix, iy), masking V.focal differences if best.pid is trusted directly, but failing if aiming angles are re-simulated.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "What are the engineering and runtime costs of the four candidate mitigations: (1) deterministic software math / lookup tables, (2) fixed-point arithmetic, (3) quantization at comparison points, and (4) engine pinning or WebAssembly?",
+    "fact": "For OBSERVER M1 (20 Hz = 50 ms tick, ~5 enemy platoons / ~100 soldiers): (1) Deterministic software math / LUT in pure TypeScript (replacing Math.sin/cos/tan/exp/log/atan2 with polynomial/rational approximations or fdlibm ports using only IEEE 754 +, -, *, / and replacing Math.hypot with Math.sqrt(dx*dx+dy*dy) and x**2 with x*x) has LOW engineering cost and NEGLIGIBLE runtime cost (<0.05 ms/tick for ~1,000 calls) while keeping sim/ in pure TS (PRD §2, §7.5). (2) Full fixed-point arithmetic (e.g., Q16.16/Q32.32) guarantees integer determinism but has HIGH engineering cost (rewriting terrain bilinear interpolation, 3D raymarch, and ballistics with manual scaling and 64-bit/BigInt overflow guards since 10240^2 > 2^31). (3) Quantization at comparison points only has LOW cost for input boundaries (e.g., quantizing azimuth/elevation to 0.1 mil and grids to 1m/10m), but FAILS if used alone for internal state because 1-ULP differences in accumulated continuous coordinates (P.cx, P.cy) eventually cross a branch boundary on a later tick, altering RNG call counts (rA/rB/rE) and desynchronizing the run. (4) Engine pinning is IMPOSSIBLE across web clients (iOS/macOS Safari uses JSC, Firefox uses SpiderMonkey, Chrome uses V8, and client Chrome V8 differs in version from Vercel Node V8) unless the simulation is compiled to WebAssembly, whose core spec guarantees IEEE 754 roundTiesToEven arithmetic and excludes host transcendental opcodes.",
+    "source_url": "https://webassembly.github.io/spec/core/exec/numerics.html#floating-point-operations",
+    "source_title": "WebAssembly Core Specification — §4.3.3 Floating-Point Operations & ECMA-262 §6.1.6.1",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Floating-point arithmetic follows the IEEE 754 standard... All operators use round-to-nearest ties-to-even, except where otherwise specified.",
+    "version_or_date_of_source": "W3C / WebAssembly Community Group Draft (retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "WebAssembly floating-point operations still allow nondeterministic NaN bit payloads when arithmetic produces NaN, though standard numeric calculations without NaN bit-reinterpretation are bit-exact.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "Is Array.prototype.sort guaranteed to be stable across V8, JavaScriptCore, and SpiderMonkey, and when can sorting become nondeterministic?",
+    "fact": "Since ECMAScript 2019 (ECMA-262 §23.1.3.30.1 SortIndexedProperties), Array.prototype.sort and Array.prototype.toSorted are strictly required to be stable when given a consistent comparator. However, if the comparator is inconsistent (returns NaN, relies on implementation-approximated math, or mutates state), sort order is implementation-defined. Furthermore, in event queues like OBSERVER's at(delay, fn) (line 401), sorting by floating-point t = simT + delay can reorder simultaneous events if delay calculation drifts by 1 ULP; assigning integer tick timestamps and a monotonic integer sequence ID (a.tick - b.tick || a.seq - b.seq) eliminates this risk.",
+    "source_url": "https://tc39.es/ecma262/multipage/indexed-collections.html#sec-sortindexedproperties",
+    "source_title": "ECMAScript® 2027 Language Specification — §23.1.3.30.1 SortIndexedProperties",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "if ℝ(sortCompare(old[j], old[k])) = 0, then π(j) < π(k); i.e., the sort is stable.",
+    "version_or_date_of_source": "ECMA-262 Living Standard (Draft 2027, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "Pre-ES2019 engines (e.g., V8 prior to v7.0 / Chrome 70 / Node 12) used unstable QuickSort for arrays >10 elements, though all modern Evergreen browsers and Node 18+/20+/22+ implement stable sort.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "How do object key iteration order, TypedArrays (Float32Array), and floating-point accumulation order affect cross-engine determinism?",
+    "fact": "(1) Object key enumeration (Object.keys, Object.entries, Reflect.ownKeys, and ES2020+ for..in on ordinary objects via §10.1.11.1 OrdinaryOwnPropertyKeys) is deterministic: array index keys (0 to 2^32-2) iterate in ascending numeric order first, followed by remaining string keys in insertion order, whereas Map and Set (§24.1/§24.2) always iterate strictly in insertion order; nondeterminism only arises if keys are inserted in nondeterministic order or inherited prototype properties differ. (2) TypedArray numeric element access (e.g., Float32Array GROUND/SURF in OBSERVER) converts numbers via IEEE 754 roundTiesToEven (equivalent to Math.fround) deterministically, provided multi-type views over the same ArrayBuffer (endianness-sensitive) and NaN payload inspection are avoided. (3) IEEE 754 floating-point addition and multiplication (§6.1.6.1.7 / §6.1.6.1.4) are commutative but NOT associative ((a + b) + c !== a + (b + c)), so reduction order must be fixed and simulation time must be derived from integer ticks (simT = tick * STEP) or tracked as integer ticks.",
+    "source_url": "https://tc39.es/ecma262/multipage/ordinary-and-exotic-objects-behaviours.html#sec-ordinaryownpropertykeys",
+    "source_title": "ECMAScript® 2027 Language Specification — §10.1.11.1 OrdinaryOwnPropertyKeys, §23.2 TypedArray, & §6.1.6.1.7 Number::add",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Finite-precision addition is commutative, but not always associative.",
+    "version_or_date_of_source": "ECMA-262 Living Standard (Draft 2027, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "While all major consumer desktop and mobile CPUs (x86_64, ARM64) are little-endian, ECMA-262 leaves ArrayBuffer byte order for TypedArray views implementation-defined unless DataView with an explicit littleEndian boolean is used.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "What public web/JS or cross-platform game engines implement deterministic lockstep or replay verification, and how do they handle JavaScript Math nondeterminism?",
+    "fact": "Two primary open-source engines document and solve this exact problem: (1) 0 A.D. (Wildfire Games), an RTS running simulation scripts in SpiderMonkey JS with lockstep multiplayer and replay verification, overrides Math.sin, Math.cos, Math.atan, Math.atan2, and Math.pow in binaries/data/mods/public/globalscripts/Math.js with pure-JS polynomial approximations using only basic arithmetic (+, -, *, /, %), uses Math.sqrt(dx*dx + dz*dz) instead of Math.hypot, and uses 32-bit Q15.16 fixed-point (CFixed_15_16 in source/maths/Fixed.cpp) for C++ movement/collision; (2) Rapier (@dimforge/rapier2d-deterministic), a Rust/Wasm web physics engine, achieves cross-platform determinism across browsers on IEEE 754-2008 platforms by using software math in Wasm and explicitly warns JS callers not to pass results of JS Math.sin/Math.cos into the simulation.",
+    "source_url": "https://raw.githubusercontent.com/0ad/0ad/master/binaries/data/mods/public/globalscripts/Math.js",
+    "source_title": "0 A.D. Source — binaries/data/mods/public/globalscripts/Math.js & Rapier JS Determinism User Guide (https://rapier.rs/docs/user_guides/javascript/determinism)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "These functions are implemented in JS to avoid observed differences between results of different floating point libraries",
+    "version_or_date_of_source": "0 A.D. master branch & Rapier JavaScript 0.21 (retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "PRD §11.3 reference KH-179 (https://kh179.pages.dev/) was also inspected; it is a client-side Three.js artillery training simulator and does not document cross-engine server replay verification.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "How do web games like Pokémon Showdown and lockstep engines like Factorio structure input logs, PRNGs, and state separation for server replay verification?",
+    "fact": "Pokémon Showdown (smogon/pokemon-showdown, running in both browsers and Node.js) records a deterministic input log (initial seed + setup + discrete per-turn player choices) and executes all random rolls through an explicit seeded integer PRNG (sim/prng.ts) with integer truncation at each damage step. Factorio (FFF #302) enforces a strict architectural boundary between sacred deterministic Game State (mutated only at fixed integer ticks by quantized input actions) and non-sacred client Render/Latency State (camera, UI, audio), ensuring that client viewport/FPS differences never leak into simulation state.",
+    "source_url": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/sim/prng.ts",
+    "source_title": "Pokémon Showdown Source (sim/prng.ts) & Factorio Friday Facts #302 (https://factorio.com/blog/post/fff-302)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "this also makes it possible to record an \"input log\" (a seed + initial teams + move/switch decisions) and \"replay\"",
+    "version_or_date_of_source": "pokemon-showdown master branch & Factorio FFF-302 (2019-06-28, retrieved 2026-11-06)",
+    "confidence": "high",
+    "limitations": "Pokémon Showdown is turn-based rather than 20 Hz continuous-space tick-based, so OBSERVER combines Showdown's seeded PRNG + input-log pattern with Factorio/0 A.D.'s fixed-tick state separation and deterministic software math.",
+    "conflicts_with_other_sources": []
+  }
+]
