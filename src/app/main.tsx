@@ -54,7 +54,8 @@ function App() {
   return (
     <>
       <TickCounter tick={tick} />
-      <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={GRID_LETTERS} mode={sim.state.mode} />
+      {/* The example shows training mode's glosses; real utterances will follow sim.state.mode. */}
+      <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={GRID_LETTERS} mode="training" />
     </>
   );
 }

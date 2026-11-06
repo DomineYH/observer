@@ -2,6 +2,9 @@ import type { Mode, RadioUtterance } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { radioSentence } from './radio/sentence';
 
+/** 훈련 모드의 숫자 병기 is drawn dim beside the words. */
+const GLOSS_STYLE = { opacity: 0.6 } as const;
+
 interface Props {
   utterances: readonly RadioUtterance[];
   callsign: string;
@@ -20,7 +23,7 @@ export function RadioLog({ utterances, callsign, gridLetters, mode }: Props) {
             {radioSentence(u, { callsign, gridLetters }).map((p, j) =>
               p.gloss ? (
                 mode === 'training' && (
-                  <span key={j} className="dim">
+                  <span key={j} style={GLOSS_STYLE}>
                     ({p.text})
                   </span>
                 )
