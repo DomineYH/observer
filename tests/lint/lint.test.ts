@@ -10,15 +10,15 @@ async function rulesFor(filePath: string, code: string): Promise<(string | null)
 }
 
 const BANNED: [string, string][] = [
-  ['Math.random()', 'no-restricted-properties'],
-  ['Math.sin(1)', 'no-restricted-properties'],
-  ['Math.cos(1)', 'no-restricted-properties'],
-  ['Math.tan(1)', 'no-restricted-properties'],
-  ['Math.atan2(1, 2)', 'no-restricted-properties'],
-  ['Math.exp(1)', 'no-restricted-properties'],
-  ['Math.log(2)', 'no-restricted-properties'],
-  ['Math.pow(2, 3)', 'no-restricted-properties'],
-  ['Math.hypot(3, 4)', 'no-restricted-properties'],
+  ['Math.random()', 'no-restricted-syntax'],
+  ['Math.sin(1)', 'no-restricted-syntax'],
+  ['Math.cos(1)', 'no-restricted-syntax'],
+  ['Math.tan(1)', 'no-restricted-syntax'],
+  ['Math.atan2(1, 2)', 'no-restricted-syntax'],
+  ['Math.exp(1)', 'no-restricted-syntax'],
+  ['Math.log(2)', 'no-restricted-syntax'],
+  ['Math.pow(2, 3)', 'no-restricted-syntax'],
+  ['Math.hypot(3, 4)', 'no-restricted-syntax'],
   ['Date.now()', 'no-restricted-globals'],
   ['new Date()', 'no-restricted-globals'],
   ['performance.now()', 'no-restricted-globals'],
@@ -42,6 +42,9 @@ const BANNED: [string, string][] = [
   ['const m = Math; m.random()', 'no-restricted-syntax'],
   ['const { random } = Math; random()', 'no-restricted-syntax'],
   ["const k = 'random'; Math[k]()", 'no-restricted-syntax'],
+  // Math is an allowlist: any member outside it is banned, including ones that hand out Math itself.
+  ['const m = Math.valueOf() as unknown as { random(): number }; m.random()', 'no-restricted-syntax'],
+  ['Math.hypot(1, 2)', 'no-restricted-syntax'],
 ];
 
 describe('린트', () => {

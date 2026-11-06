@@ -4,10 +4,8 @@ import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 const DETERMINISM = '결정성 (ADR 0005): 시뮬레이션에서 금지';
-const NONDETERMINISTIC_MATH = [
-  'random', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
-  'exp', 'expm1', 'log', 'log1p', 'log2', 'log10', 'pow', 'cbrt', 'hypot',
-];
+// Math is an allowlist: exactly rounded or integer operations only (the rest come from 결정적 수학).
+const DETERMINISTIC_MATH = ['imul', 'sqrt', 'fround', 'floor', 'ceil', 'round', 'trunc', 'abs', 'min', 'max', 'sign', 'clz32', 'PI'];
 const IMPURE_GLOBALS = [
   'Date', 'performance', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'setImmediate',
   'requestAnimationFrame', 'cancelAnimationFrame', 'queueMicrotask', 'window', 'document', 'navigator', 'location',
@@ -15,10 +13,13 @@ const IMPURE_GLOBALS = [
 ];
 
 const determinism = {
-  'no-restricted-properties': ['error', ...NONDETERMINISTIC_MATH.map((property) => ({ object: 'Math', property, message: `${DETERMINISM} (결정적 수학을 쓴다)` }))],
   'no-restricted-globals': ['error', ...IMPURE_GLOBALS.map((name) => ({ name, message: `${DETERMINISM} (화면·시계·외부 상태)` }))],
   'no-restricted-syntax': [
     'error',
+    {
+      selector: `MemberExpression[object.name='Math']:not([property.name=/^(${DETERMINISTIC_MATH.join('|')})$/])`,
+      message: `${DETERMINISM} (Math는 ${DETERMINISTIC_MATH.join('·')}만. 나머지는 결정적 수학을 쓴다)`,
+    },
     { selector: "BinaryExpression[operator='**']", message: `${DETERMINISM} (거듭제곱 연산자)` },
     { selector: "AssignmentExpression[operator='**=']", message: `${DETERMINISM} (거듭제곱 연산자)` },
     { selector: 'ForInStatement', message: `${DETERMINISM} (키 순회 반복문)` },
@@ -29,7 +30,7 @@ const determinism = {
       message: `${DETERMINISM} (키 순서 순회. 정해진 순서의 배열을 쓴다)`,
     },
     {
-      // Aliases and destructuring would slip past no-restricted-properties.
+      // Aliases and destructuring would slip past the member checks.
       selector: 'Identifier[name=/^(Math|Object|Reflect)$/]:not(MemberExpression > Identifier.object)',
       message: `${DETERMINISM} (Math·Object·Reflect는 멤버로만 쓴다)`,
     },
