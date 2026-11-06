@@ -1,3 +1,4 @@
+import type { RadioEvent } from './radio';
 import type { StreamName } from './rng';
 
 export type SeedKind = 'daily' | 'practice';
@@ -38,8 +39,8 @@ export interface Input {
   v?: readonly number[];
 }
 
-/** 사건. None yet. */
-export type SimEvent = never;
+/** 사건. Nothing emits radio events until the radio state machine slice. */
+export type SimEvent = RadioEvent;
 
 export interface StepResult {
   events: readonly SimEvent[];
