@@ -53,13 +53,14 @@ describe('F-06', () => {
       expect(strokes).toContainEqual(east(km * 50 + 0.5));
       expect(strokes).toContainEqual(north(512 - km * 50 + 0.5));
     }
-    const labels = (x: number | null, y: number | null) =>
-      texts.filter((t) => (x === null || t.x === x) && (y === null || t.y === y)).map((t) => t.text);
-    // east labels along the top (the 10 km line at 500.5 px leaves no room), north labels along the left edge
-    expect(labels(null, 9)).toEqual(['40', '41', '42', '43', '44', '45', '46', '47', '48', '49']);
-    expect(labels(2, null)).toEqual(['30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40']);
-    expect(texts.find((t) => t.text === '43' && t.y === 9)!.x).toBe(152.5);
-    expect(texts.find((t) => t.text === '33' && t.x === 2)!.y).toBe(362.5 - 3);
+    // Every label with its position: east along the top beside its line (the 10 km line at 500.5 px leaves no room),
+    // north along the left edge above its line. Then the seven names, nothing else.
+    const expected = [
+      ...['40', '41', '42', '43', '44', '45', '46', '47', '48', '49'].map((text, km) => ({ text, x: km * 50 + 2.5, y: 9 })),
+      ...['30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40'].map((text, km) => ({ text, x: 2, y: 509.5 - km * 50 })),
+    ];
+    expect(texts.slice(0, expected.length)).toEqual(expected);
+    expect(texts).toHaveLength(expected.length + 7);
 
     // 지명: all seven, above each village
     const k = 512 / 10240;
