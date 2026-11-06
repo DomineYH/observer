@@ -1,0 +1,176 @@
+[
+  {
+    "question": "PRD 11.1 (1) 통신 점검: '감명 보고' / '감명 양호'가 실제 한국군 무전 교신 문구인지 여부 (확인됨 vs 확인 불가)",
+    "fact": null,
+    "source_url": null,
+    "source_title": null,
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": null,
+    "version_or_date_of_source": null,
+    "confidence": "low",
+    "limitations": "[공개 공식 자료 확인 불가] 국립국어원 온용어(방위사업청 《국방 통합 용어 사전》, kli.korean.go.kr), 국방부·합참 공개 자료(mil.kr), 학술논문(kci.go.kr)에서 '감명 보고', '감명 양호', '감명도', '감도 명료도'를 검색했으나 육군 통신운용·통신보안 교범이 비공개(군사자료)여서 1차 공식 출처로 문구를 확인할 수 없음. [2차 자료 참고] 나무위키(namu.wiki/w/무전기) 및 군 복무자 커뮤니티 증언에서는 감도(1~5)와 명료도(1~5)를 합쳐 물을 때 '감명도 여하' / '감명도 삼삼(또는 오오)', '감도 아리랑, 명료도 쓰리랑', '통신보안, 감명도 양호' 등을 사용한다고 기술하며, 데모(OBSERVER_demo_v0.2.html)의 '감명 보고' / '감명 양호'는 이를 축약한 게임용 표현에 해당함.",
+    "conflicts_with_other_sources": [
+      "PRD/데모는 '감명 보고' → '감명 양호'를 사용하나, 2차 자료(나무위키 '무전기' 등)에서는 호출 시 '감명도 여하(또는 통신 점검)' 및 응답 시 '감명도 오오/삼삼' 또는 '수신 양호' 형식이 주로 언급됨."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (2) 전이사격 전체 문형: '전이, 표적번호 …, 방향 …, 우로 …, 줄이기 …, [표적성질], 포대 삼발, 효력사'의 실제 교신 문구 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] PRD의 전이사격 6요소 구조(경고명령 '전이+기지점/표적번호' → 관측소-표적 방향 → 좌/우 편차 및 사거리 수정 → 표적성질 → 사격방법·발수·효력사)는 미 해병대 포병 사격요구 교범(B2C2437 Call For Indirect Fire)의 'Shift from a Known Point' 표준 양식과 정확히 일치하며, '효력사(Fire For Effect)'와 '탄착수정(Spotting)'은 방위사업청 《국방 통합 용어 사전》의 공식 용어임. [확인 불가] 한국군 포병 야전교범상의 전이사격 구두 무전 문장 전체 어순은 교범 비공개로 1차 공식 자료에서 직접 대조 불가함.",
+    "source_url": "https://www.trngcmd.marines.mil/Portals/207/Docs/TBS/B2C2437%20Call%20For%20Indirect%20Fire.pdf",
+    "source_title": "USMC Basic Officer Course B2C2437: Call For Indirect Fire (병행 확인: 방위사업청 《국방 통합 용어 사전》 '효력사' trgtWordNo=221618570)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Shift from a Known Point: Shift Known Point ____, Direction ____, Left/Right ____, Add/Drop ____.",
+    "version_or_date_of_source": "USMC B2C2437 (undated official TBS handout) / 방위사업청 국방 통합 용어 사전 (2021)",
+    "confidence": "medium",
+    "limitations": "PRD 4.1절이 명시한 대로 해당 문형은 미군 교범(FM 6-30 / USMC B2C2437)의 Shift from a Known Point 구조를 한국군 어투로 옮긴 것임. 2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920)과 kh179.pages.dev 시뮬레이터에는 좌표법·극좌표법 초탄 사격요구와 일반 수정사격만 있고 전이사격(기지점 전이) 전문 예문은 수록되어 있지 않음.",
+    "conflicts_with_other_sources": [
+      "초탄 사격요구 3회 분리 송신 원칙(경고명령 → 표적위치 → 표적성질·효력사)과 달리, PRD/데모의 전이사격 문형은 단일 송신에 모든 요소를 이어 붙인 축약형으로 구현되어 있음."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (3) 수정 단위(좌우 10 m, 사거리 50 m)와 협차 규칙(400→200→100→50)이 한국군 교범과 같은지 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 방위사업청 《국방 통합 용어 사전》은 관측자가 사탄 조정 후 효력사를 실시하는 '수정사격(Adjust Fire)'과 편각·거리를 수정하는 '탄착수정'을 공식 정의하며, 한국군 포병 절차의 모태인 미군 교범(B2C2437)은 좌우 편차 10 m 단위 반올림, 사거리 연속 협차(400 m → 200 m → 100 m) 및 100 m 협차 달성 후 50 m 절감 시 즉시 효력사(FFE) 요구 규칙을 명시함. [확인 불가] 한국군 야전교범 원문의 수치 표기는 비공개로 1차 한국 정부 문헌에서 직접 열람 불가함.",
+    "source_url": "https://www.trngcmd.marines.mil/Portals/207/Docs/TBS/B2C2437%20Call%20For%20Indirect%20Fire.pdf",
+    "source_title": "USMC Basic Officer Course B2C2437: Call For Indirect Fire (병행 확인: 방위사업청 《국방 통합 용어 사전》 '수정사격' trgtWordNo=221608641)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Once a 100-meter bracket is achieved, split it by 50 meters and request fire for effect.",
+    "version_or_date_of_source": "USMC B2C2437 / 방위사업청 국방 통합 용어 사전 (2021)",
+    "confidence": "high",
+    "limitations": "한국군 포병 관측 교범 원문은 대외비/군사자료여서 1차 공개 원문 대조는 불가하나, 2차 자료인 유용원의 군사세계(bemil.chosun.com #88920, '줄이기 200' → '줄이기 100' → '우로 10, 줄이기 50, 효력사'), 군사 블로그(tcatmon.com/115, OT 거리 1km 이하 100m, 1~2km 200m, 2km 초과 400m 개시 및 50m 협차 시 효력사), 포병 시뮬레이터(kh179.pages.dev/js/c2.js) 모두 미군 FM 6-30/B2C2437과 동일한 좌우 10 m 단위 및 400→200→100→50 m 협차 규칙을 기술함.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "PRD 11.1 (4) 사거리 수정 '늘리기'가 실제 한국군 표현인지 여부 (예문에는 '줄이기'만 있음) (확인됨 vs 확인 불가)",
+    "fact": null,
+    "source_url": null,
+    "source_title": null,
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": null,
+    "version_or_date_of_source": null,
+    "confidence": "low",
+    "limitations": "[공개 공식 자료 확인 불가] 방위사업청 《국방 통합 용어 사전》(kli.korean.go.kr '탄착수정' trgtWordNo=221616200) 및 국방 과학기술 학술지(kci.go.kr)를 검색했으나, 미군 'Add / Drop'에 대응하는 한국군 구두 무전 표준어가 '늘리기/줄이기'인지 '연장/단축'인지 1차 공식 문서에서 확인되지 않음. [2차 자료 참고] 아카라이브 포병 관측 정리글(arca.live/b/staytactical/83853341)은 '늘리기/줄이기'를 사용하고 유용원의 군사세계(bemil.chosun.com #88920)는 '줄이기'를 사용한 반면, 티스토리 군사 블로그(tcatmon.com/115)는 '사거리 연장/단축', 포병 시뮬레이터(kh179.pages.dev/js/c2.js)는 '증가/감소'로 표기하여 2차 자료 간에도 용어가 갈림.",
+    "conflicts_with_other_sources": [
+      "2차 자료 간 표현 불일치: '늘리기 / 줄이기'(PRD·데모, arca.live, bemil '줄이기') vs '사거리 연장 / 단축'(tcatmon.com/115) vs '증가 / 감소'(kh179.pages.dev)."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (5) 백 단위가 아닌 수정 거리 읽기: '50 m = 오십?', '150 m = 하나백오십?'의 실제 여부 (확인됨 vs 확인 불가)",
+    "fact": null,
+    "source_url": null,
+    "source_title": null,
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": null,
+    "version_or_date_of_source": null,
+    "confidence": "low",
+    "limitations": "[공개 공식 자료 확인 불가] 방위사업청 《국방 통합 용어 사전》(kli.korean.go.kr) 및 공개 군사 자료에 포병 무전 숫자 독법(특히 50 m, 150 m 등 십 단위 포함 수정량 읽기) 규정이 수록되어 있지 않음. [2차 자료 참고] 유용원의 군사세계 예문(bemil.chosun.com #88920)은 '200→둘백, 400→넷백, 100→하나백'처럼 백 단위 자릿수를 살려 읽으나 50 m는 아라비아 숫자로만('줄이기 50') 적혀 있음. 반면 나무위키(namu.wiki/w/포병/용어)와 kh179.pages.dev/js/ammo.js(ARTY_DIGITS)는 포병 숫자를 자릿수 단위('백', '십') 없이 한 자리씩 '공·하나·둘·삼·넷·오·여섯·칠·팔·아홉'(예: 50→'오공' 또는 일상 한자어 '오십', 150→'하나오공')으로 읽는다고 기술하여 데모(OBSERVER_demo_v0.2.html corrWord 함수의 '하나백오십')와 상충함.",
+    "conflicts_with_other_sources": [
+      "데모(OBSERVER_demo_v0.2.html)는 150 m를 '하나백오십', 50 m를 '오십'으로 읽으나, 2차 자료(나무위키 포병/용어, kh179.pages.dev)의 포병 숫자 독법은 자릿수 단위를 생략한 단음절 나열('하나오공', '오공') 또는 백 단위에서만 '하나백/둘백'을 쓰는 관행으로 나뉨."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (6) 극좌표법 교신 문구: '극좌표, 방위각 … 거리 …'의 실제 한국군 표현 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 방위사업청 《국방 통합 용어 사전》('포병 관측 장비')은 한국군 포병 관측반이 레이저거리측정기와 전자식 측각기로 표적의 방위각·거리를 산출하여 포병사격요청을 수행함을 명시하며, 미군 교범(B2C2437)은 극좌표 표적위치 통보 양식을 'Polar, Direction ____, Distance ____'로 규정함. [확인 불가] '극좌표, 방위각 …, 거리 …'라는 한국어 구두 무전 문장 자체는 한국군 야전교범 비공개로 1차 공식 문헌에서 직접 검증 불가함.",
+    "source_url": "https://kli.korean.go.kr/term/trgtWord/indexTrgtWord.do?trgtWordNo=221616915",
+    "source_title": "포병 관측 장비 (砲兵觀測裝備) — 방위사업청 《국방 통합 용어 사전》 / 국립국어원 온용어 (병행 확인: USMC B2C2437 p.7 Polar Plot)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "표적을 탐지하여 포병사격요청을 하는 주·야간 관측장비로서 주로 포병부대 관측반에 배치되며 레이저거리측정기, 열상관측기, 전자식 측각기로 구성되어 표적제원을 자동 산출",
+    "version_or_date_of_source": "2021 (국방 통합 용어 사전)",
+    "confidence": "medium",
+    "limitations": "1차 자료로 관측반의 방위각·거리 기반 사격요구 체계와 미군 Polar Plot 원형은 확인되나, 한국어 구두 문형('극좌표, 방위각 …, 거리 …')은 2차 자료인 티스토리 군사 블로그(tcatmon.com/113), 아카라이브(arca.live/b/staytactical/83853341), 포병 시뮬레이터(kh179.pages.dev/js/c2.js 277행: `극좌표, 방위각 ${pad4(r10(L.azMil))}, 거리 ${r10(L.dist)}`)에서만 동일 문구로 확인됨.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "PRD 11.1 (7) '제압'·'긴급제압'·'위험근접'·'정정'·'재송신'의 한국군 표현 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 5개 용어 중 '제압(Suppression)'과 '제압사격(Suppression Fire)'은 방위사업청 《국방 통합 용어 사전》에 등재된 공식 한국군 포병 용어이며, 5개 모두 미군 교범(B2C2437)의 공식 절차 용어(Suppression, Immediate Suppression, Danger Close[포병·박격포 아군 600 m 이내], Correction, Say Again/Repeat)에 대응함. [확인 불가] '긴급제압', '위험근접', '정정', '재송신' 4개 어휘가 한국군 포병 무전에서 실제 쓰이는 표준 구두 콜사인지는 공개 1차 한국군 자료로 확인 불가함.",
+    "source_url": "https://kli.korean.go.kr/term/trgtWord/indexTrgtWord.do?trgtWordNo=221613878",
+    "source_title": "제압 (制壓, Suppression) 및 제압사격 (trgtWordNo=221613879) — 방위사업청 《국방 통합 용어 사전》 (병행 확인: USMC B2C2437)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "제압: 임무를 수행하고 있는 적 인원 및 장비의 전투 능력을 제한시키는 것으로 그 효과는 통상 사격을 하고 있는 동안에만 지속됨.",
+    "version_or_date_of_source": "2021 (국방 통합 용어 사전)",
+    "confidence": "medium",
+    "limitations": "방위사업청 《국방 통합 용어 사전》에서 '위험근접', '긴급제압', '재송신'은 표제어로 검색되지 않음. 2차 자료(tcatmon.com/113, arca.live/b/staytactical/83853341, kh179.pages.dev)에서는 '제압사격', '즉각제압(또는 긴급제압)', '위험근접(아군 600m 이내)'이 쓰이며, 특히 미군 교범에서 통신문 반복 요청은 'Say Again(재송신)'이고 동일 제원 재사격 요청은 'Repeat(재사격/반복)'로 엄격히 구분됨.",
+    "conflicts_with_other_sources": [
+      "2차 자료(tcatmon.com/113 등)에서는 Immediate Suppression을 '긴급제압' 외에 '즉각제압'으로도 번역하며, 무전 재요청('재송신', Say Again)과 효력사 재사격('반복/재사격', Repeat)을 혼동하지 않도록 구분함."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (8) 조정을 이어갈 때(효력사가 아닐 때) 수정 문장 끝에 붙이는 말이 있는지 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 미군 교범(B2C2437)의 수정사격(Adjust Fire) 절차에서는 효력사로 전환하기 전까지 중간 수정 송신 끝에 별도의 단계 선언어를 붙이지 않고 수정량만 부른 뒤 송신 종료어('Over' / '이상')로 끝내며, 효력사 진입 시에만 끝에 'Fire for Effect(효력사)'를 붙임. [확인 불가] 한국군 야전교범에서 중간 수정 끝에 아무 말도 안 붙이는지, 혹은 '조정'/'수정'을 붙이는지는 한국군 1차 공개 자료로 확인 불가함.",
+    "source_url": "https://www.trngcmd.marines.mil/Portals/207/Docs/TBS/B2C2437%20Call%20For%20Indirect%20Fire.pdf",
+    "source_title": "USMC Basic Officer Course B2C2437: Call For Indirect Fire (pp. 18-21, Adjusting Fire / Successive Bracketing)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "Once a 100-meter bracket is achieved, split it by 50 meters and request fire for effect.",
+    "version_or_date_of_source": "USMC B2C2437 (official TBS handout)",
+    "confidence": "medium",
+    "limitations": "2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920: '우로 30, 줄이기 200.' → '줄이기 100.' → '우로 10, 줄이기 50, 효력사.')과 kh179.pages.dev/js/c2.js(335행: `${parts.join(', ')}, 이상`) 모두 효력사가 아닐 때는 끝에 별도 단어를 붙이지 않음. 이는 PRD 4.1절 표 및 데모 코드(OBSERVER_demo_v0.2.html 939행)와 일치하나, PRD 6.1절 본문 설명('계속 조정할 때는 우로 삼십, 줄이기 둘백, 조정')과는 문서 내부 불일치가 존재함.",
+    "conflicts_with_other_sources": [
+      "PRD 내부 불일치: PRD 4.1절·데모 구현(OBSERVER_demo_v0.2.html) 및 2차 자료(bemil #88920, kh179.pages.dev)는 중간 수정 끝에 접미어를 붙이지 않으나('우로 삼십, 줄이기 둘백.'), PRD 6.1절 설명만 끝에 '조정'을 붙인다고 서술함."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (9) '임무끝'에 대한 FDC 응답 문구의 실제 표현 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 방위사업청 《국방 통합 용어 사전》('연속사격' 항목)에서 사격 종료 명령어로 '임무 끝, 사격 멈춰'라는 공식 한국군 포병 문구가 확인됨. [확인 불가] 관측자의 '임무 끝' 보고 직후 FDC가 관측자에게 무전으로 회신하는 정확한 표준 응답 문구(예: 데모의 '전포대 임무끝' vs 복창)는 공개 1차 자료에서 확인 불가함.",
+    "source_url": "https://kli.korean.go.kr/term/trgtWord/indexTrgtWord.do?trgtWordNo=221609991",
+    "source_title": "연속사격 (Continuous Fire) — 방위사업청 《국방 통합 용어 사전》 / 국립국어원 온용어",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "일제 사격의 연속으로 ‘임무 끝, 사격 멈춰’ 할 때까지 지속적으로 사격하는 사격 방법.",
+    "version_or_date_of_source": "2021 (국방 통합 용어 사전)",
+    "confidence": "medium",
+    "limitations": "1차 자료에서는 '임무 끝, 사격 멈춰' 구령의 존재만 확인됨. 2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920)에서는 관측자가 '표적 제압 사격임무 끝'을 보내면 FDC가 포대에 '전포대 사격임무 끝 차렷! 원위치'를 하달하며, kh179.pages.dev/js/c2.js(346행)에서는 FDC가 관측자에게 '사격 종료, [효과], 표적번호 [번호] 기록, 이상'으로 복창·회신함.",
+    "conflicts_with_other_sources": [
+      "데모(OBSERVER_demo_v0.2.html)는 FDC가 관측자에게 '전포대 임무끝.'이라고 응답하나, 2차 자료(bemil #88920)에서 '전포대 사격임무 끝 차렷! 원위치'는 FDC가 포대(포반)에 내리는 구령이고 대관측자 무전은 복창 형태임."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (10) 관측소 이동 통보와 위치 보고의 실제 교신 문구 여부 (확인됨 vs 확인 불가)",
+    "fact": null,
+    "source_url": null,
+    "source_title": null,
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": null,
+    "version_or_date_of_source": null,
+    "confidence": "low",
+    "limitations": "[공개 공식 자료 확인 불가] 방위사업청 《국방 통합 용어 사전》(kli.korean.go.kr), 국방 학술논문(kci.go.kr), 미군 교범(B2C2437)을 모두 검색했으나 관측소(OP) 진지 변환·이동 개시 통보('관측소 이동. 완료 후 보고하겠음.') 및 점령 후 위치 보고('관측소 이동 완료. 현 위치 좌표 …')의 정형화된 구두 무전 문구는 공개된 1차 공식 자료에 존재하지 않음. [2차 자료 참고] kh179.pages.dev에서도 관측반 이동은 시스템 상태 표시('장비 철수·승차 → 이동 중 → 하차·장비 설치·관측소 구축')로만 구현되어 있고 별도 표준 무전 예문은 없음.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "PRD 11.1 (11) 적정 단계 용어('탐지'·'병종 식별'·'적정 확인')가 실제 쓰던 말과 맞는지 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 한국군 감시·관측 체계 및 국방 과학기술 학술지의 공식 표적 획득(Target Acquisition) 3단계 용어는 '탐지(Detection) → 인식(Recognition) → 식별(Identification)'이며, 방위사업청 《국방 통합 용어 사전》('포병 관측 장비')에서도 '표적을 탐지하여 포병사격요청'한다는 표현이 확인됨. 반면 PRD/데모의 2·3단계 명칭인 '병종 식별'과 '적정 확인'은 공식 단계명이 아닌 게임 UI·상황보고용 평서 표현임.",
+    "source_url": "https://www.kimst.or.kr/electronic_paper/pdf_down.kin?idx=10940",
+    "source_title": "한국군사과학기술학회지 논문 (전자광학 관측장비 표적 탐지·인식·식별 단계 기준) 및 방위사업청 《국방 통합 용어 사전》 '포병 관측 장비'(trgtWordNo=221616915)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "표적을 탐지하여 포병사격요청을 하는 주·야간 관측장비로서 주로 포병부대 관측반에 배치되며 레이저거리측정기, 열상관측기, 전자식 측각기로 구성되어 표적제원을 자동 산출",
+    "version_or_date_of_source": "한국군사과학기술학회지 / 방위사업청 국방 통합 용어 사전 (2021)",
+    "confidence": "high",
+    "limitations": "광학·열상 관측 교리상 1단계 '탐지(유무 파악)' → 2단계 '인식(보병/장갑차/화포 등 병종·범주 구분)' → 3단계 '식별(구체적 제원·활동·수량 파악)'로 구분되므로, 게임의 '병종 식별'은 교리상 '인식(Recognition)'에, '적정 확인'은 '식별(Identification)' 및 표적성질 산출 단계에 해당함.",
+    "conflicts_with_other_sources": [
+      "공식 국방 표적획득 단계('탐지 → 인식 → 식별')와 PRD/데모의 단계 명칭('탐지 → 병종 식별 → 적정 확인') 간에 2·3단계 용어 차이가 있음."
+    ]
+  },
+  {
+    "question": "PRD 11.1 (12) 표적성질 문구('사격중인 적 장갑차 2대', '사격중인 적 박격포 3문')의 실제 표현 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 한국통신학회논문지 게재 한국군 포병대대 사격지휘체계(BTCS) 논문과 미군 교범(B2C2437)에 따르면, 포병 표적분석 및 표적성질(Target Description) 보고는 '표적의 활동 상태(사격중/집결중 등), 표적 종류(보병/장갑차/박격포 등), 크기·수량(명/대/문), 방호·노출 정도'의 4대 요소로 구성됨. [확인 불가] 개별 병종별 구두 무전 문장의 고정 표준어순은 야전교범 비공개로 1차 자료에서 직접 검증 불가함.",
+    "source_url": "https://engjournal.kics.or.kr/digital-library/manuscript/file/33792/NODE01552797.pdf",
+    "source_title": "포병대대 사격지휘체계의 전술적 사격지휘 자동화 방안 연구 — 한국통신학회논문지 (KICS)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "표적분석 단계에서는 표적의 활동 상태, 크기, 방호 정도 등을 고려하여 표적에 대한 위협 가치를 평가한다.",
+    "version_or_date_of_source": "한국통신학회논문지 (KICS, NODE01552797)",
+    "confidence": "high",
+    "limitations": "1차 학술자료(BTCS 논문)와 미군 교범(B2C2437)에서 표적성질의 구성 요소(활동 상태·종류·크기·방호 정도)는 명확히 확인됨. 2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920)의 '야지에 노출된 적 보병 20명'과 kh179.pages.dev/js/c2.js의 '적 포병 진지 (견인포 4문)' 사례에 비추어 볼 때, 데모의 '사격중인 적 장갑차 2대', '사격중인 적 박격포 3문'은 한국어 수분류사(명·대·문)와 어순에 부합하나 '노출/엄폐' 등 방호 상태가 생략된 형태임.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "PRD 11.1 (13) 효과 보고 세 단계('파괴'·'무력화'·'효과 미흡')의 실제 표현과 기준 여부 (확인됨 vs 확인 불가)",
+    "fact": "[확인됨] 방위사업청 《국방 통합 용어 사전》('전장기능', '파괴사격', '제압') 및 한국통신학회논문지 BTCS 논문에 따르면, 한국군 포병 교리의 공식 화력 효과 3단계는 '파괴(Destruction)', '무력화(Neutralization)', '제압(Suppression)'임. 반면 PRD/데모의 3번째 단계인 '효과 미흡'은 공식 교리 등급이 아닌 관측자의 비정형 평가 표현이며, 데모의 피해율 기준(70% 이상 파괴, 30~69% 무력화, 30% 미만 효과 미흡)도 게임용 자체 규칙임. [확인 불가] 한국군 교범의 사격결과판정(BDA) 세부 정량 기준(%)과 구두 보고 문구는 공개 1차 자료로 확인 불가함.",
+    "source_url": "https://kli.korean.go.kr/term/trgtWord/indexTrgtWord.do?trgtWordNo=221613183",
+    "source_title": "전장기능 (화력: 제압·무력화·파괴) — 방위사업청 《국방 통합 용어 사전》 및 한국통신학회논문지 BTCS 논문(NODE01552797)",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "적 전투력을 제압하고 무력화 및 파괴를 행하여 아군의 기동을 지원하며, 적의 기동은 방해 및 저지시키고 중심을 파괴하는 기능을 함.",
+    "version_or_date_of_source": "2021 (국방 통합 용어 사전) / 한국통신학회논문지",
+    "confidence": "high",
+    "limitations": "1차 자료에서 화력의 3대 효과 용어가 '파괴·무력화·제압'임은 명확히 확인되나, 미군 교범에서 흔히 인용되는 정량 기준(파괴 30% 이상 피해, 무력화 10% 이상 피해)이 한국군 관측반의 효력사 직후 즉각 구두 보고에 그대로 쓰이는지는 한국군 공개 1차 자료에 없음. 2차 자료인 유용원의 군사세계 예문(bemil.chosun.com #88920)은 '적 5명 사살 어쩌구 저쩌구 표적 제압 사격임무 끝'처럼 사상자 추정치와 '표적 제압'을 함께 보고하며, kh179.pages.dev/js/c2.js(343행)는 '표적 파괴 / 표적 제압 / 효과 미흡'의 3단계를 사용함.",
+    "conflicts_with_other_sources": [
+      "교리상 화력 3대 효과는 '파괴(Destruction) · 무력화(Neutralization) · 제압(Suppression)'(국방 통합 용어 사전, BTCS 논문)이나, PRD/데모는 '제압' 대신 '효과 미흡'을 3번째 단계로 두었으며 피해율 기준(70%/30%)도 일반 포병 교리(파괴 30%, 무력화 10%)보다 높게 설정되어 있음."
+    ]
+  }
+]
