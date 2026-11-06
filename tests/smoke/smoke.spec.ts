@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
-  await page.goto('/');
+  // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
+  await page.goto('/?seed=20261106');
   const tick = page.getByRole('status', { name: '틱' });
   await expect(tick).toBeVisible();
   // 작전 준비: the clock stands still.
@@ -24,19 +25,20 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   });
   expect(colours).toBeGreaterThan(8);
 
-  // 관측소 후보: pressing the map's centre picks it, then 작전 개시 starts the clock.
+  // 관측소 후보: pressing an open field north of 1번 고지 picks it, then 작전 개시 starts the clock.
+  // (The map's centre is forest on this seed: the eye stands under the canopy and sees only trees.)
   const prep = page.getByRole('region', { name: '작전 준비' });
-  await expect(prep).toContainText('일일 ');
+  await expect(prep).toContainText('연습 20261106');
   const box = (await map.boundingBox())!;
-  await map.click({ position: { x: box.width / 2, y: box.height / 2 } });
-  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3512');
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await expect(tick).toHaveText('0');
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
   await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
   const first = Number(await tick.textContent());
   await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(first);
   // Not the planned post: 위치 보고 is required.
-  await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3512 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
+  await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3256 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
 
   // 관측 화면: 화살표가 조준을, B가 쌍안경을 바꾼다
   const view = page.getByRole('img', { name: '관측 화면' });
@@ -49,7 +51,15 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
         for (let x = c.width / 16; x < c.width; x += c.width / 8) out.push(ctx.getImageData(x | 0, y | 0, 1, 1).data.join());
       return out.join(';');
     });
-  await expect.poll(async () => new Set((await pixels()).split(';')).size).toBeGreaterThan(4); // terrain is drawn
+  // Terrain is drawn: the lower part of the view (ground at the default -22 mil) holds many colours, not a blank or a wall.
+  const shades = () =>
+    view.evaluate((c: HTMLCanvasElement) => {
+      const d = c.getContext('2d')!.getImageData(0, c.height * 0.6 | 0, c.width, c.height * 0.4 | 0).data;
+      const seen = new Set<number>();
+      for (let i = 0; i < d.length; i += 4) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
+      return seen.size;
+    });
+  await expect.poll(shades).toBeGreaterThan(32);
   const before = await pixels();
   await page.keyboard.press('Shift+ArrowRight');
   await expect.poll(pixels).not.toBe(before);
