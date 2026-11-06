@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>[PROTOTYPE 모바일 세로] OBSERVER — 포병 관측 데모</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0c100b;--panel:#131911;--panel2:#182014;--line:#2a3525;--txt:#d9ddc9;--dim:#8b947c;--amber:#e8b04a;--red:#e2604a;--blue:#62aee6;--green:#93c86e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:'Nanum Gothic Coding',ui-monospace,Menlo,monospace;font-size:14px}
+header{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--line);background:#0f140d}
+.brand{font-weight:700;letter-spacing:.12em;color:var(--amber)}
+.brand small{color:var(--dim);font-weight:400;margin-left:8px;letter-spacing:0}
+.hctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+button{font:inherit;color:var(--txt);background:#1c2418;border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
+button:hover:not(:disabled){background:#27321f}
+button.on{background:var(--amber);color:#17130a;font-weight:700}
+button:disabled{opacity:.38;cursor:default}
+button.primary{background:#34441f;border-color:#5b7234;font-weight:700}
+button.fire{background:#7c2a1c;border-color:#b5452f;font-weight:700;font-size:16px;padding:10px 18px}
+.stat{color:var(--dim);white-space:nowrap}.stat b{color:var(--txt)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:10px;padding:10px;max-width:1520px;margin:0 auto}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
+#viewWrap{position:relative;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;touch-action:none;cursor:crosshair;user-select:none}
+#view{width:100%;height:100%;display:block}
+#viewBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0}
+#laseOut{color:var(--amber);margin-left:auto;font-size:13px}
+#bottom{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:10px}
+@media(max-width:700px){#bottom{grid-template-columns:1fr}}
+#map{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated;cursor:crosshair;border-radius:4px;background:#000}
+#romer{margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:30px;color:var(--amber)}
+h3{margin:0 0 8px;font-size:12px;color:var(--dim);letter-spacing:.12em;font-weight:700}
+#tlist,#llist{list-style:none;margin:0 0 12px;padding:0}
+#tlist li,#llist li{padding:5px 0;border-bottom:1px dashed #253020;font-size:13px}
+.red{color:var(--red)}.amb{color:var(--amber)}.grn{color:var(--green)}.blu{color:var(--blue)}.dim{color:var(--dim)}
+#right{display:flex;flex-direction:column;gap:10px;min-height:0}
+@media(min-width:1001px){#right{position:sticky;top:10px;height:calc(100vh - 80px)}}
+#composer{background:var(--panel2)}
+.step{color:var(--amber);font-weight:700;margin-bottom:8px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.row label{display:inline-flex;gap:4px;align-items:center}
+select,input[type=number],input[type=text]{font:inherit;background:#0e130c;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:4px 6px}
+input[type=number]{width:84px}input.g4{width:70px;letter-spacing:.1em}
+.preview{margin:8px 0;padding:8px;border-left:3px solid var(--amber);background:#0e130c;font-size:13px;line-height:1.5;min-height:22px}
+.hint{margin-top:8px;color:var(--dim);font-size:12px;line-height:1.5}
+.wait{color:var(--dim)}
+#logCard{flex:1;min-height:220px;display:flex;flex-direction:column}
+#log{flex:1;overflow:auto;font-size:13px;max-height:60vh}
+.msg{padding:4px 0;border-bottom:1px dashed #212a1c;line-height:1.5}
+.msg .t{color:var(--dim);font-size:11px;margin-right:6px}
+.msg .who{font-weight:700;margin-right:6px}
+.msg.fo .who{color:var(--amber)}.msg.fdc .who{color:var(--green)}
+.msg.sys{color:var(--dim);font-size:12px}.msg.warn{color:var(--red);font-size:12px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.modal .box{max-width:680px;width:100%;max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 22px;line-height:1.6}
+.modal h2{margin:0 0 6px;color:var(--amber);letter-spacing:.08em}
+.csRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.02)}
+.csRow input{font:inherit;font-size:16px;padding:6px 10px;width:150px;background:#0b0f0c;color:var(--amber);border:1px solid var(--line);border-radius:4px;letter-spacing:.06em}
+.csMsg{font-size:12px;min-height:16px}
+.rkTabs{display:flex;gap:4px;margin:8px 0;flex-wrap:wrap}
+.rkTabs button.on{background:var(--amber);color:#111}
+tr.me td{color:var(--amber);font-weight:600}
+.metric{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin:8px 0}
+.metric div{border:1px solid var(--line);border-radius:5px;padding:6px 8px}
+.metric b{display:block;font-size:17px;color:var(--amber)}
+.metric span{font-size:11px;color:var(--dim,#8a8)}
+details.payload pre{max-height:240px;overflow:auto;font-size:11px;background:#0b0f0c;padding:8px;border-radius:4px;white-space:pre-wrap}
+.modal table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}
+.modal td,.modal th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+kbd{background:#222b1d;border:1px solid #3a4732;border-radius:3px;padding:0 5px;font-size:12px}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border:1px solid var(--line);border-radius:10px;color:var(--dim);margin-left:6px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">OBSERVER <small>포병 관측 데모 v0.2 · 목업 데이터</small></div>
+  <div class="hctl">
+    <span class="dim">모드</span>
+    <span class="seg"><button id="mTrain" class="on">훈련</button><button id="mStd">표준</button></span>
+    <span class="dim">화질</span>
+    <span class="seg"><button data-res="480">보통</button><button data-res="640" class="on">높음</button><button data-res="960">최고</button></span>
+    <span class="dim">배속</span>
+    <span class="seg"><button data-sp="1">×1</button><button data-sp="2" class="on">×2</button><button data-sp="4">×4</button><button data-sp="8">×8</button></span>
+    <button id="pauseBtn">일시정지</button>
+    <button id="muteBtn">소리 켜짐</button>
+    <button id="ttsBtn" title="기러기 교신을 음성으로 읽어 줌">음성 꺼짐</button>
+    <span class="stat">호출부호 <b id="csChip" class="amb">—</b> <small id="netChip" class="dim"></small></span>
+    <span class="stat">시드 <b id="seedChip">—</b></span>
+    <button id="rankBtn">랭킹</button>
+    <span class="stat">기상 <b id="wxChip">—</b></span>
+    <span class="stat">경과 <b id="clock">00:00</b></span>
+    <span class="stat">점수 <b id="score">0</b></span>
+    <span class="stat">사용 탄 <b id="ammo">0</b></span>
+  </div>
+</header>
+
+<main>
+  <section id="left">
+    <div id="viewWrap"><canvas id="view"></canvas></div>
+    <div id="viewBar">
+      <button id="binoBtn">쌍안경 <kbd>B</kbd></button>
+      <button id="laseBtn">레이저 <kbd>R</kbd></button>
+      <button data-turn="-1">◀</button><button data-turn="1">▶</button>
+      <button data-tilt="1">▲</button><button data-tilt="-1">▼</button>
+      <span id="laseOut">레이저 측정 없음</span>
+    </div>
+    <div id="bottom">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0;flex:1">지도 (가상)</h3>
+          <button id="zOut" title="축소">−</button><b id="zoomLvl" style="min-width:34px;text-align:center">×1</b><button id="zIn" title="확대">+</button><button id="zAll">전체</button><button id="zOP">관측소로</button></div>
+        <canvas id="map" width="512" height="512" style="touch-action:none"></canvas>
+        <div class="dim" style="font-size:11px;margin-top:4px">누르기 = 좌표자·관측소 이동 · 휠·두 손가락 = 확대(최대 ×8) · 끌기 = 이동 · ×3부터 100 m 방안선</div>
+        <div id="romer"><span class="dim">지도를 누르면 그 지점의 8자리 좌표를 읽습니다.</span></div>
+        <label id="vsWrap" style="display:inline-flex;gap:6px;align-items:center;margin-top:6px;font-size:12px"><input type="checkbox" id="vsChk"> 가시권 표시 <span class="dim">(훈련 전용 · 관측소에서 보이지 않는 땅을 어둡게)</span></label>
+      </div>
+      <div class="card">
+        <h3>식별 표적</h3>
+        <ul id="tlist"><li class="dim">아직 식별한 표적이 없습니다. 쌍안경으로 북쪽 능선을 살피고, 적을 찾으면 화면을 누르십시오.</li></ul>
+        <h3>레이저 기록</h3>
+        <ul id="llist"><li class="dim">—</li></ul>
+        <h3>관측 책임구역</h3>
+        <div class="dim" style="font-size:12px;line-height:1.6">방위각 5600 ~ 0800 밀 · 아군 1~3소대 진지(지도 파란 표시) 전방<br>포대(기러기): 남쪽 약 8~10 km · 155mm 견인포 6문</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="right">
+    <div class="card" id="composer"></div>
+    <div class="card" id="logCard">
+      <h3>무전 기록 — 사격망</h3>
+      <div id="log"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="intro">
+  <div class="box">
+    <h2>OBSERVER — 관측 데모</h2>
+    <div class="dim">가상 전장 · 목업 지형 · 근사 탄도 모델 (실제 교범·사표 아님)</div>
+    <p>귀하는 관측장교입니다. 아래 닉네임이 그대로 <b>무전 호출부호</b>가 됩니다. 먼저 <b>첩보와 지도</b>를 보고 관측소 자리를 고릅니다. 작전이 시작되면 적이 북쪽 능선 너머에서 <b class="blu">아군 소대 진지</b>로 공격해 옵니다. 적은 처음에 아무것도 알려지지 않습니다. 쌍안경으로 찾아 누르면 <b>탐지</b>, 계속 지켜보면 <b>병종</b>과 <b>규모·활동</b>이 드러납니다. 그다음 거리를 재고 포대 사격지휘소 <b class="grn">기러기</b>에게 사격요구를 하십시오.</p>
+    <p class="dim" style="font-size:13px">같은 날에는 모두 같은 <b>일일 시드</b>(적 배치·기상·탄도 편차)로 경쟁합니다. 주소에 <code>?seed=숫자</code>를 붙이면 그 배치로 연습할 수 있고, 연습 기록은 랭킹에서 제외됩니다.</p>
+    <table>
+      <tr><th>조작</th><th>내용</th></tr>
+      <tr><td>화면 드래그 · <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></td><td>시선 이동 (<kbd>Shift</kbd> 누르면 10배)</td></tr>
+      <tr><td><kbd>B</kbd></td><td>육안 ↔ 쌍안경 7× (밀 눈금 레티클)</td></tr>
+      <tr><td>화면 누르기</td><td>보이는 적(사람·차량·먼지·사격 연기)을 눌러 탐지. 쌍안경 안에 두고 지켜보면 적정 확인</td></tr>
+      <tr><td><kbd>R</kbd></td><td>레이저 거리측정 (레티클 중앙 기준)</td></tr>
+      <tr><td>지도 누르기</td><td>좌표자: 그 지점의 8자리 좌표 읽기</td></tr>
+      <tr><td><kbd>F</kbd></td><td>지명사일 때 "준비 쏴"</td></tr>
+      <tr><td>방향</td><td>첫 수정 때 관측자–표적 방위각(화면 상단 방위각)을 "방향 ○○○○"으로 보냄. 좌·우, 줄이기·늘리기는 이 방향을 기준으로 적용됨</td></tr>
+      <tr><td>수정 단위</td><td>좌·우 10 m, 줄이기·늘리기 50 m. 위험근접(아군 600 m 이내)이면 한 번에 100 m까지</td></tr>
+      <tr><td>지도 누르기 → 이동</td><td>관측소 이동(도보). 도착 후 장비 설치 30초, 그다음 기러기에게 위치 보고</td></tr>
+    </table>
+    <p class="dim" style="font-size:13px"><b>훈련 모드</b>는 레이저 측정점의 좌표를 자동으로 계산하고, 탄착 편의(m)와 실제 전과를 보여 줍니다. <b>표준 모드</b>에서는 지도와 밀 눈금(편의 m = 거리 km × 밀)으로 직접 판단해야 합니다.</p>
+    <div class="csRow"><label for="csIn"><b>호출부호</b> <span class="dim">(닉네임)</span></label>
+      <input id="csIn" maxlength="8" autocomplete="off" spellcheck="false" placeholder="예: 갈매기">
+      <span class="dim" style="font-size:12px">한글·영문·숫자 2–8자 · 회원가입 없음</span>
+      <div class="csMsg" id="csMsg" style="width:100%"></div>
+      <div id="tsBox" style="width:100%"></div>
+      <div class="dim" style="font-size:11px;width:100%">무전에서 “기러기, 여기는 <b class="amb" id="csEcho">갈매기</b>”로 쓰이고 랭킹에도 이 이름이 올라갑니다. <span id="netNote">로그인은 익명 세션(Supabase)으로 처리되며, 이 데모에서는 서버 없이 목업으로 동작합니다.</span></div></div>
+    <button class="primary" id="startBtn" style="font-size:16px;padding:9px 20px">작전 준비</button> <button id="rankBtnIntro">랭킹 보기</button>
+  </div>
+</div>
+
+<div class="modal" id="debrief" style="display:none"><div class="box" id="debriefBox"></div></div>
+<div class="modal" id="rank" style="display:none;z-index:30"><div class="box" id="rankBox"></div></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const TAU=Math.PI*2, MIL=6400/TAU;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const mod=(a,n)=>((a%n)+n)%n;
+function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+/* ---- 시드와 난수 스트림 ----
+   ?seed=숫자 가 있으면 그 값(연습 · 랭킹 제외), 없으면 일일 시드(한국 시간 날짜, 예 20261106).
+   난수는 용도별로 스트림을 나눠 플레이어 행동이 다른 영역의 난수를 밀지 않게 한다(서버 재생 검증 전제). */
+const URLSEED=new URLSearchParams(location.search).get('seed');
+const kstDay=()=>{const d=new Date(Date.now()+9*3600e3);return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate()};
+const SEED_KIND=URLSEED!=null&&/^\d{1,9}$/.test(URLSEED)?'custom':'daily';
+const SEED=SEED_KIND==='custom'?(+URLSEED)|0:kstDay();
+const RNG={scn:mulberry32(SEED),bal:mulberry32(SEED^0x5bd1e995),fdc:mulberry32(SEED^0x1b873593),exp:mulberry32(SEED^0x68e31da4),ai:mulberry32(SEED^0x3c6ef372)};
+const rS=RNG.scn,rB=RNG.bal,rF=RNG.fdc,rE=RNG.exp,rA=RNG.ai;   // 시나리오 · 탄도 · FDC 판단 · 발각 · 적/아군 행동
+const gaussOf=r=>{let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(TAU*r())};
+const gS=()=>gaussOf(rS),gB=()=>gaussOf(rB),gA=()=>gaussOf(rA),gE=()=>gaussOf(rE);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* ---- 입력 기록: 모든 플레이어 행동을 틱 번호와 함께 남긴다(재생 검증용) ---- */
+const INPUTS=[];let tick=0;
+const logIn=(a,v)=>{INPUTS.push(v===undefined?{t:tick,a}:{t:tick,a,v})};
+const fmtT=t=>{t=Math.max(0,Math.floor(t));return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')};
+
+/* ================= 목업 지형 (절차 생성 높이맵) ================= */
+const N=1024, CELL=10, SIZE=N*CELL;         // 10.24 km 정사각, 10 m 간격
+const GROUND=new Float32Array(N*N), SURF=new Float32Array(N*N);
+const CR=new Uint8Array(N*N), CG=new Uint8Array(N*N), CB=new Uint8Array(N*N), FOREST=new Uint8Array(N*N);
+const OBS={x:5120,y:1800};                 // 실제 관측소 위치(이동하면 바뀜)
+const OPS={state:'ready',move:null,setupUntil:0,fdc:{x:5120,y:1800},unreported:false,moves:0,dest:null};   // fdc = 기러기가 알고 있는 관측소 위치
+const EYE_H=3.5;                             // 관측 눈높이(서서 쌍안경·삼각대 장비 기준)
+const FRONT_Y=3650;                         // 아군 전선(FEBA) 표시선 — 넘어갈 수 있지만 발각·피격 위험이 커짐
+const PLANNED_OP={x:5120,y:1800};           // 작전명령상 계획된 관측소(1번 고지)                      // 아군 진지선 너머로는 이동 불가
+const FRIEND=[{x:4350,y:3380,name:'아군 1소대'},{x:5150,y:3460,name:'아군 2소대'},{x:5950,y:3380,name:'아군 3소대'}];
+const BATT={x:4200,y:-4600};                // 포대 위치(지도 밖, 남쪽)
+const GZD='CH', E0=40000, N0=30000;          // 가상 방안좌표 원점
+
+function hash(ix,iy,s){let h=(Math.imul(ix,374761393)+Math.imul(iy,668265263)+Math.imul(s,982451653))|0;h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return(h>>>0)/4294967296}
+function vnoise(x,y,s){const ix=Math.floor(x),iy=Math.floor(y);let fx=x-ix,fy=y-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);const a=hash(ix,iy,s),b=hash(ix+1,iy,s),c=hash(ix,iy+1,s),d=hash(ix+1,iy+1,s);return(a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy)*2-1}
+function fbm(x,y,s,o){let v=0,a=.5,f=1;for(let i=0;i<o;i++){v+=a*vnoise(x*f,y*f,s+i*17);a*=.5;f*=2.03}return v}
+const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+const riverY=x=>3950+180*Math.sin(x/900)+60*Math.sin(x/310);
+
+/* ---- 목업 정주지·도로 (가상 지명) ---- */
+const VILLAGES=[
+  {name:'청계읍',x:4300,y:1050,r:330,n:120,town:true},
+  {name:'새터마을',x:4720,y:2930,r:170,n:28},
+  {name:'솔미리',x:6350,y:3020,r:160,n:22},
+  {name:'아랫말',x:3200,y:3250,r:140,n:16},
+  {name:'갈골',x:3700,y:4450,r:150,n:18},
+  {name:'북원리',x:5650,y:5350,r:170,n:24},
+  {name:'윗말',x:2700,y:6250,r:120,n:12},
+];
+const ROADS=[
+  [{x:300,y:3150},{x:3200,y:3250},{x:4720,y:2930},{x:5600,y:3100},{x:6350,y:3020},{x:9900,y:3200}],   // 골짜기 도로
+  [{x:4300,y:1050},{x:4380,y:1800},{x:4500,y:2500},{x:4720,y:2930}],                                    // 청계읍 → 고개 → 새터
+  [{x:4720,y:2930},{x:4900,y:3900},{x:5650,y:5350},{x:5900,y:6900},{x:6100,y:9900}],                     // 북쪽으로 가는 도로(다리 포함)
+  [{x:3200,y:3250},{x:3700,y:4450},{x:2700,y:6250},{x:2400,y:9900}],
+  [{x:3700,y:4450},{x:5650,y:5350}],
+  [{x:300,y:900},{x:4300,y:1050},{x:9900,y:1300}],
+];
+const BLD=new Float32Array(N*N),ROAD=new Uint8Array(N*N),VILL=new Uint8Array(N*N);
+const BR=new Uint8Array(N*N),BG=new Uint8Array(N*N),BB=new Uint8Array(N*N);   // 조명 전 기본색
+function genTerrain(){
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const x=i*CELL,y=j*CELL;
+    let h=170+120*fbm(x/2400,y/2400,11,6);
+    h+=170*Math.exp(-(((y-1800)/420)**2))*(0.75+0.35*fbm(x/1500,y/1500,23,3));
+    h+=80*Math.exp(-(((x-OBS.x)**2+(y-OBS.y)**2)/(170*170)));
+    h-=95*Math.exp(-(((y-3800)/950)**2));
+    h+=150*ss(4600,7600,y)*(0.8+0.4*fbm(x/1800,y/1800,31,3));
+    h+=320*ss(8200,10240,y)*(0.7+0.5*fbm(x/1200,y/1200,41,4));
+    h-=60*ss(1300,0,y);
+    for(const f of FRIEND)h+=28*Math.exp(-(((x-f.x)**2+(y-f.y)**2)/(300*300)));
+    const rd=Math.abs(y-riverY(x)); if(rd<120)h-=12*(1-rd/120);
+    GROUND[j*N+i]=Math.max(40,h);
+  }
+  // 마을 터 고르기(평탄화)
+  for(const v of VILLAGES){const c=sampleH(GROUND,v.x,v.y),R=v.r*1.6;
+    for(let j=Math.max(0,((v.y-R)/CELL)|0);j<=Math.min(N-1,((v.y+R)/CELL)|0);j++)for(let i=Math.max(0,((v.x-R)/CELL)|0);i<=Math.min(N-1,((v.x+R)/CELL)|0);i++){
+      const d=Math.hypot(i*CELL-v.x,j*CELL-v.y);if(d>R)continue;const w=0.75*(1-ss(v.r*0.7,R,d));const k=j*N+i;GROUND[k]=GROUND[k]*(1-w)+c*w;VILL[k]=1}}
+  // 도로
+  for(const rd of ROADS)for(let s=1;s<rd.length;s++){const a=rd[s-1],b=rd[s],L=Math.hypot(b.x-a.x,b.y-a.y);
+    for(let t=0;t<=L;t+=8){const x=a.x+(b.x-a.x)*t/L+18*Math.sin(t/260),y=a.y+(b.y-a.y)*t/L,i=(x/CELL)|0,j=(y/CELL)|0;if(i>=0&&i<N&&j>=0&&j<N)ROAD[j*N+i]=1}}
+  // 건물
+  const R2=mulberry32(4242);
+  for(const v of VILLAGES)for(let n=0;n<v.n*2;n++){const a=R2()*TAU,d=Math.sqrt(R2())*v.r,x=v.x+Math.cos(a)*d,y=v.y+Math.sin(a)*d,i=(x/CELL)|0,j=(y/CELL)|0;if(i<0||i>=N||j<0||j>=N)continue;const k=j*N+i;
+    if(ROAD[k])continue;const big=v.town&&R2()<0.12,hgt=big?18+R2()*14:v.town?6+R2()*5:4.5+R2()*3;
+    const w=big?2+((R2()*2)|0):1,d2=big?2+((R2()*3)|0):(R2()<0.4?2:1);
+    for(let dj=0;dj<d2;dj++)for(let di=0;di<w;di++){const kk=Math.min(N-1,j+dj)*N+Math.min(N-1,i+di);if(!ROAD[kk])BLD[kk]=hgt}}
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const k=j*N+i,x=i*CELL,y=j*CELL;
+    const g=fbm(x/700,y/700,57,4)+0.25*fbm(x/180,y/180,61,2);
+    const dObs=Math.hypot(x-OBS.x,y-OBS.y);
+    let f=g>0.12&&dObs>350&&y>2300;
+    if(y<2300&&g>0.28&&dObs>500)f=true;
+    for(const fr of FRIEND)if(Math.hypot(x-fr.x,y-fr.y)<220)f=false;
+    if(Math.abs(y-riverY(x))<45||VILL[k]||ROAD[k]||BLD[k])f=false;
+    FOREST[k]=f?1:0;
+    SURF[k]=GROUND[k]+(f?12+5*hash(i,j,5):0)+BLD[k];
+    // 기본색
+    let r,gg,b;const gr=GROUND[k];
+    if(BLD[k]){const p=[[150,72,56],[72,92,132],[122,122,116],[82,112,92],[172,104,62],[196,190,178]][(hash(i,j,21)*6)|0];[r,gg,b]=p}
+    else if(ROAD[k]){r=160;gg=150;b=128}
+    else if(Math.abs(y-riverY(x))<30){r=78;gg=104;b=122}
+    else if(VILL[k]&&hash(i,j,23)>0.35){r=176;gg=164;b=128}
+    else if(f){if(fbm(x/400,y/400,71,2)>0.0){r=56;gg=76;b=44}else{r=126;gg=90;b=46}if(hash(i,j,13)>0.86){r=152;gg=108;b=48}}
+    else if(gr<175&&fbm(x/500,y/500,83,3)>-0.15){const p=mod(Math.floor(x/160)+Math.floor(y/120)*2,3);r=[182,164,148][p];gg=[162,150,126][p];b=[104,92,78][p]}
+    else{r=152;gg=138;b=84}
+    BR[k]=r;BG[k]=gg;BB[k]=b;
+  }
+}
+/* ---- 조명: 낮은 서남서 햇빛 + 계곡 어둡게 + 구름량 반영 ---- */
+function shadeTerrain(){
+  const sunAz=(250)*Math.PI/180,sunEl=(WX?32-WX.cloud_cover*0.05:32)*Math.PI/180;
+  const L=[Math.sin(sunAz)*Math.cos(sunEl),Math.cos(sunAz)*Math.cos(sunEl),Math.sin(sunEl)];
+  const cloud=WX?WX.cloud_cover/100:0.2,dirK=1.05*(1-0.65*cloud),amb=0.42+0.3*cloud;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const k=j*N+i,i0=Math.max(0,i-1),i1=Math.min(N-1,i+1),j0=Math.max(0,j-1),j1=Math.min(N-1,j+1);
+    const hl=SURF[j*N+i0],hr=SURF[j*N+i1],hd=SURF[j0*N+i],hu=SURF[j1*N+i];
+    let nx=-(hr-hl)/(2*CELL),ny=-(hu-hd)/(2*CELL),nz=1;const nl=Math.hypot(nx,ny,nz);nx/=nl;ny/=nl;nz/=nl;
+    let lit=amb+dirK*Math.max(0,nx*L[0]+ny*L[1]+nz*L[2]);
+    // 오목한 곳(계곡)은 어둡게, 볼록한 곳(능선)은 밝게
+    let avg=0;for(let dj=-6;dj<=6;dj+=6)for(let di=-6;di<=6;di+=6){const ii=clamp(i+di,0,N-1),jj=clamp(j+dj,0,N-1);avg+=GROUND[jj*N+ii]}avg/=9;
+    lit*=clamp(1+(GROUND[k]-avg)*0.012,0.78,1.12);
+    if(!BLD[k]&&1-nz>0.22&&!FOREST[k]&&!ROAD[k])lit*=0.93;
+    const m=lit*(1+hash(i,j,9)*0.12-0.06+(FOREST[k]||BLD[k]?0:0.16*fbm(i*0.23,j*0.23,91,2)));
+    CR[k]=clamp(BR[k]*m,0,255);CG[k]=clamp(BG[k]*m,0,255);CB[k]=clamp(BB[k]*m,0,255);
+  }
+}
+function refl(v){if(v<0)v=-v;const m=SIZE-CELL-1e-3;if(v>m){v=2*m-v;if(v<0)v=0;}return v}
+function sampleH(arr,x,y){x=refl(x)/CELL;y=refl(y)/CELL;let ix=x|0,iy=y|0;if(ix>N-2)ix=N-2;if(iy>N-2)iy=N-2;const fx=x-ix,fy=y-iy,i=iy*N+ix;const a=arr[i],b=arr[i+1],c=arr[i+N],d=arr[i+N+1];return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy}
+function cellIdx(x,y){let i=(refl(x)/CELL)|0,j=(refl(y)/CELL)|0;if(i>N-1)i=N-1;if(j>N-1)j=N-1;return j*N+i}
+
+/* ================= 좌표·숫자 ================= */
+const AD=['공','하나','둘','삼','넷','오','여섯','칠','팔','아홉'];
+const dg=s=>[...String(s)].map(c=>AD[+c]??c).join('');
+function corrWord(n){const h=Math.floor(n/100),t=Math.floor((n%100)/10);let s='';if(h)s+=(h>=10?dg(h):AD[h])+'백';if(t)s+=(s?' ':'')+AD[t]+'십';return s||'공'}
+function toGrid(x,y){const e=Math.floor(mod(E0+x,100000)/10),n=Math.floor(mod(N0+y,100000)/10);return{e:String(e).padStart(4,'0').slice(-4),n:String(n).padStart(4,'0').slice(-4)}}
+function fromGrid(e,n){return{x:(+e)*10+5-E0,y:(+n)*10+5-N0}}
+const az4=rad=>String(Math.round(mod(rad*MIL,6400))%6400).padStart(4,'0');
+const azOf=(dx,dy)=>Math.atan2(dx,dy);
+
+/* ================= 렌더러: 보셀 지형 + 픽셀화 ================= */
+let VW=640,VH=360,RK=384/VW;                 // 관측 화면 내부 해상도(화질 설정)
+const low=document.createElement('canvas');let lctx,img,pix,pix32,ybuf,dbuf;
+function setRes(w){VW=w;VH=Math.round(w*9/16);RK=384/VW;low.width=VW;low.height=VH;lctx=low.getContext('2d');img=lctx.createImageData(VW,VH);pix=img.data;pix32=new Uint32Array(pix.buffer);ybuf=new Int32Array(VW);dbuf=new Float32Array(VW*VH)}
+setRes(640);
+const vc=$('#view'),vctx=vc.getContext('2d');
+const cam={h:0.02,p:-22/MIL,binoc:false};
+const EYE_FOV=60*Math.PI/180,BINO_FOV=7*Math.PI/180;
+let camZ=0,V=null;
+const pack=(r,g,b)=>(255<<24)|(b<<16)|(g<<8)|r;
+const FOG=[196,198,194],SKY=[[120,147,188],[202,205,206]];
+/* ================= 기상 (목업 · Open-Meteo current 응답과 같은 필드) ================= */
+const WX_PRESETS={
+  clear:{label:'맑음',weather_code:1,cloud_cover:15,visibility:24000,wind_speed_10m:2.6,wind_direction_10m:285,wind_gusts_10m:5.1,temperature_2m:9.4,relative_humidity_2m:48,pressure_msl:1023.4,precipitation:0},
+  haze:{label:'박무',weather_code:3,cloud_cover:70,visibility:6500,wind_speed_10m:1.4,wind_direction_10m:220,wind_gusts_10m:3.0,temperature_2m:6.1,relative_humidity_2m:88,pressure_msl:1017.2,precipitation:0},
+  rain:{label:'비',weather_code:61,cloud_cover:100,visibility:8000,wind_speed_10m:5.2,wind_direction_10m:200,wind_gusts_10m:9.8,temperature_2m:11.2,relative_humidity_2m:94,pressure_msl:1008.6,precipitation:2.4},
+  wind:{label:'강한 북서풍',weather_code:2,cloud_cover:40,visibility:20000,wind_speed_10m:10.8,wind_direction_10m:315,wind_gusts_10m:17.5,temperature_2m:2.3,relative_humidity_2m:35,pressure_msl:1027.9,precipitation:0},
+  fog:{label:'안개',weather_code:45,cloud_cover:100,visibility:2500,wind_speed_10m:0.7,wind_direction_10m:180,wind_gusts_10m:1.5,temperature_2m:4.0,relative_humidity_2m:99,pressure_msl:1020.1,precipitation:0},
+};
+let WX=null,WV={x:0,y:0},SIGMA=0.0002;
+const DIR16=['북','북북동','북동','동북동','동','동남동','남동','남남동','남','남남서','남서','서남서','서','서북서','북서','북북서'];
+const dir16=d=>DIR16[Math.round(mod(d,360)/22.5)%16];
+function setWeather(key){
+  WX={...WX_PRESETS[key],key,source:'목업(Open-Meteo current 형식)'};
+  const d=(WX.wind_direction_10m+180)*Math.PI/180;WV={x:Math.sin(d)*WX.wind_speed_10m,y:Math.cos(d)*WX.wind_speed_10m};   // 바람이 불어가는 방향
+  SIGMA=3.912/WX.visibility;                                   // 코슈미더: 시정 거리에서 대비 2%
+  const c=WX.cloud_cover/100,wet=WX.precipitation>0||WX.weather_code===45;
+  FOG[0]=Math.round(198-22*c-(wet?14:0));FOG[1]=Math.round(200-18*c-(wet?10:0));FOG[2]=Math.round(196-8*c-(wet?4:0));
+  SKY[0]=[Math.round(120+40*c),Math.round(147+18*c),Math.round(188-20*c)];SKY[1]=[...FOG];
+  shadeTerrain();if(mapBase)buildMap();
+  const ch=document.getElementById('wxChip');if(ch)ch.textContent=`${WX.label} · 시정 ${(WX.visibility/1000).toFixed(1)}km · ${dir16(WX.wind_direction_10m)} ${WX.wind_speed_10m.toFixed(1)}m/s`;
+}
+function wxText(){return `${WX.label} · 시정 ${(WX.visibility/1000).toFixed(1)} km · 구름 ${WX.cloud_cover}% · 바람 ${dir16(WX.wind_direction_10m)}(${WX.wind_direction_10m}°) ${WX.wind_speed_10m.toFixed(1)} m/s(순간 ${WX.wind_gusts_10m.toFixed(1)}) · ${WX.temperature_2m.toFixed(1)}°C · 습도 ${WX.relative_humidity_2m}% · ${WX.pressure_msl.toFixed(1)} hPa${WX.precipitation>0?` · 강수 ${WX.precipitation} mm/h`:''}`}
+function renderTerrain(){
+  const fov=cam.binoc?BINO_FOV:EYE_FOV,tanH=Math.tan(fov/2),focal=(VW/2)/tanH,hor=VH/2+Math.tan(cam.p)*focal;
+  const s0=SKY[0],s1=SKY[1];for(let y=0;y<VH;y++){const t=clamp((hor-y)/(VH*0.9),0,1);pix32.fill(pack((s1[0]+(s0[0]-s1[0])*t)|0,(s1[1]+(s0[1]-s1[1])*t)|0,(s1[2]+(s0[2]-s1[2])*t)|0),y*VW,(y+1)*VW)}
+  dbuf.fill(Infinity);
+  ybuf.fill(VH);
+  const dx=Math.sin(cam.h),dy=Math.cos(cam.h),rx=Math.cos(cam.h),ry=-Math.sin(cam.h);
+  let z=cam.binoc?40:4;const ZMAX=11500;
+  const SM=SIZE-CELL-1e-3;
+  while(z<ZMAX){
+    const half=z*tanH;let px=OBS.x+dx*z-rx*half,py=OBS.y+dy*z-ry*half;
+    const sx=rx*2*half/VW,sy=ry*2*half/VW;
+    let f=Math.min(0.97,1-Math.exp(-SIGMA*z));const near=z<450;const f1=1-f,fr=FOG[0]*f,fg=FOG[1]*f,fb=FOG[2]*f,inv=focal/z;
+    for(let i=0;i<VW;i++,px+=sx,py+=sy){
+      if(ybuf[i]===0)continue;
+      let qx=px,qy=py;if(qx<0||qx>SM||qy<0||qy>SM){qx=refl(qx);qy=refl(qy)}
+      const gx=qx/CELL,gy=qy/CELL;let ix=gx|0,iy=gy|0;if(ix>N-2)ix=N-2;if(iy>N-2)iy=N-2;
+      const fx=gx-ix,fy=gy-iy,k0=iy*N+ix,a=SURF[k0],b1=SURF[k0+1],c1=SURF[k0+N],d1=SURF[k0+N+1];
+      const h=a+(b1-a)*fx+(c1-a)*fy+(a-b1-c1+d1)*fx*fy;let yy=Math.floor((camZ-h)*inv+hor);
+      if(yy<ybuf[i]){if(yy<0)yy=0;const k=k0+(fy>=0.5?N:0)+(fx>=0.5?1:0);const tx=near?1+(hash((px*0.6)|0,(py*0.6)|0,3)-0.5)*0.22*(1-z/450):1;let cr,cg,cb;if(BLD[k]>0){cr=CR[k];cg=CG[k];cb=CB[k]}else{const w00=(1-fx)*(1-fy),w10=fx*(1-fy),w01=(1-fx)*fy,w11=fx*fy;cr=CR[k0]*w00+CR[k0+1]*w10+CR[k0+N]*w01+CR[k0+N+1]*w11;cg=CG[k0]*w00+CG[k0+1]*w10+CG[k0+N]*w01+CG[k0+N+1]*w11;cb=CB[k0]*w00+CB[k0+1]*w10+CB[k0+N]*w01+CB[k0+N+1]*w11}
+        const c=pack((cr*tx*f1+fr)|0,(cg*tx*f1+fg)|0,(cb*tx*f1+fb)|0);
+        const e=ybuf[i],b=BLD[k];
+        if((b>0||FOREST[k])&&e-yy>1){                          // 지붕/수관은 위쪽, 벽/줄기는 그 높이만큼만, 나머지는 땅색
+          const objPx=(SURF[k]-GROUND[k])*inv,top=yy+Math.max(1,Math.min(e-yy,(objPx*(b>0?0.35:0.5))|0)),side=Math.min(e,yy+Math.max(1,objPx|0));let c2;
+          if(b>0){const L=CR[k]/(BR[k]||1),wv=(1-0.15*hash(k,1,31))*L*f1;c2=pack((206*wv+fr)|0,(200*wv+fg)|0,(188*wv+fb)|0)}
+          else c2=pack((cr*0.72*tx*f1+fr)|0,(cg*0.72*tx*f1+fg)|0,(cb*0.72*tx*f1+fb)|0);
+          for(let y=yy;y<top;y++){pix32[y*VW+i]=c;dbuf[y*VW+i]=z}for(let y=top;y<side;y++){pix32[y*VW+i]=c2;dbuf[y*VW+i]=z}for(let y=side;y<e;y++){pix32[y*VW+i]=c;dbuf[y*VW+i]=z}}
+        else for(let y=yy;y<e;y++){pix32[y*VW+i]=c;dbuf[y*VW+i]=z}
+        ybuf[i]=yy}
+    }
+    z+=cam.binoc?(z<9000?Math.max(3,Math.min(10,z*0.0028)):z*0.004):Math.max(1.2,z*0.0072);
+  }
+  return{tanH,focal,hor};
+}
+function ridgeLines(){                                      // 깊이가 크게 바뀌는 곳(능선 윤곽)에 어두운 선
+  for(let y=1;y<VH;y++)for(let x=0;x<VW;x++){const i=y*VW+x,d=dbuf[i];if(d===Infinity)continue;const du=dbuf[i-VW];
+    if(du>d*1.25+50){const k=0.5*Math.exp(-SIGMA*d),o=i*4;pix[o]*=1-k;pix[o+1]*=1-k;pix[o+2]*=1-k}}
+}
+function proj(x,y,z){const rx=x-OBS.x,ry=y-OBS.y,s=Math.sin(cam.h),c=Math.cos(cam.h);const fwd=rx*s+ry*c;if(fwd<5)return null;const lat=rx*c-ry*s;return{sx:VW/2+lat/fwd*V.focal,sy:V.hor+(camZ-z)/fwd*V.focal,fwd,k:V.focal/fwd}}
+function los(x,y,z){const d=Math.hypot(x-OBS.x,y-OBS.y),n=clamp((d/15)|0,8,400);for(let s=1;s<n;s++){const t=s/n;if(sampleH(SURF,OBS.x+(x-OBS.x)*t,OBS.y+(y-OBS.y)*t)>camZ+(z-camZ)*t)return false}return true}
+function blend(i,R,G,B,a){pix[i]=pix[i]*(1-a)+R*a;pix[i+1]=pix[i+1]*(1-a)+G*a;pix[i+2]=pix[i+2]*(1-a)+B*a}
+function disc(cx,cy,r,R,G,B,a,grain){const x0=Math.max(0,Math.floor(cx-r)),x1=Math.min(VW-1,Math.ceil(cx+r)),y0=Math.max(0,Math.floor(cy-r)),y1=Math.min(VH-1,Math.ceil(cy+r)),r2=r*r;
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const ddx=x+.5-cx,ddy=y+.5-cy,d2=ddx*ddx+ddy*ddy;if(d2<=r2){if(grain&&hash(x,y,grain)>0.75)continue;blend((y*VW+x)*4,R,G,B,a*(1-0.35*d2/r2))}}}
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function posterize(){const S=16;for(let y=0;y<VH;y++){const by=(y&3)*4;for(let x=0;x<VW;x++){const i=(y*VW+x)*4,t=(BAYER[by+(x&3)]/16-0.5)*S;pix[i]=Math.round((pix[i]+t)/S)*S;pix[i+1]=Math.round((pix[i+1]+t)/S)*S;pix[i+2]=Math.round((pix[i+2]+t)/S)*S}}}
+
+/* ================= 시뮬레이션 상태 ================= */
+let CS='갈매기',clearT=null,trainUsed=false,opsStartReal=null;
+let simT=0,paused=true,simSpeed=2,trainMode=true,score=0,ammoUsed=0,ended=false;
+const events=[];
+function at(delay,fn){events.push({t:simT+delay,fn});events.sort((a,b)=>a.t-b.t)}
+function runEvents(){while(events.length&&events[0].t<=simT)events.shift().fn()}
+const platoons=[],effects=[],impacts=[],lases=[],missions=[];   // platoons = 적 부대 전체(병종 무관)
+let tcount=0,romerPin=null,friendlyHits=0,dangerMiss=0,friendlyMortar=0,apcBursts=0,phase='prep',SCN=null;
+
+/* ---- 목업 시나리오: 첩보(작전 지도)와 실제 배치 ---- */
+const ROUTES={
+  A:{name:'서측 접근로',pts:[{x:3300,y:6900},{x:3550,y:5300},{x:4350,y:3380}]},
+  B:{name:'중앙 접근로',pts:[{x:5050,y:6600},{x:5000,y:5000},{x:5150,y:3460}]},
+  C:{name:'동측 접근로',pts:[{x:6800,y:6700},{x:6450,y:5100},{x:5950,y:3380}]},
+};
+const NAI=[
+  {id:'NAI 1',x:3450,y:6300,r:450,txt:'서측 고개 — 적 정찰조 활동 첩보',conf:'보통'},
+  {id:'NAI 2',x:5050,y:6150,r:450,txt:'중앙 안부 — 적 주 접근로로 판단',conf:'높음'},
+  {id:'NAI 3',x:5800,y:7550,r:550,txt:'북쪽 능선 일대 — 적 박격포 진지 추정',conf:'낮음'},
+];
+const INTEL_ROUTES=[{r:'B',conf:'높음'},{r:'A',conf:'보통'}];   // 첩보가 예상한 접근로(실제와 다를 수 있음)
+const TYPE={inf:{label:'보병',short:'보병소대'},recon:{label:'보병',short:'정찰조'},apc:{label:'장갑차',short:'장갑차'},mortar:{label:'박격포',short:'박격포반'}};
+function member(kind,u,v,uc,vc){return{kind,u,v,uc:uc??u,vc:vc??v,ph:rS()*TAU,alive:true,prone:false,x:0,y:0,vis:false}}   // u,v = 횡대 대형 · uc,vc = 종대(접근) 대형
+function makePlatoons(){
+  const second=rS()<0.5?'A':'C',apcR=rS()<0.5?'B':'C',reconR=rS()<0.6?'A':'B';
+  let mo;for(let k=0;k<40;k++){mo={x:NAI[2].x+(rS()-0.5)*700,y:NAI[2].y+(rS()-0.5)*500};if(sampleH(SURF,mo.x,mo.y)-sampleH(GROUND,mo.x,mo.y)<3&&sampleH(SURF,mo.x+30,mo.y)-sampleH(GROUND,mo.x+30,mo.y)<3)break}
+  SCN={second,apcR,reconR,mo};
+  const defs=[
+    {type:'recon',name:'적 정찰조',route:reconR,t0:0},
+    {type:'inf',name:'적 1소대',route:'B',t0:90},
+    {type:'inf',name:'적 2소대',route:second,t0:200},
+    {type:'apc',name:'적 장갑차 2대',route:apcR,t0:260},
+    {type:'mortar',name:'적 82mm 박격포반',pos:mo,t0:0},
+  ];
+  defs.forEach((d,id)=>{
+    const s=[];
+    // 보병: 횡대(폭 150 m × 깊이 30 m)와 접근 종대(분대 종대 3열, 폭 80 m × 깊이 72 m) 두 대형
+    if(d.type==='inf')for(let q=0;q<3;q++)for(let m=0;m<10;m++)s.push(member('man',(q-1)*55+(m-4.5)*5+gS()*3,(q===1?12:0)+gS()*10,(q-1)*40+gS()*1.5,-m*8+gS()*1.5));
+    if(d.type==='recon')[-15,-5,6,16].forEach(u=>s.push(member('man',u,gS()*4)));
+    if(d.type==='apc'){s.push(member('veh',0,0));s.push(member('veh',4,-45))}
+    if(d.type==='mortar'){[-25,0,25].forEach(u=>{s.push(member('tube',u,0));s.push(member('man',u-3,-4));s.push(member('man',u+3,-5));s.push(member('man',u,-9))})}
+    const route=d.route?ROUTES[d.route].pts.map(p=>({x:p.x+gS()*30,y:p.y+gS()*30})):null;
+    const st=route?route[0]:d.pos;
+    platoons.push({id,type:d.type,name:d.name,routeKey:d.route||'',route,wp:1,cx:st.x,cy:st.y,sx:st.x,sy:st.y,dir:d.type==='mortar'?Math.PI:0,t0:d.t0,state:'wait',s,
+      pinnedUntil:0,assaultT:0,nextFire:0,lastFire:-999,moving:false,form:d.type==='inf'?0:1,early:false,
+      intel:{stage:0,prog:0,seenMax:0,tubes:0,t1:0,t3:0,tnum:0,size:''},seenX:st.x,seenY:st.y,seenAz:0,seenT:0,total:s.length,fate:null,
+      objName:d.route?FRIEND[{A:0,B:1,C:2}[d.route]].name:''});
+  });
+}
+const alive=P=>P.s.reduce((a,s)=>a+(s.alive?1:0),0);
+const strength=P=>alive(P)/P.total;
+const distToObj=P=>{const f=P.route.at(-1);return Math.hypot(f.x-P.cx,f.y-P.cy)};
+function moveAlong(P,speed,dt){
+  const tgt=P.route[P.wp];const dx=tgt.x-P.cx,dy=tgt.y-P.cy,d=Math.hypot(dx,dy);
+  if(d<25&&P.wp<P.route.length-1){P.wp++;return}
+  if(d>1){P.dir=Math.atan2(dx,dy);const st=Math.min(d,speed*dt);P.cx+=dx/d*st;P.cy+=dy/d*st}
+}
+function updatePlatoon(P,dt){
+  if(P.state==='wait'){if(simT>=P.t0)P.state=P.type==='mortar'?'emplaced':'approach';else return}
+  const pinned=simT<P.pinnedUntil;let speed=0;
+  if(P.type==='inf'&&(P.state==='approach'||P.state==='assault')){
+    const dist=distToObj(P);
+    if(P.state==='approach'&&dist<900){P.state='assault';P.assaultT=simT}
+    speed=P.state==='approach'?2.2:1.9+1.2*Math.exp(-(simT-P.assaultT)/120);   // 공격: 10~12 km/h → 6~8 km/h
+    if(dist<80&&strength(P)>0.7){P.state='overran';P.fate='overran';addScore(-300);sys(`${P.name}이(가) ${P.objName} 진지를 돌파했습니다.`,'warn')}
+    // 대형: 1.5 km 밖에서는 분대 종대로 접근, 안에서는 횡대로 전개(약 20초에 걸쳐)
+    const want=dist<1500?1:0;P.form+=(want-P.form)*Math.min(1,dt/20);
+  }else if(P.type==='recon'&&P.state==='approach'){
+    speed=1.4;if(P.wp>=2)P.state='hold';
+  }else if(P.type==='apc'){
+    if(P.state==='approach'){speed=5;if(distToObj(P)<1300){P.state='support';P.nextFire=simT+6}}
+    else if(P.state==='support'&&simT>=P.nextFire){P.nextFire=simT+8+rA()*8;apcFire(P)}
+  }else if(P.type==='mortar'&&P.state==='emplaced'&&simT>=210&&simT>=P.nextFire&&!pinned){
+    P.nextFire=simT+45+rA()*25;mortarVolley(P);
+  }
+  if(P.state==='broken'&&simT>P.pinnedUntil&&P.type!=='mortar'){speed=P.type==='apc'?3:0.8;P.dir=Math.atan2(P.sx-P.cx,P.sy-P.cy)}
+  if(pinned&&P.type!=='apc')speed=0;
+  if(P.state==='broken'){P.cx+=Math.sin(P.dir)*speed*dt;P.cy+=Math.cos(P.dir)*speed*dt}
+  else if(speed>0)moveAlong(P,speed,dt);
+  P.moving=speed>0;
+  if(P.type==='apc'&&P.moving&&simT-(P.dustT||0)>1.5){P.dustT=simT;for(const q of P.s)if(q.alive)effects.push({kind:'dust',x:q.x,y:q.y,gz:sampleH(GROUND,q.x,q.y),t:simT,life:9,pid:P.id})}
+  const c=Math.cos(P.dir),s=Math.sin(P.dir),f=P.form,g=1-f;
+  P.s.forEach((q,i)=>{
+    q.prone=q.kind==='man'&&(!q.alive||pinned||P.state==='destroyed'||(P.type==='recon'&&P.state==='hold'&&i>0));
+    const sway=speed>0&&q.kind==='man'?Math.sin(simT*1.3+q.ph)*2:0;
+    const uu=q.u*f+q.uc*g+sway,vv=q.v*f+q.vc*g;
+    q.x=P.cx+uu*c+vv*s;q.y=P.cy-uu*s+vv*c;
+  });
+}
+function apcFire(P){
+  for(const q of P.s)if(q.alive)effects.push({kind:'muzzle',x:q.x,y:q.y,gz:sampleH(GROUND,q.x,q.y)+1.5,t:simT,life:3,pid:P.id,small:true});
+  apcBursts++;addScore(-3);P.lastFire=simT;
+  if(apcBursts===1)sys('아군 진지 방향으로 적 직사화기 사격이 시작됐습니다.','warn');
+}
+/* 아군 손실: 적 박격포·직사·아군 포탄에 아군 진지 병력이 피해를 입는다. 손실은 점수와 강평에 반영 */
+let friendlyLoss=0;
+function hitFriendlies(x,y,R,pStand,pProne,why){
+  let k=0;for(const q of friendlies){if(q.kind!=='man'||!q.alive)continue;const r=Math.hypot(q.x-x,q.y-y);if(r>R)continue;
+    const p=(q.prone?pProne:pStand)*Math.exp(-((r/R)**2)*1.5);if(rB()<p){q.alive=false;q.prone=true;k++}}
+  if(k){friendlyLoss+=k;addScore(-10*k);if(why)sys(`${why} — 아군 ${k}명 손실.`,'warn')}return k;
+}
+function mortarVolley(P){
+  const crew=P.s.filter(q=>q.kind==='man'&&q.alive).length;if(crew<2)return;
+  const tubes=P.s.filter(q=>q.kind==='tube'&&q.alive);if(!tubes.length)return;
+  P.lastFire=simT;
+  for(const q of tubes){effects.push({kind:'muzzle',x:q.x,y:q.y,gz:sampleH(GROUND,q.x,q.y)+1,t:simT,life:11,pid:P.id});
+    const fi=(rA()*3)|0,f=FRIEND[fi];
+    at(22+rA()*4,()=>{const x=f.x+gA()*45,y=f.y+gA()*35,gz=sampleH(GROUND,x,y);effects.push({kind:'burst',x,y,gz,t:simT,life:12,small:true});FRIEND_PIN[fi]=simT+40;
+      const d=Math.hypot(x-OBS.x,y-OBS.y);at(d/343,()=>boom(d*1.6));friendlyMortar++;addScore(-5);hitFriendlies(x,y,15,0.3,0.1,null)})}
+  if(!P.warned){P.warned=true;at(26,()=>sys('적 박격포탄이 아군 진지에 떨어지기 시작했습니다.','warn'))}
+}
+/* 판정 척도(단일): 사상 30% 이상 = 무력화(정지·퇴각), 60% 이상 = 파괴. 효과 보고의 정답(truthOf)도 같은 척도 */
+const NEUT=0.30,DESTROY=0.60;
+function judge(P){
+  if(P.state==='destroyed'||P.state==='overran')return;
+  const cas=1-strength(P);
+  if(cas>=DESTROY){if(P.fate!=='destroyed'){P.state='destroyed';P.fate='destroyed';addScore(P.fateScore?150-P.fateScore:150);P.fateScore=150;earlyBonus(P)}}
+  else if(cas>=NEUT&&P.state!=='broken'){P.state='broken';P.fate='broken';addScore(100);P.fateScore=100;earlyBonus(P)}
+}
+function earlyBonus(P){if(P.early||P.type!=='inf'||P.assaultT)return;P.early=true;addScore(50);sys(`${P.name} 조기 격퇴 — 돌격선(900 m) 진입 전 제압. +50`)}
+/* ---- 적정: 탐지 → 병종 → 규모·활동 ---- */
+function actOf(P){
+  if(P.type==='inf')return P.state==='assault'&&simT>=P.pinnedUntil?'공격중':(P.moving?'이동중':'정지중');
+  if(P.type==='apc')return P.moving?'이동중':(simT-P.lastFire<30?'사격중':'정지중');
+  if(P.type==='mortar')return simT-P.lastFire<70?'사격중':'정지중';
+  return P.moving?'이동중':'정지중';
+}
+function sizeOf(P){
+  const n=P.intel.seenMax;
+  if(P.type==='apc')return `${Math.max(1,n)}대`;
+  if(P.type==='mortar')return P.intel.tubes?`${P.intel.tubes}문`:'(문수 미상)';
+  return n>=22?'1개 소대':n>=12?'1개 소대(-)':n>=5?'1개 분대':`${Math.max(1,n)}명`;
+}
+function descOf(P){
+  const I=P.intel;if(I.stage<2)return'미상 표적';
+  const lab=TYPE[P.type].label+(P.type==='apc'?'(BMP 계열 추정)':P.type==='mortar'?'(82mm 추정)':'');
+  return `${actOf(P)}인 적 ${lab}${I.stage>=3?' '+sizeOf(P):''}`;
+}
+const shortOf=P=>!P||P.intel.stage<2?'표적':P.intel.stage>=3?`적 ${TYPE[P.type].short}`:`적 ${TYPE[P.type].label}`;
+function intelTimes(P){const dk=Math.hypot(P.cx-OBS.x,P.cy-OBS.y)/1000;const T1=3+2.5*dk;return{T1,T2:T1+6+4*dk}}
+/* ---- 가시성(시뮬레이션 쪽): 가시선 + 각크기(밀) + 시정. 화면 크기·화질과 무관하다 ---- */
+const DET_MIL={eye:1.5,bino:0.3};                       // 키 1.7 m 기준: 육안 약 1.1 km, 쌍안경 약 5.7 km까지
+const relAzOf=(x,y)=>mod(Math.atan2(x-OBS.x,y-OBS.y)-cam.h+Math.PI,TAU)-Math.PI;
+function visOf(x,y,size,topZ){const d=Math.hypot(x-OBS.x,y-OBS.y);if(d<5)return false;
+  if(1-Math.exp(-SIGMA*d)>0.9)return false;
+  if(size/d*1000<(cam.binoc?DET_MIL.bino:DET_MIL.eye))return false;
+  return los(x,y,topZ)}
+const effSize=(e,age)=>e.kind==='muzzle'?(e.small?1.5:3)+age*1.6:e.kind==='dust'?3+age*1.6:6+age*2.2;
+const effTop=(e,age)=>e.gz+(e.kind==='muzzle'?1+age*(e.small?1.2:5):e.kind==='burst'?6:3);
+function updateVisibility(all){
+  if(all){
+    for(const P of platoons){if(P.state==='wait')continue;for(const q of P.s){if(!q.alive){q.vis=false;continue}const hh=q.kind==='veh'?2.3:q.kind==='tube'?1.0:q.prone?0.45:1.7;q.vis=visOf(q.x,q.y,hh,sampleH(GROUND,q.x,q.y)+hh*0.85)}}
+    for(const q of friendlies){if(q.kind==='man'&&!q.alive){q.vis=false;continue}const hh=q.kind==='truck'?2.6:q.prone?0.45:1.7;q.vis=visOf(q.x,q.y,hh,sampleH(GROUND,q.x,q.y)+hh*0.85)}
+  }
+  for(const e of effects){if(!all&&e.vis!==undefined)continue;const age=simT-e.t;if(age<0){e.vis=undefined;continue}e.vis=visOf(e.x,e.y,effSize(e,age),effTop(e,age))}
+}
+function updateIntel(dt){
+  if(!cam.binoc)return;
+  const half=BINO_FOV*0.42,cnt={},tubes={},sig={};
+  for(const P of platoons){if(P.state==='wait')continue;for(const q of P.s){if(!q.alive||!q.vis||Math.abs(relAzOf(q.x,q.y))>half)continue;
+    if(q.kind==='tube')tubes[P.id]=(tubes[P.id]||0)+1;else cnt[P.id]=(cnt[P.id]||0)+1}}
+  for(const e of effects){if(!e.vis||e.pid==null||e.pid<0||(e.kind!=='dust'&&e.kind!=='muzzle'))continue;if(Math.abs(relAzOf(e.x,e.y))<=half)sig[e.pid]=1}
+  for(const P of platoons){const I=P.intel;if(I.stage<1)continue;
+    const c=(cnt[P.id]||0)+(tubes[P.id]||0);if(!c&&!sig[P.id])continue;
+    P.seenX=P.cx;P.seenY=P.cy;P.seenAz=azOf(P.cx-OBS.x,P.cy-OBS.y);P.seenT=simT;if(I.stage>=3)continue;
+    I.prog+=dt*(c?1:0.5);I.seenMax=Math.max(I.seenMax,cnt[P.id]||0);I.tubes=Math.max(I.tubes,tubes[P.id]||0);
+    const{T1,T2}=intelTimes(P);
+    if(I.stage===1&&I.prog>=T1){I.stage=2;sys(`표적 ${I.tnum} 병종 식별 — ${descOf(P)}.`)}
+    else if(I.stage===2&&I.prog>=T2){I.stage=3;I.t3=simT;addScore(20);sys(`표적 ${I.tnum} 적정 — ${descOf(P)}. 방위각 ${az4(azOf(P.cx-OBS.x,P.cy-OBS.y))} 밀, 약 ${(Math.hypot(P.cx-OBS.x,P.cy-OBS.y)/1000).toFixed(1)} km.`)}
+  }
+}
+
+/* ---- 아군: 진지 병력과 보급 차량 ---- */
+const friendlies=[],FRIEND_PIN=[0,0,0];
+function makeFriendlies(){
+  FRIEND.forEach((f,fi)=>{for(let n=0;n<24;n++){const hx=f.x+(n-11.5)*7+gS()*2,hy=f.y+8*Math.sin(n*0.8)+gS()*3;
+    friendlies.push({kind:'man',fi,hx,hy,x:hx,y:hy,tx:hx,ty:hy,ph:rS()*TAU,walker:n%5===2,wait:rS()*40,moving:false,dir:0,prone:false,vis:false,alive:true,fireT:0})}});
+  const rd=ROADS[1],pts=[];for(let k=1;k<rd.length;k++){const a=rd[k-1],b=rd[k],L=Math.hypot(b.x-a.x,b.y-a.y);for(let t=0;t<=L;t+=20)pts.push({x:a.x+(b.x-a.x)*t/L+18*Math.sin(t/260),y:a.y+(b.y-a.y)*t/L})}
+  friendlies.push({kind:'truck',path:pts,pi:0,dirn:1,x:pts[0].x,y:pts[0].y,wait:20,moving:false,dir:0,ph:0,vis:false,alive:true,dustT:0});
+}
+const friendAlive=fi=>friendlies.filter(q=>q.kind==='man'&&q.fi===fi&&q.alive).length;
+function stepTo(q,tx,ty,v,dt){const dx=tx-q.x,dy=ty-q.y,d=Math.hypot(dx,dy);if(d<0.5){q.moving=false;return true}const st=Math.min(d,v*dt);q.x+=dx/d*st;q.y+=dy/d*st;q.dir=Math.atan2(dx,dy);q.moving=true;return false}
+function updateFriendly(dt){
+  const threat=FRIEND.map(f=>{let best=1e9;for(const P of platoons){if(P.state==='wait'||P.type==='mortar'||P.type==='recon'||P.state==='destroyed'||P.state==='broken'||!alive(P))continue;best=Math.min(best,Math.hypot(P.cx-f.x,P.cy-f.y))}return best});
+  for(const q of friendlies){
+    if(!q.alive){q.moving=false;continue}
+    if(q.kind==='truck'){
+      if(q.wait>0){q.wait-=dt;q.moving=false;continue}
+      if(threat.some(t=>t<1500)&&q.dirn===1&&q.pi>q.path.length*0.5){q.dirn=-1}                     // 적 접근 시 후방으로
+      const nt=q.path[q.pi+q.dirn];if(!nt){q.dirn*=-1;q.wait=60;continue}
+      if(stepTo(q,nt.x,nt.y,7,dt))q.pi+=q.dirn;
+      if(q.moving&&simT-q.dustT>1.2){q.dustT=simT;effects.push({kind:'dust',x:q.x,y:q.y,gz:sampleH(GROUND,q.x,q.y),t:simT,life:7,pid:-1})}
+      continue}
+    const th=threat[q.fi],shelled=simT<FRIEND_PIN[q.fi],fight=th<1000;
+    if(fight||shelled){
+      const home=stepTo(q,q.hx,q.hy,2.6,dt);
+      q.prone=shelled||(home&&fight&&hash(q.hx|0,q.hy|0,5)<0.5);
+      if(fight&&home&&th<750&&simT>q.fireT){q.fireT=simT+1+rA()*3.5;effects.push({kind:'muzzle',x:q.x,y:q.y+3,gz:sampleH(GROUND,q.x,q.y)+(q.prone?0.4:1.3),t:simT,life:0.5,pid:-1,small:true,tiny:true})}
+    }else{
+      q.prone=false;
+      if(q.walker){if(stepTo(q,q.tx,q.ty,1.1,dt)){q.wait-=dt;if(q.wait<=0){q.wait=10+rA()*40;if(rA()<0.5){q.tx=q.hx;q.ty=q.hy}else{q.tx=q.hx+gA()*25;q.ty=q.hy-25-rA()*60}}}}
+      else q.moving=false;
+    }
+  }
+  // 아군 직사화기: 600 m 안에 들어온 적 보병에 손실(진지 잔존 병력에 비례). 적 보병도 400 m 안에서 아군에 손실을 입힘
+  FRIEND.forEach((f,fi)=>{const fa=friendAlive(fi)/24;for(const P of platoons){if(P.state==='wait'||P.state==='destroyed'||P.type==='mortar')continue;const d=Math.hypot(P.cx-f.x,P.cy-f.y);if(d>600)continue;
+    let k=0;for(const q of P.s)if(q.alive&&q.kind==='man'&&rA()<0.003*dt*fa*(600-d)/600*(q.prone?0.4:1)){q.alive=false;k++}if(k)judge(P);
+    if(P.type==='inf'&&d<400&&simT>=P.pinnedUntil){const ea=alive(P)/P.total;let fk=0;for(const q of friendlies)if(q.kind==='man'&&q.fi===fi&&q.alive&&rA()<0.0012*dt*ea*(400-d)/400*(q.prone?0.5:1)){q.alive=false;q.prone=true;fk++}
+      if(fk){friendlyLoss+=fk;addScore(-10*fk)}}}});
+}
+
+/* ---- 관측소 발각 ---- */
+let obsLost=false,obsLostReason='';
+function exposureTick(){                              // 5초(시뮬)마다
+  if(phase!=='live'||obsLost)return;
+  const canopy=sampleH(SURF,OBS.x,OBS.y)-sampleH(GROUND,OBS.x,OBS.y)>3,fwd=OBS.y>FRONT_Y;
+  for(const P of platoons){
+    if(P.state==='wait'||P.state==='destroyed'||P.type==='mortar'||!alive(P))continue;
+    const d=Math.hypot(P.cx-OBS.x,P.cy-OBS.y);if(d>1100)continue;
+    if(!los(P.cx,P.cy,sampleH(GROUND,P.cx,P.cy)+1.7))continue;
+    const p=0.12*(1-d/1100)*(OPS.state==='moving'?1.8:1)*(canopy?0.35:1)*(fwd?1.3:1)*(P.type==='recon'?1.6:1);
+    if(rE()<p){compromise(P);return}
+  }
+}
+function compromise(P){
+  if(OPS.compromised&&simT-OPS.compromised<150)return;
+  OPS.compromised=simT;const at0={x:OBS.x,y:OBS.y};
+  sys(`관측소가 ${P.intel.stage>=1?`표적 ${P.intel.tnum}(${P.intel.stage>=2?TYPE[P.type].label:'미상'})`:'아직 탐지하지 못한 적'}에게 발각된 것 같습니다. 곧 사격이 올 수 있습니다 — 자리를 옮기십시오.`,'warn');
+  const mo=platoons.find(q=>q.type==='mortar');
+  const shooter=mo&&mo.state!=='destroyed'&&mo.state!=='broken'&&mo.s.some(q=>q.kind==='tube'&&q.alive)?'박격포':(P.type==='apc'||P.type==='inf')&&Math.hypot(P.cx-at0.x,P.cy-at0.y)<800?'직사':null;
+  if(!shooter){sys('↳ 적에게 지금 관측소를 때릴 화력은 없는 것 같습니다.');return}
+  if(shooter==='박격포')for(let k=0;k<3;k++)effects.push({kind:'muzzle',x:mo.s[k*4].x,y:mo.s[k*4].y,gz:sampleH(GROUND,mo.cx,mo.cy)+1,t:simT+35,life:11,pid:mo.id});
+  for(let k=0;k<(shooter==='박격포'?4:6);k++)at((shooter==='박격포'?60:20)+k*(shooter==='박격포'?4:2),()=>{
+    if(obsLost)return;const x=at0.x+gE()*35,y=at0.y+gE()*35,gz=sampleH(GROUND,x,y);
+    if(shooter==='박격포'){effects.push({kind:'burst',x,y,gz,t:simT,life:12,small:true});boom(Math.max(60,Math.hypot(x-OBS.x,y-OBS.y)))}
+    const d=Math.hypot(x-OBS.x,y-OBS.y);
+    if(d<(shooter==='박격포'?25:4)&&rE()<0.7){loseObserver(`적 ${shooter} 사격에 관측반이 피격됐습니다.`)}
+    else if(d<120&&k===0)sys(`관측소 주변에 적 ${shooter==='박격포'?'박격포탄':'직사화기 탄'}이 떨어집니다!`,'warn');
+  });
+}
+function loseObserver(reason){if(obsLost)return;obsLost=true;obsLostReason=reason;addScore(-400);sys(reason+' 관측반 전투 불능.','warn');at(4,()=>endGame())}
+
+/* ================= 탄도·효과 (근사 모델) ================= */
+const tofOf=d=>3+d/1000*2.6;
+function impact(x,y,fuze,m){
+  const gz=sampleH(GROUND,x,y),vt=fuze==='접근';
+  effects.push({kind:'burst',x,y,gz,vt,t:simT,life:16});
+  impacts.push({x,y,t:simT,mid:m.id});
+  const d=Math.hypot(x-OBS.x,y-OBS.y);at(d/343,()=>boom(d));
+  for(const P of platoons){
+    if(P.state==='wait')continue;
+    if(Math.hypot(x-P.cx,y-P.cy)>220)continue;
+    let k=0;
+    for(const q of P.s){if(!q.alive)continue;const r=Math.hypot(q.x-x,q.y-y);if(r>110)continue;let p;
+      if(q.kind==='veh')p=(vt?0.22:0.9)*Math.exp(-((r/7)**2));                        // 장갑: 근접 직격만 유효, 접근신관은 거의 무효
+      else if(q.kind==='tube')p=0.9*Math.exp(-((Math.hypot(r,vt?7:0)/(vt?7:10))**2));
+      else{const re=Math.hypot(r,vt?7:0),R=q.prone?(vt?24:15):(vt?28:26);p=0.92*Math.exp(-((re/R)**2))}
+      if(rB()<p){q.alive=false;k++}}
+    m.kills[P.id]=(m.kills[P.id]||0)+k;
+    if(P.type!=='apc')P.pinnedUntil=Math.max(P.pinnedUntil,simT+35+rB()*30);
+    judge(P);
+  }
+  if(Math.hypot(x-OBS.x,y-OBS.y)<45&&rB()<0.6)loseObserver('아군 포탄이 관측소에 떨어졌습니다.');
+  for(const f of FRIEND)if(Math.hypot(x-f.x,y-f.y)<70){friendlyHits++;addScore(-200);const k=hitFriendlies(x,y,30,0.6,0.3,null);sys(`탄착이 ${f.name} 진지 70 m 이내! 아군 피해 발생${k?` — ${k}명 손실`:''}.`,'warn')}
+}
+function fireRound(m,aimX,aimY,fuze,sheaf){
+  const gtx=aimX-BATT.x,gty=aimY-BATT.y,gd=Math.hypot(gtx,gty),ux=gtx/gd,uy=gty/gd,px=uy,py=-ux;
+  const prR=1.5*gd/1000+2,prD=0.5*gd/1000+1;
+  const er=gB()*prR/0.6745+(sheaf?sheaf[1]:0),ed=gB()*prD/0.6745+(sheaf?sheaf[0]:0);
+  const ix=aimX+m.bias.x+ux*er+px*ed,iy=aimY+m.bias.y+uy*er+py*ed;
+  const tof=tofOf(gd);ammoUsed++;m.roundsFired++;
+  at(tof,()=>{impact(ix,iy,fuze,m);if(m.onImpact)m.onImpact(ix,iy)});
+  return simT+tof;
+}
+const SHEAF=[[-60,22],[-36,-22],[-12,22],[12,-22],[36,22],[60,-22]];   // 포대 6문 W자 방열
+
+/* ================= 오디오 ================= */
+let AC=null,noiseBuf=null,muted=false;
+function initAudio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();const len=AC.sampleRate*2;noiseBuf=AC.createBuffer(1,len,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2)}catch(e){AC=null}}
+function boom(dist){if(!AC||muted)return;try{const s=AC.createBufferSource();s.buffer=noiseBuf;const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=Math.max(110,700-dist/10);const g=AC.createGain();g.gain.value=Math.min(0.9,1200/dist);s.connect(f).connect(g).connect(AC.destination);s.start()}catch(e){}}
+function squelch(){if(!AC||muted)return;try{const s=AC.createBufferSource();s.buffer=noiseBuf;const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;const g=AC.createGain();g.gain.value=0.05;s.connect(f).connect(g).connect(AC.destination);s.start(0,0.4,0.07)}catch(e){}}
+
+/* ================= 무전 기록 ================= */
+const logEl=$('#log');
+function addMsg(cls,who,text){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=`<span class="t">${fmtT(simT)}</span>${who?`<span class="who">${who}</span>`:''}${text}`;logEl.appendChild(d);logEl.scrollTop=logEl.scrollHeight}
+const fo=t=>{addMsg('fo',CS,t);squelch()};
+const fdc=t=>{addMsg('fdc','기러기',t);squelch();speak(t)};
+const sys=(t,c)=>addMsg(c||'sys','',t);
+function addScore(v){score+=v}
+const nm=v=>trainMode?`<span class="dim">(${v})</span>`:'';
+/* ---- 음성 출력(기러기 교신): 브라우저 speechSynthesis. 끄고 켤 수 있고, 시뮬레이션에는 영향 없음 ---- */
+let ttsOn=false;
+function speak(t){if(!ttsOn||!('speechSynthesis' in window))return;try{const u=new SpeechSynthesisUtterance(t.replace(/<[^>]+>/g,'').replace(/\([^)]*\)/g,'').replace(/,/g,', '));u.lang='ko-KR';u.rate=1.05;
+  const v=speechSynthesis.getVoices().find(v=>v.lang&&v.lang.startsWith('ko'));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+
+/* ================= 사격요구 상태 기계 ================= */
+const R={state:'IDLE',m:null,lastAim:null,lastBias:null,lastFuze:'순발',lastTn:null,devText:'',impactAt:0,lastLase:null,lastImpactT:0};
+let tnSeq=1000;                                        // 표적번호: 기러기가 사격지휘통보에서 부여(AB1001, AB1002 …)
+const tnWord=tn=>`표적번호 알파브라보 ${dg(tn.slice(2))}${nm(tn)}`;
+function newMission(warn){
+  const b=30+rB()*60,ba=rB()*TAU;                      // 비표준 조건 편차 30–90 m(방향 무작위) + 기상 잔차
+  const gx=5000-BATT.x,gy=5500-BATT.y,gd=Math.hypot(gx,gy),tk=(WX.temperature_2m-15)*1.2;   // 기상 잔차: 바람 6 m/(m/s), 기온 1.2 m/°C(저온 = 근탄)
+  const m={id:missions.length+1,tn:null,warn,phase:warn==='조정'?'adj':'ffe',loc:null,aim:null,ot:null,dir:null,desc:'',reqRounds:3,reqFuze:'',fuze:'순발',rounds:3,amc:false,dc:false,
+    bias:{x:Math.sin(ba)*b+WV.x*6+gx/gd*tk,y:Math.cos(ba)*b+WV.y*6+gy/gd*tk},adjCount:0,roundsFired:0,kills:{},firstErr:null,dirErr:null,rangeCorrs:[],targetPid:null,t0:simT,ffeT:null,bda:null,truth:null,shift:false};
+  missions.push(m);return m;
+}
+function setState(s){R.state=s;renderComposer()}
+/* 관측–표적 기준선(OT): 관측자가 보낸 "방향"이 있으면 그 방위각. 없으면(방향 송신 전) 기러기가 아는 관측소→표적 방위각 */
+function otFrame(m){let a;if(m.dir!=null)a=m.dir/MIL;else{a=Math.atan2(m.aim.x-OPS.fdc.x,m.aim.y-OPS.fdc.y)}m.ot={x:Math.sin(a),y:Math.cos(a)};m.right={x:Math.cos(a),y:-Math.sin(a)}}
+function setDir(m,dir){m.dir=dir;otFrame(m);
+  const P=m.targetPid!=null?platoons[m.targetPid]:null;if(P){const tru=mod(azOf(P.cx-OBS.x,P.cy-OBS.y)*MIL,6400);let e=Math.abs(dir-tru);if(e>3200)e=6400-e;m.dirErr=Math.round(e)}}
+function nearestPlatoon(x,y,maxD){let best=null,bd=maxD||1e9;for(const P of platoons){if(P.state==='wait')continue;const d=Math.hypot(P.cx-x,P.cy-y);if(d<bd){bd=d;best=P}}return best}
+function locText(m){return m.locMethod==='polar'?`극좌표, 방위각 ${dg(m.locAz)}${nm(m.locAz)}, 거리 ${dg(m.locDist)}${nm(m.locDist+' m')}`:`좌표 찰리호텔 ${dg(m.locE)} ${dg(m.locN)}${nm(m.locE+' '+m.locN)}`}
+const okDir=d=>/^\d{1,4}$/.test(String(d))&&+d>=0&&+d<6400;
+
+function sendCall(warn){
+  if(R.state!=='IDLE'||phase!=='live'||OPS.state!=='ready'||OPS.unreported||hardPause())return;logIn('call',warn);
+  const m=R.m=newMission(warn);
+  fo(`기러기, 여기는 ${CS}, ${warn}, 이상.`);setState('WAIT');
+  at(2.5+rF()*1.5,()=>{fdc(`${CS}, 여기는 기러기, ${warn}, 좌표 송신바람, 이상.`);setState('LOC')});
+}
+function sendLoc(method,a,b){
+  if(R.state!=='LOC')return;const m=R.m;
+  if(method==='grid'){if(!/^\d{4}$/.test(a)||!/^\d{4}$/.test(b)){sys('좌표는 동서·남북 각 4자리 숫자로 입력하십시오.','warn');return}
+    m.locMethod='grid';m.locE=a;m.locN=b;m.loc=fromGrid(a,b)}
+  else{const az=+a,dist=+b;if(!(az>=0&&az<6400)||!(dist>100&&dist<15000)){sys('방위각(0~6399 밀)과 거리(m)를 확인하십시오.','warn');return}
+    m.locMethod='polar';m.locAz=String(Math.round(az)).padStart(4,'0');m.locDist=Math.round(dist/10)*10;const r=az/MIL;m.loc={x:OPS.fdc.x+Math.sin(r)*m.locDist,y:OPS.fdc.y+Math.cos(r)*m.locDist}}
+  logIn('loc',[method,a,b]);
+  m.aim={...m.loc};
+  const tp=nearestPlatoon(m.loc.x,m.loc.y,600);m.targetPid=tp?tp.id:null;
+  if(method==='polar')setDir(m,Math.round(+a));else otFrame(m);   // 극좌표면 방위각이 곧 방향
+  const t=locText(m);fo(`${t}, 이상.`);setState('WAIT');
+  at(2.5+rF()*1.5,()=>{fdc(`${t}, 이상.`);setState('DESC')});
+}
+function decideMTO(m){
+  let fz=m.reqFuze,n=m.reqRounds;const exposed=/공격중|이동중/.test(m.desc);
+  if(!fz)fz=exposed&&rF()<0.7?'접근':'순발';else if(fz==='순발'&&exposed&&rF()<0.35)fz='접근';
+  if(n>1&&rF()<0.15)n-=1;m.fuze=fz;m.rounds=n;
+  if(!m.tn)m.tn='AB'+(++tnSeq);
+}
+function mtoText(m){return `사격지휘통보, 포대, ${m.fuze}신관, ${AD[m.rounds]}발${m.amc?', 지명사':''}, ${tnWord(m.tn)}, 잠깐대기.`}
+function sendDesc(desc,n,fuze,amc,dc){
+  if(R.state!=='DESC')return;const m=R.m;m.desc=desc;m.reqRounds=n;m.reqFuze=fuze;m.amc=amc;m.dc=dc;logIn('desc',[desc,n,fuze,amc,dc]);
+  const body=`${desc}, 포대 ${AD[n]}발${fuze?`, ${fuze}신관`:''}${amc?', 지명사':''}${dc?', 위험근접':''}`;
+  fo(`${body}, 이상.`);setState('WAIT');
+  const near=FRIEND.some(f=>Math.hypot(f.x-m.loc.x,f.y-m.loc.y)<600)||Math.hypot(OBS.x-m.loc.x,OBS.y-m.loc.y)<600;
+  at(3+rF()*1.5,()=>{
+    fdc(`${body}, 잠깐대기.`);
+    if(near&&!dc){dangerMiss++;addScore(-30);fdc(`${CS}, 여기는 기러기, 표적이 아군 600 m 이내, 위험근접 적용, 이상.`);m.dc=true}
+    if(m.dc&&m.phase==='ffe'){m.phase='adj';fdc(`${CS}, 여기는 기러기, 위험근접, 조정 후 효력사, 이상.`);if(trainMode)sys('↳ 위험근접에서는 바로 효력사를 걸 수 없습니다. 수정탄 1발로 확인한 뒤 효력사로 넘어갑니다. 수정량은 한 번에 100 m까지.')}
+  });
+  at(9+rF()*3,()=>{decideMTO(m);
+    const chg=(m.fuze!==m.reqFuze&&m.reqFuze)||m.rounds!==m.reqRounds;
+    fdc(mtoText(m));
+    if(chg&&trainMode)sys('↳ 기러기가 요청과 다르게 신관·발수를 바꿨습니다. 사격지휘통보를 그대로 따릅니다.');
+  });
+  at(24+rF()*14,()=>{fdc(m.phase==='adj'?'포대 사격준비 끝.':`${m.fuze}신관 사격준비 끝.`);readyToFire()});
+}
+function readyToFire(){const m=R.m;if(m.amc)setState('AMC');else{at(1.5,()=>fireNow());setState('WAIT')}}
+function sendFireCmd(){if(R.state!=='AMC')return;logIn('fire');fo('준비 쏴.');setState('WAIT');at(1+rF(),()=>fireNow())}
+function fireNow(){
+  const m=R.m;
+  if(m.phase==='adj'){
+    m.onImpact=(ix,iy)=>afterAdjImpact(m,ix,iy);
+    const t=fireRound(m,m.aim.x,m.aim.y,'순발',null);
+    fdc('하나발 떳다, 이상.');R.impactAt=t;setState('FLIGHT');
+    at(1.2,()=>fo('하나발 떳다, 잠깐대기.'));
+  }else{
+    if(m.ffeT==null)m.ffeT=simT;
+    m.onImpact=null;let lastFire=0,lastImp=0;
+    for(let g=0;g<6;g++)for(let r=0;r<m.rounds;r++){
+      const dt=r*9+rF()*2.2;lastFire=Math.max(lastFire,dt);
+      at(dt,()=>{const ti=fireRound(m,m.aim.x,m.aim.y,m.fuze,SHEAF[g]);if(ti>lastImp)lastImp=ti});
+    }
+    R.impactAt=simT+tofOf(Math.hypot(m.aim.x-BATT.x,m.aim.y-BATT.y));
+    fdc('하나발 떳다, 이상.');at(1.2,()=>fo('하나발 떳다, 잠깐대기.'));
+    at(lastFire+2.3,()=>{fdc('마감탄 떳다, 이상.');at(1.2,()=>fo('마감탄 떳다, 잠깐대기.'));
+      const wait=Math.max(2,lastImp-simT+2.5);at(wait,()=>afterFFE(m))});
+    setState('FLIGHT');
+  }
+}
+function devAgainst(m,ix,iy){
+  const P=m.targetPid!=null?platoons[m.targetPid]:nearestPlatoon(ix,iy,800);
+  if(!P)return null;const rx=ix-P.cx,ry=iy-P.cy;
+  const ox=P.cx-OBS.x,oy=P.cy-OBS.y,od=Math.hypot(ox,oy),ux=ox/od,uy=oy/od;   // 관측자가 실제로 보는 관측-표적선
+  return{lat:rx*uy+ry*(-ux),rng:rx*ux+ry*uy,P};
+}
+function afterAdjImpact(m,ix,iy){
+  const d=devAgainst(m,ix,iy);R.lastImpactT=simT;
+  if(d){if(m.firstErr==null)m.firstErr=Math.round(Math.hypot(d.lat,d.rng));
+    const L=Math.round(Math.abs(d.lat)/10)*10,G=Math.round(Math.abs(d.rng)/50)*50;
+    R.devText=`탄착 편의 ${d.lat>0?'우':'좌'} ${L} m · 사거리 ${d.rng>0?'원':'근'} ${Math.round(Math.abs(d.rng))} m  →  ${d.lat>0?'좌로':'우로'} ${L}, ${d.rng>0?'줄이기':'늘리기'} ${G}`;
+    R.suggest={lr:d.lat>0?'좌로':'우로',lv:L,rr:d.rng>0?'줄이기':'늘리기',rv:G};
+  }else{R.devText='탄착 부근에 표적 없음';R.suggest=null}
+  at(1.5,()=>setState('ADJ'));
+}
+function afterFFE(m){
+  const P=bestPlatoon(m);R.lastImpactT=simT;
+  if(P&&trainMode){const c=P.total-alive(P);sys(`↳ (훈련) ${P.name} 실제 사상 ${c}/${P.total} (${Math.round(c/P.total*100)}%)`)}
+  R.devText='';setState('EOM');
+}
+function bestPlatoon(m){let best=null,bk=-1;for(const id in m.kills){if(m.kills[id]>bk){bk=m.kills[id];best=platoons[id]}}return best||(m.targetPid!=null?platoons[m.targetPid]:null)}
+function corrParts(lr,lv,rr,rv){const p=[];if(lv>0)p.push(`${lr} ${corrWord(lv)}${nm(lv)}`);if(rv>0)p.push(`${rr} ${corrWord(rv)}${nm(rv)}`);return p}
+function applyCorr(m,lr,lv,rr,rv){const ls=lr==='우로'?1:-1,rs=rr==='늘리기'?1:-1;m.aim.x+=m.right.x*ls*lv+m.ot.x*rs*rv;m.aim.y+=m.right.y*ls*lv+m.ot.y*rs*rv}
+/* 수정 단위: 좌우 10 m, 사거리 50 m. 위험근접이면 축당 100 m 이하 */
+const snapLat=v=>Math.round(Math.max(0,+v||0)/10)*10,snapRng=v=>Math.round(Math.max(0,+v||0)/50)*50;
+function sendCorr(dir,lr,lv,rr,rv,next){
+  if(R.state!=='ADJ'&&R.state!=='EOM')return;const m=R.m;lv=snapLat(lv);rv=snapRng(rv);
+  if(m.dir==null){if(!okDir(dir)){sys('첫 수정에는 방향(관측자–표적 방위각, 0~6399 밀)을 함께 보내야 합니다.','warn');return}dir=+dir}else dir=null;
+  if(m.dc&&(lv>100||rv>100)){fo(`${dir!=null?`방향 ${dg(String(dir).padStart(4,'0'))}, `:''}${corrParts(lr,lv,rr,rv).join(', ')}, 이상.`);setState('WAIT');
+    at(2.5,()=>{fdc(`${CS}, 여기는 기러기, 위험근접, 수정량 100 이하로 재송신, 이상.`);setState('ADJ')});return}
+  logIn('corr',[dir,lr,lv,rr,rv,next]);
+  if(dir!=null)setDir(m,dir);
+  applyCorr(m,lr,lv,rr,rv);m.adjCount++;if(rv>0)m.rangeCorrs.push(rv);
+  const p=corrParts(lr,lv,rr,rv);if(!p.length)p.push('동제원');
+  if(dir!=null)p.unshift(`방향 ${dg(String(dir).padStart(4,'0'))}${nm(dir)}`);
+  if(next==='효력사')p.push('효력사');
+  const body=p.join(', ');fo(`${body}, 이상.`);setState('WAIT');
+  at(2.5+rF()*1.5,()=>fdc(`${body}, 잠깐대기.`));
+  if(next==='효력사'){m.phase='ffe';at(14+rF()*8,()=>{fdc(`${m.fuze}신관 사격준비 끝.`);readyToFire()})}
+  else at(11+rF()*6,()=>{fdc('사격준비 끝.');readyToFire()});
+}
+function bdaWord(b){return b==='미흡'?'효과 미흡':b}
+function truthOf(P){const c=1-strength(P);return c>=DESTROY?'파괴':c>=NEUT?'무력화':'미흡'}
+function recordBDA(m,b){const P=bestPlatoon(m);m.bda=b;if(P){m.truth=truthOf(P);m.truthPct=Math.round((1-strength(P))*100);m.pname=P.name;if(m.truth===b)addScore(30);else addScore(-20)}}
+function sendRepeat(b,n){
+  if(R.state!=='EOM')return;const m=R.m;recordBDA(m,b);m.rounds=n;logIn('repeat',[b,n]);
+  fo(`${shortOf(bestPlatoon(m))} ${bdaWord(b)}, 재효력사, 동제원, 포대 ${AD[n]}발${nm(n+'발')}, 이상.`);setState('WAIT');
+  at(3,()=>fdc(`동제원 포대 ${AD[n]}발, 잠깐대기.`));
+  let prep=20;if(m.fuze==='접근'&&rF()<0.5){m.fuze='순발';prep=10}
+  at(3+prep,()=>{fdc(`${m.fuze}신관 사격준비 끝.`);readyToFire()});
+}
+function sendEOM(b){
+  if(R.state!=='EOM')return;const m=R.m;recordBDA(m,b);logIn('eom',b);fo(`임무끝, ${shortOf(bestPlatoon(m))} ${bdaWord(b)}.`);
+  R.lastAim={...m.aim};R.lastBias={...m.bias};R.lastFuze=m.fuze;R.lastTn=m.tn;R.m=null;setState('IDLE');
+}
+/* 전이사격: 직전 표적번호를 기준점으로 방향 + 좌우·원근 + 표적성질 + 사격규모를 보내고, 기러기가 새 표적번호를 부여한다 */
+function sendShift(dir,lr,lv,rr,rv,desc,n){
+  if(R.state!=='IDLE'||!R.lastAim||OPS.state!=='ready'||hardPause())return;
+  if(!okDir(dir)){sys('전이사격에는 방향(0~6399 밀)이 필요합니다.','warn');return}
+  lv=snapLat(lv);rv=snapRng(rv);dir=+dir;logIn('shift',[dir,lr,lv,rr,rv,desc,n]);
+  const m=R.m=newMission('효력사');m.shift=true;m.bias={...R.lastBias};m.aim={...R.lastAim};m.dir=dir;otFrame(m);
+  applyCorr(m,lr,lv,rr,rv);m.loc={...m.aim};m.rounds=n;m.reqRounds=n;m.reqFuze='';m.fuze=R.lastFuze;m.desc=desc;
+  const tp=nearestPlatoon(m.aim.x,m.aim.y,600);m.targetPid=tp?tp.id:null;setDir(m,dir);
+  const p=corrParts(lr,lv,rr,rv);const body=`전이, ${tnWord(R.lastTn||'AB'+tnSeq)}, 방향 ${dg(String(dir).padStart(4,'0'))}${nm(dir)}, ${p.length?p.join(', ')+', ':''}${desc}, 포대 ${AD[n]}발${nm(n+'발')}, 효력사`;
+  fo(`${body}, 이상.`);setState('WAIT');
+  const near=FRIEND.some(f=>Math.hypot(f.x-m.loc.x,f.y-m.loc.y)<600)||Math.hypot(OBS.x-m.loc.x,OBS.y-m.loc.y)<600;
+  at(3,()=>{fdc(`${body}, 잠깐대기.`);if(near){m.dc=true;m.phase='adj';dangerMiss++;addScore(-30);fdc(`${CS}, 여기는 기러기, 표적이 아군 600 m 이내, 위험근접, 조정 후 효력사, 이상.`)}});
+  at(9+rF()*3,()=>{decideMTO(m);fdc(mtoText(m))});
+  at(20+rF()*8,()=>{fdc(m.phase==='adj'?'포대 사격준비 끝.':`${m.fuze}신관 사격준비 끝.`);readyToFire()});
+}
+
+/* ================= 관측소 이동 ================= */
+function planMove(to){
+  const dx=to.x-OBS.x,dy=to.y-OBS.y,d=Math.hypot(dx,dy),n=Math.max(1,Math.ceil(d/20));
+  const pts=[{x:OBS.x,y:OBS.y,t:0}];let t=0,forest=0;
+  for(let i=1;i<=n;i++){const x=OBS.x+dx*i/n,y=OBS.y+dy*i/n,seg=d/n;
+    const g0=sampleH(GROUND,pts[i-1].x,pts[i-1].y),g1=sampleH(GROUND,x,y),grade=(g1-g0)/Math.max(1,seg);
+    const inF=sampleH(SURF,x,y)-g1>3;if(inF)forest+=seg;
+    const v=6*Math.exp(-3.5*Math.abs(grade+0.05))/3.6*0.85*(inF?0.7:1);   // 토블러 보행 공식 × 장비 휴대 0.85 × 숲 0.7 (m/s)
+    t+=seg/v;pts.push({x,y,t})}
+  return{to,pts,total:t,dist:d,forest};
+}
+function moveCheck(to){
+  if(to.x<200||to.x>SIZE-200||to.y<200)return'지도 가장자리입니다.';
+  if(OPS.state!=='ready')return OPS.state==='moving'?'이미 이동 중입니다.':'관측소 설치 중입니다.';
+  if(R.state!=='IDLE')return'사격 임무 중에는 이동할 수 없습니다. 임무끝을 먼저 보내십시오.';
+  return'';
+}
+function startMove(to){
+  const why=moveCheck(to);if(why){sys(why,'warn');return}
+  logIn('move',[Math.round(to.x),Math.round(to.y)]);
+  const m=planMove(to);OPS.move=m;OPS.move.done=0;OPS.state='moving';OPS.unreported=true;OPS.moves++;OPS.dest=to;
+  if(cam.binoc)toggleBino();
+  fo(`기러기, 여기는 ${CS}, 관측소 이동, 이상.`);
+  at(2.5+rF(),()=>fdc(`${CS}, 여기는 기러기, 관측소 이동, 이상.`));
+  if(to.y>FRONT_Y)sys('목적지가 아군 전선 전방입니다. 이동 중에는 발각될 확률이 높습니다.','warn');
+  sys(`관측소 이동 시작 — 거리 ${Math.round(m.dist).toLocaleString()} m, 예상 ${fmtT(m.total)}${m.forest>50?` (숲 ${Math.round(m.forest)} m 통과)`:''}.`);
+  renderComposer();
+}
+function updateOP(dt){
+  if(OPS.state==='moving'){
+    const m=OPS.move;m.done+=dt;
+    if(m.done>=m.total){OBS.x=m.to.x;OBS.y=m.to.y;OPS.state='setup';OPS.setupUntil=simT+30;OPS.move=null;
+      sys('관측소 도착. 관측 장비 설치 중(약 30초).');if(showVS)computeViewshed();renderComposer();return}
+    let i=1;while(i<m.pts.length-1&&m.pts[i].t<m.done)i++;
+    const a=m.pts[i-1],b=m.pts[i],f=clamp((m.done-a.t)/Math.max(1e-6,b.t-a.t),0,1);
+    OBS.x=a.x+(b.x-a.x)*f;OBS.y=a.y+(b.y-a.y)*f;
+  }else if(OPS.state==='setup'&&simT>=OPS.setupUntil){
+    OPS.state='ready';
+    const canopy=sampleH(SURF,OBS.x,OBS.y)-sampleH(GROUND,OBS.x,OBS.y);
+    sys('관측소 설치 끝. 기러기에게 새 위치를 보고하십시오.'+(canopy>3?' (숲 속이라 시야가 가립니다.)':''),canopy>3?'warn':'sys');
+    renderComposer();
+  }
+}
+function sendPosReport(e,n){
+  if(R.state!=='IDLE'||!OPS.unreported||OPS.state!=='ready')return;
+  if(!/^\d{4}$/.test(e)||!/^\d{4}$/.test(n)){sys('좌표는 동서·남북 각 4자리 숫자로 입력하십시오.','warn');return}
+  logIn('pos',[e,n]);
+  const t=`관측소 이동 끝, 현 위치 좌표 찰리호텔 ${dg(e)} ${dg(n)}${nm(e+' '+n)}`;
+  fo(`기러기, 여기는 ${CS}, ${t}, 이상.`);setState('WAIT');
+  at(3+rF(),()=>{fdc(`${CS}, 여기는 기러기, ${t}, 이상.`);OPS.fdc=fromGrid(e,n);OPS.unreported=false;OPS.stale=false;
+    const err=Math.round(Math.hypot(OPS.fdc.x-OBS.x,OPS.fdc.y-OBS.y));
+    if(err>60)sys(`↳ 보고한 위치가 실제 위치와 약 ${err} m 다릅니다. 극좌표로 보낸 표적 위치가 그만큼 어긋납니다(좌표법 + 방향 송신에는 영향 없음).`,'warn');
+    else if(trainMode)sys(`↳ (훈련) 보고 위치 오차 ${err} m.`);
+    setState('IDLE')});
+}
+
+/* ================= 입력기(사격요구 작성) UI ================= */
+const comp=$('#composer');
+const sel=(id,opts,v)=>`<select id="${id}">${opts.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}</select>`;
+const hint=t=>`<div class="hint">${t}</div>`;
+function corrInputs(pfx,sg,dc){
+  sg=sg||{lr:'좌로',lv:0,rr:'줄이기',rv:0};const mx=dc?100:800,mr=dc?100:1500;
+  return `<div class="row">${sel(pfx+'lr',['좌로','우로'],sg.lr)}<input type="number" id="${pfx}lv" min="0" max="${mx}" step="10" value="${Math.min(sg.lv,mx)}"> m <span class="dim">(10 m 단위)</span></div>
+          <div class="row">${sel(pfx+'rr',['줄이기','늘리기'],sg.rr)}<input type="number" id="${pfx}rv" min="0" max="${mr}" step="50" value="${Math.min(sg.rv,mr)}"> m <span class="dim">(50 m 단위${dc?' · 위험근접: 100 m까지':''})</span></div>`;
+}
+/* 방향 입력: 훈련은 현재 화면 방위각이 미리 들어가고, 표준은 비워 둠(화면 상단 방위각을 읽어 넣음) */
+const dirInput=(id,pre)=>`<div class="row">방향 <input type="number" id="${id}" min="0" max="6399" step="1" value="${pre!=null?pre:''}" placeholder="밀" style="width:90px"> 밀 <span class="dim">(관측자–표적 방위각)</span></div>`;
+const curAz=()=>Math.round(mod(cam.h*MIL,6400));
+const gv=id=>{const e=$('#'+id);return e?(e.type==='checkbox'?e.checked:e.value):''};
+const hardPause=()=>paused&&!trainMode&&phase==='live'&&!ended;    // 표준 모드 일시정지: 관측·지도·교신을 가림
+function renderComposer(){
+  const s=R.state;let h='';
+  if(hardPause()){comp.innerHTML=`<div class="step">일시정지</div><div class="wait">표준 모드에서는 일시정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</div>`;return}
+  if(phase==='prep'){
+    const g=toGrid(OBS.x,OBS.y),pg=toGrid(PLANNED_OP.x,PLANNED_OP.y),picked=OPS.picked;
+    h=`<div class="step">작전 준비 — 관측소 선정</div>
+      <div style="font-size:13px;line-height:1.65">
+      <b class="amb">적정(첩보)</b> 적 보병 1개 중대(-) 규모가 아군 1~3소대 진지 방향으로 공격할 것으로 판단됨. 장갑차 일부 동반 가능. 82mm 박격포 1개 반이 북쪽 능선 일대에서 지원할 것으로 추정.<br>
+      <b class="amb">첩보 지점</b> <span class="dim">(지도 주황 원)</span><br>${NAI.map(a=>`· ${a.id} ${a.txt} <span class="dim">(신뢰도 ${a.conf})</span>`).join('<br>')}<br>
+      <b class="amb">예상 접근로</b> <span class="dim">(지도 붉은 점선)</span> ${INTEL_ROUTES.map(r=>`${ROUTES[r.r].name}(가능성 ${r.conf})`).join(', ')}<br>
+      <b class="amb">임무</b> 관측소를 선정·점령하여 NAI와 접근로를 감시하고, 적 발견 시 화력을 유도한다.<br>
+      <b class="amb">기상</b> ${wxText()} <span class="dim">(${WX.source})</span><br>
+      <b class="amb">시드</b> ${SEED_KIND==='daily'?`일일 ${SEED} — 오늘은 모두 같은 배치·기상·편차로 경쟁`:`사용자 지정 ${SEED} — 연습(랭킹 제외)`}<br>
+      ${SEED_KIND==='custom'?`<span class="dim">데모 기상 바꾸기</span> <select id="wxSel">${Object.entries(WX_PRESETS).map(([k,v])=>`<option value="${k}"${k===WX.key?' selected':''}>${v.label}</option>`).join('')}</select><br>`:''}
+      <b class="amb">주의</b> 파란 점선은 아군 전선. 그 앞으로도 나갈 수 있지만 적에게 발각되면 관측소가 사격을 받는다. 작전 개시 후 이동은 도보. 계획된 관측소는 1번 고지(찰리호텔 ${pg.e} ${pg.n}). 다른 곳을 점령하면 기러기에게 위치를 보고해야 함.
+      </div>
+      <div class="preview">${picked?`관측소 후보: <b>찰리호텔 ${g.e} ${g.n}</b> · 표고 ${Math.round(sampleH(GROUND,OBS.x,OBS.y))} m${sampleH(SURF,OBS.x,OBS.y)-sampleH(GROUND,OBS.x,OBS.y)>3?' · <span class="red">숲 속 — 시야 가림</span>':''}`:'<span class="dim">지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.</span>'}</div>
+      <button class="primary" id="bGo">관측소 점령 · 작전 개시</button>
+      ${hint(trainMode?'훈련: 후보를 고르면 그 자리에서 보이는 화면을 미리 볼 수 있고, 지도의 "가시권 표시"로 보이는 땅을 확인할 수 있습니다.':'표준: 등고선과 첩보만으로 판단합니다. 관측 화면은 점령한 뒤에 열립니다.')}`;
+  }else if(s==='IDLE'&&OPS.state!=='ready'){
+    const rem=OPS.state==='moving'?OPS.move.total-OPS.move.done:OPS.setupUntil-simT;
+    h=`<div class="step">${OPS.state==='moving'?'관측소 이동 중':'관측소 설치 중'}</div><div class="wait">남은 시간 약 <b id="opRem">${fmtT(rem)}</b>. 이동 중에는 쌍안경·레이저를 쓸 수 없고 사격요구도 할 수 없습니다.</div>`;
+  }else if(s==='IDLE'&&OPS.unreported){
+    const g=trainMode?toGrid(OBS.x,OBS.y):(romerPin?toGrid(romerPin.x,romerPin.y):{e:'',n:''});
+    h=`<div class="step">관측소 위치 보고</div>
+      <div class="row">현 위치 찰리호텔 <input class="g4" id="pe" maxlength="4" inputmode="numeric" value="${g.e}"> <input class="g4" id="pn" maxlength="4" inputmode="numeric" value="${g.n}"></div>
+      <div class="preview" id="pv"></div><button class="primary" id="bP">송신</button> <button id="bSkip">보고하지 않고 계속</button>
+      ${hint(trainMode?'기러기는 극좌표와 수정량을 관측소 위치 기준으로 계산합니다. 보고하지 않으면 옛 위치로 계산합니다.':'지도를 눌러 자기 위치를 좌표자로 읽어 넣으십시오.')}`;
+  }else if(s==='IDLE'){
+    h=`<div class="step">① 호출 · 경고명령</div>
+      <div class="row"><label><input type="radio" name="wo" value="조정" checked> 조정 <span class="dim">(수정사격)</span></label><label><input type="radio" name="wo" value="효력사"> 효력사</label></div>
+      <div class="preview" id="pv"></div><button class="primary" id="b1">송신</button>
+      ${trainMode?hint('표적을 식별하고 레이저로 측정한 뒤 호출합니다. 첫 탄 오차가 걱정되면 <b>조정</b>, 좌표가 확실하면 <b>효력사</b>.'):''}`;
+    if(R.lastAim){const opts=[...new Set([...platoons.filter(q=>q.intel.stage>=2&&q.state!=='wait'&&!q.fate).map(descOf),'미상 표적'])];
+      h+=`<hr style="border-color:#2a3525;margin:14px 0"><div class="step">또는 전이사격 <span class="tag">기준: ${R.lastTn||'직전 표적'}</span></div>
+      ${dirInput('sdir',trainMode?curAz():null)}${corrInputs('s')}<div class="row">${sel('sd',opts,opts[0])}</div><div class="row">포대 ${sel('sn',['1','2','3','4','5'],'3')}발</div>
+      <div class="preview" id="pvS"></div><button id="bS">전이사격 송신</button>
+      ${trainMode?hint('직전 표적번호를 기준점으로 방향·좌우·원근·표적성질·발수를 보내 옆 표적을 바로 효력사로 칩니다. 기러기가 새 표적번호를 줍니다.'):''}`}
+  }else if(s==='LOC'){
+    const L=R.lastLase,g=L?toGrid(L.x,L.y):null,rp=romerPin?toGrid(romerPin.x,romerPin.y):null;
+    const ge=trainMode&&g?g.e:(rp?rp.e:''),gn=trainMode&&g?g.n:(rp?rp.n:'');
+    h=`<div class="step">② 표적위치</div>
+      <div class="row"><label><input type="radio" name="lm" value="grid" checked> 좌표</label><label><input type="radio" name="lm" value="polar"> 극좌표</label></div>
+      <div class="row" id="gridRow">찰리호텔 <input class="g4" id="ge" maxlength="4" inputmode="numeric" value="${ge}"> <input class="g4" id="gn" maxlength="4" inputmode="numeric" value="${gn}"></div>
+      <div class="row" id="polRow" style="display:none">방위각 <input type="number" id="paz" value="${L?az4(L.az):''}"> 밀 · 거리 <input type="number" id="pd" step="10" value="${L?L.dist:''}"> m</div>
+      <div class="preview" id="pv"></div><button class="primary" id="b2">송신</button>
+      ${OPS.stale&&Math.hypot(OPS.fdc.x-OBS.x,OPS.fdc.y-OBS.y)>30?`<div class="hint red">기러기는 관측소 위치를 이전 지점으로 알고 있습니다. 극좌표로 보낸 표적 위치가 어긋납니다.</div>`:''}
+      ${hint(trainMode?'훈련: 마지막 레이저 측정점의 좌표가 자동으로 들어갑니다. 극좌표는 레이저의 방위각·거리를 그대로 씁니다.':'표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.')}`;
+  }else if(s==='DESC'){
+    const P=R.m&&nearestPlatoon(R.m.loc.x,R.m.loc.y,600);
+    const opts=[...new Set([...platoons.filter(q=>q.intel.stage>=2&&q.state!=='wait').map(descOf),'미상 표적'])];
+    const dd=P&&P.intel.stage>=2?descOf(P):'미상 표적';
+    h=`<div class="step">③ 표적성질 · 사격규모 · 통제방법</div>
+      <div class="row">${sel('dd',opts,dd)}</div>
+      <div class="row">포대 ${sel('dn',['1','2','3','4','5'],'3')}발 · 신관 ${sel('df',['요청 안 함','순발','접근'],'요청 안 함')}</div>
+      <div class="row"><label><input type="radio" name="dc" value="0" checked> 준비되는 대로</label><label><input type="radio" name="dc" value="1"> 지명사</label></div>
+      <div class="row"><label><input type="checkbox" id="ddc"> 위험근접 <span class="dim">(아군 600 m 이내)</span></label></div>
+      <div class="preview" id="pv"></div><button class="primary" id="b3">송신</button>
+      ${trainMode?hint('<b>지명사</b>: 사격준비가 끝나면 관측자가 "준비 쏴"로 발사 시점을 정합니다. 이동하는 적의 앞을 노릴 때 씁니다. <b>위험근접</b>을 선언하면 바로 효력사를 걸 수 없고 수정량도 100 m까지입니다.'):''}`;
+  }else if(s==='AMC'){
+    const tof=R.m?Math.round(tofOf(Math.hypot(R.m.aim.x-BATT.x,R.m.aim.y-BATT.y))):0;
+    h=`<div class="step">지명사 — 발사 시점 결정</div>
+      <div class="row"><button class="fire" id="bF">준비 쏴 <kbd>F</kbd></button></div>
+      ${hint(`예상 비과시간 약 ${tof}초. 이동 중인 적이라면 탄착 시점의 위치를 생각하고 쏘십시오.`)}`;
+  }else if(s==='FLIGHT'){
+    h=`<div class="step">사격 중</div><div class="wait">탄착을 관측하십시오. 쌍안경으로 표적 지역을 보고 있어야 편의를 읽을 수 있습니다.</div>`;
+  }else if(s==='ADJ'){
+    const sg=trainMode?R.suggest:null,m=R.m,needDir=m&&m.dir==null;
+    h=`<div class="step">수정${m&&m.tn?` <span class="tag">${m.tn}</span>`:''}${m&&m.dc?' <span class="tag red">위험근접</span>':''}</div>${trainMode&&R.devText?`<div class="preview">${R.devText}<br><span class="dim">※ 적이 움직이고 있다면 이동량을 더 고려하십시오.</span></div>`:''}
+      ${needDir?dirInput('cdir',trainMode?curAz():null):`<div class="row dim">방향 ${String(m.dir).padStart(4,'0')} 밀 (송신함)</div>`}
+      ${corrInputs('c',sg,m&&m.dc)}
+      <div class="row"><label><input type="radio" name="nx" value="조정" checked> 조정 계속</label><label><input type="radio" name="nx" value="효력사"> 효력사</label></div>
+      <div class="preview" id="pv"></div><button class="primary" id="b4">송신</button>
+      ${hint((needDir?'첫 수정에는 <b>방향</b>(관측자–표적 방위각, 화면 상단 밀 값)을 함께 보냅니다. 좌·우, 줄이기·늘리기는 이 방향을 기준으로 적용됩니다.<br>':'')+'편의(m) ≈ 관측자–표적 거리(km) × 레티클에서 읽은 밀. 좌우 10 m, 사거리 50 m 단위. 사거리는 근탄·원탄을 번갈아 내며 반씩 좁힙니다(협차: 400→200→100→50).')}`;
+  }else if(s==='EOM'){
+    h=`<div class="step">효력 판정${R.m&&R.m.tn?` <span class="tag">${R.m.tn}</span>`:''}</div>
+      <div class="preview">효과 관측 중 — 마지막 탄착 후 <b id="eomT">${Math.round(simT-R.lastImpactT)}</b>초. <span class="dim">엎드린 생존자는 35–65초 뒤 일어나거나 물러납니다. 연기가 걷힌 뒤 움직임을 보고 판정하십시오.</span></div>
+      <div class="row">판정 ${sel('eb',['파괴','무력화','미흡'],'무력화')}</div>
+      <div class="row"><button class="primary" id="bE">임무끝 송신</button></div>
+      <div class="row">재효력사 · 동제원 · 포대 ${sel('en',['1','2','3'],'2')}발 <button id="bR">송신</button></div>
+      <details style="margin-top:6px"><summary class="dim">수정 후 효력사</summary>${corrInputs('e',null,R.m&&R.m.dc)}<button id="bC">수정 · 효력사 송신</button></details>
+      ${hint('판정 기준(데모): 사상 60% 이상 파괴 · 30% 이상 무력화 · 그 미만 효과 미흡. 적 부대의 상태 변화(정지·퇴각)도 같은 척도를 씁니다.')}`;
+  }else{
+    h=`<div class="step">교신 중</div><div class="wait">기러기 응답 대기…</div>`;
+  }
+  comp.innerHTML=h;bindComposer();
+}
+function bindComposer(){
+  const s=R.state,pv=$('#pv'),pvS=$('#pvS');
+  const upd=()=>{if(pv)pv.innerHTML=previewText();if(pvS)pvS.innerHTML=shiftPreview()};
+  comp.querySelectorAll('input,select').forEach(e=>{e.addEventListener('input',upd);e.addEventListener('change',()=>{if(s==='LOC'){const pol=comp.querySelector('input[name=lm]:checked').value==='polar';$('#gridRow').style.display=pol?'none':'';$('#polRow').style.display=pol?'':'none'}upd()})});
+  upd();
+  const on=(id,fn)=>{const b=$('#'+id);if(b)b.onclick=fn};
+  on('bGo',startOps);
+  const ws=$('#wxSel');if(ws)ws.onchange=()=>{setWeather(ws.value);if(showVS)computeViewshed();renderComposer();drawMap()};
+  on('bP',()=>sendPosReport(gv('pe'),gv('pn')));
+  on('bSkip',()=>{OPS.skipReport=true;OPS.unreported=false;OPS.stale=true;sys('위치 보고 생략 — 기러기는 이전 관측소 위치를 기준으로 계산합니다.','warn');renderComposer()});
+  on('b1',()=>sendCall(comp.querySelector('input[name=wo]:checked').value));
+  on('b2',()=>{const pol=comp.querySelector('input[name=lm]:checked').value==='polar';pol?sendLoc('polar',gv('paz'),gv('pd')):sendLoc('grid',gv('ge'),gv('gn'))});
+  on('b3',()=>{const f=gv('df');sendDesc(gv('dd'),+gv('dn'),f==='요청 안 함'?'':f,comp.querySelector('input[name=dc]:checked').value==='1',gv('ddc'))});
+  on('bF',sendFireCmd);
+  on('b4',()=>sendCorr(gv('cdir'),gv('clr'),+gv('clv'),gv('crr'),+gv('crv'),comp.querySelector('input[name=nx]:checked').value));
+  on('bE',()=>sendEOM(gv('eb')));
+  on('bR',()=>sendRepeat(gv('eb'),+gv('en')));
+  on('bC',()=>{const m=R.m;recordBDA(m,gv('eb'));sendCorr(null,gv('elr'),+gv('elv'),gv('err'),+gv('erv'),'효력사')});
+  on('bS',()=>sendShift(gv('sdir'),gv('slr'),+gv('slv'),gv('srr'),+gv('srv'),gv('sd'),+gv('sn')));
+}
+function shiftPreview(){
+  const d=gv('sdir');if(!okDir(d))return '<span class="dim">방향(밀)을 입력</span>';
+  const p=corrParts(gv('slr'),snapLat(gv('slv')),gv('srr'),snapRng(gv('srv')));
+  return `“전이, ${tnWord(R.lastTn||'AB'+tnSeq)}, 방향 ${dg(String(+d).padStart(4,'0'))}, ${p.length?p.join(', ')+', ':''}${gv('sd')}, 포대 ${AD[+gv('sn')]}발, 효력사, 이상.”`;
+}
+function previewText(){
+  const s=R.state;
+  if(s==='IDLE'&&$('#pe')){const e=gv('pe'),n=gv('pn');return e&&n?`“기러기, 여기는 ${CS}, 관측소 이동 끝, 현 위치 좌표 찰리호텔 ${dg(e)} ${dg(n)}, 이상.”`:'<span class="dim">자기 위치 좌표 8자리</span>'}
+  if(s==='IDLE'){const w=comp.querySelector('input[name=wo]:checked');return `“기러기, 여기는 ${CS}, ${w?w.value:'조정'}, 이상.”`}
+  if(s==='LOC'){const pol=comp.querySelector('input[name=lm]:checked').value==='polar';
+    if(pol){const a=gv('paz'),d=gv('pd');return a&&d?`“극좌표, 방위각 ${dg(String(Math.round(+a)).padStart(4,'0'))}, 거리 ${dg(Math.round(+d/10)*10)}, 이상.”`:'<span class="dim">방위각과 거리를 입력</span>'}
+    const e=gv('ge'),n=gv('gn');return e&&n?`“좌표 찰리호텔 ${dg(e)} ${dg(n)}, 이상.”`:'<span class="dim">좌표 8자리를 입력 (지도 좌표자 또는 레이저)</span>'}
+  if(s==='DESC'){const f=gv('df'),amc=comp.querySelector('input[name=dc]:checked').value==='1';return `“${gv('dd')}, 포대 ${AD[+gv('dn')]}발${f!=='요청 안 함'?`, ${f}신관`:''}${amc?', 지명사':''}${gv('ddc')?', 위험근접':''}, 이상.”`}
+  if(s==='ADJ'){const p=corrParts(gv('clr'),snapLat(gv('clv')),gv('crr'),snapRng(gv('crv')));if(!p.length)p.push('동제원');
+    if(R.m&&R.m.dir==null){const d=gv('cdir');if(!okDir(d))return '<span class="dim">방향(밀)을 먼저 입력</span>';p.unshift(`방향 ${dg(String(+d).padStart(4,'0'))}`)}
+    if(comp.querySelector('input[name=nx]:checked').value==='효력사')p.push('효력사');return `“${p.join(', ')}, 이상.”`}
+  return '';
+}
+
+/* ================= 관측 조작 ================= */
+/* ---- 조준선 고르기(시뮬레이션 공간): 화면 좌표가 아니라 각도(밀)로 고른다. 화면 크기·화질과 무관 ----
+   relAz = 화면 중심 기준 좌우 각(rad), elAbs = 절대 고저각(rad). 보이는(vis) 적 구성원과 먼지·연기 신호만 대상 */
+function pickAt(relAz,elAbs,tolAz,tolEl){
+  let best=null,bd=Infinity;
+  const test=(x,y,z,pid,kind,sig)=>{const d=Math.hypot(x-OBS.x,y-OBS.y);if(d<5)return;const a=relAzOf(x,y)-relAz,e=Math.atan2(z-camZ,d)-elAbs;
+    if(Math.abs(a)>tolAz||Math.abs(e)>tolEl)return;const sc=Math.hypot(a/tolAz,e/tolEl);if(sc<bd){bd=sc;best={pid,kind,sig,d,x,y,z}}};
+  for(const P of platoons){if(P.state==='wait')continue;for(const q of P.s)if(q.alive&&q.vis)test(q.x,q.y,sampleH(GROUND,q.x,q.y)+(q.kind==='veh'?1.2:q.prone?0.25:0.9),P.id,q.kind,null)}
+  for(const e of effects){if(!e.vis||e.pid==null||e.pid<0||(e.kind!=='dust'&&e.kind!=='muzzle'))continue;const age=simT-e.t;test(e.x+WV.x*age*0.8,e.y+WV.y*age*0.8,e.gz+2+age*0.8,e.pid,'sig',e.kind)}
+  return best;
+}
+function lase(){
+  initAudio();
+  if(phase==='prep'){$('#laseOut').textContent='레이저: 작전 개시 전';return}
+  if(hardPause())return;
+  if(OPS.state!=='ready'){$('#laseOut').textContent=OPS.state==='moving'?'레이저: 이동 중에는 쓸 수 없음':'레이저: 관측소 설치 중';return}
+  logIn('lase',[Math.round(mod(cam.h*MIL,6400)*10)/10,Math.round(cam.p*MIL*10)/10]);
+  const tp=Math.tan(cam.p),dx=Math.sin(cam.h),dy=Math.cos(cam.h);
+  let hit=null;
+  for(let z=10;z<12000;z+=z<2500?2:5){const px=OBS.x+dx*z,py=OBS.y+dy*z,h=sampleH(SURF,px,py);if(h>=camZ+tp*z){hit={z,px,py,h};break}}
+  const tgt=pickAt(0,cam.p,1.5/MIL,3/MIL);                       // 레티클 중앙 1.5 밀 × 3 밀 안의 보이는 적
+  if(tgt&&tgt.kind!=='sig'&&(!hit||tgt.d<hit.z+5))hit={z:tgt.d,px:OBS.x+dx*tgt.d,py:OBS.y+dy*tgt.d,h:tgt.z,soldier:true};
+  if(!hit){$('#laseOut').textContent='레이저: 반사 없음';return}
+  const dist=Math.round(hit.z+gB()*2),vm=Math.round(Math.atan2(hit.h-camZ,hit.z)*MIL);
+  const L={az:cam.h,dist,vm,x:OBS.x+dx*dist,y:OBS.y+dy*dist,t:simT,soldier:!!hit.soldier};R.lastLase=L;lases.unshift(L);if(lases.length>5)lases.pop();
+  const g=toGrid(L.x,L.y);
+  $('#laseOut').innerHTML=`레이저: 방위각 <b>${az4(L.az)}</b> 밀 · 거리 <b>${dist.toLocaleString()}</b> m · 고저 ${vm} 밀${L.soldier?' · <span class="red">표적 반사</span>':''}${trainMode?` · <span class="dim">CH ${g.e} ${g.n}</span>`:''}`;
+  $('#llist').innerHTML=lases.map(l=>{const gg=toGrid(l.x,l.y);return `<li>${fmtT(l.t)} · 방위각 ${az4(l.az)} · ${l.dist.toLocaleString()} m${trainMode?` · <span class="dim">CH ${gg.e} ${gg.n}</span>`:''}${l.soldier?' <span class="red">표적</span>':''}</li>`}).join('');
+  if(R.state==='LOC')renderComposer();
+}
+function identifyAt(ix,iy){
+  if(!V||hardPause()||phase!=='live')return false;
+  const relAz=Math.atan((ix-VW/2)/V.focal),elAbs=Math.atan((V.hor-iy)/V.focal);
+  const tol=(cam.binoc?3:12)/MIL;                                  // 누르기 허용: 쌍안경 3 밀, 육안 12 밀
+  const best=pickAt(relAz,elAbs,tol,tol*1.5);
+  if(!best)return false;
+  logIn('id',[best.pid,Math.round(mod(cam.h*MIL,6400)*10)/10,Math.round(cam.p*MIL*10)/10,Math.round(relAz*MIL*10)/10,Math.round(elAbs*MIL*10)/10]);
+  const P=platoons[best.pid],I=P.intel;P.seenX=P.cx;P.seenY=P.cy;P.seenAz=azOf(P.cx-OBS.x,P.cy-OBS.y);P.seenT=simT;
+  if(I.stage===0){I.stage=1;I.tnum=++tcount;I.t1=simT;addScore(10);
+    const what=best.sig==='dust'?'먼지 — 차량 이동 추정':best.sig==='muzzle'?'사격 섬광·연기 — 미상 화기':best.kind==='veh'?'미상 차량':'미상 인원 움직임';
+    sys(`표적 ${I.tnum} 탐지 — ${what}. 방위각 ${az4(azOf(P.cx-OBS.x,P.cy-OBS.y))} 밀. 쌍안경으로 계속 지켜보면 병종·규모가 드러납니다.`);renderTargets()}
+  return true;
+}
+const STAGE_TXT=['','탐지','병종 식별','적정 확인'];
+function renderTargets(){
+  const ids=platoons.filter(p=>p.intel.stage>0).sort((a,b)=>a.intel.tnum-b.intel.tnum);
+  if(!ids.length)return;
+  $('#tlist').innerHTML=ids.map(P=>{const I=P.intel;
+    const{T1,T2}=intelTimes(P),pct=I.stage>=3?100:Math.round(Math.min(1,I.prog/T2)*100);
+    const fate={destroyed:'<span class="grn">파괴</span>',broken:'<span class="amb">무력화</span>',overran:'<span class="red">진지 돌파</span>'}[P.fate]||'';
+    const bar=I.stage<3?`<span class="dim"> · 관측 ${pct}%</span>`:'';
+    const tr=trainMode&&I.stage>=2?` · <span class="dim">(훈련: 전투력 ${Math.round(strength(P)*100)}%)</span>`:'';
+    return `<li><b class="red">표적 ${I.tnum}</b> ${I.stage>=2?descOf(P):'미상'} ${fate}<br><span class="dim">${STAGE_TXT[I.stage]} · 최초 탐지 ${fmtT(I.t1)} · 마지막 관측 ${fmtT(P.seenT)}</span>${bar}${tr}</li>`}).join('');
+}
+
+/* ================= 그리기 ================= */
+let maskCanvas=null,maskKey='';const spriteList=[];
+const SPR_COL={enemy:{man:[52,54,38],veh:[62,64,48],tube:[84,84,76]},friend:{man:[40,54,40],truck:[72,84,64]}};
+function drawSpritesHi(c,S){
+  const dpr=window.devicePixelRatio||1,G=cam.binoc?2.2:1.4,R=Math.round;
+  spriteList.sort((a,b)=>b.fwd-a.fwd);
+  for(const sp of spriteList){
+    const col=(SPR_COL[sp.side][sp.kind]||[50,50,40]).map((v,i)=>Math.round(v*(1-sp.fz)+FOG[i]*sp.fz));
+    const dark=col.map(v=>Math.round(v*0.7));
+    const kd=sp.k*S*G,x=sp.sx*S,y=sp.sy*S;
+    const rect=(x0,y0,w,h,cc)=>{c.fillStyle=`rgb(${cc[0]},${cc[1]},${cc[2]})`;c.fillRect(R(x0),R(y0),Math.max(1,R(w)),Math.max(1,R(h)))};
+    if(sp.kind==='man'){
+      const h=1.75*kd;
+      if(sp.prone){const w=Math.max(dpr,h*0.9),hh=Math.max(dpr,h*0.2);rect(x-w/2,y-hh,w,hh,col);continue}
+      if(h<5*dpr){const w=Math.max(dpr,h*0.3),bob=sp.moving?Math.abs(Math.sin(sp.ph))*h*0.08:0;rect(x-w/2,y-h-bob,w,h*0.7,col);
+        const sw=sp.moving?Math.sin(sp.ph)*w*0.8:0;rect(x-w/2+sw,y-h*0.32-bob,w,h*0.32,dark);if(sp.moving)rect(x-w/2-sw,y-h*0.32-bob,w,h*0.32,dark);continue}
+      const u=h/8,bob=sp.moving?Math.abs(Math.sin(sp.ph))*u*0.6:0,top=y-h-bob,sw=sp.moving?Math.sin(sp.ph)*u*1.3:0;
+      if(h>=16*dpr){                                            // 가까이 크게 보일 때: 세부 묘사
+        const skin=[Math.round(150*(1-sp.fz)+FOG[0]*sp.fz),Math.round(118*(1-sp.fz)+FOG[1]*sp.fz),Math.round(92*(1-sp.fz)+FOG[2]*sp.fz)],boot=[34,32,28];
+        const pack=sp.side==='enemy'?dark:col.map(v=>Math.round(v*0.85)),as=sp.moving?Math.sin(sp.ph)*u*0.9:0;
+        rect(x-u*0.55,top,u*1.1,u*0.35,dark);rect(x-u*0.75,top+u*0.3,u*1.5,u*0.55,dark);   // 철모
+        rect(x-u*0.45,top+u*0.85,u*0.9,u*0.6,skin);                                         // 얼굴
+        rect(x-u*1.05,top+u*1.45,u*2.1,u*2.9,col);rect(x-u*1.05,top+u*2.6,u*2.1,u*0.3,dark); // 몸통·탄띠
+        rect(x-u*1.45,top+u*1.6,u*0.5,u*2.2,pack);                                          // 배낭
+        rect(x-u*1.35-as*0.3,top+u*1.6,u*0.45,u*2.3,col);rect(x+u*0.95+as*0.3,top+u*1.6,u*0.45,u*2.1,col); // 팔
+        c.strokeStyle=`rgb(${[28,28,24]})`;c.lineWidth=Math.max(dpr,u*0.28);c.beginPath();c.moveTo(R(x+u*0.2),R(top+u*3.4));c.lineTo(R(x+u*1.9),R(top+u*1.5));c.stroke();   // 소총
+        rect(x-u*0.9+sw,top+u*4.35,u*0.8,u*3.1,dark);rect(x+u*0.1-sw,top+u*4.35,u*0.8,u*3.1,dark);   // 다리
+        rect(x-u*1.0+sw,top+u*7.4,u*1.0,u*0.6,boot);rect(x+u*0.05-sw,top+u*7.4,u*1.0,u*0.6,boot);    // 군화
+        continue}
+      rect(x-u*0.7,top,u*1.4,u*1.4,dark);                       // 머리(철모)
+      rect(x-u,top+u*1.4,u*2,u*3,col);                           // 몸통
+      rect(x+u,top+u*1.8,u*0.45,u*2.6,dark);                      // 소총
+      rect(x-u*0.9+sw,top+u*4.4,u*0.8,u*3.6,dark);rect(x+u*0.1-sw,top+u*4.4,u*0.8,u*3.6,dark);   // 다리
+    }else if(sp.kind==='veh'||sp.kind==='truck'){
+      const rel=sp.dir-cam.h,Lp=(sp.kind==='veh'?6.7:6.2)*kd,Wp=(sp.kind==='veh'?3.2:2.4)*kd,Hp=(sp.kind==='veh'?2.2:2.7)*kd;
+      const vw=Math.max(2*dpr,Lp*Math.abs(Math.sin(rel))+Wp*Math.abs(Math.cos(rel))),side=Math.sin(rel)>=0?1:-1;
+      const blk=[30,30,28],sideOn=Math.abs(Math.sin(rel))>0.5;
+      if(sp.kind==='veh'){rect(x-vw/2,y-Hp*0.8,vw,Hp*0.55,col);rect(x-vw/2,y-Hp*0.28,vw,Hp*0.28,dark);rect(x-vw*0.18,y-Hp,vw*0.32,Hp*0.24,dark);
+        if(Hp>4*dpr)rect(x+side*vw*0.12,y-Hp*0.92,side*vw*0.4,Math.max(dpr,Hp*0.06),dark);   // 포신
+        if(Hp>=12*dpr&&sideOn){const n=6,r=Hp*0.11;c.fillStyle=`rgb(${blk})`;for(let k=0;k<n;k++){c.beginPath();c.arc(R(x-vw/2+vw*(k+0.5)/n),R(y-r*1.1),Math.max(dpr,r),0,TAU);c.fill()}   // 보기륜
+          rect(x-vw/2,y-Hp*0.55,vw,Math.max(dpr,Hp*0.05),blk)}}
+      else{rect(x-vw/2,y-Hp,vw*0.68,Hp*0.75,col);rect(side>0?x+vw*0.18:x-vw/2,y-Hp*0.7,vw*0.32,Hp*0.45,dark);rect(x-vw/2,y-Hp*0.25,vw,Hp*0.25,blk);
+        if(Hp>=12*dpr){rect(side>0?x+vw*0.22:x-vw*0.46,y-Hp*0.66,vw*0.2,Hp*0.18,[120,140,150]);                   // 앞유리
+          if(sideOn){const r=Hp*0.14;c.fillStyle=`rgb(${blk})`;for(const fr of [0.18,0.42,0.82]){c.beginPath();c.arc(R(x-vw/2+vw*(side>0?fr:1-fr)),R(y-r),Math.max(dpr,r),0,TAU);c.fill()}}}}
+    }else if(sp.kind==='tube'){const L=1.3*kd;c.strokeStyle=`rgb(${dark})`;c.lineWidth=Math.max(dpr,0.14*kd);c.beginPath();c.moveTo(R(x),R(y));c.lineTo(R(x+L*0.45),R(y-L*0.9));c.stroke()}
+  }
+}
+/* 렌더러는 시뮬레이션이 정한 가시(vis)만 그린다. 가시선·크기 판정은 updateVisibility()에 있고 여기서는 하지 않는다 */
+function drawSprites(){
+  spriteList.length=0;
+  const look=(q,side,moving,speed,dir)=>{
+    if(!q.vis)return;
+    const gz=sampleH(GROUND,q.x,q.y),pr=proj(q.x,q.y,gz);if(!pr||pr.sx<-6||pr.sx>VW+6)return;
+    const fz=Math.min(0.9,1-Math.exp(-SIGMA*pr.fwd));
+    spriteList.push({sx:pr.sx,sy:pr.sy,fwd:pr.fwd,k:pr.k,fz,kind:q.kind,prone:q.prone,moving,dir,ph:q.ph+simT*speed*3,side});
+  };
+  for(const P of platoons){
+    if(P.state==='wait')continue;
+    const spd=P.moving?(P.type==='apc'?5:P.state==='assault'?2.8:2):0;
+    for(const q of P.s)if(q.alive)look(q,'enemy',P.moving,spd,P.dir);
+  }
+  for(const q of friendlies)if(q.alive)look(q,'friend',q.moving,q.moving?(q.kind==='truck'?7:1.2):0,q.dir);
+  for(let i=effects.length-1;i>=0;i--){
+    const e=effects[i],age=simT-e.t;if(age>e.life){effects.splice(i,1);continue}
+    if(age<0||!e.vis)continue;
+    const eh=effTop(e,age)-e.gz;
+    const t=age/e.life,wdx=WV.x*age,wdy=WV.y*age,tr=Math.exp(-SIGMA*Math.hypot(e.x-OBS.x,e.y-OBS.y));
+    if(e.kind==='dust'){                                   // 차량 이동 먼지
+      const p=proj(e.x+wdx*0.8,e.y+wdy*0.8,e.gz+1.5+age*0.8);if(!p)continue;const r=Math.max(0.8,(3+age*1.6)*p.k);
+      disc(p.sx,p.sy,r,156,138,100,0.55*(1-t)*tr,11);continue}
+    if(e.kind==='muzzle'){                                 // 사격 섬광 + 연기
+      const p=proj(e.x,e.y,e.gz);if(!p)continue;
+      if(e.tiny){if(age<0.12)disc(p.sx,p.sy,Math.max(0.7,0.8*p.k),255,236,170,Math.sqrt(tr),0);continue}
+      if(age<0.15)disc(p.sx,p.sy,Math.max(1,(e.small?1.2:2.5)*p.k),255,230,160,Math.sqrt(tr),0);
+      const p2=proj(e.x+wdx,e.y+wdy,e.gz+eh);if(p2){const r=Math.max(0.8,((e.small?1.2:2.5)+age*1.6)*p2.k);disc(p2.sx,p2.sy,r,128,126,118,0.6*(1-t)*tr,13)}
+      continue}
+    const sc=e.small?0.6:1;
+    const pr=proj(e.x,e.y,e.gz+(e.vt?7:0));if(!pr)continue;
+    if(age<0.3){disc(pr.sx,pr.sy,Math.max(1.6,8*sc*pr.k),255,238,170,Math.sqrt(tr),0)}
+    if(age>0.05){const rise=4+age*2.4;
+      const p2=proj(e.x+wdx,e.y+wdy,e.gz+(e.vt?7:0)+rise);if(p2){const rad=Math.max(1.2,(6+age*2.2)*sc*p2.k);
+        if(e.vt)disc(p2.sx,p2.sy,rad*0.9,64,64,66,0.8*(1-t)*tr,7);
+        const p3=proj(e.x+wdx,e.y+wdy,e.gz+rise*(e.vt?0.4:1));if(p3)disc(p3.sx,p3.sy,rad,104,94,78,0.78*(1-t)*tr,3)}}
+  }
+}
+function drawOverlay(){
+  const W=vc.width,H=vc.height,s=W/VW,dpr=window.devicePixelRatio||1;
+  const c=vctx;c.save();
+  const fpx=V.focal*s,cx=W/2,cy=H/2;
+  if(hardPause()){c.fillStyle='#0b0e0a';c.fillRect(0,0,W,H);c.fillStyle='#8b947c';c.textAlign='center';c.font=`${Math.round(14*dpr)}px 'Nanum Gothic Coding',monospace`;c.fillText('일시정지 — 표준 모드에서는 정지 중 관측할 수 없습니다',W/2,H/2);c.restore();return}
+  if(!(phase==='prep'&&!trainMode))drawSpritesHi(c,s);
+  if(WX&&WX.precipitation>0&&!(phase==='prep'&&!trainMode)){const n=Math.round(90*WX.precipitation),tt=performance.now()/1000,wl=(WV.x*Math.cos(cam.h)-WV.y*Math.sin(cam.h))*2.2*dpr;
+    c.strokeStyle='rgba(210,215,222,.35)';c.lineWidth=dpr;c.beginPath();
+    for(let k=0;k<n;k++){const sx=((hash(k,1,77)*W+tt*wl*20)%W+W)%W,sy=(hash(k,2,77)*H+tt*900*dpr*(0.8+hash(k,3,77)*0.4))%H;c.moveTo(sx,sy);c.lineTo(sx+wl,sy+16*dpr)}c.stroke()}
+  if(phase==='prep'&&!trainMode){c.fillStyle='#0b0e0a';c.fillRect(0,0,W,H);c.fillStyle='#8b947c';c.textAlign='center';c.font=`${Math.round(14*dpr)}px 'Nanum Gothic Coding',monospace`;c.fillText('관측소 점령 전 — 지도와 첩보로 판단하십시오',W/2,H/2);c.restore();return}
+  if(phase==='prep'){c.fillStyle='rgba(0,0,0,.55)';c.fillRect(0,H-30*dpr,W,30*dpr);c.fillStyle='#62aee6';c.textAlign='center';c.font=`${Math.round(12*dpr)}px 'Nanum Gothic Coding',monospace`;c.fillText('미리보기 (훈련) — 관측소 후보 지점에서 본 모습',W/2,H-15*dpr)}
+  c.font=`${Math.round(11*dpr)}px 'Nanum Gothic Coding',monospace`;c.textBaseline='middle';
+  if(cam.binoc){
+    const key=W+'x'+H;if(maskKey!==key){maskCanvas=document.createElement('canvas');maskCanvas.width=W;maskCanvas.height=H;const m=maskCanvas.getContext('2d');m.fillStyle='#000';m.fillRect(0,0,W,H);m.globalCompositeOperation='destination-out';const r=H*0.56;m.beginPath();m.arc(W/2-r*0.55,H/2,r,0,TAU);m.arc(W/2+r*0.55,H/2,r,0,TAU);m.fill();maskKey=key}
+    c.drawImage(maskCanvas,0,0);
+    c.strokeStyle='rgba(18,18,14,.9)';c.fillStyle='rgba(18,18,14,.9)';c.lineWidth=Math.max(1,1.2*dpr);
+    const xm=m=>cx+Math.tan(m/MIL)*fpx,ym=m=>cy-Math.tan(m/MIL)*fpx;
+    c.beginPath();c.moveTo(xm(-50),cy);c.lineTo(xm(-3),cy);c.moveTo(xm(3),cy);c.lineTo(xm(50),cy);
+    for(let m=-50;m<=50;m+=5){if(!m)continue;const L=(m%10===0?9:5)*dpr;c.moveTo(xm(m),cy-L);c.lineTo(xm(m),cy+(m%10===0?L*0.4:0))}
+    for(let m=-20;m<=20;m+=5){if(!m)continue;const L=(m%10===0?8:4)*dpr;c.moveTo(cx-L,ym(m));c.lineTo(cx+L,ym(m))}
+    c.moveTo(cx,ym(3));c.lineTo(cx,ym(25));c.stroke();
+    c.textAlign='center';for(let m=-40;m<=40;m+=10){if(!m)continue;c.fillText(String(Math.abs(m)),xm(m),cy-17*dpr)}
+  }else{
+    c.fillStyle='rgba(0,0,0,.45)';c.fillRect(0,0,W,26*dpr);
+    c.strokeStyle='rgba(232,176,74,.9)';c.fillStyle='rgba(232,176,74,.95)';c.lineWidth=dpr;c.textAlign='center';
+    const hm=cam.h*MIL;c.beginPath();
+    for(let m=Math.ceil((hm-600)/50)*50;m<=hm+600;m+=50){const x=cx+Math.tan((m-hm)/MIL)*fpx;if(x<0||x>W)continue;const big=mod(m,100)===0;c.moveTo(x,26*dpr);c.lineTo(x,(big?16:21)*dpr);if(big)c.fillText(String(mod(m,6400)/100).padStart(2,'0'),x,8*dpr)}
+    c.stroke();c.beginPath();c.moveTo(cx,26*dpr);c.lineTo(cx-5*dpr,32*dpr);c.lineTo(cx+5*dpr,32*dpr);c.fill();
+    c.strokeStyle='rgba(255,255,255,.55)';c.beginPath();c.moveTo(cx-8*dpr,cy);c.lineTo(cx-3*dpr,cy);c.moveTo(cx+3*dpr,cy);c.lineTo(cx+8*dpr,cy);c.moveTo(cx,cy-8*dpr);c.lineTo(cx,cy-3*dpr);c.moveTo(cx,cy+3*dpr);c.lineTo(cx,cy+8*dpr);c.stroke();
+  }
+  if(trainMode){
+    c.lineWidth=dpr;c.textAlign='left';
+    c.fillStyle='rgba(98,174,230,.95)';c.textAlign='center';FRIEND.forEach(f=>{const pr=proj(f.x,f.y,sampleH(GROUND,f.x,f.y)+12);if(pr&&pr.sx>0&&pr.sx<VW)c.fillText('▼ '+f.name,pr.sx*s,pr.sy*s)});c.textAlign='left';
+    for(const P of platoons){if(!P.intel.stage||P.state==='wait')continue;const gz=sampleH(GROUND,P.cx,P.cy);const pr=proj(P.cx,P.cy,gz);if(!pr)continue;
+      const x=pr.sx*s,y=(pr.sy-1)*s,w=Math.max(10*dpr,75*pr.k*s),h=Math.max(8*dpr,22*pr.k*s);if(x<-w||x>W+w)continue;
+      c.strokeStyle='rgba(226,96,74,.85)';c.fillStyle='rgba(226,96,74,.95)';const q=Math.min(w,h)*0.35;c.beginPath();
+      for(const[sx,sy]of[[-1,-1],[1,-1],[-1,1],[1,1]]){const ax=x+sx*w,ay=y+sy*h;c.moveTo(ax,ay);c.lineTo(ax-sx*q,ay);c.moveTo(ax,ay);c.lineTo(ax,ay-sy*q)}
+      c.stroke();c.fillText('T'+P.intel.tnum+(P.intel.stage<3?' 관측중':''),x+w+3*dpr,y-h)}
+  }
+  c.textAlign='left';c.fillStyle='rgba(232,176,74,.95)';c.font=`${Math.round(12*dpr)}px 'Nanum Gothic Coding',monospace`;
+  const pad=10*dpr,top=cam.binoc?16*dpr:44*dpr;
+  {const tx=`${cam.binoc?'쌍안경 7×':'육안'}  방위각 ${az4(cam.h)} 밀  고저 ${Math.round(cam.p*MIL)} 밀`;c.fillStyle='rgba(0,0,0,.55)';c.fillRect(pad-4*dpr,top-10*dpr,c.measureText(tx).width+8*dpr,20*dpr);c.fillStyle='rgba(232,176,74,.95)'}
+  c.fillText(`${cam.binoc?'쌍안경 7×':'육안'}  방위각 ${az4(cam.h)} 밀  고저 ${Math.round(cam.p*MIL)} 밀`,pad,top);
+  if(OPS.state!=='ready'){const rem=OPS.state==='moving'?OPS.move.total-OPS.move.done:OPS.setupUntil-simT;c.textAlign='center';c.fillStyle='rgba(0,0,0,.6)';const tx=`${OPS.state==='moving'?'관측소 이동 중':'관측 장비 설치 중'} — ${fmtT(rem)}`;const tw=c.measureText(tx).width;c.fillRect(cx-tw/2-10*dpr,H/2-14*dpr,tw+20*dpr,28*dpr);c.fillStyle='#62aee6';c.fillText(tx,cx,H/2);c.textAlign='left';c.fillStyle='rgba(232,176,74,.95)'}
+  if(R.state==='FLIGHT'&&R.impactAt>simT){const r=Math.ceil(R.impactAt-simT);c.textAlign='right';c.fillStyle=r<=5?'rgba(226,96,74,1)':'rgba(232,176,74,.95)';c.fillText(`탄착까지 ${r}초${r<=5?' — 관측!':''}`,W-pad,top)}
+  if(trainMode&&R.devText&&(R.state==='ADJ'||R.state==='WAIT')){c.textAlign='center';c.fillStyle='rgba(0,0,0,.6)';const tw=c.measureText(R.devText).width;c.fillRect(cx-tw/2-8*dpr,H-30*dpr,tw+16*dpr,22*dpr);c.fillStyle='#e8b04a';c.fillText(R.devText,cx,H-19*dpr)}
+  c.restore();
+}
+/* 지도 */
+const mc=$('#map'),mctx=mc.getContext('2d');let mapBase=null,vsCanvas=null,showVS=false;
+function drawIntelOverlay(c){
+  c.save();c.font='10px monospace';
+  for(const a of NAI){c.strokeStyle='rgba(200,90,20,.95)';c.fillStyle='rgba(200,90,20,.08)';c.setLineDash([4,3]);c.beginPath();c.arc(mX(a.x),mY(a.y),mS(a.r),0,TAU);c.fill();c.stroke();c.setLineDash([]);
+    c.fillStyle='rgba(110,40,0,.95)';c.fillText(a.id,mX(a.x)-14,mY(a.y)-mS(a.r)-3)}
+  for(const ir of INTEL_ROUTES){const pts=ROUTES[ir.r].pts;c.strokeStyle=ir.conf==='높음'?'rgba(200,40,30,.8)':'rgba(200,40,30,.45)';c.lineWidth=ir.conf==='높음'?2:1.4;c.setLineDash([7,4]);
+    c.beginPath();pts.forEach((p,i)=>i?c.lineTo(mX(p.x),mY(p.y)):c.moveTo(mX(p.x),mY(p.y)));c.stroke();c.setLineDash([]);
+    const a=pts.at(-2),b=pts.at(-1),ang=Math.atan2(mY(b.y)-mY(a.y),mX(b.x)-mX(a.x)),bx=mX(b.x),by=mY(b.y)-0;
+    c.fillStyle=c.strokeStyle;c.beginPath();c.moveTo(bx,by);c.lineTo(bx-9*Math.cos(ang-0.4),by-9*Math.sin(ang-0.4));c.lineTo(bx-9*Math.cos(ang+0.4),by-9*Math.sin(ang+0.4));c.closePath();c.fill()}
+  c.lineWidth=1;
+  if(showVS&&vsCanvas){const q=vsCanvas.width/N;c.imageSmoothingEnabled=true;c.drawImage(vsCanvas,MV.x0*q,MV.y0*q,N/MV.z*q,N/MV.z*q,0,0,MW,MW)}
+  c.restore();
+}
+function computeViewshed(){
+  const G=192,cs=SIZE/G,vs=document.createElement('canvas');vs.width=G;vs.height=G;const x2=vs.getContext('2d'),id=x2.createImageData(G,G);
+  const ez=sampleH(GROUND,OBS.x,OBS.y)+EYE_H;
+  for(let j=0;j<G;j++)for(let i=0;i<G;i++){const x=(i+.5)*cs,y=(j+.5)*cs,o=((G-1-j)*G+i)*4;
+    if(y<OBS.y+150){id.data[o+3]=0;continue}
+    const tz=sampleH(GROUND,x,y)+1.7,d=Math.hypot(x-OBS.x,y-OBS.y),n=clamp((d/40)|0,6,250);let ok=true;
+    for(let k=1;k<n;k++){const t=k/n;if(sampleH(SURF,OBS.x+(x-OBS.x)*t,OBS.y+(y-OBS.y)*t)>ez+(tz-ez)*t){ok=false;break}}
+    if(!ok){id.data[o]=20;id.data[o+1]=20;id.data[o+2]=30;id.data[o+3]=120}}
+  x2.putImageData(id,0,0);vsCanvas=vs;
+}
+const MW=512,MV={z:1,x0:0,y0:0};                 // 지도 확대: 배율, 화면 왼쪽 위 칸 좌표
+const MK=()=>MW/(N/MV.z);
+const mX=x=>(x/CELL-MV.x0)*MK(),mY=y=>(N-y/CELL-MV.y0)*MK(),mS=m=>m/CELL*MK();
+function mapClamp(){MV.z=clamp(MV.z,1,8);const span=N/MV.z;MV.x0=clamp(MV.x0,0,N-span);MV.y0=clamp(MV.y0,0,N-span);const zl=document.getElementById('zoomLvl');if(zl)zl.textContent='×'+(Math.round(MV.z*10)/10)}
+function mapZoomAt(f,fx,fy){const span=N/MV.z,cx=MV.x0+fx*span,cy=MV.y0+fy*span;MV.z*=f;mapClamp();const sp2=N/MV.z;MV.x0=cx-fx*sp2;MV.y0=cy-fy*sp2;mapClamp();drawMap()}
+function mapCenterOn(x,y,z){if(z)MV.z=z;mapClamp();const sp=N/MV.z;MV.x0=x/CELL-sp/2;MV.y0=N-y/CELL-sp/2;mapClamp();drawMap()}
+function mapToWorld(e){const r=mc.getBoundingClientRect(),sp=N/MV.z;const px=MV.x0+(e.clientX-r.left)/r.width*sp,py=MV.y0+(e.clientY-r.top)/r.height*sp;return{x:px*CELL,y:(N-py)*CELL}}
+function buildMap(){
+  mapBase=document.createElement('canvas');mapBase.width=N;mapBase.height=N;const m=mapBase.getContext('2d');const id=m.createImageData(N,N);const d=id.data;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,o=((N-1-j)*N+i)*4;const hs=clamp(1+((GROUND[k]-GROUND[Math.min(N-1,j+1)*N+Math.max(0,i-1)])*0.05),0.7,1.25);let r=CR[k]*hs,g=CG[k]*hs,b=CB[k]*hs;
+    const c0=Math.floor(GROUND[k]/20),cr=i<N-1?Math.floor(GROUND[k+1]/20):c0,cu=j<N-1?Math.floor(GROUND[k+N]/20):c0;
+    if(c0!==cr||c0!==cu){const idx=c0%5===0;const a=idx?0.6:0.35;r=r*(1-a)+90*a;g=g*(1-a)+60*a;b=b*(1-a)+30*a}
+    d[o]=r;d[o+1]=g;d[o+2]=b;d[o+3]=255}
+  m.putImageData(id,0,0);
+}
+function drawMap(){
+  const c=mctx,span=N/MV.z;c.imageSmoothingEnabled=MV.z<2;c.drawImage(mapBase,MV.x0,MV.y0,span,span,0,0,MW,MW);
+  c.save();c.font='9px monospace';
+  for(let m=0;m<=SIZE;m+=100){const km=m%1000===0;if(!km&&MV.z<3)continue;const xp=Math.round(mX(m))+0.5,yp=Math.round(mY(m))+0.5;
+    c.strokeStyle=km?'rgba(20,30,60,.5)':'rgba(20,30,60,.18)';c.lineWidth=1;
+    if(xp>=0&&xp<=MW){c.beginPath();c.moveTo(xp,0);c.lineTo(xp,MW);c.stroke()}
+    if(yp>=0&&yp<=MW){c.beginPath();c.moveTo(0,yp);c.lineTo(MW,yp);c.stroke()}
+    if(km&&m<SIZE){c.fillStyle='rgba(20,25,40,.85)';const e2=String(40+m/1000),n2=String(30+m/1000);if(xp>=0&&xp<MW-12)c.fillText(e2,xp+2,9);if(yp>12&&yp<=MW)c.fillText(n2,2,yp-3)}}
+  c.restore();
+  const fov=cam.binoc?BINO_FOV:EYE_FOV;c.fillStyle='rgba(232,176,74,.16)';c.strokeStyle='rgba(232,176,74,.8)';c.lineWidth=1;
+  const ox=mX(OBS.x),oy=mY(OBS.y),Lr=mS(7000);c.beginPath();c.moveTo(ox,oy);
+  c.lineTo(ox+Math.sin(cam.h-fov/2)*Lr,oy-Math.cos(cam.h-fov/2)*Lr);c.lineTo(ox+Math.sin(cam.h+fov/2)*Lr,oy-Math.cos(cam.h+fov/2)*Lr);c.closePath();c.fill();
+  c.beginPath();c.moveTo(ox,oy);c.lineTo(ox+Math.sin(cam.h)*Lr,oy-Math.cos(cam.h)*Lr);c.stroke();
+  c.fillStyle='#62aee6';c.strokeStyle='#0c1a2a';
+  for(const f of FRIEND){c.fillRect(mX(f.x)-7,mY(f.y)-4,14,8);c.strokeRect(mX(f.x)-7,mY(f.y)-4,14,8)}
+  if(OPS.state==='moving'&&OPS.dest){c.strokeStyle='rgba(98,174,230,.95)';c.setLineDash([4,3]);c.beginPath();c.moveTo(ox,oy);c.lineTo(mX(OPS.dest.x),mY(OPS.dest.y));c.stroke();c.setLineDash([]);c.strokeStyle='#0c1a2a'}
+  c.fillStyle='rgba(226,96,74,.07)';c.fillRect(0,0,MW,mY(FRONT_Y));c.strokeStyle='rgba(60,110,200,.8)';c.setLineDash([8,4]);c.beginPath();c.moveTo(0,mY(FRONT_Y));c.lineTo(MW,mY(FRONT_Y));c.stroke();c.setLineDash([]);c.fillStyle='rgba(20,40,110,.9)';c.fillText('아군 전선 — 이북은 발각·피격 위험',MW-176,mY(FRONT_Y)-4);c.fillStyle='#62aee6';c.strokeStyle='#0c1a2a';
+  if(trainMode&&Math.hypot(OPS.fdc.x-OBS.x,OPS.fdc.y-OBS.y)>30){const fx=mX(OPS.fdc.x),fy=mY(OPS.fdc.y);c.strokeStyle='#62aee6';c.setLineDash([2,2]);c.beginPath();c.moveTo(fx,fy-7);c.lineTo(fx-6,fy+5);c.lineTo(fx+6,fy+5);c.closePath();c.stroke();c.setLineDash([]);c.fillStyle='#0c1a2a';c.fillText('기러기가 아는 위치',fx+8,fy+4);c.fillStyle='#62aee6';c.strokeStyle='#0c1a2a'}
+  c.beginPath();c.moveTo(ox,oy-7);c.lineTo(ox-6,oy+5);c.lineTo(ox+6,oy+5);c.closePath();c.fill();c.stroke();
+  c.font='10px monospace';c.fillStyle='#0c1a2a';c.fillText('OP '+CS,ox+8,oy+4);
+  for(const im of impacts){if(simT-im.t>150)continue;c.strokeStyle='rgba(255,140,40,.9)';const x=mX(im.x),y=mY(im.y);c.beginPath();c.moveTo(x-2,y-2);c.lineTo(x+2,y+2);c.moveTo(x+2,y-2);c.lineTo(x-2,y+2);c.stroke()}
+  /* 표적 표시 — 훈련: 실제 위치. 표준: 위치는 모름. 관측소에서 마지막으로 본 방위각 선만 그린다(거리는 레이저·지형 대조로 정해야 함) */
+  for(const P of platoons){const I=P.intel;if(!I.stage)continue;
+    if(!trainMode){if(P.fate)continue;const a=P.seenAz,L=mS(7500),x1=ox+Math.sin(a)*L,y1=oy-Math.cos(a)*L;
+      c.strokeStyle='rgba(226,96,74,.75)';c.setLineDash([5,4]);c.beginPath();c.moveTo(ox,oy);c.lineTo(x1,y1);c.stroke();c.setLineDash([]);
+      const lx=ox+Math.sin(a)*mS(1800),ly=oy-Math.cos(a)*mS(1800);c.fillStyle='#300';c.fillText(`T${I.tnum} ${az4(a)}`,lx+4,ly);continue}
+    const x=mX(P.cx),y=mY(P.cy);
+    c.fillStyle=P.fate?'rgba(150,150,150,.9)':'#e2604a';c.strokeStyle='#300';
+    if(I.stage<2){c.beginPath();c.arc(x,y,5,0,TAU);c.fill();c.stroke();c.fillStyle='#fff';c.fillText('?',x-3,y+3)}
+    else{c.fillRect(x-7,y-5,14,10);c.strokeRect(x-7,y-5,14,10);c.fillStyle='#fff';c.fillText({inf:'보',recon:'보',apc:'장',mortar:'박'}[P.type],x-5,y+4)}
+    c.fillStyle='#300';c.fillText('T'+I.tnum+(I.stage>=3?' '+sizeOf(P):''),x+9,y+3)}
+  /* 요구한 표적 위치(기러기가 받은 좌표·표적번호) — 모든 모드 */
+  for(const m of missions){if(!m.loc)continue;const x=mX(m.loc.x),y=mY(m.loc.y);c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1;c.strokeRect(x-4,y-4,8,8);c.fillStyle='rgba(255,255,255,.9)';c.fillText(m.tn||`#${m.id}`,x+6,y-5)}
+  if(trainMode&&R.m&&R.m.aim){c.strokeStyle='rgba(255,255,255,.9)';c.setLineDash([3,3]);c.beginPath();c.arc(mX(R.m.aim.x),mY(R.m.aim.y),6,0,TAU);c.stroke();c.setLineDash([])}
+  if(romerPin){const x=mX(romerPin.x),y=mY(romerPin.y);c.strokeStyle='#111';c.lineWidth=1.5;c.beginPath();c.moveTo(x-8,y);c.lineTo(x+8,y);c.moveTo(x,y-8);c.lineTo(x,y+8);c.stroke();c.lineWidth=1}
+  c.fillStyle='rgba(12,26,42,.9)';c.fillText('↓ 기러기(포대) 남쪽 약 9 km',6,MW-6);
+  c.save();c.lineCap='round';c.lineJoin='round';
+  for(const w of [[3.2,'rgba(60,40,20,.75)'],[1.6,'rgba(250,240,215,.95)']]){c.lineWidth=w[0];c.strokeStyle=w[1];
+    for(const rd of ROADS){c.beginPath();for(let s2=1;s2<rd.length;s2++){const a=rd[s2-1],b=rd[s2],L=Math.hypot(b.x-a.x,b.y-a.y);for(let t=0;t<=L;t+=40){const x=a.x+(b.x-a.x)*t/L+18*Math.sin(t/260),y=a.y+(b.y-a.y)*t/L;(s2===1&&t===0)?c.moveTo(mX(x),mY(y)):c.lineTo(mX(x),mY(y))}}c.stroke()}}
+  c.font='bold 10px monospace';c.textAlign='center';
+  for(const v of VILLAGES){const x=mX(v.x),y=mY(v.y)-mS(v.r)-4;c.lineWidth=3;c.strokeStyle='rgba(255,255,255,.8)';c.strokeText(v.name,x,y);c.fillStyle='#2a2418';c.fillText(v.name,x,y)}
+  if(WX){const wx0=MW-34,wy0=MW-34,a=(WX.wind_direction_10m+180)*Math.PI/180,L=8+WX.wind_speed_10m*1.4;c.fillStyle='rgba(255,255,255,.75)';c.beginPath();c.arc(wx0,wy0,24,0,TAU);c.fill();
+    c.strokeStyle='#123';c.lineWidth=2;c.beginPath();c.moveTo(wx0-Math.sin(a)*L/2,wy0+Math.cos(a)*L/2);c.lineTo(wx0+Math.sin(a)*L/2,wy0-Math.cos(a)*L/2);c.stroke();
+    c.fillStyle='#123';c.beginPath();const hx=wx0+Math.sin(a)*L/2,hy=wy0-Math.cos(a)*L/2;c.moveTo(hx,hy);c.lineTo(hx-Math.sin(a-0.5)*6,hy+Math.cos(a-0.5)*6);c.lineTo(hx-Math.sin(a+0.5)*6,hy+Math.cos(a+0.5)*6);c.fill();
+    c.font='9px monospace';c.fillText(`${WX.wind_speed_10m.toFixed(0)}m/s`,wx0,wy0+20)}
+  c.restore();
+  drawIntelOverlay(c);
+  if(hardPause()){c.fillStyle='rgba(8,10,8,.92)';c.fillRect(0,0,MW,MW);c.fillStyle='#8b947c';c.font='12px monospace';c.textAlign='center';c.fillText('일시정지 — 지도 가림',MW/2,MW/2);c.textAlign='left'}
+}
+
+/* ================= 메인 루프 ================= */
+function resize(){const r=vc.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);if(vc.width!==w||vc.height!==h){vc.width=w;vc.height=h}}
+/* ---- 고정 스텝 시뮬레이션: 50 ms 틱. 프레임률·배속과 무관하게 같은 입력이면 같은 결과 ---- */
+const STEP=0.05;let acc=0;
+let camLog={h:NaN,p:NaN};
+function logCam(){const h=Math.round(mod(cam.h*MIL,6400)*10)/10,p=Math.round(cam.p*MIL*10)/10;if(Math.abs(h-camLog.h)>=1||Math.abs(p-camLog.p)>=1||isNaN(camLog.h)){camLog={h,p};logIn('cam',[h,p])}}
+function simStep(){
+  tick++;simT=tick*STEP;camZ=sampleH(GROUND,OBS.x,OBS.y)+EYE_H;
+  if(cam.binoc&&phase==='live')logCam();                 // 쌍안경 관측 중 조준이 1밀 이상 바뀐 틱만 기록(적정 진행·식별 재생용)
+  updateOP(STEP);for(const P of platoons)updatePlatoon(P,STEP);updateFriendly(STEP);
+  updateVisibility(tick%6===0);                        // 전체 가시성은 0.3초마다, 새 효과는 즉시
+  updateIntel(STEP);if(tick%100===0)exposureTick();runEvents();checkEnd();
+}
+let last=performance.now(),lastMap=0,lastUI=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-last)/1000);last=now;
+  if(!paused&&!ended){acc+=dt*simSpeed;let n=0;while(acc>=STEP&&n<40){simStep();acc-=STEP;n++}if(n>=40)acc=0}
+  resize();camZ=sampleH(GROUND,OBS.x,OBS.y)+EYE_H;
+  V=renderTerrain();ridgeLines();drawSprites();posterize();lctx.putImageData(img,0,0);
+  vctx.imageSmoothingEnabled=false;vctx.drawImage(low,0,0,vc.width,vc.height);drawOverlay();
+  if(now-lastMap>120){drawMap();lastMap=now}
+  if(now-lastUI>400){const or=$('#opRem');if(or&&OPS.state!=='ready')or.textContent=fmtT(OPS.state==='moving'?OPS.move.total-OPS.move.done:OPS.setupUntil-simT);const et=$('#eomT');if(et)et.textContent=Math.round(simT-R.lastImpactT);$('#clock').textContent=fmtT(simT);$('#score').textContent=score;$('#ammo').textContent=ammoUsed;renderTargets();lastUI=now}
+  requestAnimationFrame(frame);
+}
+let endAt=null;const OPS_LIMIT=2400;                   // 작전 시간 한도 40분(모의 시간)
+function checkEnd(){
+  if(phase!=='live')return;
+  const done=platoons.every(P=>P.type==='recon'||P.state==='destroyed'||P.state==='overran'||P.state==='broken');
+  const busy=['FLIGHT','WAIT','AMC'].includes(R.state);
+  if(done&&clearT==null&&!obsLost&&!platoons.some(P=>P.state==='overran'))clearT=simT;   // 진지 돌파가 하나라도 있으면 섬멸 아님
+  if((done&&!busy)||simT>OPS_LIMIT){if(endAt==null)endAt=simT+8;if(simT>=endAt)endGame()}else endAt=null;
+}
+function endGame(){
+  if(ended)return;ended=true;paused=true;
+  const rec=computeRecord();{const runs=lsGet('obs.runs',[]);runs.push(rec);lsSet('obs.runs',runs.slice(-50))}
+  const brk=m=>{if(m.rangeCorrs.length<2)return m.rangeCorrs.length?`${m.rangeCorrs[0]}`:'—';let ok=true;for(let i=1;i<m.rangeCorrs.length;i++)if(m.rangeCorrs[i]>m.rangeCorrs[i-1]/2+1)ok=false;return `${m.rangeCorrs.join('→')} ${ok?'<span class="grn">✓</span>':'<span class="amb">✗</span>'}`};
+  const rows=missions.filter(m=>m.roundsFired>0).map(m=>`<tr><td>${m.tn||m.id}</td><td>${m.shift?'전이':m.warn}${m.dc?' <span class="red">근접</span>':''}</td><td>${m.adjCount}</td><td>${m.roundsFired}</td><td>${m.firstErr!=null?m.firstErr+' m':'—'}</td><td>${m.dirErr!=null?m.dirErr+' 밀':'—'}</td><td>${brk(m)}</td><td>${m.bda?bdaWord(m.bda):'—'}</td><td>${m.truth?`${bdaWord(m.truth)} (${m.truthPct}%)`:'—'}</td><td>${m.bda&&m.truth?(m.bda===m.truth?'<span class="grn">일치</span>':'<span class="red">불일치</span>'):''}</td></tr>`).join('');
+  const prow=platoons.map(P=>`<tr><td>${P.name}</td><td>${P.intel.stage?`표적 ${P.intel.tnum} · ${STAGE_TXT[P.intel.stage]} (${fmtT(P.intel.t1)})`:'<span class="red">미탐지</span>'}</td><td>${Math.round((1-strength(P))*100)}%</td><td>${{destroyed:'<span class="grn">파괴</span>',broken:'<span class="amb">무력화</span>',overran:'<span class="red">진지 돌파</span>'}[P.fate]||'공격 계속'}${P.early?' <span class="grn">조기</span>':''}</td></tr>`).join('');
+  const fl=FRIEND.map((f,i)=>`${f.name} ${friendAlive(i)}/24`).join(' · ');
+  $('#debriefBox').innerHTML=`<h2>사후강평</h2>${obsLost?`<div class="red" style="margin:4px 0">${obsLostReason} 관측반 전투 불능으로 임무 종료.</div>`:''}<div class="dim">경과 ${fmtT(simT)} · 사용 탄 ${ammoUsed}발 · 점수 <b class="amb">${score}</b> · 시드 ${SEED_KIND==='daily'?'일일':'사용자'} ${SEED}</div>
+   <h3 style="margin-top:14px">적 부대 <span class="dim" style="font-weight:400">(실제 배치: 2소대 ${ROUTES[SCN.second].name}, 장갑차 ${ROUTES[SCN.apcR].name})</span></h3><table><tr><th>부대</th><th>적정</th><th>사상</th><th>결과</th></tr>${prow}</table>
+   <h3>사격 임무</h3><table><tr><th>표적번호</th><th>경고명령</th><th>수정</th><th>탄</th><th>초탄 오차</th><th>방향 오차</th><th>협차</th><th>보고</th><th>실제</th><th></th></tr>${rows||'<tr><td colspan=10 class="dim">사격 임무 없음</td></tr>'}</table>
+   <div class="dim" style="font-size:12px">아군 진지 잔존: ${fl} (손실 ${friendlyLoss}명) · 관측소 이동 ${OPS.moves}회 · 아군 진지 피격(적 박격포) ${friendlyMortar}발 · 적 직사화기 사격 ${apcBursts}회 · 위험근접 미선언 ${dangerMiss}회 · 아군 근접 탄착 ${friendlyHits}회</div>
+   ${recordHTML(rec)}
+   <div style="margin-top:14px"><button class="primary" onclick="location.reload()">다시 하기</button> <button onclick="showRank()">랭킹 보기</button></div>`;
+  $('#debrief').style.display='flex';submitRec(rec);
+}
+
+/* ================= 입력 ================= */
+const vw=$('#viewWrap');let drag=null;
+vw.addEventListener('pointerdown',e=>{initAudio();vw.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,moved:false}});
+vw.addEventListener('pointermove',e=>{if(!drag)return;const r=vw.getBoundingClientRect(),fov=cam.binoc?BINO_FOV:EYE_FOV,k=fov/r.width;
+  const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>5)drag.moved=true;
+  cam.h=mod(cam.h-dx*k,TAU);cam.p=clamp(cam.p+dy*k,-200/MIL,200/MIL)});
+vw.addEventListener('pointerup',e=>{if(drag&&!drag.moved){const r=vw.getBoundingClientRect();const ix=(e.clientX-r.left)/r.width*VW,iy=(e.clientY-r.top)/r.height*VH;
+  if(!identifyAt(ix,iy)&&cam.binoc&&!hardPause())sys('그 위치에서 식별된 적이 없습니다.')}drag=null});
+function turn(dir,big){cam.h=mod(cam.h+dir*(cam.binoc?2:20)*(big?10:1)/MIL,TAU)}
+function tilt(dir,big){cam.p=clamp(cam.p+dir*(cam.binoc?1:5)*(big?5:1)/MIL,-200/MIL,200/MIL)}
+document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'){turn(-1,e.shiftKey);e.preventDefault()}else if(k==='arrowright'){turn(1,e.shiftKey);e.preventDefault()}
+  else if(k==='arrowup'){tilt(1,e.shiftKey);e.preventDefault()}else if(k==='arrowdown'){tilt(-1,e.shiftKey);e.preventDefault()}
+  else if(k==='b'){toggleBino()}else if(k==='r'){lase()}else if(k==='f'){sendFireCmd()}});
+function toggleBino(){if(OPS.state==='moving'&&!cam.binoc){sys('이동 중에는 쌍안경을 쓸 수 없습니다.');return}cam.binoc=!cam.binoc;logIn('bino',cam.binoc?1:0);$('#binoBtn').classList.toggle('on',cam.binoc);if(phase==='live')updateVisibility(true)}
+$('#binoBtn').onclick=toggleBino;$('#laseBtn').onclick=lase;
+document.querySelectorAll('[data-turn]').forEach(b=>b.onclick=()=>turn(+b.dataset.turn,false));
+document.querySelectorAll('[data-tilt]').forEach(b=>b.onclick=()=>tilt(+b.dataset.tilt,false));
+document.querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>{setRes(+b.dataset.res);maskKey='';document.querySelectorAll('[data-res]').forEach(x=>x.classList.toggle('on',x===b))});
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{simSpeed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+let mapDragged=false;const mPtr=new Map();let mDrag=null,mPinch=null;
+mc.addEventListener('wheel',e=>{e.preventDefault();const r=mc.getBoundingClientRect();mapZoomAt(e.deltaY<0?1.25:0.8,(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height)},{passive:false});
+mc.addEventListener('pointerdown',e=>{mPtr.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(mPtr.size===1){mDrag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY};mapDragged=false}
+  else if(mPtr.size===2){const p=[...mPtr.values()];mPinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)};mDrag=null}});
+mc.addEventListener('pointermove',e=>{if(!mPtr.has(e.pointerId))return;mPtr.set(e.pointerId,{x:e.clientX,y:e.clientY});const r=mc.getBoundingClientRect();
+  if(mPinch&&mPtr.size===2){const p=[...mPtr.values()],d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);if(d>10){mapZoomAt(d/mPinch.d,((p[0].x+p[1].x)/2-r.left)/r.width,((p[0].y+p[1].y)/2-r.top)/r.height);mPinch.d=d;mapDragged=true}return}
+  if(mDrag){const dx=e.clientX-mDrag.x,dy=e.clientY-mDrag.y;if(Math.hypot(e.clientX-mDrag.sx,e.clientY-mDrag.sy)>5)mapDragged=true;
+    if(mapDragged&&MV.z>1){const sp=N/MV.z;MV.x0-=dx/r.width*sp;MV.y0-=dy/r.height*sp;mapClamp();drawMap()}mDrag.x=e.clientX;mDrag.y=e.clientY}});
+const mEnd=e=>{mPtr.delete(e.pointerId);if(mPtr.size<2)mPinch=null;if(!mPtr.size)mDrag=null};
+window.addEventListener('pointerup',mEnd);window.addEventListener('pointercancel',mEnd);
+$('#zIn').onclick=()=>mapZoomAt(1.5,0.5,0.5);$('#zOut').onclick=()=>mapZoomAt(1/1.5,0.5,0.5);
+$('#zAll').onclick=()=>{MV.z=1;MV.x0=0;MV.y0=0;mapClamp();drawMap()};$('#zOP').onclick=()=>mapCenterOn(OBS.x,OBS.y,Math.max(MV.z,3));
+$('#vsChk').onchange=e=>{showVS=e.target.checked;if(showVS)computeViewshed();drawMap()};
+function syncVS(){$('#vsWrap').style.display=trainMode?'inline-flex':'none';if(!trainMode){showVS=false;$('#vsChk').checked=false}}
+$('#mTrain').onclick=()=>{if(trainMode)return;
+  if(phase==='live'&&!trainUsed&&!confirm('표준 모드 작전 중에 훈련 모드를 켜면 이 판은 저장만 되고 랭킹에서 제외됩니다. 계속할까요?'))return;
+  trainMode=true;if(phase==='live')trainUsed=true;logIn('mode','train');syncVS();$('#mTrain').classList.add('on');$('#mStd').classList.remove('on');renderComposer();renderTargets();drawMap()};
+$('#mStd').onclick=()=>{trainMode=false;logIn('mode','std');syncVS();$('#mStd').classList.add('on');$('#mTrain').classList.remove('on');renderComposer();renderTargets();drawMap()};
+$('#pauseBtn').onclick=()=>{if(ended)return;paused=!paused;logIn('pause',paused?1:0);$('#pauseBtn').textContent=paused?'재개':'일시정지';$('#pauseBtn').classList.toggle('on',paused);renderComposer();drawMap()};
+$('#muteBtn').onclick=()=>{muted=!muted;$('#muteBtn').textContent=muted?'소리 꺼짐':'소리 켜짐'};
+$('#ttsBtn').onclick=()=>{ttsOn=!ttsOn;$('#ttsBtn').textContent=ttsOn?'음성 켜짐':'음성 꺼짐';$('#ttsBtn').classList.toggle('on',ttsOn);if(ttsOn)speak('기러기 음성 켜짐');else if('speechSynthesis' in window)speechSynthesis.cancel()};
+$('#seedChip').textContent=(SEED_KIND==='daily'?'일일 ':'사용자 ')+SEED;
+mc.addEventListener('click',e=>{if(mapDragged){mapDragged=false;return}const w=mapToWorld(e);
+  if(phase==='prep'){prepPick(w.x,w.y);return}
+  romerPin={x:w.x,y:w.y};const g=toGrid(romerPin.x,romerPin.y);
+  const why=moveCheck(romerPin),pl=why?null:planMove(romerPin);
+  $('#romer').innerHTML=`좌표자: <b>찰리호텔 ${g.e} ${g.n}</b> <span class="dim">(${dg(g.e)} ${dg(g.n)})</span>${R.state==='LOC'?' <button id="romerUse">사격요구에 입력</button>':''}${$('#pe')?' <button id="romerPos">위치 보고에 입력</button>':''}
+    <span style="flex-basis:100%"></span>${pl?`<button id="moveBtn">여기로 관측소 이동 · ${Math.round(pl.dist).toLocaleString()} m · 약 ${fmtT(pl.total)}${pl.forest>50?' · 숲 통과':''}</button>${sampleH(SURF,romerPin.x,romerPin.y)-sampleH(GROUND,romerPin.x,romerPin.y)>3?' <span class="red" style="font-size:12px">도착지가 숲 속 — 시야가 가립니다</span>':''}`:`<span class="dim" style="font-size:12px">이동 불가: ${why}</span>`}`;
+  const u=$('#romerUse');if(u)u.onclick=()=>{$('#ge').value=g.e;$('#gn').value=g.n;$('#ge').dispatchEvent(new Event('input'))};
+  const u2=$('#romerPos');if(u2)u2.onclick=()=>{$('#pe').value=g.e;$('#pn').value=g.n;$('#pe').dispatchEvent(new Event('input'))};
+  const mb=$('#moveBtn');if(mb)mb.onclick=()=>{startMove({...romerPin});mb.disabled=true};
+  drawMap()});
+function prepPick(x,y){
+  if(x<200||x>SIZE-200||y<200||y>SIZE-200){sys('지도 가장자리는 관측소로 고를 수 없습니다.','warn');return}
+  if(y>FRONT_Y)sys('아군 전선 전방입니다. 적 정찰조·보병에게 발각되면 관측소가 사격을 받습니다.','warn');
+  OBS.x=x;OBS.y=y;OPS.picked=true;romerPin={x,y};cam.h=0.02;logIn('pick',[Math.round(x),Math.round(y)]);
+  if(showVS)computeViewshed();
+  const g=toGrid(x,y);$('#romer').innerHTML=`관측소 후보: <b>찰리호텔 ${g.e} ${g.n}</b> <span class="dim">(${dg(g.e)} ${dg(g.n)})</span>`;
+  renderComposer();drawMap();
+}
+function startOps(){
+  phase='live';paused=false;trainUsed=trainMode;$('#pauseBtn').textContent='일시정지';
+  const moved=Math.hypot(OBS.x-PLANNED_OP.x,OBS.y-PLANNED_OP.y)>50;
+  OPS.fdc={...PLANNED_OP};OPS.unreported=moved;OPS.stale=false;logIn('start',[Math.round(OBS.x),Math.round(OBS.y),trainMode?1:0]);
+  if(showVS)computeViewshed();updateVisibility(true);
+  const g=toGrid(OBS.x,OBS.y);
+  sys(`작전 개시. ${CS}은(는) 찰리호텔 ${g.e} ${g.n}에 관측소를 점령했습니다.${moved?' 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.':''}`);
+  // 통신 점검(감명 보고). 문구는 검수 필요 — 11.1 참조
+  at(4,()=>{fdc(`${CS}, 여기는 기러기, 감명 보고, 이상.`);at(1.5,()=>fo(`기러기, 여기는 ${CS}, 감명 양호, 이상.`))});
+  renderComposer();
+}
+$('#startBtn').onclick=async()=>{if(!window.__csChk()){$('#csIn').focus();return}
+  const v=$('#csIn').value.trim(),btn=$('#startBtn');
+  if(NET.online){btn.disabled=true;$('#csMsg').innerHTML='<span class="dim">서버에 호출부호 등록 중…</span>';
+    let r;try{r=await NET.claimCallsign(v)}catch(e){r={ok:false,error:'서버 연결 실패: '+(e.message||e)}}
+    btn.disabled=false;if(!r.ok){$('#csMsg').innerHTML=`<span class="red">${esc(r.error)}</span>`;return}}
+  setCS(v);initAudio();$('#intro').style.display='none';renderComposer();drawMap();
+  sys('작전 준비: 첩보와 지도를 보고 관측소를 고르십시오. 시계는 작전 개시 후 흐릅니다.')};
+
+/* ================= 호출부호 · 기록 · 랭킹 (Supabase 목업) ================= */
+const CLIENT_VER='obs-0.9.2';
+// 네트워크 계층: Vercel 배포본에서는 src/net.js가 window.OBS_NET을 채운다. 단일 파일 데모에서는 오프라인 목업.
+const NET=window.OBS_NET||{online:false};
+const RESERVED_CS=['기러기','독수리포대','관측','운영자','admin','test'];
+const CS_RE=/^[가-힣A-Za-z0-9]{2,8}$/;
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+// 목업 랭킹: 가상의 호출부호 (서버의 leaderboard 뷰 응답을 흉내냄)
+const MOCK_RUNS=(()=>{const r=mulberry32(4242),names=['참매','부엉이','송골매','황조롱이','두루미','백로','까치','제비','물총새','올빼미','왜가리','종다리'];
+  const wk=['clear','haze','rain','wind','fog'];
+  return names.map((n,i)=>{const t=900+Math.floor(r()*1100),rd=40+Math.floor(r()*90),e=25+Math.floor(r()*130),acc=Math.round(50+r()*50);
+    return{callsign:n,mock:true,mode:'standard',weather:wk[i%5],cleared:r()>0.15,clear_time_s:t,rounds_total:rd,first_round_err_avg_m:e,bda_accuracy_pct:acc,
+      units_neutralized:4,units_total:4,friendly_hits:r()<0.15?1:0,observer_lost:false,score:Math.round(1400-t*0.3-rd*3-e*2+acc*4),created_at:new Date(Date.now()-r()*12*864e5).toISOString()}})})();
+function validCS(v){v=(v||'').trim();if(!CS_RE.test(v))return'한글·영문·숫자 2–8자로 정하십시오 (공백·기호 불가).';
+  if(RESERVED_CS.some(x=>x.toLowerCase()===v.toLowerCase()))return`“${v}”은(는) 예약된 호출부호입니다.`;
+  if(!NET.online&&MOCK_RUNS.some(x=>x.callsign===v))return`“${v}”은(는) 이미 다른 관측장교가 쓰고 있습니다 (목업 중복 검사).`;return''}
+function setCS(v){CS=v;$('#csChip').textContent=CS;$('#csEcho').textContent=CS;lsSet('obs.callsign',CS)}
+{const saved=lsGet('obs.callsign',null),inp=$('#csIn');inp.value=saved&&!validCS(saved)?saved:'';$('#csEcho').textContent=inp.value||'갈매기';$('#csChip').textContent='—';
+  const chk=()=>{const v=inp.value.trim(),e=v?validCS(v):'';$('#csMsg').innerHTML=!v?'<span class="dim">호출부호를 입력하십시오.</span>':e?`<span class="red">${e}</span>`:'<span class="grn" style="color:#7c7">사용 가능</span>';$('#csEcho').textContent=v||'갈매기';return v&&!e};
+  inp.addEventListener('input',chk);inp.addEventListener('keydown',e=>{if(e.key==='Enter')$('#startBtn').click()});chk();window.__csChk=chk;
+  $('#netChip').textContent=NET.online?'· 온라인':'· 오프라인 데모';
+  if(NET.online){$('#netNote').textContent='로그인은 익명 세션으로 처리됩니다. 같은 브라우저에서는 호출부호가 유지되지만, 브라우저 데이터를 지우거나 기기를 바꾸면 되찾을 수 없습니다.';
+    NET.myCallsign().then(c=>{if(c){inp.value=c;chk()}}).catch(()=>{});if(NET.mountCaptcha)NET.mountCaptcha($('#tsBox'))}}
+function computeRecord(){
+  const fired=missions.filter(m=>m.roundsFired>0),errs=fired.map(m=>m.firstErr).filter(v=>v!=null);
+  const bdas=missions.filter(m=>m.bda&&m.truth),bdaOk=bdas.filter(m=>m.truth===m.bda).length;
+  const combat=platoons.filter(P=>P.type!=='recon'),neut=combat.filter(P=>P.state==='destroyed'||P.state==='broken').length;
+  const cleared=neut===combat.length&&!obsLost&&clearT!=null;
+  const dirs=fired.map(m=>m.dirErr).filter(v=>v!=null);
+  return{
+    callsign:CS,mode:(trainUsed||trainMode)?'training':SEED_KIND==='custom'?'practice':'standard',scenario:'ch-mock-v2',seed:SEED,seed_kind:SEED_KIND,weather:WX.key,client_version:CLIENT_VER,sim_step_ms:Math.round(STEP*1000),ticks:tick,
+    cleared,clear_time_s:cleared?Math.round(clearT):null,duration_s:Math.round(simT),
+    rounds_total:ammoUsed,missions:fired.length,adjust_rounds:fired.reduce((a,m)=>a+m.adjCount,0),
+    first_round_err_avg_m:errs.length?Math.round(errs.reduce((a,b)=>a+b,0)/errs.length):null,
+    dir_err_avg_mil:dirs.length?Math.round(dirs.reduce((a,b)=>a+b,0)/dirs.length):null,
+    bda_accuracy_pct:bdas.length?Math.round(bdaOk/bdas.length*100):null,
+    rounds_per_unit:neut?+(ammoUsed/neut).toFixed(1):null,
+    units_neutralized:neut,units_total:combat.length,early_defeats:platoons.filter(P=>P.early).length,
+    friendly_hits:friendlyHits,friendly_losses:friendlyLoss,danger_close_missed:dangerMiss,observer_lost:obsLost,op_moves:OPS.moves,compromised:!!OPS.compromised,
+    score,created_at:new Date().toISOString(),
+    events_digest:fired.map(m=>({tn:m.tn,id:m.id,adj:m.adjCount,rounds:m.roundsFired,first_err:m.firstErr,dir_err:m.dirErr,range_corrs:m.rangeCorrs,bda:m.bda||null})),
+    inputs:INPUTS.slice()
+  }}
+// 랭킹 보드 정의: 정렬 키와 자격
+const BOARDS={
+  total:{name:'종합',key:r=>r.score,dir:-1,fmt:r=>r.score+'점',ok:r=>true},
+  time:{name:'섬멸 시간',key:r=>r.clear_time_s,dir:1,fmt:r=>fmtT(r.clear_time_s),ok:r=>r.cleared},
+  ammo:{name:'사용 탄',key:r=>r.rounds_total,dir:1,fmt:r=>r.rounds_total+'발',ok:r=>r.cleared},
+  acc:{name:'정확도',key:r=>r.first_round_err_avg_m,dir:1,fmt:r=>r.first_round_err_avg_m+' m'+(r.bda_accuracy_pct!=null?` · 보고 ${r.bda_accuracy_pct}%`:''),ok:r=>r.first_round_err_avg_m!=null&&r.missions!==0}
+};
+const WXN={clear:'맑음',haze:'연무',rain:'비',wind:'강풍',fog:'안개'};
+function allRuns(){return MOCK_RUNS.concat(lsGet('obs.runs',[]).filter(r=>r.mode==='standard'))}
+function rankOf(rec,b){const B=BOARDS[b];if(rec.mode!=='standard'||!B.ok(rec))return null;
+  const list=allRuns().filter(B.ok);return list.filter(r=>(B.key(r)-B.key(rec))*B.dir<0).length+1}
+function bestPerCallsign(list,B){const m=new Map();for(const r of list){const o=m.get(r.callsign);if(!o||(B.key(r)-B.key(o))*B.dir<0)m.set(r.callsign,r)}return[...m.values()]}
+async function showRank(tab='total'){const B=BOARDS[tab];let list=null,srcNote='<b>목업</b> 표시는 가상의 예시 데이터입니다 (서버 미연결).';
+  if(NET.online){$('#rankBox').innerHTML='<h2>랭킹</h2><div class="dim">불러오는 중…</div>';$('#rank').style.display='flex';
+    try{list=await NET.fetchBoard(tab);srcNote='서버 검사를 통과한 기록입니다.'}catch(e){srcNote=`<span class="red">서버에서 불러오지 못해 이 브라우저 기록을 보여 줍니다 (${esc(e.message||e)}).</span>`}}
+  if(!list)list=bestPerCallsign(allRuns().filter(B.ok),B).sort((a,b)=>(B.key(a)-B.key(b))*B.dir).slice(0,20);
+  const mine=lsGet('obs.runs',[]);
+  $('#rankBox').innerHTML=`<h2>랭킹</h2><div class="dim" style="font-size:12px">표준 모드 기록만 집계 · 호출부호당 최고 기록 1개 · ${srcNote}</div>
+   <div class="rkTabs">${Object.entries(BOARDS).map(([k,v])=>`<button data-rk="${k}" class="${k===tab?'on':''}">${v.name}</button>`).join('')}</div>
+   <table><tr><th>#</th><th>호출부호</th><th>${B.name}</th><th>탄</th><th>초탄 오차</th><th>기상</th><th>일자</th></tr>
+   ${list.map((r,i)=>`<tr class="${r.callsign===CS?'me':''}"><td>${i+1}</td><td>${esc(r.callsign)}${r.mock?' <span class="dim" style="font-size:10px">목업</span>':''}</td><td>${B.fmt(r)}</td><td>${r.rounds_total}</td><td>${r.first_round_err_avg_m??'—'} m</td><td>${WXN[r.weather]||r.weather}</td><td>${r.created_at.slice(5,10)}</td></tr>`).join('')||'<tr><td colspan=7 class="dim">기록 없음</td></tr>'}</table>
+   ${tab!=='total'?'<div class="dim" style="font-size:12px">섬멸 시간·사용 탄은 모든 전투부대를 격멸·제압하고 관측반이 살아남은 기록만 오릅니다. 정확도 = 사격 임무별 초탄 오차 평균 (작을수록 좋음).</div>':''}
+   <h3 style="margin-top:12px">내 기록 <span class="dim" style="font-weight:400;font-size:12px">(이 브라우저에 저장됨 · 훈련 모드와 사용자 시드 연습은 랭킹 제외)</span></h3>
+   <table><tr><th>일시</th><th>호출부호</th><th>모드</th><th>결과</th><th>시간</th><th>탄</th><th>초탄 오차</th><th>점수</th></tr>
+   ${mine.slice(-10).reverse().map(r=>`<tr><td>${r.created_at.slice(5,16).replace('T',' ')}</td><td>${esc(r.callsign)}</td><td>${r.mode==='training'?'훈련':r.mode==='practice'?'연습':'표준'}</td><td>${r.cleared?'섬멸':r.observer_lost?'관측반 손실':'미완'}</td><td>${r.clear_time_s!=null?fmtT(r.clear_time_s):'—'}</td><td>${r.rounds_total}</td><td>${r.first_round_err_avg_m??'—'}</td><td>${r.score}</td></tr>`).join('')||'<tr><td colspan=8 class="dim">아직 없음</td></tr>'}</table>
+   <div style="margin-top:12px"><button class="primary" id="rkClose">닫기</button></div>`;
+  $('#rank').style.display='flex';
+  document.querySelectorAll('[data-rk]').forEach(b=>b.onclick=()=>showRank(b.dataset.rk));$('#rkClose').onclick=()=>$('#rank').style.display='none'}
+window.showRank=showRank;$('#rankBtn').onclick=()=>showRank();$('#rankBtnIntro').onclick=()=>showRank();
+async function submitRec(rec){const el=$('#submitStatus');if(!el)return;
+  if(!NET.online){el.innerHTML='<span class="dim">오프라인 데모: 서버에 보내지 않고 이 브라우저에만 저장했습니다.</span>';return}
+  el.innerHTML='<span class="dim">기록 전송 중…</span>';
+  try{const r=await NET.submitRun(rec);
+    el.innerHTML=r.status==='verified'?(rec.mode==='standard'?'<span style="color:#7c7">서버 검사 통과 · 랭킹에 반영되었습니다.</span>':'<span class="dim">저장되었습니다 (훈련 기록이라 랭킹 제외).</span>')
+      :r.status==='stored'?`<span class="amb">저장되었지만 랭킹에서 제외: ${esc(r.reason)}</span>`:`<span class="red">전송 실패: ${esc(r.error||r.reason||'알 수 없음')}</span>`}
+  catch(e){el.innerHTML=`<span class="red">전송 실패: ${esc(e.message||e)}</span>`}}
+function recordHTML(rec){
+  const rk=Object.keys(BOARDS).map(b=>{const n=rankOf(rec,b);return`<div><span>${BOARDS[b].name} 순위</span><b>${n?n+'위':'—'}</b></div>`}).join('');
+  const {events_digest,inputs,...row}=rec;
+  const payload={endpoint:'POST /api/submit-run (Vercel 함수)',auth:'Bearer <익명 세션 JWT (is_anonymous=true)>',body:{run:row,events:events_digest,inputs:`[${inputs.length}건 — 틱 번호가 붙은 플레이어 입력. 서버 재생 검증용]`}};
+  return`<h3 style="margin-top:14px">기록 — ${rec.callsign} <span class="dim" style="font-weight:400;font-size:12px">${rec.mode==='training'?'훈련 모드를 한 번이라도 썼으므로 저장만 되고 랭킹에서는 제외':rec.mode==='practice'?'사용자 시드 연습: 저장만 되고 랭킹에서는 제외':'표준 모드 · 일일 시드: 랭킹 집계'}</span></h3>
+   <div class="metric">
+    <div><span>적 섬멸 시간</span><b>${rec.clear_time_s!=null?fmtT(rec.clear_time_s):'미섬멸'}</b></div>
+    <div><span>사용 포탄</span><b>${rec.rounds_total}발</b></div>
+    <div><span>초탄 오차 평균</span><b>${rec.first_round_err_avg_m!=null?rec.first_round_err_avg_m+' m':'—'}</b></div>
+    <div><span>방향 오차 평균</span><b>${rec.dir_err_avg_mil!=null?rec.dir_err_avg_mil+' 밀':'—'}</b></div>
+    <div><span>아군 손실</span><b>${rec.friendly_losses}명</b></div>
+    <div><span>조기 격퇴</span><b>${rec.early_defeats}개 소대</b></div>
+    <div><span>전과 보고 정확도</span><b>${rec.bda_accuracy_pct!=null?rec.bda_accuracy_pct+'%':'—'}</b></div>
+    <div><span>부대당 탄</span><b>${rec.rounds_per_unit??'—'}</b></div>
+    <div><span>격멸·제압</span><b>${rec.units_neutralized}/${rec.units_total}</b></div>
+    ${rec.mode==='standard'&&!NET.online?rk:''}
+   </div>
+   <div id="submitStatus" style="font-size:12px;margin:4px 0"></div>
+   <details class="payload"><summary>서버 전송 데이터 미리보기</summary><pre>${JSON.stringify(payload,null,2).replace(/</g,'&lt;')}</pre></details>`}
+
+/* ================= 시작 ================= */
+genTerrain();{const r=rS();setWeather(r<0.3?'clear':r<0.55?'haze':r<0.7?'rain':r<0.9?'wind':'fog')}buildMap();makePlatoons();makeFriendlies();renderComposer();
+requestAnimationFrame(frame);
+/* 자동 테스트·재생 검증용 노출. step(n)은 화면 없이 n틱을 진행한다 */
+window.__obs={los:(x,y,z)=>los(x,y,z),camZ:()=>camZ,H:(x,y)=>sampleH(GROUND,x,y),S:(x,y)=>sampleH(SURF,x,y),pitchTo:(x,y)=>Math.atan2(sampleH(GROUND,x,y)+1-camZ,Math.hypot(x-OBS.x,y-OBS.y)),friendlies,spriteList,MV,mapZoomAt,mapCenterOn,startOps,prepPick,get phase(){return phase},OPS,OBS,startMove,planMove,sendPosReport,platoons,missions,R,cam,get simT(){return simT},get tick(){return tick},set speed(v){simSpeed=v},fromGrid,toGrid,lase,identifyAt,
+  get vis(){const o=[];for(const P of platoons)for(const q of P.s)if(q.alive&&q.vis)o.push({pid:P.id,kind:q.kind});return o},
+  sendCall,sendLoc,sendDesc,sendCorr,sendEOM,sendRepeat,sendShift,sendFireCmd,setPaused:v=>{paused=v;renderComposer()},step:n=>{for(let i=0;i<n&&!ended;i++)simStep()},setMode:t=>{(t?$('#mTrain'):$('#mStd')).click()},toggleBino,
+  get seed(){return SEED},get seedKind(){return SEED_KIND},get inputs(){return INPUTS},get score(){return score},get ammo(){return ammoUsed},get ended(){return ended},record:computeRecord,pickAt,updateVisibility};
+/* PROTOTYPE(#11): 레이아웃 시제품이 쓰는 노출. 데모 본문에서 바뀐 곳은 이 한 줄뿐 */
+window.__proto={cam,MIL,TAU,mod,clamp,get R(){return R},get simT(){return simT},adjDemo(){comp.innerHTML=`<div class="step">수정 <span class="tag">미리보기 — 송신 안 됨</span></div>`+dirInput('cdir',curAz())+corrInputs('c')+`<div class="row"><label><input type="radio" name="nx" checked> 조정 계속</label><label><input type="radio" name="nx"> 효력사</label></div><div class="preview">방향 ${curAz()}, 우로 30, 늘리기 100</div><button class="primary" disabled>송신</button>`}};
+})();
+</script>
+<!-- ======================================================================
+ PROTOTYPE — 버리는 코드 (wayfinder 티켓 #11 "시제품: 모바일 세로 화면 레이아웃")
+ 계획: 데모 v0.2 한 페이지 위에 세로 휴대폰 레이아웃 3안을 얹고 ?variant=A|B|C 와 아래 흰 막대로 바꾼다.
+ 데모 본문은 그대로이고(끝의 window.__proto 한 줄만 추가), 이 블록이 다섯 패널을 옮겨 붙인다.
+ 화살표 키 전환은 뺐다(데모가 ←→ 를 시선 이동에 쓴다).
+ ====================================================================== -->
+<style>
+html,body{height:100%}
+body{max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-bottom:44px}
+header{flex:none;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:4px 8px;font-size:12px;white-space:nowrap}
+header>*{flex:none}.hctl{flex-wrap:nowrap}.brand small{display:none}header button{padding:3px 6px}
+main{display:none}
+#proto{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+#proto button{min-height:40px}
+#proto input,#proto select{font-size:16px}
+#proto kbd,[data-turn],[data-tilt]{display:none}
+#proto .card{border-radius:0}
+#logCard{min-height:0;height:100%}#log{max-height:none}
+#viewBar{padding:4px 6px}
+.tabs{flex:none;display:flex;border-block:1px solid var(--line)}
+.tabs button{flex:1;border:0;border-radius:0;border-right:1px solid var(--line);padding:4px 2px}
+.tabbody,.slotbody{flex:1;min-height:0}
+.tabp{height:100%}
+.cq{container-type:size;overflow:auto}
+.cq #viewWrap{width:min(100cqw,(100cqh - 56px)*16/9);margin:0 auto}
+.cq #map{width:min(100cqw - 22px,100cqh - 120px);min-width:160px;margin:0 auto}
+.dpad{display:inline-flex;gap:4px;align-items:center}.dpad button{min-width:44px;touch-action:none}
+/* B */
+.vB .stage{position:relative;flex:none;height:48dvh;overflow:hidden;background:#000}
+.vB .smain{position:absolute;inset:0;container-type:size}
+.vB .smain #viewWrap{position:absolute;height:100%;width:auto;left:50%;transform:translateX(-50%);border-radius:0}
+.vB .smain #viewBar{position:absolute;left:6px;bottom:6px;right:40px;padding:0;z-index:2}
+.vB .smain .card{height:100%;border:0;padding:6px}.vB .smain .card>div:first-child{padding-right:170px;min-height:94px;align-content:flex-start}.vB .smain .card>.dim{display:none}
+.vB .smain #map{width:min(100cqw - 12px,100cqh - 150px);margin:0 auto}
+.vB .pip{position:absolute;top:6px;right:6px;z-index:3;border:2px solid var(--amber);border-radius:6px;overflow:hidden;background:#000;cursor:pointer}
+.vB .pip>*{pointer-events:none}
+.vB .pip .card{padding:0;border:0}.vB .pip .card>:not(canvas){display:none!important}
+.vB .pip #map{width:104px;height:104px}
+.vB .pip #viewWrap{width:160px;border-radius:0}.vB .pip #viewBar{display:none}
+.vB .pip::after{content:'⇄ 바꾸기';position:absolute;left:3px;bottom:1px;color:var(--amber);font-size:11px;text-shadow:0 0 3px #000,0 0 3px #000}
+.vB .hud{position:absolute;left:6px;top:6px;z-index:2;background:rgba(0,0,0,.6);color:var(--amber);font-size:12px;padding:2px 6px;border-radius:4px;pointer-events:none}
+.scrub{touch-action:none;user-select:none;color:var(--dim);font-size:11px;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(90deg,#4a5a40 0 1px,transparent 1px 10px),#10160e}
+.scrub.hs{flex:none;height:44px}
+.scrub.vs{position:absolute;right:0;top:124px;bottom:0;width:36px;z-index:2;background:repeating-linear-gradient(0deg,#4a5a40 0 1px,transparent 1px 10px),rgba(16,22,14,.75)}
+.vB .sheet{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg)}
+.vB .sheet.full{position:absolute;inset:10dvh 0 0 0;z-index:6;border-top:2px solid var(--amber)}
+/* C */
+.slot{display:flex;flex-direction:column;min-height:0}
+.slot.top{flex:0 0 46%}.slot.bot{flex:1}
+.divider{flex:none;height:24px;touch-action:none;user-select:none;background:#2a3525;color:var(--dim);font-size:11px;text-align:center;line-height:24px;cursor:row-resize}
+.edge{position:absolute;z-index:2;background:rgba(232,176,74,.14);border:0;color:var(--amber);padding:0;min-height:0!important;border-radius:0;touch-action:none}
+.edge.l,.edge.r{top:25%;bottom:25%;width:44px}.edge.l{left:0}.edge.r{right:0}
+.edge.u,.edge.d{left:30%;right:30%;height:34px}.edge.u{top:0}.edge.d{bottom:0}
+/* 시제품 막대: 일부러 디자인과 다른 색 */
+#pbar{position:fixed;left:0;right:0;bottom:0;height:44px;z-index:40;background:#fff;color:#111;display:flex;gap:6px;align-items:center;justify-content:center;font:700 12px system-ui,sans-serif;box-shadow:0 -2px 8px #000}
+#pbar button{background:#111;color:#fff;border:0;min-height:32px;padding:4px 8px;font:inherit;white-space:nowrap}#pLbl{white-space:nowrap;font-size:11px}
+#pbar b{background:#d0006f;color:#fff;padding:2px 5px;border-radius:3px}
+#pnote{position:fixed;left:8px;right:8px;bottom:52px;z-index:41;max-width:464px;margin:0 auto;background:#fff;color:#111;border-radius:8px;padding:12px 14px;font:13px/1.6 system-ui,sans-serif;box-shadow:0 0 0 2px #d0006f,0 4px 20px #000}
+#pnote b{color:#d0006f}
+</style>
+<div id="proto"></div><div id="park" hidden></div>
+<div id="pbar"><b>PROTOTYPE</b><button id="pPrev">◀</button><span id="pLbl"></span><button id="pNext">▶</button><button id="pInfo">설명</button><button id="pAdj" title="수정 입력 화면을 가짜로 띄움(송신 안 됨)">수정칸</button></div>
+<div id="pnote" hidden></div>
+<script>
+(()=>{
+const X=window.__proto,$=s=>document.querySelector(s),root=$('#proto'),park=$('#park');
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const vw=$('#viewWrap');const pView=el('div');pView.id='pView';pView.append($('#viewWrap'),$('#viewBar'));
+const P={view:pView,map:$('#bottom').children[0],tgt:$('#bottom').children[1],comp:$('#composer'),log:$('#logCard')};
+
+/* ---- 미세 조작 부품 (값은 밀) ---- */
+const nudge=(dh,dp)=>{const c=X.cam;c.h=X.mod(c.h+dh/X.MIL,X.TAU);c.p=X.clamp(c.p+dp/X.MIL,-200/X.MIL,200/X.MIL)};
+const hold=(b,fn)=>{let t,i;const stop=()=>{clearTimeout(t);clearInterval(i)};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();fn();stop();t=setTimeout(()=>i=setInterval(fn,90),350)});
+  for(const n of['pointerup','pointerleave','pointercancel'])b.addEventListener(n,stop);
+  b.addEventListener('contextmenu',e=>e.preventDefault());return b};
+const nb=(txt,dh,dp,cls)=>hold(el('button','px '+(cls||''),txt),()=>nudge(dh,dp));
+const scrub=(cls,axis)=>{const s=el('div','px scrub '+cls,axis==='h'?'◀ 방위 다이얼 · 끌기 10px = 1밀 ▶':'');let last=null;
+  s.addEventListener('pointerdown',e=>{s.setPointerCapture(e.pointerId);last=axis==='h'?e.clientX:e.clientY});
+  s.addEventListener('pointermove',e=>{if(last==null)return;const c=axis==='h'?e.clientX:e.clientY,d=(c-last)/10;last=c;axis==='h'?nudge(-d,0):nudge(0,d)});
+  for(const n of['pointerup','pointercancel'])s.addEventListener(n,()=>last=null);return s};
+/* C의 '정밀': 데모의 끌기 처리 뒤에 이동량을 1/4로 되돌린다 */
+let precise=false,snap=null;
+document.addEventListener('pointermove',()=>{snap={h:X.cam.h,p:X.cam.p}},true);
+vw.addEventListener('pointermove',()=>{if(!precise||!snap)return;const c=X.cam;let dh=c.h-snap.h;if(dh>Math.PI)dh-=X.TAU;if(dh<-Math.PI)dh+=X.TAU;
+  c.h=X.mod(snap.h+dh/4,X.TAU);c.p=snap.p+(c.p-snap.p)/4});
+
+const tabs=items=>{const bar=el('div','tabs'),body=el('div','tabbody cq'),ws=[];
+  items.forEach(([label,p],i)=>{const b=el('button','',label),w=el('div','tabp');w.append(p);ws.push(w);body.append(w);bar.append(b);
+    b.onclick=()=>{ws.forEach((x,j)=>x.hidden=j!==i);[...bar.children].forEach((x,j)=>x.classList.toggle('on',j===i))}});
+  bar.children[0].click();return{bar,body}};
+let hudT=0;
+
+const V={
+A:{name:'고정 관측창 + 탭',
+  note:['관측 화면이 항상 위에 고정. 아래 <b>입력</b> 탭에서 수정을 넣는 동안 탄착이 계속 보인다.','아래 탭을 <b>지도</b>로 바꾸면 관측 화면과 지도가 위아래로 함께 보인다.','관측 화면 아래 <b>◀▶▲▼ 버튼</b>: 한 번 = 1밀, 길게 누르면 연속.','데스크톱·태블릿과 <b>같은 패널을 재배치</b>(CSS만 다름).'],
+  mount(){const t=tabs([['입력',P.comp],['지도',P.map],['표적',P.tgt],['무전',P.log]]);
+    const pad=el('span','px dpad');pad.append(nb('◀',-1,0),nb('▶',1,0),nb('▲',0,1),nb('▼',0,-1));
+    $('#laseOut').before(pad);root.append(P.view,t.bar,t.body)}},
+B:{name:'큰 관측창 + 올림 시트',
+  note:['관측 화면을 화면 절반 높이로 키움(<b>좌우 시야는 잘림</b>). 입력은 아래 시트. <b>펼치기</b>를 누르면 시트가 관측 화면을 덮는다.','지도는 구석 <b>작은 창</b>. 누르면 관측 화면과 자리를 바꾼다(큰 지도 + 작은 관측).','<b>다이얼 끌기</b>: 아래 가로 띠 = 방위, 오른쪽 세로 띠 = 고저. 10px = 1밀.','<b>모바일 전용 흐름</b>(시트·작은 창·다이얼은 데스크톱에 없음).'],
+  mount(){const stage=el('div','stage'),main=el('div','smain'),pip=el('div','pip'),hud=el('div','hud');
+    main.append(P.view);pip.append(P.map);
+    pip.onclick=()=>{const a=main.firstChild,b=pip.firstChild;main.append(b);pip.append(a)};
+    stage.append(main,pip,hud,scrub('vs','v'));
+    const t=tabs([['입력',P.comp],['표적',P.tgt],['무전',P.log]]),sheet=el('div','sheet'),h=el('button','','▲ 펼치기');
+    h.onclick=()=>{h.textContent=sheet.classList.toggle('full')?'▼ 접기':'▲ 펼치기'};t.bar.append(h);sheet.append(t.bar,t.body);
+    root.append(stage,scrub('hs','h'),sheet);
+    hudT=setInterval(()=>{const c=X.cam,R=X.R;hud.textContent=`${c.binoc?'쌍안경':'육안'} · 방위각 ${String(Math.round(X.mod(c.h*X.MIL,6400))%6400).padStart(4,'0')} · 고저 ${Math.round(c.p*X.MIL)}`+(R.state==='FLIGHT'&&R.impactAt>X.simT?` · 탄착 ${Math.ceil(R.impactAt-X.simT)}초`:'')},150)}},
+C:{name:'두 칸 자유 조합',
+  note:['위·아래 두 칸에 다섯 화면 중 아무거나 골라 넣는다. 기본은 <b>관측 + 입력</b>.','칸 위 단추로 <b>관측 + 지도</b>, <b>지도 + 입력</b> 등으로 바꾼다. 가운데 띠를 끌어 칸 크기 조절.','관측 화면 <b>가장자리 누르기</b> = 1밀(길게 = 연속) + <b>정밀</b> 단추(끌기 감도 ¼).','<b>같은 패널</b>, 칸 수만 다름(폰 2칸 · 태블릿 3칸 · 데스크톱 4–5칸).'],
+  mount(){const st={top:'view',bot:'comp'},names={view:'관측',map:'지도',tgt:'표적',comp:'입력',log:'무전'};
+    const draw=()=>{for(const k in P)park.append(P[k]);T.body.append(P[st.top]);B.body.append(P[st.bot]);
+      for(const[S,k]of[[T,'top'],[B,'bot']])[...S.chips.children].forEach(b=>b.classList.toggle('on',b.dataset.n===st[k]))};
+    const mk=k=>{const s=el('div','slot '+k),chips=el('div','tabs'),body=el('div','slotbody cq');s.append(chips,body);
+      for(const n in names){const b=el('button','',names[n]);b.dataset.n=n;b.onclick=()=>{const o=k==='top'?'bot':'top';if(st[o]===n)st[o]=st[k];st[k]=n;draw()};chips.append(b)}
+      return{s,chips,body}};
+    const T=mk('top'),B=mk('bot'),div=el('div','divider','≡ 끌어서 칸 크기 조절');let on=false;
+    div.addEventListener('pointerdown',e=>{div.setPointerCapture(e.pointerId);on=true});
+    div.addEventListener('pointermove',e=>{if(on)T.s.style.flexBasis=X.clamp(e.clientY-root.getBoundingClientRect().top-12,90,root.clientHeight-130)+'px'});
+    for(const n of['pointerup','pointercancel'])div.addEventListener(n,()=>on=false);
+    vw.append(nb('‹',-1,0,'edge l'),nb('›',1,0,'edge r'),nb('˄',0,1,'edge u'),nb('˅',0,-1,'edge d'));
+    const pb=el('button','px','정밀');pb.onclick=()=>pb.classList.toggle('on',precise=!precise);$('#laseOut').before(pb);
+    root.append(T.s,div,B.s);draw()}}
+};
+
+const keys=Object.keys(V),q=new URLSearchParams(location.search);let cur=keys.includes(q.get('variant'))?q.get('variant'):'A';
+const Q=['탄착 보며 수정','지도 ↔ 관측','1–2밀 미세 조작','데스크톱·태블릿'];
+function apply(v){cur=v;clearInterval(hudT);precise=false;
+  for(const k in P)park.append(P[k]);document.querySelectorAll('.px').forEach(e=>e.remove());root.innerHTML='';
+  root.className='v'+v;V[v].mount();
+  q.set('variant',v);history.replaceState(null,'','?'+q);
+  $('#pLbl').textContent=`${v} · ${V[v].name}`;
+  $('#pnote').innerHTML=`<b>${v} — ${V[v].name}</b> <span style="float:right">✕</span><br>`+V[v].note.map((t,i)=>`<b>${Q[i]}:</b> ${t}`).join('<br>')}
+const step=d=>apply(keys[(keys.indexOf(cur)+d+keys.length)%keys.length]);
+$('#pPrev').onclick=()=>step(-1);$('#pNext').onclick=()=>step(1);
+$('#pInfo').onclick=()=>$('#pnote').hidden=!$('#pnote').hidden;$('#pnote').onclick=()=>$('#pnote').hidden=true;
+$('#pAdj').onclick=()=>X.adjDemo();
+apply(cur);
+})();
+</script>
+</body>
+</html>
