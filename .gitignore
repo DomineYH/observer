@@ -3,3 +3,8 @@
 .routing/tasks/*.json
 .routing/evidence/*.json
 .routing/hook_log.jsonl
+node_modules/
+dist/
+test-results/
+playwright-report/
+*.tsbuildinfo
