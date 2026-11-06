@@ -1,3 +1,4 @@
+import type { RadioEvent } from './radio';
 import type { StreamName } from './rng';
 import type { TerrainData } from './terrain';
 
@@ -40,8 +41,8 @@ export interface Input {
   v?: readonly number[];
 }
 
-/** 사건. None yet. */
-export type SimEvent = never;
+/** 사건. Nothing emits radio events until the radio state machine slice. */
+export type SimEvent = RadioEvent;
 
 export interface StepResult {
   events: readonly SimEvent[];
