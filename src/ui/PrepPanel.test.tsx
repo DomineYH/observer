@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import type { SeedKind } from '@sim';
+import type { Input, SeedKind } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { PrepPanel, type PrepState } from './PrepPanel';
+import { pressStart, PrepPanel, type PrepState } from './PrepPanel';
 
 const WEATHER = {
   visibilityM: 24000,
@@ -59,3 +59,17 @@ test('F-22: 작전 준비 화면', () => {
   expect(text(20261106, 'daily', live)).toContain('작전 개시 — 찰리호텔 4300 3250 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
   expect(text(20261106, 'daily', { ...live, reportDue: false })).not.toContain('위치를 보고');
 });
+
+test('F-22: 작전 개시 단추는 패널이 그린 상태가 아니라 지금의 관측소를 보낸다', () => {
+  // The panel was drawn before the pick was stepped; the simulation has applied it since, and nothing is queued.
+  const rendered: PrepState = { ...PREP, op: BASE_SCENARIO.plannedOp, picked: false };
+  const live = { op: { x: 3000, y: 2500 } };
+  const sent: Input[] = [];
+  pressStart({ state: rendered, live, queued: [], send: (i) => void sent.push(i) });
+  expect(sent).toEqual([{ a: 'start', v: [3000, 2500] }]);
+  // A pick still queued wins over both.
+  sent.length = 0;
+  pressStart({ state: rendered, live, queued: [{ a: 'pick', v: [3100, 2600] }], send: (i) => void sent.push(i) });
+  expect(sent).toEqual([{ a: 'start', v: [3100, 2600] }]);
+});
+
