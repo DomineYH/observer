@@ -1,0 +1,154 @@
+[
+  {
+    "question": "PRD/OBSERVER_demo_v0.2.html의 전역 상태(상수·가변 상태·배열·객체)는 어떻게 구성되어 있는가?",
+    "fact": "단일 IIFE(176~1559행) 안에 (1) 시드·난수(URLSEED, SEED_KIND, SEED, RNG 5개 스트림, rS/rB/rF/rE/rA, gS/gB/gA/gE), (2) 입력·틱(INPUTS, tick, STEP=0.05, acc, camLog), (3) 지형·배치(N=1024, CELL=10, SIZE=10240, GROUND/SURF/BLD Float32Array, CR/CG/CB/BR/BG/BB/FOREST/ROAD/VILL Uint8Array, OBS, OPS, EYE_H=3.5, FRONT_Y=3650, PLANNED_OP, FRIEND 3소대, BATT={x:4200,y:-4600}, GZD='CH', E0=40000, N0=30000, VILLAGES 7곳, ROADS 6개, ROUTES A~C, NAI 1~3, INTEL_ROUTES), (4) 기상(WX_PRESETS 5종, WX, WV, SIGMA), (5) 시뮬레이션·전투(CS='갈매기', clearT, trainUsed, opsStartReal(미사용), simT, paused, simSpeed=2, trainMode=true, score, ammoUsed, ended, endAt, OPS_LIMIT=2400, events, platoons 5개, effects, impacts, lases, missions, friendlies 73개, FRIEND_PIN, tcount, romerPin, friendlyHits, dangerMiss, friendlyMortar, apcBursts, friendlyLoss, phase='prep', SCN, NEUT=0.3, DESTROY=0.6, DET_MIL={eye:1.5,bino:0.3}, obsLost, obsLostReason, SHEAF), (6) 교신·음성·오디오(R, tnSeq=1000, AC, noiseBuf, muted, ttsOn), (7) 렌더·지도·UI·네트워크(VW, VH, RK(미사용), low/lctx/img/pix/pix32/ybuf/dbuf, vc/vctx, cam, camZ, V, FOG, SKY, BAYER, maskCanvas, spriteList, mc/mctx, mapBase, vsCanvas, showVS, MV, CLIENT_VER='obs-0.9.2', NET, RESERVED_CS, MOCK_RUNS, BOARDS)가 모두 한 클로저 스코프에 선언되어 있다.",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:178-1502",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 단일 HTML 소스",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const INPUTS=[];let tick=0; ... const OBS={x:5120,y:1800}; ... let simT=0,paused=true,simSpeed=2,trainMode=true,score=0,ammoUsed=0,ended=false;",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "OPS 객체는 초기 리터럴(205행) 외에 실행 중 picked(1427행), stale(898·1015·1435행), skipReport(1015행), compromised(622행) 프로퍼티가 동적으로 추가된다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "simStep()의 고정 스텝 주기와 틱당 내부 실행 순서, 그리고 렌더링 루프(frame)와의 관계는 어떠한가?",
+    "fact": "STEP=0.05(50 ms) 고정 스텝이다. frame(now)(1336~1345행)은 경과 시간 dt=Math.min(0.1,(now-last)/1000)에 simSpeed를 곱해 acc에 누적하고, 프레임당 최대 40스텝까지 simStep()을 반복 호출하며 40스텝 도달 시 남은 acc를 0으로 버린다. simStep()(1328~1334행)의 틱당 실행 순서는: (1) tick++ 및 simT=tick*STEP 갱신 → (2) camZ=sampleH(GROUND,OBS.x,OBS.y)+EYE_H 갱신 → (3) 쌍안경(cam.binoc) 및 phase==='live'일 때 조준각이 1밀 이상 변했으면 logCam() 기록 → (4) updateOP(STEP) 관측소 이동·설치 진행 → (5) platoons 전체에 updatePlatoon(P,STEP) 실행 → (6) updateFriendly(STEP) 아군 이동·교전·손실 처리 → (7) updateVisibility(tick%6===0)로 6틱(0.3초)마다 전체 가시성 갱신(매 틱에는 신규 이펙트만 즉시 계산) → (8) updateIntel(STEP) 쌍안경 적정 진행 → (9) tick%100===0(5초)마다 exposureTick() 관측소 발각 판정 → (10) runEvents()로 t<=simT인 예약 이벤트 실행 → (11) checkEnd()로 작전 종료 조건 확인 순이다.",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:1325-1353",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — 메인 루프 및 simStep()",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "function simStep(){ tick++;simT=tick*STEP;camZ=sampleH(GROUND,OBS.x,OBS.y)+EYE_H; if(cam.binoc&&phase==='live')logCam(); updateOP(STEP);for(const P of platoons)updatePlatoon(P,STEP);updateFriendly(STEP); updateVisibility(tick%6===0); updateIntel(STEP);if(tick%100===0)exposureTick();runEvents();checkEnd(); }",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "헤드리스 테스트 API인 window.__obs.step(n)(1557행)은 frame()을 거치지 않고 직접 simStep()을 n회 호출한다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "R 교신 상태 기계의 상태 목록, 컨텍스트 필드, 상태 전이(transition) 규칙은 어떻게 짜여 있는가?",
+    "fact": "R 객체(693행)는 {state:'IDLE', m:null, lastAim:null, lastBias:null, lastFuze:'순발', lastTn:null, devText:'', impactAt:0, lastLase:null, lastImpactT:0}(및 조정탄 탄착 시 동적 추가되는 suggest, 789행)를 가진다. 상태는 총 8개(IDLE, WAIT, LOC, DESC, AMC, FLIGHT, ADJ, EOM)이며 setState(s)(703행)로 전이할 때마다 renderComposer()를 호출한다. 전이 목록: (1) IDLE→WAIT→IDLE: sendPosReport(위치 보고, 3+rF()초 후 복귀); (2) IDLE→WAIT→LOC: sendCall(호출·경고명령, 2.5+rF()*1.5초 후); (3) LOC→WAIT→DESC: sendLoc(좌표/극좌표, 2.5+rF()*1.5초 후); (4) DESC→WAIT→(AMC|FLIGHT): sendDesc(3+rF()*1.5초 복창·위험근접 강제, 9+rF()*3초 decideMTO 사격지휘통보·표적번호 AB1001+ 부여, 24+rF()*14초 사격준비 끝 → readyToFire에서 m.amc면 AMC, 아니면 1.5초 후 fireNow→FLIGHT); (5) IDLE→WAIT→(AMC|FLIGHT): sendShift(전이사격, 3초 복창, 9+rF()*3초 사격지휘통보, 20+rF()*8초 준비 끝 → readyToFire); (6) AMC→WAIT→FLIGHT: sendFireCmd('준비 쏴', 1+rF()초 후 fireNow→FLIGHT); (7) FLIGHT→ADJ: 조정탄 탄착(afterAdjImpact) 1.5초 후; (8) FLIGHT→EOM: 효력사 마지막 발 발사 후 lastFire+2.3초 뒤 다시 Math.max(2, lastImp-simT+2.5)초 후 afterFFE; (9) ADJ|EOM→WAIT→ADJ: sendCorr에서 위험근접(m.dc) 축당 100m 초과 시 2.5초 후 재송신 요구; (10) ADJ|EOM→WAIT→(AMC|FLIGHT): sendCorr 정상 수정 시 next==='효력사'면 14+rF()*8초, '조정'이면 11+rF()*6초 후 readyToFire; (11) EOM→WAIT→(AMC|FLIGHT): sendRepeat(재효력사, 접근신관 50% 순발 전환 시 13초, 아니면 23초 후 readyToFire); (12) EOM→IDLE: sendEOM(임무끝, lastAim/lastBias/lastFuze/lastTn 저장 후 즉시 IDLE).",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:693-847",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — 사격요구 상태 기계 R",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const R={state:'IDLE',m:null,lastAim:null,lastBias:null,lastFuze:'순발',lastTn:null,devText:'',impactAt:0,lastLase:null,lastImpactT:0};",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "EOM 상태에서 '수정 후 효력사'(#bC, 1023행)를 보낼 때 위험근접 100m 초과로 거부되면 EOM이 아닌 ADJ 상태로 전이된다(807행).",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "at() 이벤트 큐는 어떻게 구현되어 있으며 어떤 이벤트들을 스케줄링하는가?",
+    "fact": "events 배열(400행)에 at(delay, fn)(401행)이 {t: simT + delay, fn} 객체를 추가한 뒤 events.sort((a,b)=>a.t-b.t)로 모의 시각 오름차순 정렬한다. simStep() 말미의 runEvents()(402행)가 events[0].t <= simT인 항목을 shift()하며 실행한다. 스케줄링 대상은 (1) 작전 개시 4초 후 통신 점검 감명 보고(1440행), (2) 모든 무전 송신에 대한 기러기 복창·사격지휘통보·사격준비 끝·하나발/마감탄 통보·관측자의 잠깐대기 응답(716~902행), (3) 지명사/비지명사 발사 및 효력사 6문×rounds발 시차 발사(755~770행), (4) 비과시간(tof) 후 포탄 탄착 impact() 실행 및 탄착 후 ADJ/EOM 상태 전이(668, 774, 791행), (5) 적 박격포탄 비과시간(22+rA()*4초) 후 아군 진지 탄착 및 최초 피탄 경고(504~506행), (6) 포탄·박격포탄 탄착 후 거리/343초 뒤 폭음 boom() 재생(505, 645행), (7) 관측소 발각 후 적 박격포(60초 뒤 4초 간격 4발) 또는 직사(20초 뒤 2초 간격 6발) 보복 탄착 및 관측반 피격 4초 후 endGame() 호출(629~637행)이다.",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:400-402",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — at() 이벤트 큐",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const events=[]; function at(delay,fn){events.push({t:simT+delay,fn});events.sort((a,b)=>a.t-b.t)} function runEvents(){while(events.length&&events[0].t<=simT)events.shift().fn()}",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "동일 시각(a.t === b.t) 이벤트는 ES2019+ Array.prototype.sort의 안정 정렬(삽입 순서 유지)에 의존한다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "5개 난수 스트림의 시드 파생 방식과 각 스트림의 실제 소비처(스트림 간 오염 여부 포함)는 무엇인가?",
+    "fact": "mulberry32(182행) PRNG 5개를 SEED에서 XOR 상수로 파생한다(190~193행): (1) RNG.scn(rS/gS, SEED): 초기 기상 프리셋 선택(1552행), 적 2소대·장갑차·정찰조 접근로 및 박격포 진지 좌표 결정(421~422행), 적·아군 구성원 초기 대형 오프셋·위상·경유점 산포(419, 434~438, 572~573행); (2) RNG.bal(rB/gB, SEED^0x5bd1e995): 임무별 비표준 조건 오차(30~90m, 697행), 포탄 사거리·편의 공산오차(665행), 탄착 시 적 피격 사망 판정 및 엎드림 시간(35~65초, 654~656행), 아군 오사 관측소 피격(659행), hitFriendlies() 내 아군 병력 손실 판정(박격포탄·아군 포탄 공통, 495행), 그리고 레이저 거리측정 오차(gB()*2, 1068행); (3) RNG.fdc(rF, SEED^0x1b873593): decideMTO 신관·발수 변경(733~734행), 재효력사 신관 전환(826행), 모든 무전·발사 응답 지연 시간 지터; (4) RNG.exp(rE/gE, SEED^0x68e31da4): 5초마다 관측소 발각 판정(618행), 보복 사격 탄착 산포 및 관측반 피격 판정(630~633행); (5) RNG.ai(rA/gA, SEED^0x3c6ef372): 장갑차 사격 간격(468행), 박격포 사격 간격·목표 소대·비과시간·탄착 산포(470, 503~504행), 아군 응사 간격·배회 이동(594, 597행), 아군 직사화기 적 살상 및 400m 내 적 보병에 의한 아군 손실(603~604행). 이외에 건물 생성(261행)과 목업 랭킹(1460행)은 고정 시드 mulberry32(4242)를 쓴다.",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:182-193",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — 시드와 난수 스트림",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const RNG={scn:mulberry32(SEED),bal:mulberry32(SEED^0x5bd1e995),fdc:mulberry32(SEED^0x1b873593),exp:mulberry32(SEED^0x68e31da4),ai:mulberry32(SEED^0x3c6ef372)};",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "스트림 오염 2곳: (1) lase()(1068행)가 탄도 스트림 gB()를 소비해 레이저 측정 횟수에 따라 포탄 탄착 난수열이 바뀜; (2) 적 박격포탄에 의한 아군 손실 판정(505→495행)이 RNG.ai가 아닌 RNG.bal(rB)을 소비함.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "입력 기록 {t,a,v}(INPUTS)에 기록되는 종류(a) 전체 목록과 기록에서 누락된 상태 변경 입력은 무엇인가?",
+    "fact": "logIn(a,v)(197행)가 기록하는 액션 종류(a)는 총 18종이다: (1) 'pick':[x,y] 관측소 후보 선정(1427행), (2) 'start':[x,y,trainMode?1:0] 작전 개시(1435행), (3) 'bino':0|1 쌍안경 토글(1385행), (4) 'cam':[h,p] 쌍안경 중 1밀 이상 조준각 변화(1327행), (5) 'lase':[h,p] 레이저 측정(1061행), (6) 'id':[pid,h,p,relAz,elAbs] 표적 탐지 클릭(1081행), (7) 'call':warn 호출·경고명령(713행), (8) 'loc':[method,a,b] 표적위치(724행), (9) 'desc':[desc,n,fuze,amc,dc] 표적성질·규모(739행), (10) 'fire':undefined 지명사 발사(756행), (11) 'corr':[dir,lr,lv,rr,rv,next] 수정(808행), (12) 'repeat':[b,n] 재효력사(823행), (13) 'eom':b 임무끝(830행), (14) 'shift':[dir,lr,lv,rr,rv,desc,n] 전이사격(837행), (15) 'move':[x,y] 관측소 이동 시작(868행), (16) 'pos':[e,n] 관측소 위치 보고(895행), (17) 'mode':'train'|'std' 모드 전환(1408~1409행), (18) 'pause':0|1 일시정지 토글(1410행). 반면 재생 결정성을 깨뜨리는 누락이 4건 있다: ① 관측소 위치 보고 생략 버튼(#bSkip, 1015행: OPS.unreported=false, OPS.stale=true 변경), ② EOM에서 '수정 후 효력사'(#bC, 1023행) 클릭 시 recordBDA(m,gv('eb'))에 전달되는 판정값 eb(점수 ±30/-20 변동), ③ 연습 시드에서 작전 준비 중 기상 프리셋 변경(#wxSel, 1013행), ④ 위험근접 100m 초과로 거부된 sendCorr(806~807행: 2.5초간 WAIT 전이로 타이밍 변경).",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:196-197",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — 입력 기록 logIn 호출부 전체",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const INPUTS=[];let tick=0; const logIn=(a,v)=>{INPUTS.push(v===undefined?{t:tick,a}:{t:tick,a,v})};",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "방향키·드래그를 통한 육안 시점 이동이나 쌍안경 1밀 미만 미세 이동은 'cam'으로 기록되지 않고 lase/id 호출 시점 또는 1밀 이상 변화 시점에만 기록된다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "window.__obs 자동 테스트 API가 제공하는 프로퍼티·메서드·getter/setter의 전체 목록은 무엇인가?",
+    "fact": "window.__obs(1555~1558행)는 총 43개 멤버를 노출한다: (1) 지형·공간·좌표 함수 7개: los(x,y,z), camZ(), H(x,y), S(x,y), pitchTo(x,y), fromGrid(e,n), toGrid(x,y); (2) 상태 객체·배열 직접 참조 9개: friendlies, spriteList, MV, OPS, OBS, platoons, missions, R, cam; (3) 상태 getter/setter 10개: get phase, get simT, get tick, set speed(v), get vis, get seed, get seedKind, get inputs, get score, get ammo, get ended(총 11개 접근자); (4) 지도·관측·진행 제어 함수 12개: mapZoomAt, mapCenterOn, startOps, prepPick, startMove, planMove, sendPosReport, lase, identifyAt, setPaused, step(n), setMode(t), toggleBino, record(computeRecord), pickAt, updateVisibility(총 16개 함수); (5) 무전 교신 함수 8개: sendCall, sendLoc, sendDesc, sendCorr, sendEOM, sendRepeat, sendShift, sendFireCmd (합계: 7+9+11+16-8중복제외 = 43개 고유 키).",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:1555-1558",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — window.__obs 노출 정의",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "window.__obs={los:(x,y,z)=>los(x,y,z),camZ:()=>camZ,H:(x,y)=>sampleH(GROUND,x,y),S:(x,y)=>sampleH(SURF,x,y), ... record:computeRecord,pickAt,updateVisibility};",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "위치 보고 생략(#bSkip)이나 기상 변경(setWeather)은 window.__obs에 직접 노출되어 있지 않다(단 OPS 객체 참조로 OPS.unreported=false 직접 수정은 가능).",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "데모 v0.2의 각 함수·상태 덩어리는 PRD 7.5의 권장 모듈(sim/, radio/, render/, ui/, net/) 중 어디로 대응되는가?",
+    "fact": "PRD 7.5(351행)의 5개 권장 모듈 대응은 다음과 같다: (1) sim/rng: mulberry32, RNG 5스트림, gaussOf, gS/gB/gA/gE(182~193행); (2) sim/terrain: GROUND/SURF/FOREST/BLD/ROAD/VILL, OBS/OPS/PLANNED_OP/FRONT_Y/FRIEND/BATT/VILLAGES/ROADS, hash/vnoise/fbm/genTerrain/refl/sampleH/cellIdx/los, toGrid/fromGrid/az4/azOf, WX_PRESETS/WX/WV/SIGMA/setWeather(순수 수치 부분), planMove/moveCheck/startMove/updateOP(201~350, 390, 850~890행); (3) sim/units: ROUTES/NAI/INTEL_ROUTES/TYPE, platoons/member/makePlatoons/alive/strength/distToObj/moveAlong/updatePlatoon/apcFire/mortarVolley, friendlies/FRIEND_PIN/makeFriendlies/friendAlive/stepTo/updateFriendly, hitFriendlies/NEUT/DESTROY/judge/earlyBonus(403~606행); (4) sim/intel: actOf/sizeOf/descOf/shortOf/intelTimes, DET_MIL/relAzOf/visOf/effSize/effTop/updateVisibility/updateIntel, pickAt/lase/identifyAt(518~567, 1048~1087행); (5) sim/exposure: obsLost/obsLostReason/exposureTick/compromise/loseObserver(609~637행); (6) sim/ballistics: tofOf/impact/fireRound/SHEAF, devAgainst/bestPlatoon/truthOf/recordBDA(640~671, 778~798, 820~821행); (7) sim/core(루프·기록): INPUTS/tick/logIn, simT/STEP/events/at/runEvents/simStep/checkEnd/computeRecord(196~197, 398~402, 1325~1353, 1475~1494행); (8) radio/: AD/dg/corrWord/tnWord/locText/mtoText/corrParts/bdaWord, R/tnSeq/newMission/setState/otFrame/setDir/okDir, sendCall/sendLoc/decideMTO/sendDesc/readyToFire/sendFireCmd/fireNow/afterAdjImpact/afterFFE/applyCorr/sendCorr/sendRepeat/sendEOM/sendShift, sendPosReport(311~313, 693~847, 892~903행); (9) render/: shadeTerrain(조명 색 배열), setRes/renderTerrain/ridgeLines/proj/blend/disc/BAYER/posterize(voxel), spriteList/SPR_COL/drawSprites/drawSpritesHi(sprites), drawOverlay(overlay), computeViewshed/mapClamp/mapZoomAt/mapCenterOn/mapToWorld/buildMap/drawMap/drawIntelOverlay(map)(289~305, 320~395, 1101~1320행); (10) ui/: HTML/CSS(1~174행), AC/initAudio/boom/squelch/addMsg/fo/fdc/sys/speak, renderComposer/bindComposer/shiftPreview/previewText, renderTargets, endGame(강평 모달)/showRank/recordHTML, 포인터·키보드·버튼 핸들러(674~690, 906~1043, 1089~1098, 1354~1449, 1496~1550행); (11) net/: CLIENT_VER/NET/RESERVED_CS/CS_RE/lsGet/lsSet/MOCK_RUNS/validCS/setCS/submitRec(1452~1474, 1524~1530행).",
+    "source_url": "PRD/OBSERVER_PRD_v0.2.md:351",
+    "source_title": "OBSERVER PRD v0.2 §7.5 및 데모 v0.2 전체 코드",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "M1 모듈 분할(권장): sim/ · radio/(상태 기계 + 교신 문법) · render/ · ui/ · net/.",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "데모에서는 많은 함수(예: lase, identifyAt, startMove, updateOP, send*)가 sim/radio 로직과 DOM/오디오/렌더 호출을 한 함수 안에 섞어 두고 있어 M1 이관 시 이벤트/콜백 분리가 필요하다.",
+    "conflicts_with_other_sources": []
+  },
+  {
+    "question": "데모 v0.2의 시뮬레이션·교신 코드 중 DOM, 캔버스, Date, Math.random 등에 닿는 비순수(impure) 코드는 어디인가?",
+    "fact": "시뮬레이션·교신 영역에서 순수성을 깨는 결합 지점은 총 7가지다: (1) Date 사용: kstDay()(187행)가 Date.now()로 일일 시드를 계산하고, computeRecord()(1491행)가 new Date().toISOString()을 넣으며, MOCK_RUNS(1464행)도 Date.now()를 쓴다; (2) location 사용: URLSEED(186행)가 location.search를 직접 읽는다; (3) Math.random() 사용: initAudio()(675행)가 오디오 노이즈 버퍼 생성에 Math.random()을 쓴다(시뮬레이션 수치에는 미영향); (4) 렌더러 상태 V에 대한 identifyAt()의 역의존(1076~1077행): identifyAt(ix,iy)이 렌더러 함수 renderTerrain()이 갱신하는 전역 V({focal,hor})가 없으면 즉시 false를 반환하여, 화면 렌더링 없이 simStep()만 돌리는 헤드리스 환경에서는 identifyAt()이 동작하지 않는다; (5) 시뮬레이션 함수 내 캔버스 생성: updateOP()(881행), prepPick()(1428행), startOps()(1436행)가 computeViewshed()(1248행: document.createElement('canvas'))를 직접 호출한다; (6) 시뮬레이션·교신 함수 내 DOM 조작: updatePlatoon/apcFire/hitFriendlies/mortarVolley/earlyBonus/updateIntel/compromise/loseObserver/impact 및 모든 send* 함수가 sys()/fo()/fdc()를 통해 #log DOM에 노드를 추가하고, setState()/startMove()/updateOP()/lase()가 renderComposer()(#composer.innerHTML)를 호출하며, lase()는 #laseOut·#llist를, identifyAt()은 #tlist를, endGame()은 #debriefBox와 localStorage를 직접 갱신한다; (7) Web Audio / Web Speech 직접 호출: mortarVolley/compromise/impact가 boom()을, fo()/fdc()가 squelch()와 speak()(window.speechSynthesis)를, lase()가 initAudio()를 직접 호출한다.",
+    "source_url": "PRD/OBSERVER_demo_v0.2.html:186-187",
+    "source_title": "OBSERVER 포병 관측 데모 v0.2 — 시뮬레이션 내 비순수 결합 지점",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "function identifyAt(ix,iy){ if(!V||hardPause()||phase!=='live')return false; const relAz=Math.atan((ix-VW/2)/V.focal),elAbs=Math.atan((V.hor-iy)/V.focal);",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "drawOverlay()의 강수 효과(1191행)와 frame() 루프(1335행)는 performance.now()를 쓰지만 이는 render/ 영역이다.",
+    "conflicts_with_other_sources": [
+      "PRD 7.5(348, 351행)는 렌더 독립과 화면 없는 헤드리스 재생을 표방하나, 데모의 identifyAt(ix,iy)(1076행)은 renderTerrain()이 설정하는 V(focal, hor)와 내부 뷰포트 픽셀 좌표(VW, VH)에 의존한다."
+    ]
+  },
+  {
+    "question": "PRD의 [데모] 표기 항목(F-01~F-31, 4장 교신, 5.1~5.3 규칙) 중 데모 v0.2 실제 동작·수치와 다른 곳은 어디인가?",
+    "fact": "기능·규칙 불일치는 다음과 같다: (1) F-02 쌍안경 레티클(PRD 155행 vs 데모 1203~1205행): PRD는 '수평 ±50밀, 10밀 간격 / 수직 ±20밀, 5밀 간격'이라 했으나 데모는 수평도 5밀 간격 눈금(10밀 장선)을 그리고, 수직 중심선은 위쪽(+3~+25밀)만 있고 아래쪽이 없다; (2) F-03 시선 조작(데모 안내표 151행 vs 코드 1378~1379행): 안내표는 Shift가 10배라 하나 고저(tilt)는 Shift 시 5배만 적용된다; (3) F-04/5.2 적정 확인(PRD 226~230행 vs 데모 526~566행): 쌍안경 적정은 시야 중심 ±42%(좌우 ±2.94°)만 인정하되 고저각(cam.p)은 전혀 검사하지 않으며, 먼지·연기만 보일 때는 적정 진행 속도가 0.5배(562행)이고, 병종 식별 시 문구에 '(BMP 계열 추정)'·'(82mm 추정)'이 붙는다(532행); (4) F-05 레이저 오차(PRD 158행 vs 데모 1068행): PRD는 '±2 m'이나 데모는 가우시안 표준편차 σ=2m(gB()*2)라 ±2m를 초과할 수 있고 탄도 난수 스트림을 소비한다; (5) F-07/4.3 교신 입력기·문구(PRD 79, 111, 133행 vs 데모 740~846, 973, 999행): 데모 ③에는 PRD 4.3에 없는 '신관 직접 요청(요청 안 함/순발/접근)' 드롭다운이 있고, sendCorr의 조정 계속 시 준비 완료 문구가 '포대 사격준비 끝' 대신 '사격준비 끝.'(817행)이며, 위험근접 미선언 시 sendDesc는 경고문을 2번에 나눠 보내는 반면 sendShift는 1번에 보내고(745~746 vs 844행), sendCorr로 조준점이 아군 600m 안으로 들어올 때는 위험근접 재검사가 없으며, EOM에 PRD 3장에 없는 '수정 후 효력사'(#bC, 999행)가 있어 BDA 점수가 중복 가산될 수 있다; (6) F-21/5.1 관측소 이동·발각(PRD 193~204행 vs 데모 612~635, 713, 860, 941~946행): 이동 후 위치를 보고하지 않으면 자동으로 이전 위치로 계산하는 것이 아니라 사격요구(sendCall) 자체가 차단되어 '보고하지 않고 계속'(#bSkip)을 먼저 눌러야 하며, 946행 힌트는 '수정량도 관측소 위치 기준'이라는 구버전(v0.1) 설명이 남아 있고, moveCheck(860행)에 북쪽 지도 가장자리(to.y>SIZE-200) 검사가 누락되어 있으며, 발각 시 관측소가 숲 속에 있으면 los()가 자체 수관(SURF)에 막혀 발각 판정이 거의 일어나지 않고, 박격포 부재 시 직사 보복(6발, 산포 σ=35m, 피격반경 4m)은 발각시킨 부대 P 자신이 보병/장갑차이고 800m 이내일 때만 작동하며 150초 발각 쿨다운(622행)이 있다; (7) F-22/5.2 실제 배치(PRD 220행 vs 데모 421~422행): PRD는 2소대·장갑차·박격포만 시드 배치로 적었으나 데모는 정찰조도 서측(60%)/중앙(40%) 중 무작위 선택하며, 박격포는 NAI 3 원(반경 550m)이 아닌 700×500m 직사각형 내 비삼림 지점에 배치된다; (8) 5.3 탐지·누르기(PRD 239, 242행 vs 데모 549, 1051행): 아군 트럭 높이 2.6m가 추가되어 있고, pickAt()은 '가장 가까운 대상'이 아니라 정규화 각도 오차 Math.hypot(a/tolAz, e/tolEl)가 가장 작은(조준선 중심에 가장 가까운) 대상을 선택한다; (9) F-24 가시권(데모 1251행): 관측소 남쪽 및 북쪽 150m 이내(y<OBS.y+150)는 가시권 음영을 계산하지 않는다.",
+    "source_url": "PRD/OBSERVER_PRD_v0.2.md:152-243",
+    "source_title": "OBSERVER PRD v0.2 §4~§5 대 데모 v0.2 코드 비교",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const sc=Math.hypot(a/tolAz,e/tolEl);if(sc<bd){bd=sc;best={pid,kind,sig,d,x,y,z}}",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "PRD 4장·5장의 핵심 구조(3단계 사격요구, 방향 송신, 표적번호 부여, 위험근접 100m 상한, 표준 모드 방위각 선, 표준 일시정지 가림)는 데모에 구현되어 있다.",
+    "conflicts_with_other_sources": [
+      "PRD 5.1(194행)은 좌표법+방향 송신 임무는 관측소 위치에 영향받지 않는다고 명시하나, 데모 946행 훈련 힌트는 '기러기는 극좌표와 수정량을 관측소 위치 기준으로 계산합니다'라고 상충되게 안내한다.",
+      "PRD 5.3(242행)은 허용 각도 안의 보이는 대상 중 '가장 가까운 것'을 고른다고 했으나, 데모 pickAt()(1051행)은 거리(d)가 아니라 조준선 중심 각도 편차(sc)가 최소인 대상을 고른다."
+    ]
+  },
+  {
+    "question": "PRD 6장 시뮬레이션 수치표, 7장 그래픽 사양, 10장 기록·랭킹 사양 중 데모 v0.2 실제 코드와 다른 곳은 어디인가?",
+    "fact": "수치·기술·랭킹 불일치는 다음과 같다: (1) 6장 보병 횡대 전개 시간(PRD 253행 vs 데모 463행): PRD는 '목표 1.5 km에서 약 20초에 걸쳐 전개'라 했으나 데모는 P.form+=(want-P.form)*Math.min(1,dt/20)으로 시상수 τ=20초 지수 감쇠를 써서 20초에 63.2%, 60초에 95% 전개된다; (2) 6장 포대 거리(PRD 260행 vs 데모 204, 210행): PRD는 '관측소 남쪽 약 9 km'라 했으나 기본 관측소(5120,1800)와 포대(4200,-4600) 사이 실제 거리는 약 6.47 km이다(아군 진지까지 약 8 km, 적 출현 지점까지 약 10~11.5 km); (3) 6장 비표준 조건 기온 잔차 방향(PRD 264행 vs 데모 698~700행): 기온 잔차(1.2 m/°C)를 임무 조준점 방향이 아니라 고정 좌표(5000,5500) 방향으로 더한다; (4) 6장 효력사 간격(PRD 267행 vs 데모 768행): 문당 9초 간격에 포마다 0~2.2초 무작위 지터(rF()*2.2)가 추가된다; (5) 6장 장갑차·박격포 살상 모델(PRD 279행 vs 데모 651~652행): 장갑차는 순발 최고 살상확률이 0.92가 아닌 0.9이고 접근신관은 '0.22배'가 아니라 계수 자체가 0.22(순발의 약 0.244배)이며 파열고 7m를 적용하지 않는다. 또한 박격포 포신(tube) 전용 살상식(계수 0.9, 순발 R=10m, 접근 R=7m+파열고 7m)이 있으나 PRD 6장 표에는 누락되어 있다; (6) 6장 아군 포탄 오사 피해 감쇠(PRD 272행 vs 데모 495행): hitFriendlies()의 거리 감쇠가 exp(-(r/R)²)가 아니라 exp(-(r/R)²*1.5)다; (7) 6장 장갑차 첫 사격(PRD 279행 vs 데모 467행): 1,300m 정지 후 첫 사격은 8~16초가 아닌 6초 뒤다; (8) 7.1 햇빛 방향(PRD 293 vs 297행 vs 데모 290행): PRD 293행은 '남남동 햇빛', 297행은 '서남서 햇빛'으로 자체 모순이며 데모는 250°(서남서)를 쓴다; (9) 10.1 호출부호 예약어·욕설 필터(PRD 396행 vs 데모 1455, 1460행): 욕설 필터는 미구현이고, 상급 콜사인 '송골매'는 예약어에 없으며 오히려 목업 랭킹 플레이어 이름(MOCK_RUNS)에 포함되어 있다; (10) 10.2/10.3 기록 필드(PRD 404~446행 vs 데모 1490행): 데모 computeRecord()는 PRD 표와 SQL 스키마에 없는 compromised(boolean) 필드를 추가로 반환한다.",
+    "source_url": "PRD/OBSERVER_PRD_v0.2.md:248-282",
+    "source_title": "OBSERVER PRD v0.2 §6, §7, §10 대 데모 v0.2 코드 비교",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "const OBS={x:5120,y:1800}; ... const BATT={x:4200,y:-4600}; ... if(q.kind==='veh')p=(vt?0.22:0.9)*Math.exp(-((r/7)**2));",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "공산오차(1.5m/km+2m, 0.5m/km+1m), 보병 살상 반경(순발 26/15m, 접근 28/24m, 계수 0.92), 토블러 보행 공식, 적 사상 판정 척도(30%/60%)는 PRD 6장과 데모가 정확히 일치한다.",
+    "conflicts_with_other_sources": [
+      "PRD 7.1 안에서 293행('남남동 햇빛 음영')과 297행('낮은 서남서 햇빛')이 서로 충돌하며, 데모 shadeTerrain()(290행)은 sunAz=250°(서남서)를 사용한다.",
+      "PRD 6장(260행)은 포대가 관측소 남쪽 약 9km라고 기술하나 데모 좌표상 OBS(5120,1800)와 BATT(4200,-4600) 거리는 6.47km이다."
+    ]
+  },
+  {
+    "question": "PRD가 가리키지만 문서에 없는 5개 항목('4.5 교신 문법', '개발 스펙 탭', supabase/migrations/0001_init.sql, api/_lib/validate.js, 데모 검증 스크립트)은 저장소나 데모 안에 어떤 흔적이 있는가?",
+    "fact": "저장소 전체(PRD/, docs/, .routing/)에 5개 파일·절의 실물은 모두 존재하지 않으며, PRD와 데모 HTML 내 흔적은 다음과 같다: (1) '4.5 교신 문법': PRD F-18(171행)·7.2(314행)가 참조하나 4장은 4.4(146행)에서 끝난다. 데모에는 슬롯 문법 JSON 없이 AD/dg/corrWord/tnWord/locText/mtoText/corrParts/bdaWord 및 send*·previewText·shiftPreview 함수 내 문자열 템플릿(311~313, 695~841, 896, 1026~1043행)으로 하드코딩되어 있다; (2) '개발 스펙 탭': PRD 2장(36행)·7.3(318행)·9장(387행)이 참조하나 마크다운과 데모 HTML 어디에도 탭이나 내용이 없다(원본 노션/문서의 별도 탭이 반출 시 누락된 흔적); (3) 'supabase/migrations/0001_init.sql': PRD 10.3(465행)·10.5(495행)가 참조하나 파일은 없고, PRD 423~466행에 발췌 SQL(profiles, runs, leaderboard_time 뷰 1개, 기본 RLS)이 있으며, 데모(1455~1456, 1496~1506행)에 CS_RE 정규식, RESERVED_CS 6개, BOARDS 4개 정렬·자격 함수가 클라이언트 측 대응물로 구현되어 있다; (4) 'api/_lib/validate.js'(및 src/net.js, /api/submit-run, /api/daily): PRD 10.4~10.5(470~496행)에 검증 규칙(일일 시드 대조, 부대 수 4, 탄/수정 합계·초탄 오차 일관성, 최소 섬멸 시간 300초, 무사격 섬멸·관측반 손실 섬멸 제외, 분당 3건 제한)이 서술되어 있고, 데모(1445~1447, 1453~1454, 1472~1474, 1508~1509, 1524~1534행)에 window.OBS_NET 인터페이스(online, claimCallsign, myCallsign, mountCaptcha, fetchBoard, submitRun)와 POST /api/submit-run 페이로드 미리보기({run, events, inputs}) 흔적이 있다; (5) '데모 검증 스크립트': PRD 머리말(5행)·6장(283행: 시드 4242, 1회 수정 후 효력사 18발 → 사상 60% 파괴)·7.1(302행: 헤드리스 FPS 측정)·7.5(348행: 동일 시드·입력 2회 실행 상태 일치 확인)에 실행 결과만 적혀 있고 스크립트 파일은 없으며, 데모 말미(1554~1558행)의 window.__obs 객체가 이 스크립트를 위한 진입점 흔적이다.",
+    "source_url": "PRD/OBSERVER_PRD_v0.2.md:171-496",
+    "source_title": "OBSERVER PRD v0.2 및 데모 v0.2 내 누락 산출물 참조·흔적",
+    "retrieved_on": "2026-11-06",
+    "section_or_quote": "// 네트워크 계층: Vercel 배포본에서는 src/net.js가 window.OBS_NET을 채운다. 단일 파일 데모에서는 오프라인 목업.",
+    "version_or_date_of_source": "v0.2 (2026-11-06, commit a2b3c48)",
+    "confidence": "high",
+    "limitations": "5개 산출물의 원본 파일 자체는 현재 저장소 워킹트리에 커밋되어 있지 않아, M1/M6 이슈(#8, #9, #10, #14)에서 데모 내 흔적과 PRD 본문을 바탕으로 재정의해야 한다.",
+    "conflicts_with_other_sources": []
+  }
+]
