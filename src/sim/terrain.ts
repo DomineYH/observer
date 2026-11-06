@@ -75,6 +75,9 @@ export const surfaceAt = (t: TerrainData, x: number, y: number): number => sampl
 export function lineOfSight(t: TerrainData, a: Point & { z: number }, b: Point & { z: number }): boolean {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
+  // ponytail: demo sampling (game rule): every 15 m, at most 400 samples. Beyond 6 km samples spread out, and from
+  // 8 km (20 m apart) a lone 10 m cell such as one building can fall between them and not block. Changing it changes
+  // results: raise SIM_VERSION and regenerate the goldens.
   const steps = Math.min(400, Math.max(8, Math.floor(Math.sqrt(dx * dx + dy * dy) / 15)));
   for (let s = 1; s < steps; s++) {
     const f = s / steps;

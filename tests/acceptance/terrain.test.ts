@@ -1,12 +1,12 @@
 // The mock 지형 원천 seam: 지형 해시, 마을과 도로, 방안 하나 불변 조건.
 import { describe, expect, test } from 'vitest';
 import { COVER, terrainHash } from '@sim';
-import { generateTerrain, mockTerrain } from '@adapters/mock/terrain';
+import { mockTerrain } from '@adapters/mock/terrain';
 import { BATTERY } from '@content/scenario';
 import { readGolden } from '../golden/golden';
 
 const SEED = 20261106;
-const terrain = generateTerrain(SEED);
+const terrain = await mockTerrain.load(SEED); // through the 지형 원천 interface
 
 describe('F-15', () => {
   test('F-15: 지형 해시는 시드로 정해진다', async () => {
@@ -17,7 +17,7 @@ describe('F-15', () => {
     // The engines job checks the same golden header in Chromium, Firefox and WebKit.
     expect(hash).toBe(readGolden('0-empty.json').terrainHash);
     expect(terrainHash(await mockTerrain.load(SEED))).toBe(hash);
-    expect(terrainHash(generateTerrain(SEED + 1))).not.toBe(hash);
+    expect(terrainHash(await mockTerrain.load(SEED + 1))).not.toBe(hash);
   });
 });
 
