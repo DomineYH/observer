@@ -18,6 +18,17 @@ const targetLabel = (t: Target) =>
     ? W.targetType.unknown.text
     : `${W.activity[t.activity].text}인 적 ${W.targetType[t.targetType].text}${t.unit === 'none' ? '' : ` ${'count' in t ? t.count : ''}${W.unit[t.unit].text}`}`;
 
+/** The form's starting values (a sent form keeps its values for the next mission). `target` is an option's JSON. */
+export interface ComposerForm {
+  warning: Warning;
+  grid: { e: string; n: string };
+  target: string;
+  rounds: number;
+  fuzeRequest: FuzeRequest;
+  control: Control;
+  dangerClose: Flag;
+}
+
 interface Props {
   stage: RadioStage;
   live: boolean;
@@ -25,16 +36,17 @@ interface Props {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  initial?: Partial<ComposerForm>;
 }
 
-export function Composer({ stage, live, platoons, names, mode, send }: Props) {
-  const [warning, setWarning] = useState<Warning>('adjust');
-  const [grid, setGrid] = useState({ e: '', n: '' });
-  const [target, setTarget] = useState('');
-  const [rounds, setRounds] = useState(3);
-  const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
-  const [control, setControl] = useState<Control>('ready');
-  const [dangerClose, setDangerClose] = useState<Flag>(0);
+export function Composer({ stage, live, platoons, names, mode, send, initial = {} }: Props) {
+  const [warning, setWarning] = useState<Warning>(initial.warning ?? 'adjust');
+  const [grid, setGrid] = useState(initial.grid ?? { e: '', n: '' });
+  const [target, setTarget] = useState(initial.target ?? '');
+  const [rounds, setRounds] = useState(initial.rounds ?? 3);
+  const [fuzeRequest, setFuze] = useState<FuzeRequest>(initial.fuzeRequest ?? 'none');
+  const [control, setControl] = useState<Control>(initial.control ?? 'ready');
+  const [dangerClose, setDangerClose] = useState<Flag>(initial.dangerClose ?? 0);
 
   const options = targetOptions(platoons);
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;

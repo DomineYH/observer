@@ -1,9 +1,10 @@
 // 사격요구 교신 (F-07, F-09): 통신 점검, the three transmissions and 기러기's replies, through the public interface only.
 import { describe, expect, test } from 'vitest';
 import { validateReplay, type Input, type RadioEvent, type Sim } from '@sim';
+import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { radioSentence, spoken } from '@ui/radio/sentence';
 import { replayData, START } from './init';
-import { CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, openRadio, radioEvents, send, started, toReady, unstarted, until } from './mission';
+import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, openRadio, radioEvents, send, started, toReady, unstarted } from './mission';
 
 const said = (events: readonly RadioEvent[]) =>
   events.map((e) => ({ tick: e.tick, speaker: e.utterance.speaker, kind: e.utterance.kind, ending: e.utterance.ending }));
@@ -62,9 +63,10 @@ describe('F-07: 세 송신의 순서와 상태 가드', () => {
     expect(sim.step([input]).accepted).toEqual([true]);
     expect(twin.step([input]).accepted).toEqual([true]);
   };
-  const runBoth = (sim: Sim, twin: Sim, stage: string) => {
-    until(sim, () => sim.state.radio.stage === stage);
-    until(twin, () => twin.state.radio.stage === stage);
+  /** Both run until 기러기 has answered the transmission `a`. */
+  const runBoth = (sim: Sim, twin: Sim, a: 'call' | 'loc' | 'desc') => {
+    answered(sim, a);
+    answered(twin, a);
     expect(sim.state.tick).toBe(twin.state.tick);
   };
 
@@ -77,16 +79,16 @@ describe('F-07: 세 송신의 순서와 상태 가드', () => {
     // waiting for call_ack: nothing
     ignoredLikeTwin(sim, twin, CALL_ADJUST);
     ignoredLikeTwin(sim, twin, LOC);
-    runBoth(sim, twin, 'loc');
+    runBoth(sim, twin, 'call');
     ignoredLikeTwin(sim, twin, CALL_ADJUST);
     ignoredLikeTwin(sim, twin, DESC_UNKNOWN);
     sendBoth(sim, twin, LOC);
-    runBoth(sim, twin, 'desc');
+    runBoth(sim, twin, 'loc');
     ignoredLikeTwin(sim, twin, LOC);
     ignoredLikeTwin(sim, twin, CALL_ADJUST);
     sendBoth(sim, twin, DESC_UNKNOWN);
     ignoredLikeTwin(sim, twin, DESC_UNKNOWN);
-    runBoth(sim, twin, 'ready');
+    runBoth(sim, twin, 'desc');
     expect(sim.hash()).toBe(twin.hash());
   });
 
@@ -111,9 +113,9 @@ describe('F-07: 표적성질 슬롯', () => {
     const sim = started();
     openRadio(sim);
     send(sim, CALL_ADJUST);
-    until(sim, () => sim.state.radio.stage === 'loc');
+    answered(sim, 'call');
     send(sim, LOC);
-    until(sim, () => sim.state.radio.stage === 'desc');
+    answered(sim, 'loc');
     return sim;
   };
   const HEAD = [3, 'none', 'ready', 0] as const;
@@ -207,6 +209,8 @@ describe('F-09: 사격지휘통보와 표적번호', () => {
   const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
   const find = (events: readonly RadioEvent[], kind: string) => events.find((e) => e.utterance.speaker === 'fdc' && e.utterance.kind === kind)!.utterance;
 
+  // 임무마다 번호가 는다: a second mission needs 임무 종료 (#30), past this slice's 사격준비 끝; #29 extends this test
+  // with mission 2 → AB1002 (host decision Q2).
   test('첫 임무의 표적번호는 AB1001이다', () => {
     const sim = started();
     openRadio(sim);
@@ -214,8 +218,12 @@ describe('F-09: 사격지휘통보와 표적번호', () => {
     expect(mto.kind === 'mto' && mto.slots.targetNumber).toBe(1001);
     expect(sim.state.missions).toHaveLength(1);
     expect(sim.state.missions[0]!.mto).toEqual(mto.kind === 'mto' ? mto.slots : null);
-    expect(sim.state.radio.lastTn).toBe(1001);
-    expect(spoken(radioSentence(mto, NAMES))).toContain('표적번호 알파브라보 하나공공하나');
+    const sentence = spoken(radioSentence(mto, NAMES));
+    expect(sentence).toContain('표적번호 알파브라보 하나공공하나');
+    // 영문 2자 + 숫자 4자
+    const letter = `(?:${Object.values(RADIO_GRAMMAR.phonetic.words).join('|')})`;
+    const digit = `(?:${RADIO_GRAMMAR.digits.words.join('|')})`;
+    expect(sentence).toMatch(new RegExp(`표적번호 ${letter}{2} ${digit}{4},`));
   });
 
   test('지명사 요청은 통보에 실리고 효력사 호출만 준비 끝에 신관을 붙인다', () => {

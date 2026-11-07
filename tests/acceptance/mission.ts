@@ -1,5 +1,5 @@
 // Fixtures for the radio procedure tests: an empty battlefield on the flat test terrain, started at its middle.
-import { createSim, type Input, type RadioEvent, type Sim } from '@sim';
+import { createSim, type Input, type RadioEvent, type RadioKind, type Sim, type Speaker } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, START } from './init';
 
@@ -20,18 +20,22 @@ export function radioEvents(sim: Sim, ticks: number): RadioEvent[] {
   return out;
 }
 
-/** Steps with no input until `done` holds (at most `limit` ticks), collecting the radio events. */
-export function until(sim: Sim, done: () => boolean, limit = 2000): RadioEvent[] {
+/** Steps with no input until `speaker` has said `kind` (at most `limit` ticks); returns the radio events up to it. */
+export function untilSaid(sim: Sim, speaker: Speaker, kind: RadioKind, limit = 2000): RadioEvent[] {
   const out: RadioEvent[] = [];
   for (let k = 0; k < limit; k++) {
-    if (done()) return out;
     out.push(...sim.step([]).events);
+    if (out.some((e) => e.utterance.speaker === speaker && e.utterance.kind === kind)) return out;
   }
-  throw new Error(`condition not met in ${limit} ticks`);
+  throw new Error(`${speaker} ${kind} not said in ${limit} ticks`);
 }
 
-/** Runs until the radio check is answered and 기러기 takes calls. */
-export const openRadio = (sim: Sim) => until(sim, () => sim.state.radio.stage === 'idle');
+/** Runs until 감명 양호 has gone out: from the next step 기러기 takes calls. */
+export const openRadio = (sim: Sim) => untilSaid(sim, 'observer', 'radio_check_reply');
+
+/** 기러기's answer that lets the next transmission go: call → 호출 복창, loc → 좌표 복창, desc → 사격준비 끝. */
+export const ANSWER = { call: 'call_ack', loc: 'location', desc: 'ready' } as const satisfies Record<string, RadioKind>;
+export const answered = (sim: Sim, a: keyof typeof ANSWER) => untilSaid(sim, 'fdc', ANSWER[a]);
 
 /** Sends one input; returns whether it was accepted and the step's events. */
 export function send(sim: Sim, input: Input): { ok: boolean; events: RadioEvent[] } {
@@ -49,15 +53,10 @@ export const desc = (...v: (number | string)[]): Input => ({ a: 'desc', v });
 /** From an open radio, sends the three transmissions (waiting for each readback) and runs until 사격준비 끝. */
 export function toReady(sim: Sim, d: Input = DESC_UNKNOWN, call: Input = CALL_ADJUST): RadioEvent[] {
   const out: RadioEvent[] = [];
-  const stage = (s: string) => () => sim.state.radio.stage === s;
-  for (const [input, next] of [
-    [call, 'loc'],
-    [LOC, 'desc'],
-    [d, 'ready'],
-  ] as const) {
+  for (const input of [call, LOC, d]) {
     const r = send(sim, input);
     if (!r.ok) throw new Error(`${input.a} ignored`);
-    out.push(...r.events, ...until(sim, stage(next)));
+    out.push(...r.events, ...answered(sim, input.a as keyof typeof ANSWER));
   }
   return out;
 }
