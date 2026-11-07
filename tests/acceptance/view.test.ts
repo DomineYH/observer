@@ -5,6 +5,7 @@ import { CLEAR_WEATHER } from '@app/clearWeather';
 import { createSession } from '@app/session';
 import { fovOf, pxToMil, QUALITIES } from '@render/projection';
 import { createAimControl } from '@ui/aim';
+import { startInput } from '@ui/prep';
 import { terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { BASE_SCENARIO } from '@content/scenario';
@@ -101,36 +102,47 @@ test('입력 기록: 받아들인 입력만 남긴다', () => {
 });
 
 test('F-01: 화질은 결과를 바꾸지 않는다', () => {
-  // The same player actions at each 화질; the view is drawn after every tick that had an action (drawing is the
-  // costly part, and a frame between actions draws the same aim again).
+  // The same player actions at each 화질, from 작전 개시 on, so deployment, movement, 보임 and 첩보 all run; the view
+  // is drawn after every tick that had an action (drawing is the costly part, and a frame between actions draws the
+  // same aim again). The full-size flat terrain keeps the enemy on the map, in binocular range of the planned post.
+  const big = flatTerrain({ n: 800 });
+  const bigColours = terrainColours(big, CLEAR_WEATHER);
+  const eye = { ...BASE_SCENARIO.plannedOp, z: EYE.z };
   const play = (w: number) => {
-    const sim = createSim(init(11));
+    const sim = createSim(init(11, big));
     const session = createSession(sim);
     const aim = createAimControl(sim.state, session.send);
     const buf = createViewBuffers(w);
     const actions: (() => void)[] = [
+      () => session.send(startInput(sim.state, session.queued)),
+      () => aim.toggleBino(),
       () => aim.key('ArrowRight', false),
       () => aim.key('ArrowUp', true),
       () => aim.drag(37, -12, 800),
-      () => aim.toggleBino(),
       () => aim.key('ArrowLeft', true),
       () => aim.drag(-5, 3, 800),
       () => aim.key('ArrowDown', false),
       () => aim.toggleBino(),
     ];
     const hashes: string[] = [];
-    for (let tick = 0; tick < 30; tick++) {
+    let seen = 0;
+    for (let tick = 0; tick < 40; tick++) {
       const action = actions[tick % 4 === 0 ? tick / 4 : -1];
       action?.();
       session.step();
-      if (action) renderView(buf, terrain, colours, EYE, aim.aim(), aim.bino(), CLEAR_WEATHER);
+      if (action) renderView(buf, big, bigColours, eye, aim.aim(), aim.bino(), CLEAR_WEATHER);
       hashes.push(sim.hash());
+      seen = Math.max(seen, sim.state.platoons.flatMap((p) => p.members).filter((m) => m.vis).length);
     }
-    return { hashes, log: session.log };
+    return { hashes, log: session.log, phase: sim.state.phase, tick: sim.state.tick, seen };
   };
   const [medium, high, max] = Object.values(QUALITIES).map(play);
-  // The actions really sent 조준 and 쌍안경 (the last two moves stay under 1 mil from the value sent).
-  expect(medium!.log.map((i) => i.a)).toEqual(['cam', 'cam', 'cam', 'bino', 'cam', 'bino']);
+  // The operation really ran, and the binoculars saw enemy members.
+  expect(medium!.phase).toBe('live');
+  expect(medium!.tick).toBeGreaterThan(0);
+  expect(medium!.seen).toBeGreaterThan(0);
+  // The actions really sent 작전 개시, 조준 and 쌍안경 (the last two moves stay under 1 mil from the value sent).
+  expect(medium!.log.map((i) => i.a)).toEqual(['start', 'bino', 'cam', 'cam', 'cam', 'cam', 'bino']);
   expect(high).toEqual(medium);
   expect(max).toEqual(medium);
 });
