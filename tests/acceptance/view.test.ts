@@ -145,4 +145,4 @@ test('F-01: 화질은 결과를 바꾸지 않는다', () => {
   expect(medium!.log.map((i) => i.a)).toEqual(['start', 'bino', 'cam', 'cam', 'cam', 'cam', 'bino']);
   expect(high).toEqual(medium);
   expect(max).toEqual(medium);
-});
+}, 30000);

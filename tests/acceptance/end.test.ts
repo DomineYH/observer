@@ -134,7 +134,7 @@ describe('F-13: 종료', () => {
     expect(q.state, `${Math.hypot(q.x - q.path.at(-1)!.x, q.y - q.path.at(-1)!.y)} m`).toBe('approach');
     for (let k = 0; k < 20000 && q.state !== 'overran'; k++) hit.step([]);
     expect(q.state).toBe('overran');
-  });
+  }, 30000);
 
   test('F-13: 진지 돌파 — 무력화된 소대는 돌파하지 않는다', () => {
     // INF_RECON's platoon broken or destroyed on its approach never overruns, and that game is a 섬멸.

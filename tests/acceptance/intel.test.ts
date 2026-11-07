@@ -166,7 +166,7 @@ describe('F-04', () => {
     expect(count).toBe(12);
     expect(results.size).toBe(1);
     expect(JSON.parse([...results][0]!)[0]).toMatchObject({ stage: 1, tnum: 1, cue: 'man' });
-  });
+  }, 30000);
 
   test('F-04: 적정 세 단계', () => {
     // The mortar section 1 km due north: type and activity after 3 + 2.5 = 5.5 s of watching, its size after

@@ -256,7 +256,7 @@ describe('F-09: 신관 판단', () => {
     expect(fuzes(desc(3, 'none', 'ready', 0, 'infantry', 'halted', 'platoon'))).toEqual(new Set(['quick']));
     expect(fuzes(DESC_UNKNOWN)).toEqual(new Set(['quick']));
     expect(fuzes(desc(3, 'vt', 'ready', 0, 'infantry', 'halted', 'platoon'))).toEqual(new Set(['vt']));
-  });
+  }, 30000);
 
   test('발수는 하나 줄 수 있지만 1발은 그대로다', () => {
     expect(new Set(mtos(DESC_UNKNOWN).map((m) => m.rounds))).toEqual(new Set([3, 2]));

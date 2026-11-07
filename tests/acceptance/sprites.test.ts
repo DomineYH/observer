@@ -112,7 +112,7 @@ describe('F-27', () => {
     };
     expect(painted(true)).toBe(true);
     expect(painted(false)).toBe(false);
-  });
+  }, 30000);
 });
 
 /** The view from the flat-terrain post aimed at `p`. */

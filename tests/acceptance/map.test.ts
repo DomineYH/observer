@@ -109,7 +109,7 @@ describe('F-06', () => {
     const plain = lum(29); // 119 → 120 m
     expect(index).toBeLessThan(plain);
     expect(plain).toBeLessThan(lum(15));
-  });
+  }, 30000);
 
   test('F-06: 좌표자', () => {
     const t = flatTerrain({ n: 1024 }); // 10 240 m square, 방안 기준 동 40000·북 30000

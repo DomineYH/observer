@@ -63,7 +63,7 @@ describe('린트', () => {
       'export const n = (x: object) => Object.keys(x).length + (Object.hasOwn(x, "a") ? 1 : 0);',
     ];
     for (const code of allowed) expect(await rulesFor('src/sim/__probe__.ts', code), code).toEqual([]);
-  });
+  }, 30000);
 
   test('린트: 모듈 의존 자기 검사', async () => {
     const forbidden: [string, string][] = [

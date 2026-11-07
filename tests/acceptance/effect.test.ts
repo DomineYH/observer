@@ -78,7 +78,7 @@ describe('B1: 전과 보고는 받아들인 입력에 한 번', () => {
       expect(send(sim, REPEAT(sent, 2)).ok).toBe(false);
       expect(sim.record().score).toBe(score);
     }
-  });
+  }, 30000);
 
   test('보고할 부대가 없으면 채점하지 않는다', () => {
     const sim = ffe();

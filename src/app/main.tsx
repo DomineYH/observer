@@ -36,6 +36,7 @@ const terrain = await mockTerrain.load(seed);
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
+let games = 0; // a new game remounts the panels that keep their own state from the game they started with
 let game = newGame({
   seed,
   seedKind,
@@ -113,6 +114,7 @@ async function changeWeather(p: WeatherPreset): Promise<void> {
   const weather = await mockWeather.load(seed, seedKind, p);
   if (game.sim.state.phase !== 'prep') return; // started while the weather was on its way
   game = newGame({ ...game.init, weather }, game);
+  games++;
   colours = terrainColours(terrain, weather);
   preset = p;
   log = [];
@@ -141,6 +143,7 @@ function App() {
       <HeadBand tick={tick} score={score} rounds={rounds} />
       <SoundToggles sound={sound} />
       <ObservationView
+        key={games}
         terrain={terrain}
         colours={colours}
         weather={init.weather}

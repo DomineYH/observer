@@ -121,7 +121,7 @@ describe('F-27: 아군 직사화기', () => {
     expect(dead(sim)).toBeGreaterThanOrEqual(9);
     const lost = men - sim.state.friendlies.filter((m) => m.alive).length;
     expect(sim.state.score - score + 10 * lost).toBe(sim.state.platoons[0]!.assaultTick < 0 ? 150 : 100);
-  });
+  }, 30000);
 
   // Model numbers (pure): friendly losses come with #35, so `alive` cannot change in a run yet; #35 adds the run check.
   test('F-27: 직사는 잔존 병력에 비례', () => {

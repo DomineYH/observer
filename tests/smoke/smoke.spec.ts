@@ -73,23 +73,72 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
 });
 
+/** The map's pixels on a 16 px grid, less the bottom-right corner where the wind arrow follows the weather. */
+const mapPixels = (map: Locator) =>
+  map.evaluate((c: HTMLCanvasElement) => {
+    const ctx = c.getContext('2d')!;
+    const out: string[] = [];
+    for (let y = 8; y < c.height; y += 16)
+      for (let x = 8; x < c.width; x += 16) if (x < c.width * 0.82 || y < c.height * 0.82) out.push(ctx.getImageData(x, y, 1, 1).data.join());
+    return out.join(';');
+  });
+
+test('F-30: 연습 시드의 기상 선택 — 화면', async ({ page }) => {
+  // A daily game: the weather the seed picked is shown, and there is nothing to choose.
+  await page.goto('/');
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  await expect(prep).toContainText('일일 ');
+  await expect(prep).toContainText(/기상 시정 \d+\.\d km · 구름 \d+% · 바람 \d+° \d+\.\d m\/s/);
+  await expect(page.getByRole('combobox', { name: '기상 바꾸기' })).toHaveCount(0);
+
+  // A practice game: the five presets by name, clear first; choosing one shows its values.
+  await page.goto('/?seed=20261106');
+  await expect(prep).toContainText('연습 20261106');
+  const picker = page.getByRole('combobox', { name: '기상 바꾸기' });
+  await expect(picker).toBeVisible();
+  for (const name of ['맑음', '박무', '비', '강한 북서풍', '안개']) await expect(picker.getByRole('option', { name, exact: true })).toHaveCount(1);
+  await expect(picker.getByRole('option')).toHaveCount(5);
+  await expect(picker).toHaveValue('clear');
+  await expect(prep).toContainText('기상 시정 24.0 km · 구름 15% · 바람 285° 2.6 m/s');
+  await picker.selectOption({ label: '비' });
+  await expect(prep).toContainText('기상 시정 8.0 km · 구름 100% · 바람 200° 5.2 m/s · 11.2°C · 습도 94% · 1009 hPa · 강수 2.4 mm/h');
+  await expect(picker).toHaveValue('rain');
+});
+
 test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page }) => {
   await page.goto('/?seed=20261106');
   const tick = page.getByRole('status', { name: '틱' });
   const prep = page.getByRole('region', { name: '작전 준비' });
   const map = page.getByRole('img', { name: '지도' });
+  const bino = page.getByRole('button', { name: '쌍안경' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
-  // 안개: the new game's weather is shown, the chosen 관측소 후보 is kept and the clock still stands at 0.
+  const fresh = await mapPixels(map);
+
+  // Prep state the simulation holds and the screen shows: the line of sight turned east (the map's sight wedge) and the
+  // binoculars on.
+  for (let k = 0; k < 4; k++) await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('b');
+  await expect.poll(() => mapPixels(map)).not.toBe(fresh);
+  await expect(bino).toHaveAttribute('aria-pressed', 'true');
+
+  // 안개: a fresh game under the new weather, the line of sight and the binoculars back where a new game has them, the
+  // chosen 관측소 후보 kept and the clock still at 0.
   await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
   await expect(prep).toContainText('기상 시정 2.5 km · 구름 100% · 바람 180° 0.7 m/s');
+  await expect.poll(() => mapPixels(map)).toBe(fresh);
+  await expect(bino).toHaveAttribute('aria-pressed', 'false');
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await expect(tick).toHaveText('0');
-  // The new game starts from that post.
+
+  // 작전 개시 runs the new game from that post: its clock moves, and none of the old game's inputs (the turned sight,
+  // the binoculars) reach it.
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
-  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(20);
   await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3256 점령.');
+  await expect(bino).toHaveAttribute('aria-pressed', 'false');
+  expect(await mapPixels(map)).toBe(fresh);
 });
 
 test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {
