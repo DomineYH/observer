@@ -1,8 +1,8 @@
 // 작전 준비 (F-22, demo lines 922–936): the briefing, the seed and weather, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
-import type { GridRef, Input, Point, ReadonlySimState, Scenario, SeedKind, Weather } from '@sim';
+import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import { BRIEFING } from '@content/scenario';
-import { gridOf } from '@render/mapView';
+import { gridOf, underCanopy } from '@render/mapView';
 import { startInput } from './prep';
 import { gridLabel } from './radio/readings';
 
@@ -11,7 +11,7 @@ export type PrepState = Pick<ReadonlySimState, 'phase' | 'op' | 'picked' | 'repo
 export interface PrepPanelProps {
   state: PrepState;
   scenario: Scenario;
-  grid: GridRef;
+  terrain: TerrainData; // its 방안 기준 labels grids; its forest marks a candidate under the canopy
   seed: number;
   seedKind: SeedKind;
   weather: Weather;
@@ -40,7 +40,8 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
+  const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
     return (
@@ -85,7 +86,7 @@ export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send
       </p>
       <p>
         {state.picked
-          ? `관측소 후보: ${at(state.op)}`
+          ? `관측소 후보: ${at(state.op)}${underCanopy(terrain, state.op.x, state.op.y) ? ' · 숲 속 — 시야 가림' : ''}`
           : '지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.'}
       </p>
       <button type="button" onClick={() => pressStart({ state, live, queued, send })}>

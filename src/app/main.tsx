@@ -116,7 +116,7 @@ function App() {
       <PrepPanel
         state={{ phase, op, picked, reportDue }}
         scenario={BASE_SCENARIO}
-        grid={terrain.grid}
+        terrain={terrain}
         seed={seed}
         seedKind={seedKind}
         weather={CLEAR_WEATHER}
