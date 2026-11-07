@@ -23,9 +23,11 @@ const FORMATS = new Map<string, Format>([
   ['bino', [[[0, 1]]]], // 쌍안경: 끔 · 켬
   ['pick', [[[0, 99999], [0, 99999]]]], // 관측소 후보 선정: 동 · 북 m (one 방안)
   ['start', [[[0, 99999], [0, 99999]]]], // 작전 개시: 동 · 북 m
-  ['id', [[[0, 63999], [-6000, 6000]]]], // 식별: the pressed point's 방위 · 고저, 0.1 mil; the simulation picks the target
+  ['id', [[[0, 63999], [-6000, 6000]]]],
+  ['lase', [[[0, 63999], [-2000, 2000]]]], // 레이저: 방위 · 고저, 0.1 mil // 식별: the pressed point's 방위 · 고저, 0.1 mil; the simulation picks the target
   ['call', [[WARNINGS]]], // 호출: 경고명령
-  ['loc', [[['grid'], range('easting'), range('northing')]]], // 표적위치: 좌표법, 동 · 북 4자리
+  // 표적위치: 좌표법 동 · 북 4자리, or 극좌표법 방위각 mils · 거리 m (raw; the simulation snaps it to 10 m)
+  ['loc', [[['grid'], range('easting'), range('northing')], [['polar'], range('azimuth'), range('distance')]]],
   ['desc', [
     [...DESC_HEAD, ['unknown']], // 미상 표적: no activity or size
     [...DESC_HEAD, ...KNOWN, ['platoon', 'platoon_minus', 'squad', 'none']],

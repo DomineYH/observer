@@ -24,6 +24,8 @@ export function hashState(state: SimState): string {
   h.u32(PHASES.indexOf(state.phase));
   h.i32(state.op.x);
   h.i32(state.op.y);
+  h.f64(state.knownOp.x);
+  h.f64(state.knownOp.y);
   h.u32(bit(state.picked));
   h.u32(bit(state.reportDue));
   for (const p of state.platoons) {
@@ -164,6 +166,8 @@ export function hashState(state: SimState): string {
     h.u32(opt(EFFECTS, m.truth ?? undefined));
     h.i32(m.truthPct);
     h.i32(m.score);
+    h.u32(bit(m.dangerClose));
+    h.u32(bit(m.dangerMissed));
   }
   h.u32(state.queue.length);
   for (const q of state.queue) {
@@ -174,6 +178,20 @@ export function hashState(state: SimState): string {
   h.i32(state.aim.az);
   h.i32(state.aim.el);
   h.u32(bit(state.bino));
+  h.u32(state.lases.length);
+  for (const l of state.lases) {
+    h.u32(l.tick);
+    h.u32(l.az);
+    h.i32(l.el);
+    h.u32(l.range ? 1 : 0);
+    if (l.range) {
+      h.u32(l.range.dist);
+      h.i32(l.range.vm);
+      h.f64(l.range.x);
+      h.f64(l.range.y);
+      h.u32(bit(l.range.target));
+    }
+  }
   for (const name of STREAMS) {
     h.i32(state.rng[name].a);
     h.u32(state.rng[name].count);

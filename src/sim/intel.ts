@@ -11,7 +11,7 @@ const MIL = 3200 / Math.PI;
 const REACH = { bino: [3, 4.5], eye: [12, 18] } as const;
 /** 쌍안경 안: within 42% of the 7° field either side of the line of sight. */
 const WATCH_MIL = ((7 * 6400) / 360) * 0.42;
-const PICK_Z = { veh: 1.2, prone: 0.25, other: 0.9 }; // where on a member a press lands, m above the ground
+export const PICK_Z = { veh: 1.2, prone: 0.25, other: 0.9 }; // where on a member a press lands, m above the ground
 const HALF_TICKS_PER_S = 40;
 const SCORE = { found: 10, sized: 20 };
 

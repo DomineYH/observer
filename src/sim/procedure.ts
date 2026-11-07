@@ -5,6 +5,7 @@
 // gives each mission its bias at the call (2 draws) and each round its 공산오차 at the shot (2 gaussians), the 효력사
 // rounds gun by gun and round by round within a gun. Both draw orders are part of the golden records.
 import { drawBias, fall, SHEAF, shifted, snap, tofSec } from './ballistics';
+import { announceDanger, markDanger, overCap } from './danger';
 import { fromGrid } from './grid';
 import { strike } from './lethality';
 import { schedule, type Act } from './queue';
@@ -24,6 +25,7 @@ export interface Ctx {
   battery: Point;
   say: Say;
   landed: (x: number, y: number, fuze: Fuze) => void;
+  friends: readonly Point[]; // 아군 진지, for 위험근접
 }
 
 const TICKS_PER_S = 20;
@@ -57,23 +59,30 @@ function decideMto(s: SimState, d: DescriptionSlots, fdc: Stream): MtoSlots {
   return { fuze, rounds, control: d.control, targetNumber: ++s.radio.lastTn };
 }
 
-/** 수정 (demo sendCorr, lines 799–818): snaps to 10 m across and 50 m in range, keeps the first 방향 as the 기준선 and
- * moves the aim along it. An axis that snaps to 0 is left out; both out reads 동제원. */
-function correct(m: Mission, v: readonly (number | string)[]): CorrectionSlots {
+/** A 수정 as sent (demo sendCorr, lines 799–818): snapped to 10 m across and 50 m in range; an axis that snaps to 0 is
+ * left out (both out reads 동제원). 방향 only with the mission's first correction. */
+function corrSlots(m: Mission, v: readonly (number | string)[]): CorrectionSlots {
   const first = m.direction === null;
   const [lateralDir, rawLat, rangeDir, rawRng, nextStep] = (first ? v.slice(1) : v) as [LateralDir, number, RangeDir, number, Next];
-  if (first) m.direction = v[0] as number;
   const lateral = snap(rawLat, 10);
   const range = snap(rawRng, 50);
-  m.corrections++;
-  if (range > 0) m.rangeCorrections.push(range);
-  m.aim = shifted(m.aim!, m.direction!, lateralDir === 'right' ? lateral : -lateral, rangeDir === 'add' ? range : -range);
   return {
-    ...(first ? { direction: m.direction! } : {}),
+    ...(first ? { direction: v[0] as number } : {}),
     ...(lateral > 0 ? { lateralDir, lateral } : {}),
     ...(range > 0 ? { rangeDir, range } : {}),
     next: nextStep,
   } as CorrectionSlots;
+}
+
+/** 수정 taken: keeps the first 방향 as the 기준선 and moves the aim along it. */
+function correct(m: Mission, c: CorrectionSlots): CorrectionSlots {
+  if (c.direction !== undefined) m.direction = c.direction;
+  const lateral = c.lateral ?? 0;
+  const range = c.range ?? 0;
+  m.corrections++;
+  if (range > 0) m.rangeCorrections.push(range);
+  m.aim = shifted(m.aim!, m.direction!, c.lateralDir === 'right' ? lateral : -lateral, c.rangeDir === 'add' ? range : -range);
+  return c;
 }
 
 /** Applies `call`, `loc`, `desc`, `fire`, `corr`, `repeat` or `eom` if the stage takes it; false means ignored and nothing changed. `v` is valid for
@@ -85,17 +94,28 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const bias = drawBias(ctx.bal);
-    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => null), target: -1, firstError: null, directionError: null, rangeCorrections: [], corrections: 0, report: null, truth: null, truthPct: -1, score: 0 });
+    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => null), target: -1, firstError: null, directionError: null, rangeCorrections: [], corrections: 0, report: null, truth: null, truthPct: -1, score: 0, dangerClose: false, dangerMissed: false });
     say({ speaker: 'observer', ending: 'over', kind: 'call', slots: { warning } });
     after(s, 2.5 + next(fdc) * 1.5, 'call_ack');
   } else if (a === 'loc' && stage === 'loc') {
-    m!.location = { method: 'grid', easting: v![1] as number, northing: v![2] as number };
-    m!.aim = fromGrid(m!.location.easting, m!.location.northing, ctx.terrain.grid);
-    noteTarget(s, m!);
+    if (v![0] === 'grid') {
+      m!.location = { method: 'grid', easting: v![1] as number, northing: v![2] as number };
+      m!.aim = fromGrid(m!.location.easting, m!.location.northing, ctx.terrain.grid);
+      noteTarget(s, m!);
+    } else {
+      // 극좌표법 (demo sendLoc): from the post 기러기 knows; the 방위각 is the mission's 방향 (demo setDir).
+      const azimuth = v![1] as number;
+      m!.location = { method: 'polar', azimuth, distance: snap(v![2] as number, 10) };
+      m!.aim = shifted(s.knownOp, azimuth, 0, m!.location.distance);
+      noteTarget(s, m!);
+      m!.direction = azimuth;
+      noteDirection(s, m!);
+    }
     say({ speaker: 'observer', ending: 'over', kind: 'location', slots: { ...m!.location } });
     after(s, 2.5 + next(fdc) * 1.5, 'loc_readback');
   } else if (a === 'desc' && stage === 'desc') {
     m!.description = descSlots(v!);
+    markDanger(s, m!, ctx.friends);
     say({ speaker: 'observer', ending: 'over', kind: 'description', slots: { ...m!.description } });
     // Three draws, in this order: readback, 사격지휘통보, 사격준비 끝.
     after(s, 3 + next(fdc) * 1.5, 'desc_readback');
@@ -110,9 +130,18 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
     // The guards: 효과 exactly when sent after 효력사 (수정 후 효력사), and 방향 only with the mission's first correction,
     // so a 바로 효력사 mission sends it here (B1). A corr breaking one is rejected, not trimmed, so the accepted record
     // stays canonical (ADR 0003); the composer never sends it.
+    const sent = corrSlots(m!, v!);
+    if (overCap(m!, sent)) {
+      // 위험근접, over 100 m: an accepted input 기러기 refuses. Checked before the 전과 보고 so a refused send scores
+      // nothing (B1: once per report 기러기 takes; else each oversized send would farm +30).
+      say({ speaker: 'observer', ending: 'over', kind: 'correction', slots: sent });
+      after(s, 2.5, 'dc_resend');
+      s.radio.stage = 'wait';
+      return true;
+    }
     if (stage === 'effect') report(s, m!, v!.at(-1) as Effect);
     const first = m!.direction === null;
-    m!.correction = correct(m!, v!);
+    m!.correction = correct(m!, sent);
     if (first) noteDirection(s, m!);
     say({ speaker: 'observer', ending: 'over', kind: 'correction', slots: { ...m!.correction } });
     // Two draws, in this order: readback, 사격준비 끝 (효력사 takes longer: the fuzes are set for the whole battery).
@@ -171,6 +200,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       break;
     case 'desc_readback':
       say({ speaker: 'fdc', ending: 'wait', kind: 'description', slots: { ...m.description! } });
+      announceDanger(s, m, say);
       break;
     case 'mto':
       m.mto = decideMto(s, m.description!, fdc);
@@ -246,6 +276,10 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       break;
     case 'adjust_open':
       s.radio.stage = 'adjust';
+      break;
+    case 'dc_resend': // 수정량 100 이하로 재송신: back where the refused correction came from
+      say({ speaker: 'fdc', ending: 'over', kind: 'danger_close_resend' });
+      s.radio.stage = m.phase === 'ffe' ? 'effect' : 'adjust';
       break;
   }
 }

@@ -8,7 +8,7 @@ import { CLEAR_WEATHER } from '@app/clearWeather';
 import { drawEffects } from '@render/effects';
 import { focalOf, MIL, project, type ViewGeometry } from '@render/projection';
 import { createViewBuffers } from '@render/voxel';
-import { CALL_ADJUST, CALL_FFE, corr, desc, FIRE, LOC, LOC_NEAR, openRadio, send, started, toAdjust, toReady } from './mission';
+import { CALL_ADJUST, CALL_FFE, corr, desc, FIRE, LOC, LOC_CLEAR, openRadio, send, started, toAdjust, toReady } from './mission';
 import { START } from './init';
 import { flatTerrain } from './terrain';
 
@@ -213,10 +213,11 @@ describe('F-09: 접근신관', () => {
     expect(n, 'flash pixels').toBeGreaterThan(0);
     return rows / n;
   };
-  /** The first impact of a mission sent with `call` and `d` to the grid near the post, one tick after it lands. */
+  /** The first impact of a mission sent with `call` and `d` to the grid 686 m from the post (just outside 위험근접, so a
+   * 바로 효력사 stays one), one tick after it lands. */
   const firstBurst = (call: Input, d: Input) => {
     const sim = opened();
-    toReady(sim, d, call, LOC_NEAR);
+    toReady(sim, d, call, LOC_CLEAR);
     const impact = until(sim, isImpact).find(isImpact)!;
     return { sim, impact };
   };

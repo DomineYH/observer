@@ -193,6 +193,17 @@ export interface Mission {
   truth: Effect | null; // the reported unit's real effect at that report; null when there was no unit to judge
   truthPct: number; // its casualties then, %; −1 when no unit
   score: number; // this mission's 전과 보고 points (also in the game's score)
+  dangerClose: boolean; // 위험근접 rules apply: declared, or applied by 기러기
+  dangerMissed: boolean; // near and not declared (−30)
+}
+
+/** One 레이저 press: the angles it went out on and what came back. */
+export interface Lase {
+  tick: number;
+  az: number; // as sent, 0.1 mil
+  el: number;
+  /** null: 반사 없음. dist: 수평거리 m (with the laser's error), vm: 고저각 mil, x/y: the point measured, target: 표적 반사. */
+  range: { dist: number; vm: number; x: number; y: number; target: boolean } | null;
 }
 
 export interface SimState {
@@ -201,6 +212,8 @@ export interface SimState {
   phase: Phase;
   /** 관측소: in prep the candidate (the planned one until a pick), once started the occupied one. */
   op: Point;
+  /** 기러기가 아는 관측소 위치: the planned post until a 위치 보고 (M1-12). Polar 표적위치 are taken from here. */
+  knownOp: Point;
   picked: boolean;
   /** 위치 보고 required: the operation started away from the planned observation post. */
   reportDue: boolean;
@@ -212,6 +225,7 @@ export interface SimState {
   /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */
   aim: { az: number; el: number };
   bino: boolean;
+  lases: Lase[]; // newest first, at most 5
   radio: { stage: RadioStage; lastTn: number }; // lastTn: the last 표적번호 기러기 gave (starts 1000, so AB1001)
   missions: Mission[]; // one per accepted call; the last is the current one
   queue: Scheduled[]; // 예약 이벤트, by tick

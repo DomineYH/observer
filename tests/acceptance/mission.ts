@@ -62,6 +62,10 @@ export const CALL_FFE: Input = { a: 'call', v: ['ffe'] };
 export const LOC: Input = { a: 'loc', v: ['grid', 4720, 3150] }; // 7.2 km NE of the post, off the flat terrain
 /** (505, 505) on the flat terrain: 260 m NE of the post at its middle. */
 export const LOC_NEAR: Input = { a: 'loc', v: ['grid', 4050, 3050] };
+/** (805, 805) on the flat terrain: 686 m NE of the post, just outside 위험근접. */
+export const LOC_CLEAR: Input = { a: 'loc', v: ['grid', 4080, 3080] };
+/** 극좌표법: 방위각 mils, 거리 m from the post 기러기 knows. */
+export const POLAR = (azimuth: number, distance: number): Input => ({ a: 'loc', v: ['polar', azimuth, distance] });
 /** 미상 표적, 포대 3발, no fuze asked, 준비되는 대로. */
 export const DESC_UNKNOWN: Input = { a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] };
 export const desc = (...v: (number | string)[]): Input => ({ a: 'desc', v });

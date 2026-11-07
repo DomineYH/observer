@@ -1,6 +1,7 @@
 import { deploy } from './deploy';
 import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
+import { applyLase } from './laser';
 import { isValid } from './inputs';
 import { applyPrep } from './prep';
 import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
@@ -22,6 +23,7 @@ export function createSim(init: SimInit): Sim {
     tick: 0,
     phase: 'prep',
     op: { ...init.scenario.plannedOp },
+    knownOp: { ...init.scenario.plannedOp },
     picked: false,
     reportDue: false,
     platoons: deploy(init.scenario, init.terrain, rng.scn),
@@ -31,6 +33,7 @@ export function createSim(init: SimInit): Sim {
     score: 0,
     aim: { ...INITIAL_AIM },
     bino: false,
+    lases: [],
     radio: { stage: 'off', lastTn: 1000 },
     missions: [],
     queue: [],
@@ -46,6 +49,7 @@ export function createSim(init: SimInit): Sim {
     battery: init.scenario.battery,
     say: (utterance) => out.push({ type: 'radio', utterance }),
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
+    friends: init.scenario.friends,
   };
 
   return {
@@ -61,6 +65,7 @@ export function createSim(init: SimInit): Sim {
         if (a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
         else if (a === 'bino') state.bino = v[0] === 1;
         else if (a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
+        else if (a === 'lase') return applyLase(state, init.terrain, rng.las, v); // so does the laser
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
           if (a === 'start') openProcedure(state);
