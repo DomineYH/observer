@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import type { Activity, RadioEvent, Target, Unit, UnitType, Warning } from '@sim';
 import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_AMC, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
 import { oneUnit } from '../../tests/acceptance/enemy';
-import { aimedAt, isImpact } from '../../tests/acceptance/strike';
+import { aimedAt, isImpact, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
 import { Composer, type ComposerForm } from './Composer';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
@@ -184,4 +184,20 @@ test('F-12: 훈련 모드의 실제 사상 — 빗나가도 220 m 안이면 0명
   const far = run(400);
   expect(far.nearest).toBeGreaterThan(220);
   expect(far.line).not.toContain('실제 사상');
+});
+
+test('F-07: 임무끝 — 입력기', () => {
+  // At the 효과 관측 the composer offers 효과 and 다음 조치, and starts on 임무끝 · 무력화 (demo); what it shows is what
+  // the log shows once it is sent.
+  const sim = aimedAt(NEAR, 2, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
+  toEffect(sim);
+  watch(sim, 0, 3);
+  const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} mode="standard" send={() => {}} state={sim.state} />);
+  expect(html).toMatch(/<select aria-label="효과">.*<option value="neutralized" selected="">무력화<\/option>/);
+  expect(html).toMatch(/<select aria-label="다음 조치">.*<option value="eom" selected="">임무끝<\/option><option value="repeat">재효력사<\/option><option value="corr">수정 후 효력사<\/option><\/select>/);
+  const preview = text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  expect(preview).toBe('임무끝, 적 보병소대 무력화.');
+  const r = send(sim, { a: 'eom', v: ['neutralized'] });
+  expect(r.ok).toBe(true);
+  expect(logged(r.events[0]!)).toBe(preview);
 });

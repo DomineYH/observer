@@ -5,8 +5,8 @@ import { describe, expect, test } from 'vitest';
 import type { Input, RadioEvent, Sim, SimEvent } from '@sim';
 import { radioSentence, spoken } from '@ui/radio/sentence';
 import { CALL_ADJUST, CALL_FFE, DESC_UNKNOWN, EOM, LOC, REPEAT, corr, desc, openRadio, send, started, toReady, untilSaid, untilTaken } from './mission';
-import { angleTo, idAt, oneUnit, until } from './enemy';
-import { aimedAt, isImpact, untilLanded } from './strike';
+import { oneUnit } from './enemy';
+import { aimedAt, isImpact, NEAR, toEffect, untilLanded, watch } from './strike';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const isRadio = (e: SimEvent): e is RadioEvent => e.type === 'radio';
@@ -58,14 +58,6 @@ function reportOnce(sim: Sim, twin: Sim, input: Input): { points: number; events
     expect(sim.hash()).toBe(twin.hash());
   }
   throw new Error(`${input.a} not taken`);
-}
-
-/** Through the volley and well into the 효과 관측 without sending anything: 2,500 ticks, the last round over 5 s ago. */
-function toEffect(sim: Sim): void {
-  let last = 0;
-  for (let k = 0; k < 2500; k++) if (sim.step([]).events.some((e) => e.type === 'impact')) last = sim.state.tick;
-  expect(last).toBeGreaterThan(0);
-  expect(sim.state.tick - last).toBeGreaterThan(100);
 }
 
 describe('B1: 전과 보고는 받아들인 입력에 한 번', () => {
@@ -198,24 +190,15 @@ describe('F-07: 재효력사', () => {
 
 describe('F-09: 효과 보고의 표적 이름', () => {
   // A platoon walking in from 2 km north, struck by an aimed 바로 효력사; at the 효과 관측 the observer looks at it.
-  const NEAR = oneUnit({ type: 'inf', route: 'A', t0: 0 }, [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 600 }]);
-  const cam = (az: number, el = -40) => ({ a: 'cam', v: [Math.round(az + 64000) % 64000, el] });
 
   test('시뮬레이션이 적정만큼 이름을 정해 사건 슬롯에 싣는다', () => {
-    const name = (stage: 0 | 1 | 2 | 3) => {
-      const sim = aimedAt(NEAR, 2, 0, CALL_FFE, QUICK3);
+    const name = (stage: 0 | 1 | 2 | 3, off = 0) => {
+      const sim = aimedAt(NEAR, 2, 0, CALL_FFE, QUICK3, { x: off, y: 0 });
       const p = sim.state.platoons[0]!;
       toEffect(sim);
-      if (stage > 0) {
-        const man = p.members.find((m) => m.alive && m.vis) ?? p.members.find((m) => m.alive)!;
-        const at = angleTo(sim, man);
-        sim.step([{ a: 'bino', v: [1] }, cam(at.az, Math.round(at.el))]);
-        const seen = p.members.find((m) => m.alive && m.vis)!;
-        expect(sim.step([idAt(angleTo(sim, seen))]).accepted).toEqual([true]);
-        until(sim, () => p.intel.stage >= stage, 3000);
-        expect(p.intel.stage).toBe(stage);
-      }
-      const effect = truthOf(sim).effect;
+      if (stage > 0) watch(sim, 0, stage);
+      expect(p.intel.stage).toBe(stage);
+      const effect = off ? 'ineffective' : truthOf(sim).effect;
       const said = radio(untilTaken(sim, EOM(effect), 10))[0]!;
       return { slots: said.kind === 'end_of_mission' ? said.slots : null, sentence: spoken(radioSentence(said, NAMES)) };
     };
@@ -229,6 +212,8 @@ describe('F-09: 효과 보고의 표적 이름', () => {
     const size = name(3);
     expect(size.slots).toMatchObject({ targetName: 'infantry', named: 1 });
     expect(size.sentence).toMatch(/^임무끝, 적 보병소대 /);
+    // 400 m off, no round within 220 m: the report is about the unit nearest the sent grid.
+    expect(name(3, 400).slots).toMatchObject({ targetName: 'infantry', named: 1 });
   });
 });
 

@@ -1,6 +1,6 @@
 // 수정 입력 (demo lines 778–792, 799–818, 909–916, 985–991): the correction form's sentence and input, and the
 // training-mode help (탄착 편의, 수정값 제안, 미리 채운 방향). Pure.
-import type { CorrectionSlots, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
+import type { CorrectionSlots, Effect, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
 import type { Draft } from './radio/drafts';
 
 /** The form's fields as typed: numbers stay strings until sent. */
@@ -69,8 +69,9 @@ function field(text: string, min: number, max: number): number | null {
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
 }
 
-/** The correction to send, or null while the form cannot be sent (the first correction has no valid 방향). */
-export function corrDraft(f: CorrForm, mission: { direction: number | null }): Draft | null {
+/** The correction to send, or null while the form cannot be sent (the first correction has no valid 방향). With `effect`
+ * it is 수정 후 효력사: the 효과 rides along in the input, not in the sentence. */
+export function corrDraft(f: CorrForm, mission: { direction: number | null }, effect?: Effect): Draft | null {
   const first = mission.direction === null;
   const direction = first ? (/^\d{1,4}$/.test(f.direction.trim()) ? field(f.direction, 0, MAX.direction) : null) : null;
   const lateral = field(f.lateral, 0, MAX.lateral);
@@ -84,7 +85,7 @@ export function corrDraft(f: CorrForm, mission: { direction: number | null }): D
     next: f.next,
   } as CorrectionSlots;
   return {
-    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, lateral, f.rangeDir, range, f.next] },
+    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, lateral, f.rangeDir, range, f.next, ...(effect ? [effect] : [])] },
     utterance: { speaker: 'observer', ending: 'over', kind: 'correction', slots },
   };
 }

@@ -1,6 +1,6 @@
 // 입력기 초안: one form's values as the input to send and the observer's 교신 한 마디 the simulation will say for it, so
 // the preview is made from the same utterance as the log line (F-07). Pure.
-import type { Activity, Control, Flag, FuzeRequest, Input, RadioUtterance, Target, TargetType, Unit, UnitType, Warning } from '@sim';
+import type { Activity, Control, Effect, Flag, FuzeRequest, Input, RadioUtterance, Target, TargetNameSlots, TargetType, Unit, UnitType, Warning } from '@sim';
 
 export interface Draft {
   input: Input;
@@ -32,6 +32,18 @@ export function descDraft({ target, ...head }: DescForm): Draft {
     utterance: { speaker: 'observer', ending: 'over', kind: 'description', slots: { ...head, ...target } },
   };
 }
+
+/** 임무끝 with the 효과 seen; `name` is the unit's name as the ui reads it (effect.ts reportName). */
+export const eomDraft = (effect: Effect, name: TargetNameSlots): Draft => ({
+  input: { a: 'eom', v: [effect] },
+  utterance: { speaker: 'observer', ending: 'none', kind: 'end_of_mission', slots: { ...name, effect } },
+});
+
+/** 재효력사, 동제원, 포대 `rounds`발 with the 효과 seen. */
+export const repeatDraft = (effect: Effect, rounds: number, name: TargetNameSlots): Draft => ({
+  input: { a: 'repeat', v: [effect, rounds] },
+  utterance: { speaker: 'observer', ending: 'over', kind: 'repeat', slots: { ...name, effect, rounds } },
+});
 
 /** 발사 (준비 쏴): the "준비 쏴" button and the F key send this same input. */
 export const FIRE: Input = { a: 'fire' };

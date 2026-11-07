@@ -1,7 +1,7 @@
 // Fixtures for the fire-for-effect tests on enemy units: a mission sent so its rounds fall where a unit will stand.
 import { toGrid, type ImpactEvent, type Input, type Point, type Scenario, type Sim, type SimEvent } from '@sim';
 import { answered, openRadio, send, toReady } from './mission';
-import { started } from './enemy';
+import { angleTo, idAt, oneUnit, started, until } from './enemy';
 import { flatTerrain } from './terrain';
 
 export const isImpact = (e: SimEvent): e is ImpactEvent => e.type === 'impact';
@@ -57,4 +57,25 @@ export function aimedAt(scenario: Scenario, seed: number, pid: number, call: Inp
   if (!send(sim, d).ok) throw new Error('desc ignored');
   answered(sim, 'desc');
   return sim;
+}
+
+/** Through the volley and well into the 효과 관측 without sending anything: 2,500 ticks, the last round over 5 s ago. */
+export function toEffect(sim: Sim): void {
+  let last = 0;
+  for (let k = 0; k < 2500; k++) if (sim.step([]).events.some(isImpact)) last = sim.state.tick;
+  if (last === 0 || sim.state.tick - last <= 100) throw new Error('not at the 효과 관측');
+}
+
+/** An infantry platoon walking in from 2 km north of the flat terrain's post: close enough to tell apart. */
+export const NEAR = oneUnit({ type: 'inf', route: 'A', t0: 0 }, [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 600 }]);
+
+/** Turns the binoculars on unit `pid`, finds it by a man in sight and watches it until its 적정 reaches `stage`. */
+export function watch(sim: Sim, pid: number, stage: number): void {
+  const p = sim.state.platoons[pid]!;
+  const man = p.members.find((m) => m.alive && m.vis) ?? p.members.find((m) => m.alive)!;
+  const at = angleTo(sim, man);
+  sim.step([{ a: 'bino', v: [1] }, { a: 'cam', v: [Math.round(at.az + 64000) % 64000, Math.round(at.el)] }]);
+  const seen = p.members.find((m) => m.alive && m.vis)!;
+  if (!sim.step([idAt(angleTo(sim, seen))]).accepted[0]) throw new Error('id ignored');
+  until(sim, () => p.intel.stage >= stage, 3000);
 }

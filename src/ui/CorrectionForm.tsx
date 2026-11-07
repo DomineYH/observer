@@ -1,6 +1,6 @@
 // 수정 form and the send preview shared by the composer's forms (demo lines 986–993).
 import { useState } from 'react';
-import type { Input, Mode } from '@sim';
+import type { Effect, Input, Mode } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
 import type { Draft } from './radio/drafts';
@@ -37,17 +37,19 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
   sent: number | null; // the mission's 방향, once sent with the first correction
   help: ReturnType<typeof suggestion> | null; // training only
   prefill: string;
+  /** 수정 후 효력사: the 효과 seen, sent with the correction; 다음 is then 효력사. */
+  effect?: Effect;
 }
 
 /** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
-export function CorrectionForm({ sent, help, prefill, names, mode, send }: CorrectionProps) {
+export function CorrectionForm({ sent, help, prefill, effect, names, mode, send }: CorrectionProps) {
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
-    next: 'adjust',
+    next: effect ? 'ffe' : 'adjust',
     ...(help?.form ?? { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
   }));
   const set = (patch: Partial<CorrForm>) => setForm({ ...form, ...patch });
-  const draft = corrDraft(form, { direction: sent });
+  const draft = corrDraft(form, { direction: sent }, effect);
   return (
     <>
       {help && <p aria-label="탄착 편의">{help.text}</p>}
@@ -74,13 +76,15 @@ export function CorrectionForm({ sent, help, prefill, names, mode, send }: Corre
         ))}
       </select>
       <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m{' '}
-      <select aria-label="다음" value={form.next} onChange={(e) => set({ next: e.target.value as CorrForm['next'] })}>
+{!effect && (
+              <select aria-label="다음" value={form.next} onChange={(e) => set({ next: e.target.value as CorrForm['next'] })}>
         {keys(NEXT_LABEL).map((k) => (
           <option key={k} value={k}>
             {NEXT_LABEL[k]}
           </option>
         ))}
       </select>
+      )}
       <Preview
         draft={draft}
         empty={sent === null ? '방향(밀)을 먼저 입력' : '좌우 0–800 m, 사거리 0–1500 m'}

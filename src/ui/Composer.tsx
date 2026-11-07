@@ -7,6 +7,7 @@ import type { RadioNames } from './radio/sentence';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
+import { EffectForm } from './EffectForm';
 
 const W = RADIO_GRAMMAR.tables;
 const FUZE_LABEL: Record<FuzeRequest, string> = { none: '신관 요청 없음', quick: W.fuze.quick.text, vt: W.fuze.vt.text };
@@ -85,6 +86,9 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
       {stage === 'flight' && <p>탄착을 관측하십시오.</p>}
       {stage === 'effect' && <p>효과를 관측하십시오.</p>}
       {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
+      {stage === 'effect' && mission && (
+        <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+      )}
       {stage === 'adjust' && mission && (
         <CorrectionForm
           sent={mission.direction}

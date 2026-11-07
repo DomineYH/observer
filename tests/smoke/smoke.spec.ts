@@ -98,9 +98,9 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   await expect(targets).toContainText('탐지 · 최초 탐지');
 });
 
-/** From a fresh page on a fixed seed: occupy the post, then 조정 · 찰리호텔 4720 3150 · 미상 표적 포대 삼발 with `control`,
- * until 기러기's 포대 사격준비 끝. */
-async function toReady(page: Page, control: 'ready' | 'amc') {
+/** From a fresh page on a fixed seed: occupy the post, then `warning` (조정 unless asked) · 찰리호텔 4720 3150 · 미상 표적
+ * 포대 삼발 with `control`, until 기러기's 사격준비 끝. */
+async function toReady(page: Page, control: 'ready' | 'amc', warning: 'adjust' | 'ffe' = 'adjust') {
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
@@ -118,6 +118,10 @@ async function toReady(page: Page, control: 'ready' | 'amc') {
   const preview = composer.getByLabel('보낼 문장');
   const send = composer.getByRole('button', { name: '송신' });
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 조정, 이상.');
+  if (warning === 'ffe') {
+    await composer.getByLabel('경고명령').selectOption('ffe');
+    await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.');
+  }
   await send.click();
   await expect(log).toContainText('좌표 송신바람');
   await composer.getByLabel('동', { exact: true }).fill('4720');
@@ -129,7 +133,7 @@ async function toReady(page: Page, control: 'ready' | 'amc') {
   await expect(preview).toHaveText(control === 'amc' ? '미상 표적, 포대 삼발, 지명사, 이상.' : '미상 표적, 포대 삼발, 이상.');
   await send.click();
   await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 }); // 9–12 s
-  await expect(log).toContainText('포대 사격준비 끝.', { timeout: 60_000 });
+  await expect(log).toContainText(warning === 'ffe' ? '신관 사격준비 끝.' : '포대 사격준비 끝.', { timeout: 60_000 });
   return { log, composer, preview, send };
 }
 
@@ -195,4 +199,36 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
   await expect(log).toContainText('기러기 마감탄 떳다, 이상.', { timeout: 40_000 });
   await expect(log).toContainText('갈매기 마감탄 떳다, 잠깐대기.', { timeout: 5_000 });
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 40_000 });
+});
+
+test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 보내고, 임무끝으로 임무를 맺는다', async ({ page }) => {
+  // 사격준비 끝 24–38 s, the volley lands ~40 s later; after the correction 14–22 s, then the volley again.
+  test.setTimeout(300_000);
+  const { log, composer, preview, send } = await toReady(page, 'ready', 'ffe');
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+
+  // B1: this mission never sent 방향, so 수정 후 효력사 asks for it and cannot go without it.
+  await composer.getByLabel('효과').selectOption('ineffective');
+  await composer.getByLabel('다음 조치').selectOption('corr');
+  const direction = composer.getByLabel('방향');
+  await expect(direction).toHaveValue('');
+  await expect(send).toBeDisabled();
+  await direction.fill('0800');
+  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
+  await composer.getByLabel('좌우 거리').fill('50');
+  await expect(preview).toHaveText('방향 공팔공공, 우로 오십, 효력사, 이상.');
+  await send.click();
+  await expect(log).toContainText('방향 공팔공공, 우로 오십, 효력사, 이상.');
+  await expect(log).toContainText('방향 공팔공공, 우로 오십, 효력사, 잠깐대기.', { timeout: 10_000 });
+  await expect(log.locator('li', { hasText: '마감탄 떳다, 잠깐대기.' })).toHaveCount(2, { timeout: 90_000 }); // fired again
+
+  // 임무끝: the preview is the line the log shows, and the composer is back to a new call.
+  await expect(composer.getByLabel('다음 조치')).toHaveValue('eom', { timeout: 60_000 });
+  await composer.getByLabel('효과').selectOption('destroyed');
+  const said = await preview.textContent();
+  expect(said).toMatch(/^임무끝, .+ 파괴\.$/);
+  await send.click();
+  await expect(log.locator('li').last()).toContainText(said!);
+  await expect(composer.getByLabel('경고명령')).toBeVisible();
+  await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.'); // the form keeps the last mission's values
 });
