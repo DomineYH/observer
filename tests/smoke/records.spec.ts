@@ -1,4 +1,35 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { replay, validateReplay } from '../../src/sim/index';
+import { mockTerrain } from '../../src/adapters/mock/terrain/index';
+import { BASE_SCENARIO } from '../../src/content/scenario';
+
+/** A run as 기록 보관소 keeps it in this browser (the stored shape), standard · daily unless `record` says otherwise. */
+const stored = (callsign: string, record: object = {}, createdAt = '2026-11-01T09:00:00.000Z') => ({
+  callsign,
+  record: {
+    ticks: 30000, seed: 20261101, seedKind: 'daily', cleared: true, clearTick: 20000, roundsTotal: 30, missions: 2,
+    adjustRounds: 3, firstErrorAvg: 20, directionErrorAvg: 5, reportAccuracyPct: 100, roundsPerUnit: 7.5, neutralized: 4,
+    combatUnits: 4, earlyDefeats: 1, friendlyHits: 0, friendlyLosses: 0, dangerCloseMissed: 0, observerLost: false,
+    postMoves: 0, compromised: false, score: 5000, mode: 'standard', ...record,
+  },
+  missions: [],
+  replay: {},
+  createdAt,
+  ranked: true, // the board does not trust it
+});
+/** Storage as it is before the page loads. */
+const seed = (page: Page, runs: unknown) =>
+  page.addInitScript((json) => localStorage.setItem('observer.runs', json), JSON.stringify(runs));
+const openRanking = async (page: Page) => {
+  const errors: Error[] = [];
+  page.on('pageerror', (e) => errors.push(e));
+  await page.goto('/?seed=20261106');
+  await page.getByRole('button', { name: '랭킹' }).click();
+  const dialog = page.getByRole('dialog', { name: '랭킹' });
+  await expect(dialog).toBeVisible();
+  return { dialog, errors };
+};
+const cells = (row: ReturnType<Page['getByRole']>) => row.getByRole('cell').allTextContents();
 
 test('F-08: 호출부호 반영', async ({ page }) => {
   await page.goto('/?seed=20261106');
@@ -42,18 +73,106 @@ test('F-08: 호출부호 반영', async ({ page }) => {
   await expect(page.getByLabel('호출부호', { exact: true })).toHaveValue('참새12');
 });
 
-test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 문자열은 글자로 보인다', async ({ page }) => {
-  // Storage edited by hand: a ranked run under a callsign with markup, which the rules never let through.
-  await page.addInitScript(() => {
-    const record = { score: 5000, cleared: true, clearTick: 20000, roundsTotal: 30, firstErrorAvg: 20, reportAccuracyPct: 100, missions: 2,
-      mode: 'standard', seedKind: 'daily', observerLost: false };
-    const run = { callsign: '<b>x</b>', record, missions: [], replay: {}, createdAt: '2026-11-01T09:00:00.000Z', ranked: true };
-    localStorage.setItem('observer.runs', JSON.stringify([run]));
-  });
+test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', async ({ page }) => {
+  // The shortest end the app allows: 효력사 on our own post. 기러기 applies 위험근접 and adjusts first; one correction
+  // with 효력사 brings the volley onto the post and our rounds take out the 관측반 (about 2 min of game time).
+  test.setTimeout(300_000);
   await page.goto('/?seed=20261106');
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await expect(log).toContainText('감명 양호', { timeout: 15_000 });
+  const composer = page.getByRole('region', { name: '입력기' });
+  const send = composer.getByRole('button', { name: '송신' });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+  await composer.getByLabel('경고명령').selectOption('ffe');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByLabel('동', { exact: true }).fill('4512');
+  await composer.getByLabel('북', { exact: true }).fill('3256');
+  await send.click();
+  await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
+  await send.click();
+  const direction = composer.getByLabel('방향');
+  await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
+  await direction.fill('1600');
+  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
+  await composer.getByLabel('좌우 거리').fill('40');
+  await composer.getByLabel('사거리', { exact: true }).selectOption('add');
+  await composer.getByLabel('사거리 거리').fill('60');
+  await composer.getByLabel('다음').selectOption('ffe');
+  await send.click();
+
+  const debrief = page.getByRole('region', { name: '사후강평' });
+  await expect(debrief).toBeVisible({ timeout: 150_000 });
+  await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
+  await expect(debrief).toContainText('저장했습니다 · 연습 시드: 랭킹에서는 제외');
+  const [, rounds, score] = (await debrief.textContent())!.match(/사용 탄 (\d+)발 · 점수 (-?\d+) · 시드 연습 20261106/)!;
+  await debrief.getByText('전송 데이터 미리보기').click();
+  const preview = debrief.getByLabel('전송 데이터');
+  await expect(preview).toBeVisible();
+
+  // In Node: the text is 재생 자료 as it is, and replaying it gives this game with nothing ignored.
+  const checked = validateReplay(JSON.parse((await preview.textContent())!));
+  expect(checked.ok && checked.data.seed).toBe(20261106);
+  if (!checked.ok) return;
+  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO);
+  expect(again.ignored).toBe(0);
+  expect(again.record.observerLost).toBe(true);
+  expect([again.record.roundsTotal, again.record.score]).toEqual([Number(rounds), Number(score)]);
+  expect(checked.data.inputs.map((i) => i.a)).toEqual(expect.arrayContaining(['pick', 'start', 'pos_skip', 'call', 'loc', 'desc', 'corr']));
+
+  // The game is kept in this browser: 내 기록 shows it as a 연습 game.
   await page.getByRole('button', { name: '랭킹' }).click();
-  const dialog = page.getByRole('dialog', { name: '랭킹' });
-  await expect(dialog).toBeVisible();
+  const mine = page.getByRole('dialog', { name: '랭킹' }).getByRole('row').filter({ hasText: '관측반 손실' });
+  await expect(mine).toHaveCount(1);
+  expect((await cells(mine)).slice(1)).toEqual(['갈매기', '연습', '관측반 손실', '—', rounds, String(again.record.firstErrorAvg ?? '—'), score]);
+});
+
+test('F-30: 랭킹 자격 — 실제 화면', async ({ page }) => {
+  await seed(page, [
+    stored('표준병'),
+    stored('훈련병', { mode: 'training' }, '2026-11-02T09:00:00.000Z'),
+    stored('연습생', { seedKind: 'practice' }, '2026-11-03T09:00:00.000Z'),
+  ]);
+  const { dialog, errors } = await openRanking(page);
+  const boardRow = (name: string) => dialog.getByRole('table').first().getByRole('row').filter({ hasText: name });
+  // Each board: the standard · daily run tops it with its value; the training and practice runs are on none.
+  const tabs: [string, string][] = [['종합', '5000점'], ['섬멸 시간', '16:40'], ['사용 탄', '30발'], ['정확도', '20 m · 보고 100%']];
+  for (const [tab, value] of tabs) {
+    await dialog.getByRole('button', { name: tab }).click();
+    await expect(dialog.getByRole('button', { name: tab })).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByRole('columnheader', { name: tab })).toBeVisible();
+    await expect(boardRow('표준병')).toHaveCount(1);
+    expect(await cells(boardRow('표준병'))).toEqual(['1', '표준병', value, '30', '20 m', '11-01']);
+    await expect(boardRow('훈련병')).toHaveCount(0);
+    await expect(boardRow('연습생')).toHaveCount(0);
+  }
+  // 내 기록: all three, newest first, with their 모드.
+  const mine = dialog.getByRole('table').nth(1).getByRole('row');
+  await expect(mine).toHaveCount(4);
+  const rows = await Promise.all([1, 2, 3].map(async (i) => (await cells(mine.nth(i))).slice(1, 3)));
+  expect(rows).toEqual([['연습생', '연습'], ['훈련병', '훈련'], ['표준병', '표준']]);
+  expect(errors).toEqual([]);
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 모양이 틀린 저장 기록', async ({ page }) => {
+  await seed(page, [{ callsign: 'x', record: {} }, null, 7, { ...stored('깨진'), createdAt: 3 }, { ...stored('빈칸'), record: { score: 1 } }, stored('멀쩡')]);
+  const { dialog, errors } = await openRanking(page);
+  await expect(dialog.getByRole('table').first().getByRole('row').filter({ hasText: '멀쩡' })).toHaveCount(1);
+  await expect(dialog.getByRole('table').nth(1).getByRole('row')).toHaveCount(2); // header + the one valid run
+  await expect(dialog).not.toContainText('깨진');
+  await expect(dialog).not.toContainText('빈칸');
+  expect(errors).toEqual([]);
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 문자열은 글자로 보인다', async ({ page }) => {
+  // Storage edited by hand: a run under a callsign with markup, which the rules never let through.
+  await seed(page, [stored('<b>x</b>')]);
+  const { dialog } = await openRanking(page);
   const rows = dialog.getByRole('row');
   await expect(rows.filter({ hasText: '<b>x</b>' })).toHaveCount(2); // on the board and in 내 기록, as characters
   await expect(rows.filter({ hasText: '<b>x</b>' }).first()).toContainText('1<b>x</b>5000점');

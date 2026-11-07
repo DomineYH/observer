@@ -1,5 +1,5 @@
 // 기록 보관소 mock (demo lines 1457–1460, 1495–1503; PRD 10.2): this browser's runs plus fake rows, ranked by board.
-import type { Board, RankRow, RecordArchive, StoredRun } from '../index';
+import type { Board, RankRow, RecordArchive, RunRecord, StoredRun } from '../index';
 
 const fake = (
   callsign: string,
@@ -46,14 +46,41 @@ const BOARDS: Record<Board, { key: (r: Row) => number; ok: (r: Row) => boolean }
   accuracy: { key: (r) => r.firstErrorAvg!, ok: (r) => r.firstErrorAvg !== null && r.missions > 0 },
 };
 
-const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null;
+const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+const count = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
+const countOrNull = (x: unknown) => x === null || count(x);
+const flag = (x: unknown) => typeof x === 'boolean';
+const oneOf = (...xs: string[]) => (x: unknown) => xs.includes(x as string);
+// Every field a stored 판 기록 must have, and its type; a missing key fails its check.
+const RECORD: Record<keyof RunRecord, (x: unknown) => boolean> = {
+  ticks: count, seed: count, seedKind: oneOf('daily', 'practice'), cleared: flag, clearTick: countOrNull,
+  roundsTotal: count, missions: count, adjustRounds: count, firstErrorAvg: countOrNull, directionErrorAvg: countOrNull,
+  reportAccuracyPct: countOrNull, roundsPerUnit: countOrNull, neutralized: count, combatUnits: count, earlyDefeats: count,
+  friendlyHits: count, friendlyLosses: count, dangerCloseMissed: count, observerLost: flag, postMoves: count,
+  compromised: flag, score: count, mode: oneOf('training', 'standard'),
+};
+const RECORD_KEYS = Object.keys(RECORD) as (keyof RunRecord)[];
+/** Storage can be edited by hand: only an entry of the stored shape is a run. */
+const isRun = (r: unknown): r is StoredRun =>
+  isObject(r) &&
+  typeof r.callsign === 'string' &&
+  typeof r.createdAt === 'string' &&
+  !Number.isNaN(Date.parse(r.createdAt)) &&
+  flag(r.ranked) &&
+  Array.isArray(r.missions) &&
+  isObject(r.replay) &&
+  isObject(r.record) &&
+  RECORD_KEYS.every((k) => RECORD[k]((r.record as Record<string, unknown>)[k]));
+/** 랭킹 자격 (PRD 10.2): 표준 모드 and 일일 시드, read off the record itself. */
+const rankable = (r: RunRecord) => r.mode === 'standard' && r.seedKind === 'daily';
+const byTime = (a: RankRow, z: RankRow) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0);
 
 export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>): RecordArchive {
-  // Oldest first. Storage can be edited by hand: keep only entries that look like runs.
+  // Oldest first, valid runs only.
   const load = (): StoredRun[] => {
     try {
       const v: unknown = JSON.parse(storage.getItem(KEY) ?? '[]');
-      return Array.isArray(v) ? v.filter((r): r is StoredRun => isObject(r) && typeof r.callsign === 'string' && isObject(r.record)) : [];
+      return Array.isArray(v) ? v.filter(isRun) : [];
     } catch {
       return [];
     }
@@ -78,7 +105,7 @@ export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>): Reco
         missions: s.missions,
         replay: s.replay,
         createdAt: new Date().toISOString(), // the archive stamps the time
-        ranked: record.mode === 'standard' && record.seedKind === 'daily', // 랭킹 자격 (PRD 10.2)
+        ranked: rankable(record),
       };
       save([...load(), run].slice(-KEEP));
       return run;
@@ -86,16 +113,15 @@ export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>): Reco
     async board(b) {
       const { key, ok } = BOARDS[b];
       const mine = load()
-        .filter((r) => r.ranked === true)
+        .filter((r) => rankable(r.record)) // not the stored flag: storage can be edited
         .map((r): RankRow => ({ callsign: r.callsign, fake: false, createdAt: r.createdAt, record: r.record }));
-      // Earlier first, so a stable sort puts the earlier of a tie on top.
-      const rows = [...FAKE_RUNS, ...mine].filter((r) => ok(r.record)).sort((a, z) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0));
+      // Each callsign's best run (the earlier of a tie), then best first and, on a tie, the earlier run first.
       const best = new Map<string, RankRow>();
-      for (const r of rows) {
+      for (const r of [...FAKE_RUNS, ...mine].filter((r) => ok(r.record)).sort(byTime)) {
         const held = best.get(r.callsign);
         if (!held || key(r.record) < key(held.record)) best.set(r.callsign, r);
       }
-      return [...best.values()].sort((a, z) => key(a.record) - key(z.record)).slice(0, TOP); // stable: ties stay earlier first
+      return [...best.values()].sort((a, z) => key(a.record) - key(z.record) || byTime(a, z)).slice(0, TOP);
     },
     mine: async () => load().reverse(),
   };

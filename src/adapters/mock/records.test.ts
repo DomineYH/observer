@@ -19,6 +19,13 @@ const run = (callsign: string, record: Partial<RunRecord> = {}): Submission => (
   missions: [],
   replay: replayData([]),
 });
+/** A run as the archive keeps it, with its own time. */
+const stored = (callsign: string, record: Partial<RunRecord>, createdAt: string, ranked = true) => ({ ...run(callsign, record), createdAt, ranked });
+const seeded = (runs: unknown[]) => {
+  const storage = memoryStorage();
+  storage.setItem('observer.runs', JSON.stringify(runs));
+  return mockArchive(storage);
+};
 const callsigns = async (archive: ReturnType<typeof mockArchive>, b: Board) => (await archive.board(b)).map((r) => r.callsign);
 
 test('B5: 송골매는 예약어 — mock 랭킹에 없다', async () => {
@@ -126,12 +133,67 @@ test('F-30: 랭킹 자격', async () => {
   const forged = await archive.submit({ ...run('위조', { mode: 'training' }), ranked: true } as Submission);
   expect(forged.ranked).toBe(false);
   expect(await callsigns(archive, 'total')).not.toContain('위조');
+  // Nor a stored one: the board reads the record's 모드 and 시드 종류.
+  const edited = seeded([
+    stored('훈련병', { mode: 'training' }, '2026-11-01T00:00:00.000Z', true),
+    stored('연습생', { seedKind: 'practice' }, '2026-11-01T00:00:00.000Z', true),
+    stored('표준병', {}, '2026-11-01T00:00:00.000Z', false),
+  ]);
+  for (const b of BOARDS) expect((await edited.board(b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['표준병']);
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 동점은 그 기록을 먼저 낸 쪽이 위', async () => {
+  // A's best (2000) came after B's (2000): B is above, whenever A's first, weaker run was.
+  const archive = seeded([
+    stored('에이', { score: 1000 }, '2026-01-01T00:00:00.000Z'),
+    stored('비이', { score: 2000 }, '2026-01-02T00:00:00.000Z'),
+    stored('에이', { score: 2000 }, '2026-01-03T00:00:00.000Z'),
+  ]);
+  expect((await callsigns(archive, 'total')).slice(0, 2)).toEqual(['비이', '에이']);
+  const time = seeded([
+    stored('에이', { clearTick: 30000 }, '2026-01-01T00:00:00.000Z'),
+    stored('비이', { clearTick: 15000 }, '2026-01-02T00:00:00.000Z'),
+    stored('에이', { clearTick: 15000 }, '2026-01-03T00:00:00.000Z'),
+  ]);
+  expect((await callsigns(time, 'time')).slice(0, 2)).toEqual(['비이', '에이']);
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장소가 깨져 있으면 빈 기록', async () => {
   const storage = memoryStorage();
   storage.setItem('observer.runs', '{broken');
   expect(await mockArchive(storage).mine()).toEqual([]);
-  storage.setItem('observer.runs', JSON.stringify([{ callsign: 3 }, null, { callsign: '<b>x</b>', record: { ...RECORD, mode: 'standard' } }]));
-  expect((await mockArchive(storage).mine()).map((r) => r.callsign)).toEqual(['<b>x</b>']);
+  storage.setItem('observer.runs', JSON.stringify({ callsign: 'x' }));
+  expect(await mockArchive(storage).mine()).toEqual([]);
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 기록의 모양이 틀리면 버린다', async () => {
+  const good = stored('<b>x</b>', {}, '2026-11-01T09:00:00.000Z');
+  const { record } = good;
+  const bad: unknown[] = [
+    { callsign: 'x', record: {} },
+    null,
+    3,
+    'run',
+    [],
+    { ...good, callsign: 3 },
+    { ...good, createdAt: undefined },
+    { ...good, createdAt: 'yesterday' },
+    { ...good, ranked: 'yes' },
+    { ...good, missions: {} },
+    { ...good, replay: null },
+    { ...good, record: { ...record, score: '5000' } },
+    { ...good, record: { ...record, score: null } }, // NaN and Infinity come back from JSON as null
+    { ...good, record: { ...record, clearTick: 'soon' } },
+    { ...good, record: { ...record, cleared: 1 } },
+    { ...good, record: { ...record, mode: 'expert' } },
+    { ...good, record: { ...record, seedKind: 'custom' } },
+    { ...good, record: { ...record, firstErrorAvg: undefined } },
+    { ...good, record: Object.fromEntries(Object.entries(record).filter(([k]) => k !== 'roundsTotal')) },
+  ];
+  const archive = seeded([...bad, good]);
+  expect(await archive.mine()).toEqual([good]);
+  for (const b of BOARDS) expect((await archive.board(b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['<b>x</b>']);
+  // A new submission keeps the valid runs and drops the rest from storage.
+  await archive.submit(run('참새12'));
+  expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새12', '<b>x</b>']);
 });

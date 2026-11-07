@@ -9,7 +9,7 @@ describe('골든', () => {
     const files = goldenFiles();
     expect(files).toContain('0-empty.json');
     for (const f of files) expect(readGolden(f).replay.simVersion, f).toBe(SIM_VERSION);
-  });
+  }, 30000); // reads every golden file
 
   test('골든: 0번 개시만 한 빈 판', () => {
     const { terrainHash: header, replay: data, ...expected } = readGolden('0-empty.json');
@@ -18,7 +18,7 @@ describe('골든', () => {
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
     expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
-  });
+  }, 30000); // terrain generation and a replay (~2 s alone): vitest's 5 s default is hit under load
 
   test('골든: ① 좌표법 조정에서 임무끝까지', () => {
     const { terrainHash: header, replay: data, ...expected } = readGolden('1-grid-eom.json');
