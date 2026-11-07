@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { CALL_ADJUST, CALL_FFE, LOC_CLEAR, MOVE, POLAR, SHIFT, answered, ended, openRadio, send, started } from '../../tests/acceptance/mission';
 import { oneUnit, started as startedWith } from '../../tests/acceptance/enemy';
+import { flatTerrain } from '../../tests/acceptance/terrain';
 import { hashState } from './stateHash';
 import type { SimState } from './types';
 
@@ -108,6 +109,57 @@ test('상태 해시: 발각·보복·관측반 손실이 해시에 든다', () =
     ['fire none', (s) => (s.fire = null)],
     ['observerLost', (s) => (s.observerLost = true)],
     ['phase ended', (s) => (s.phase = 'ended')],
+  ];
+  for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
+});
+
+test('상태 해시: 아군 병사·보급 트럭·아군 섬광이 해시에 든다', () => {
+  const FRIEND = { x: 1280, y: 1200 };
+  const terrain = { ...flatTerrain({ n: 256 }), roads: [[], [{ x: 400, y: 400 }, { x: 400, y: 1400 }]] };
+  const route = [{ x: 1280, y: 2700 }, { x: 1280, y: 1800 }, FRIEND];
+  const sim = startedWith({ ...oneUnit({ type: 'inf', route: 'B', t0: 0 }, route), friends: [FRIEND], supplyRoad: 1 }, { seed: 7, terrain });
+  while (!sim.state.effects.some((e) => e.tiny)) sim.step([]); // the enemy within 750 m: the men fire, the truck drives
+  const state = structuredClone(sim.state) as SimState;
+  const base = hashState(state);
+  const differs = (change: (s: SimState) => void) => {
+    const s = structuredClone(state);
+    change(s);
+    return hashState(s);
+  };
+  const man = (s: SimState) => s.friendlies[3]!;
+  const truck = (s: SimState) => s.truck!;
+  const changes: [string, (s: SimState) => void][] = [
+    ['friendlies length', (s) => s.friendlies.pop()],
+    ['man.pos', (s) => man(s).pos++],
+    ['man.hx', (s) => (man(s).hx += 0.5)],
+    ['man.hy', (s) => (man(s).hy += 0.5)],
+    ['man.x', (s) => (man(s).x += 0.5)],
+    ['man.y', (s) => (man(s).y += 0.5)],
+    ['man.tx', (s) => (man(s).tx += 0.5)],
+    ['man.ty', (s) => (man(s).ty += 0.5)],
+    ['man.ph', (s) => (man(s).ph += 0.5)],
+    ['man.walker', (s) => (man(s).walker = !man(s).walker)],
+    ['man.wait', (s) => man(s).wait++],
+    ['man.moving', (s) => (man(s).moving = !man(s).moving)],
+    ['man.dir', (s) => (man(s).dir += 0.5)],
+    ['man.prone', (s) => (man(s).prone = !man(s).prone)],
+    ['man.alive', (s) => (man(s).alive = false)],
+    ['man.vis', (s) => (man(s).vis = !man(s).vis)],
+    ['man.nextFire', (s) => man(s).nextFire++],
+    ['truck.path length', (s) => truck(s).path.pop()],
+    ['truck.path.x', (s) => (truck(s).path[2]!.x += 0.5)],
+    ['truck.path.y', (s) => (truck(s).path[2]!.y += 0.5)],
+    ['truck.i', (s) => truck(s).i++],
+    ['truck.dirn', (s) => (truck(s).dirn = truck(s).dirn === 1 ? -1 : 1)],
+    ['truck.x', (s) => (truck(s).x += 0.5)],
+    ['truck.y', (s) => (truck(s).y += 0.5)],
+    ['truck.wait', (s) => truck(s).wait++],
+    ['truck.moving', (s) => (truck(s).moving = !truck(s).moving)],
+    ['truck.dir', (s) => (truck(s).dir += 0.5)],
+    ['truck.dustTick', (s) => truck(s).dustTick++],
+    ['truck.vis', (s) => (truck(s).vis = !truck(s).vis)],
+    ['truck none', (s) => (s.truck = null)],
+    ['effect.tiny', (s) => (s.effects.find((e) => e.tiny)!.tiny = false)],
   ];
   for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
 });

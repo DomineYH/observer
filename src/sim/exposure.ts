@@ -98,7 +98,7 @@ export function runExposureAct(s: SimState, ctx: Ctx, act: 'retaliation' | 'reta
   const x = f.at.x + gauss(ctx.exp) * SPREAD_M;
   const y = f.at.y + gauss(ctx.exp) * SPREAD_M;
   if (f.shooter === 'mortar')
-    s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: true, vt: false, vis: false });
+    s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: true, vt: false, tiny: false, vis: false });
   const d = far({ x, y }, s.op);
   if (d < salvo.hit && next(ctx.exp) < 0.7) lose(s, ctx, f.shooter);
   else if (d < 120 && k === 0) ctx.note({ what: 'near_miss', fire: f.shooter });

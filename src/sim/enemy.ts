@@ -61,7 +61,7 @@ export function layout(p: Platoon, tick: number, speed: number): void {
 
 function emit(st: SimState, t: TerrainData, p: Platoon, pid: number, kind: FieldEffect['kind'], of: 'veh' | 'tube', lift: number, life: number, small: boolean): void {
   for (const q of p.members)
-    if (q.kind === of && q.alive) st.effects.push({ kind, x: q.x, y: q.y, gz: heightAt(t, q.x, q.y) + lift, tick: st.tick, life, pid, small, vt: false, vis: false });
+    if (q.kind === of && q.alive) st.effects.push({ kind, x: q.x, y: q.y, gz: heightAt(t, q.x, q.y) + lift, tick: st.tick, life, pid, small, vt: false, tiny: false, vis: false });
 }
 
 /** 사격 섬광 of the mortar section's live tubes. */

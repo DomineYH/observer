@@ -122,6 +122,43 @@ export function hashState(state: SimState): string {
     h.u32(I.size ? UNITS.indexOf(I.size.unit) + 1 : 0);
     h.u32(I.size ? I.size.n : 0);
   }
+  h.u32(state.friendlies.length);
+  for (const q of state.friendlies) {
+    h.u32(q.pos);
+    h.f64(q.hx);
+    h.f64(q.hy);
+    h.f64(q.x);
+    h.f64(q.y);
+    h.f64(q.tx);
+    h.f64(q.ty);
+    h.f64(q.ph);
+    h.u32(bit(q.walker));
+    h.i32(q.wait);
+    h.u32(bit(q.moving));
+    h.f64(q.dir);
+    h.u32(bit(q.prone));
+    h.u32(bit(q.alive));
+    h.u32(bit(q.vis));
+    h.i32(q.nextFire);
+  }
+  const k = state.truck;
+  h.u32(k ? 1 : 0);
+  if (k) {
+    h.u32(k.path.length);
+    for (const q of k.path) {
+      h.f64(q.x);
+      h.f64(q.y);
+    }
+    h.u32(k.i);
+    h.i32(k.dirn);
+    h.f64(k.x);
+    h.f64(k.y);
+    h.i32(k.wait);
+    h.u32(bit(k.moving));
+    h.f64(k.dir);
+    h.i32(k.dustTick);
+    h.u32(bit(k.vis));
+  }
   h.u32(state.effects.length);
   for (const e of state.effects) {
     h.u32(EFFECT_KINDS.indexOf(e.kind));
@@ -133,6 +170,7 @@ export function hashState(state: SimState): string {
     h.u32(e.pid);
     h.u32(bit(e.small));
     h.u32(bit(e.vt));
+    h.u32(bit(e.tiny));
     h.u32(bit(e.vis));
   }
   h.u32(state.targets);

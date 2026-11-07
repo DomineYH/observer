@@ -4,7 +4,7 @@ import { validateReplay, type Input, type RadioEvent, type Sim } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { radioSentence, spoken } from '@ui/radio/sentence';
 import { replayData, START } from './init';
-import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, openRadio, POS_SKIP, radioEvents, send, started, toReady, unstarted } from './mission';
+import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, NO_TROOPS, openRadio, POS_SKIP, radioEvents, send, started, toReady, unstarted } from './mission';
 
 const said = (events: readonly RadioEvent[]) =>
   events.map((e) => ({ tick: e.tick, speaker: e.utterance.speaker, kind: e.utterance.kind, ending: e.utterance.ending }));
@@ -264,7 +264,7 @@ describe('F-09: 신관 판단', () => {
   });
 
   test('판단은 기러기 스트림에서만 뽑는다', () => {
-    const sim = started();
+    const sim = started(7, NO_TROOPS);
     const before = structuredClone(sim.state.rng);
     openRadio(sim);
     toReady(sim, desc(3, 'none', 'ready', 0, 'infantry', 'attacking', 'platoon'));

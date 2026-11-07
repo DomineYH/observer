@@ -27,6 +27,7 @@ export interface Scenario extends Ref {
   battery: Point; // 포대, off the map
   frontY: number; // 아군 전선 (이동 한계선), north meters
   friends: readonly Point[]; // 아군 진지
+  supplyRoad: number; // index into the terrain's roads the 보급 트럭 drives; no truck when the terrain has no such road
   routes: { readonly [K in RouteKey]: readonly Point[] }; // 접근로, start to objective
   nais: readonly { x: number; y: number; r: number; conf: Confidence }[]; // 주요 감시 지역
   intelRoutes: readonly { route: RouteKey; conf: Confidence }[]; // 예상 접근로
@@ -105,6 +106,7 @@ export interface FieldEffect {
   pid: number; // index of the platoon that made it
   small: boolean;
   vt: boolean; // a 접근신관 burst, 7 m above the ground
+  tiny: boolean; // 아군 소화기 섬광: a muzzle flash only, no smoke (pid −1); seen as a small muzzle
   vis: boolean;
 }
 
@@ -122,6 +124,42 @@ export interface MovePlan {
   total: number;
   dist: number;
   forest: number;
+}
+
+/** 아군 병사 (demo makeFriendlies): `pos` indexes the scenario's friends; home `hx, hy`, walking target `tx, ty`.
+ * `wait`: ticks left standing at its target (counts down only there); `nextFire`: tick it may fire again. */
+export interface FriendlyMan {
+  pos: number;
+  hx: number;
+  hy: number;
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  ph: number;
+  walker: boolean;
+  wait: number;
+  moving: boolean;
+  dir: number;
+  prone: boolean;
+  alive: boolean; // always true until the friendly-losses slice
+  vis: boolean;
+  nextFire: number;
+}
+
+/** 보급 트럭 (demo makeFriendlies): drives `path` (its road, points every 20 m) to and fro; `i` is the point it last
+ * reached, `dirn` the way it drives, `wait` ticks left standing, `dustTick` the tick of its last dust cloud. */
+export interface Truck {
+  path: Point[];
+  i: number;
+  dirn: 1 | -1;
+  x: number;
+  y: number;
+  wait: number;
+  moving: boolean;
+  dir: number;
+  dustTick: number;
+  vis: boolean;
 }
 
 /** Who fires at a compromised post: the enemy mortar section, or infantry/APC direct fire. */
@@ -257,6 +295,8 @@ export interface SimState {
   /** 관측반 전투 불능: the operation ends 4 s later. */
   observerLost: boolean;
   platoons: Platoon[];
+  friendlies: FriendlyMan[]; // 아군 소대, 24 men per position, in position order
+  truck: Truck | null; // null when the terrain has no supply road
   effects: FieldEffect[]; // oldest first
   targets: number; // units found so far: the last 표적 번호 given
   mode: Mode;

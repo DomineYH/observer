@@ -3,9 +3,13 @@ import { createSim, type ImpactEvent, type Input, type RadioEvent, type RadioKin
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, START } from './init';
 
-/** A started simulation with no enemy, so only the radio procedure draws from the streams. */
-export function started(seed = 7): Sim {
-  const sim = createSim({ ...init(seed), scenario: { ...BASE_SCENARIO, units: [] } });
+/** No enemy, and no friendly troops either (their walkers draw from the 행동 stream), for the stream-isolation checks.
+ * Without troops there are no friendly positions, so no 위험근접 through them. */
+export const NO_TROOPS = { ...BASE_SCENARIO, units: [], friends: [] };
+
+/** A started simulation with no enemy; only the radio procedure and the friendly troops draw from the streams. */
+export function started(seed = 7, scenario = { ...BASE_SCENARIO, units: [] }): Sim {
+  const sim = createSim({ ...init(seed), scenario });
   sim.step([START]);
   return sim;
 }

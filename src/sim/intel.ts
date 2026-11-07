@@ -61,7 +61,7 @@ export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly num
       if (q.vis) test(q.x, q.y, heightAt(t, q.x, q.y) + (q.kind === 'veh' ? PICK_Z.veh : q.prone ? PICK_Z.prone : PICK_Z.other), 0, i, q.kind === 'veh' ? 'veh' : 'man');
   });
   for (const e of s.effects) {
-    if (!e.vis || e.kind === 'burst') continue; // our own 탄착 points at no enemy unit
+    if (!e.vis || e.kind === 'burst' || e.pid < 0) continue; // 탄착, and our troops' dust and flashes, point at no enemy unit (demo 1053)
     const c = signalAt(e, s.tick, w); // where and how large the view draws it
     test(c.x, c.y, c.z, c.r, e.pid, e.kind);
   }

@@ -10,6 +10,7 @@ const OPAQUE = 0.9; // Koschmieder opacity past which nothing is seen
 const LOS_AT = 0.85; // the sight line must reach this fraction of the target's height
 const HEIGHT: Record<Member['kind'], number> = { man: 1.7, veh: 2.3, tube: 1.0 };
 const PRONE_M = 0.45;
+const TRUCK_M = 2.6;
 
 /** Where a dust cloud or smoke puff is at `tick` (demo drawing, lines 1162–1176): its centre, carried downwind
  * (dust at 80% of the wind) and rising, and its radius, m. It is drawn, pressed and watched there. */
@@ -35,7 +36,7 @@ export function signalDetect(e: Pick<FieldEffect, 'kind' | 'gz' | 'small' | 'tic
   return { size: 3 + age * 1.6, top: e.gz + 3 };
 }
 
-/** Recomputes 보임 for every member (`all`) or only for effects made this tick. */
+/** Recomputes 보임 for every member, friendly man and the truck (`all`), or only for effects made this tick. */
 export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: boolean): void {
   const eye = { x: s.op.x, y: s.op.y, z: heightAt(t, s.op.x, s.op.y) + EYE_HEIGHT };
   const sigma = 3.912 / w.visibilityM;
@@ -55,6 +56,14 @@ export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: b
         q.vis = q.alive && visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT); // the dead are not seen
       }
     }
+  if (all) {
+    for (const q of s.friendlies) {
+      const hh = q.prone ? PRONE_M : HEIGHT.man;
+      q.vis = q.alive && visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT);
+    }
+    const k = s.truck;
+    if (k) k.vis = visOf(k.x, k.y, TRUCK_M, heightAt(t, k.x, k.y) + TRUCK_M * LOS_AT);
+  }
   for (const e of s.effects) {
     if (!all && e.tick !== s.tick) continue;
     const d = signalDetect(e, s.tick);

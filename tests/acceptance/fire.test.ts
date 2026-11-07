@@ -9,7 +9,7 @@ import { drawEffects } from '@render/effects';
 import { splashOf } from '@render/overlay';
 import { focalOf, MIL } from '@render/projection';
 import { createViewBuffers } from '@render/voxel';
-import { CALL_ADJUST, corr, DESC_AMC, DESC_UNKNOWN, FIRE, LOC, LOC_NEAR, openRadio, radioEvents, send, started, toAdjust, toReady, untilImpact, untilSaid } from './mission';
+import { CALL_ADJUST, corr, DESC_AMC, DESC_UNKNOWN, FIRE, LOC, LOC_NEAR, NO_TROOPS, openRadio, radioEvents, send, started, toAdjust, toReady, untilImpact, untilSaid } from './mission';
 import { replayData, START } from './init';
 import { flatTerrain } from './terrain';
 
@@ -106,7 +106,8 @@ describe('F-10: 탄착 분포 수치', () => {
     const defl: number[] = [];
     let gd = 0;
     for (let seed = 1; seed <= 300; seed++) {
-      const sim = opened(seed);
+      const sim = started(seed, NO_TROOPS);
+      openRadio(sim);
       const ready = toReady(sim).at(-1)!;
       const m = sim.state.missions[0]!;
       const before = structuredClone(sim.state.rng);

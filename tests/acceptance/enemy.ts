@@ -5,11 +5,13 @@ import { CLEAR_WEATHER } from '@app/clearWeather';
 import { init, START } from './init';
 import { flatTerrain } from './terrain';
 
-/** The base scenario with only `unit`; every route is `route` when given. */
+/** The base scenario with only `unit`; every route is `route` when given. No friendly positions: the base ones lie
+ * kilometres off the flat test terrain, and their troops would only draw from the 행동 stream and cost sight lines. */
 export const oneUnit = (unit: UnitDef, route?: readonly Point[]): Scenario => ({
   ...BASE_SCENARIO,
   routes: route ? { A: route, B: route, C: route } : BASE_SCENARIO.routes,
   units: [unit],
+  friends: [],
 });
 
 /** The mortar section dug in exactly at `at` (a zero spread puts it on the NAI's centre). */

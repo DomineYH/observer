@@ -58,7 +58,7 @@ export function strike(s: SimState, x: number, y: number, fuze: Fuze, bal: Strea
 
 /** 무력화 at 30% casualties, 파괴 at 60%, each scored when reached (파괴 after 무력화 adds the difference). The first of
  * them before an infantry platoon's assault is 조기 격퇴, +50; a broken platoon never assaults afterwards. */
-function judge(s: SimState, p: Platoon): void {
+export function judge(s: SimState, p: Platoon): void {
   if (p.state === 'destroyed') return;
   const cas = p.members.filter((q) => !q.alive).length / p.members.length;
   const was = p.state;

@@ -34,7 +34,7 @@ describe('골든', () => {
     expect(events.some((e) => e.type === 'impact' && e.fuze === 'vt')).toBe(true);
     expect(events.some((e) => e.type === 'radio' && e.utterance.kind === 'end_of_mission')).toBe(true);
     expect(sim.state.missions[0]).toMatchObject({ report: 'neutralized', truth: 'neutralized' });
-  });
+  }, 30000); // two full runs (~3 s alone): vitest's 5 s default is hit under load
 
   test('골든: ② 극좌표·레이저·전이·위험근접·이동', () => {
     const { terrainHash: header, replay: data, ...expected } = readGolden('2-polar-move.json');

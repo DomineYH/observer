@@ -274,7 +274,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       break;
     case 'impact': {
       const { x, y, fuze } = m.flights.shift()!;
-      s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vt: fuze === 'vt', vis: false });
+      s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vt: fuze === 'vt', tiny: false, vis: false });
       m.impacts.push({ x, y, tick: s.tick });
       strike(s, x, y, fuze, ctx.bal, m.kills);
       // 아군 포탄 오사 (demo 659): within 45 m of the post, 60 % (a 탄도 draw only then)

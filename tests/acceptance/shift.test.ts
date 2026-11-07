@@ -2,6 +2,7 @@
 // for effect at the shifted point under a new 표적번호. Public interface only: create, step, events, read-only state, record.
 import { describe, expect, test } from 'vitest';
 import type { ImpactEvent, Input, RadioEvent, Sim, SimEvent } from '@sim';
+import { BASE_SCENARIO } from '@content/scenario';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, SHIFT, answered, ended, openRadio, send, started, unstarted, untilSaid } from './mission';
 
 /** 전이 from the base mission: 방향 0800 (from the post toward the target), no 좌우, 사거리 200 m, 포대 3발, 미상 표적. */
@@ -177,8 +178,10 @@ describe('F-09: 전이의 표적번호', () => {
 
 /** After the base mission, sends `input` and steps to 기러기's readback of it: that step's utterances as kinds, the score
  * change at the send and in that step. `SH('drop', …)` aims 486 m from the post, `SH('add', …)` 886 m. */
-function toShiftReadback(input: Input) {
-  const [sim] = endedPair();
+function toShiftReadback(input: Input, loc = LOC_CLEAR) {
+  const sim = started();
+  openRadio(sim);
+  ended(sim, CALL_FFE, loc);
   const start = sim.record().score;
   if (!send(sim, input).ok) throw new Error('shift ignored');
   const atSend = sim.record().score - start;
@@ -243,5 +246,32 @@ describe('B4: 전이사격 위험근접 미선언', () => {
     expect([m.dangerClose, m.dangerMissed]).toEqual([false, false]);
     const ffe = until(r.sim, [EOM('ineffective')]).events;
     expect(ffe.filter(isImpact)).toHaveLength(6 * m.mto!.rounds);
+  });
+});
+
+describe('B4: 전이 조준점이 아군 진지 600 m 안', () => {
+  // 아군 1소대 (4350, 3380) is 4.9 km from the post. The base mission ~895 m south of it (grid 4435 3248), then a 전이
+  // 400 m north (방향 0, 추가 400) lands ~495 m from the position: the rules apply through the friendly position alone.
+  const SOUTH: Input = { a: 'loc', v: ['grid', 4435, 3248] };
+  const NORTH = (dangerClose: number) => SHIFT(0, 'left', 0, 'add', 400, 3, dangerClose, 'unknown');
+  const friend = BASE_SCENARIO.friends[0]!;
+  const far = (r: ReturnType<typeof toShiftReadback>, i: number) => Math.hypot(r.sim.state.missions[i]!.aim!.x - friend.x, r.sim.state.missions[i]!.aim!.y - friend.y);
+
+  test('선언하지 않으면 관측소가 멀어도 −30 뒤 위험근접이 적용된다', () => {
+    const r = toShiftReadback(NORTH(0), SOUTH);
+    expect(far(r, 0)).toBeGreaterThan(600);
+    expect(far(r, 1)).toBeLessThan(600);
+    const op = r.sim.state.op;
+    expect(Math.hypot(r.sim.state.missions[1]!.aim!.x - op.x, r.sim.state.missions[1]!.aim!.y - op.y)).toBeGreaterThan(600);
+    expect(r.said).toEqual(['fdc shift wait', APPLIED, ADJ_FIRST]);
+    expect([r.atSend, r.change]).toEqual([0, -30]);
+    expect([r.sim.state.missions[1]!.dangerClose, r.sim.state.missions[1]!.dangerMissed]).toEqual([true, true]);
+  });
+
+  test('선언하면 감점 없이 조정 후 효력사', () => {
+    const r = toShiftReadback(NORTH(1), SOUTH);
+    expect(r.said).toEqual(['fdc shift wait', ADJ_FIRST]);
+    expect([r.atSend, r.change]).toEqual([0, 0]);
+    expect([r.sim.state.missions[1]!.dangerClose, r.sim.state.missions[1]!.dangerMissed]).toEqual([true, false]);
   });
 });

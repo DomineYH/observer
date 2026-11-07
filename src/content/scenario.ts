@@ -13,6 +13,7 @@ export const BASE_SCENARIO: Scenario = {
     { x: 5150, y: 3460 },
     { x: 5950, y: 3380 },
   ],
+  supplyRoad: 1, // 청계읍 → 고개 → 새터 (demo ROADS[1]): keep equal to the mock terrain's road order
   routes: {
     A: [{ x: 3300, y: 6900 }, { x: 3550, y: 5300 }, { x: 4350, y: 3380 }],
     B: [{ x: 5050, y: 6600 }, { x: 5000, y: 5000 }, { x: 5150, y: 3460 }],
