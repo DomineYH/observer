@@ -1,4 +1,4 @@
-// 먼지와 사격 연기 and our own 탄착 (demo lines 1162–1182, disc 392): drawn into the low-resolution view before the dot
+// 먼지와 사격 연기, our troops' small-arms flashes and our own 탄착 (demo lines 1162–1182, disc 392): drawn into the low-resolution view before the dot
 // look, only when the simulation has decided they are seen. Dust and smoke drift downwind and fade with age and
 // distance; a burst's smoke does not drift yet (smoke flow comes with the weather slice, M1-15). A 접근신관 burst
 // flashes 7 m up and leaves a dark puff there over the earth thrown up below it.
@@ -59,6 +59,12 @@ export function drawEffects(buf: ViewBuffers, v: ViewGeometry, s: ReadonlySimSta
     const p = project(v, c);
     if (e.kind === 'dust') {
       if (p) disc(buf, p.sx, p.sy, Math.max(0.8, c.r * (v.focal / p.fwd)), DUST, 0.55 * (1 - t) * tr, 11);
+      continue;
+    }
+    if (e.tiny) {
+      // 아군 소화기: a pinpoint flash for 0.12 s, no smoke (demo 1166)
+      const q = age < 0.12 && project(v, { x: e.x, y: e.y, z: e.gz });
+      if (q) disc(buf, q.sx, q.sy, Math.max(0.7, 0.8 * (v.focal / q.fwd)), BURST_FLASH, Math.sqrt(tr), 0);
       continue;
     }
     const f = age < 0.15 && project(v, { x: e.x, y: e.y, z: e.gz });
