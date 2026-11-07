@@ -1,5 +1,5 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
-import { StrictMode, useSyncExternalStore } from 'react';
+import { StrictMode, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { underCanopy } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
@@ -7,6 +7,7 @@ import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
+import { DEFAULT_QUALITY, type Quality } from '@render/projection';
 import { terrainColours } from '@render/shade';
 import { Composer } from '@ui/Composer';
 import { MapPanel } from '@ui/MapPanel';
@@ -125,6 +126,7 @@ const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사�
 
 function App() {
   const { sim, init } = useSyncExternalStore(subscribe, () => game);
+  const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY); // outlives the per-game view
   const tick = useSyncExternalStore(subscribe, () => game.sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
   const phase = useSyncExternalStore(subscribe, () => game.sim.state.phase);
@@ -144,6 +146,8 @@ function App() {
       <SoundToggles sound={sound} />
       <ObservationView
         key={games}
+        quality={quality}
+        onQuality={setQuality}
         terrain={terrain}
         colours={colours}
         weather={init.weather}

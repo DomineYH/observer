@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
 import { drawOverlay, drawRain, rainStreaks, splashOf } from '@render/overlay';
-import { angleAt, DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
+import { angleAt, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
 import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
@@ -26,11 +26,13 @@ export interface ObservationViewProps {
   /** Calls `draw` once per frame until the returned function is called. */
   onFrame: (draw: (now: number) => void) => () => void;
   showFps: boolean;
+  /** 화질, the player's choice: held above the view so a new game (which remounts it) keeps it. */
+  quality: Quality;
+  onQuality: (q: Quality) => void;
 }
 
-export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps }: ObservationViewProps) {
+export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, onQuality }: ObservationViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY);
   const [bino, setBino] = useState(state.bino);
   // Made once: it starts from the simulation's aim and remembers the value it sent last.
   const [aim] = useState(() => createAimControl(state, send));
@@ -154,7 +156,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} />
       <span role="group" aria-label="화질">
         {(Object.keys(QUALITIES) as Quality[]).map((q) => (
-          <button key={q} type="button" aria-pressed={q === quality} onClick={() => setQuality(q)}>
+          <button key={q} type="button" aria-pressed={q === quality} onClick={() => onQuality(q)}>
             {QUALITY_NAMES[q]}
           </button>
         ))}
