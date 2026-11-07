@@ -159,6 +159,13 @@ export function hashState(state: SimState): string {
     h.i32(k.dustTick);
     h.u32(bit(k.vis));
   }
+  h.u32(state.shells.length);
+  for (const q of state.shells) {
+    h.u32(q.pos);
+    h.i32(q.at);
+  }
+  h.u32(state.shelledUntil.length);
+  for (const t of state.shelledUntil) h.i32(t);
   h.u32(state.effects.length);
   for (const e of state.effects) {
     h.u32(EFFECT_KINDS.indexOf(e.kind));

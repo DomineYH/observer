@@ -4,6 +4,7 @@ import { activityOf, applyId, updateIntel } from './intel';
 import { exposureTick, runExposureAct } from './exposure';
 import { makeFriendlies, makeTruck, updateFriendlies } from './friendly';
 import { applyLase } from './laser';
+import { runLossAct } from './losses';
 import { isValid } from './inputs';
 import { applyMove, applyReport, runPostAct, updatePost } from './post';
 import { applyPrep } from './prep';
@@ -37,6 +38,8 @@ export function createSim(init: SimInit): Sim {
     platoons: deploy(init.scenario, init.terrain, rng.scn),
     friendlies: [],
     truck: makeTruck(init.terrain.roads[init.scenario.supplyRoad]),
+    shells: [],
+    shelledUntil: init.scenario.friends.map(() => 0),
     effects: [],
     targets: 0,
     mode: init.mode,
@@ -57,6 +60,7 @@ export function createSim(init: SimInit): Sim {
     fdc: rng.fdc,
     bal: rng.bal,
     exp: rng.exp,
+    ai: rng.ai,
     frontY: init.scenario.frontY,
     terrain: init.terrain,
     battery: init.scenario.battery,
@@ -94,13 +98,14 @@ export function createSim(init: SimInit): Sim {
       if (state.phase === 'live') {
         state.tick++; // 작전 준비: the clock stands still
         updatePost(state, ctx); // the post walks first: this tick's sight is from where it now stands
-        for (let i = 0; i < state.platoons.length; i++) updatePlatoon(state, init.terrain, rng.ai, i);
+        for (let i = 0; i < state.platoons.length; i++) updatePlatoon(state, ctx, i);
         updateFriendlies(state, init.terrain, rng.ai, init.scenario.friends);
         state.effects = state.effects.filter((e) => state.tick - e.tick <= e.life);
         // Due acts run before 보임 so a round landing now is seen now; no act reads this tick's 보임 or 적정.
         for (let act = takeDue(state); act; act = takeDue(state)) {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
           else if (act === 'retaliation' || act === 'retaliation_muzzle' || act === 'end') runExposureAct(state, ctx, act);
+          else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
           else runAct(state, ctx, act);
         }
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.

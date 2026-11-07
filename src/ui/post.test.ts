@@ -30,3 +30,10 @@ test('F-21: 발각·보고 오차 문구', () => {
   expect(reportError({ x: 0, y: 0 }, { x: 60, y: 0 }, 'standard')).toBeNull();
   expect(reportError({ x: 0, y: 0 }, { x: 7, y: 0 }, 'training')).toBe('↳ (훈련) 보고 위치 오차 7 m.');
 });
+
+test('F-29: 아군 피해 문구', () => {
+  expect(postNote({ what: 'shelling' }, [], false)).toEqual(['적 박격포탄이 아군 진지에 떨어지기 시작했습니다.']);
+  expect(postNote({ what: 'apc_fire' }, [], false)).toEqual(['아군 진지 방향으로 적 직사화기 사격이 시작됐습니다.']);
+  expect(postNote({ what: 'friendly_hit', pos: 1, k: 3 }, [], false)).toEqual(['탄착이 아군 2소대 진지 70 m 이내! 아군 피해 발생 — 3명 손실.']);
+  expect(postNote({ what: 'friendly_hit', pos: 0, k: 0 }, [], false)).toEqual(['탄착이 아군 1소대 진지 70 m 이내! 아군 피해 발생.']);
+});

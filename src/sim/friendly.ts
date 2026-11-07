@@ -2,6 +2,7 @@
 // scenario stream when the simulation is created; every later draw comes from the 적/아군 행동 stream.
 import { atan2, sin } from './math';
 import { judge } from './lethality';
+import { enemyFire } from './losses';
 import { gauss, next, type Stream } from './rng';
 import { heightAt, type Point, type TerrainData } from './terrain';
 import type { FriendlyMan, SimState, Truck } from './types';
@@ -102,10 +103,12 @@ export function updateFriendlies(s: SimState, t: TerrainData, ai: Stream, friend
       q.moving = false;
       continue;
     }
-    if (threat[q.pos]! < FIGHT_M) {
+    const fight = threat[q.pos]! < FIGHT_M;
+    const shelled = s.tick < s.shelledUntil[q.pos]!; // an enemy round fell on the position within 40 s
+    if (fight || shelled) {
       const there = stepTo(q, q.hx, q.hy, 2.6);
-      q.prone = there && hash(q.hx | 0, q.hy | 0, 5) < 0.5;
-      if (there && threat[q.pos]! < FIRE_M && s.tick > q.nextFire) {
+      q.prone = shelled || (there && hash(q.hx | 0, q.hy | 0, 5) < 0.5);
+      if (fight && there && threat[q.pos]! < FIRE_M && s.tick > q.nextFire) {
         q.nextFire = s.tick + ticks(1 + next(ai) * 3.5);
         const gz = heightAt(t, q.x, q.y) + (q.prone ? 0.4 : 1.3);
         s.effects.push({ kind: 'muzzle', x: q.x, y: q.y + 3, gz, tick: s.tick, life: FLASH_TICKS, pid: -1, small: true, vt: false, tiny: true, vis: false });
@@ -130,7 +133,8 @@ export function updateFriendlies(s: SimState, t: TerrainData, ai: Stream, friend
   directFire(s, ai, friends);
 }
 
-/** Each position's direct fire on the enemy men within 600 m of it, position by position, unit by unit, man by man. */
+/** Each position's direct fire on the enemy men within 600 m of it, position by position, unit by unit, man by man;
+ * each unit's own fire on the position right after (losses.ts). */
 function directFire(s: SimState, ai: Stream, friends: readonly Point[]): void {
   friends.forEach((f, pos) => {
     const alive = s.friendlies.filter((q) => q.pos === pos && q.alive).length;
@@ -145,6 +149,7 @@ function directFire(s: SimState, ai: Stream, friends: readonly Point[]): void {
           k++;
         }
       if (k) judge(s, p);
+      enemyFire(s, ai, p, pos, d);
     }
   });
 }

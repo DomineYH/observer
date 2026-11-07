@@ -142,7 +142,7 @@ export interface FriendlyMan {
   moving: boolean;
   dir: number;
   prone: boolean;
-  alive: boolean; // always true until the friendly-losses slice
+  alive: boolean; // a fallen man lies (prone) where he fell and never comes back
   vis: boolean;
   nextFire: number;
 }
@@ -204,12 +204,17 @@ export interface ImpactEvent {
 }
 
 /** What happened to the post or the 관측반, for the log (the texts are the ui's): arrived · set up (장비 설치 끝) ·
- * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost. */
+ * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost.
+ * And to our positions: the enemy mortar's rounds begin to fall (26 s after its first volley) · our round fell within
+ * 70 m of position `pos` and `k` men fell to it · the first enemy APC burst of the game. */
 export type PostNote =
   | { what: 'arrived' | 'set_up' }
   | { what: 'compromised'; pid: number; fire: Shooter | null }
   | { what: 'near_miss'; fire: Shooter }
-  | { what: 'lost'; cause: Shooter | 'friendly' };
+  | { what: 'lost'; cause: Shooter | 'friendly' }
+  | { what: 'shelling' }
+  | { what: 'apc_fire' }
+  | { what: 'friendly_hit'; pos: number; k: number };
 export type PostEvent = { type: 'post'; tick: number } & PostNote;
 
 /** 사건. */
@@ -297,6 +302,8 @@ export interface SimState {
   platoons: Platoon[];
   friendlies: FriendlyMan[]; // 아군 소대, 24 men per position, in position order
   truck: Truck | null; // null when the terrain has no supply road
+  shells: { pos: number; at: number }[]; // enemy mortar rounds in the air: the position they fall on, the tick they land
+  shelledUntil: number[]; // per position: the tick its men stay down to after an enemy round (0 never)
   effects: FieldEffect[]; // oldest first
   targets: number; // units found so far: the last 표적 번호 given
   mode: Mode;

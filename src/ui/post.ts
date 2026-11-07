@@ -61,6 +61,12 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
     }
     case 'near_miss':
       return [`관측소 주변에 적 ${n.fire === 'mortar' ? '박격포탄' : '직사화기 탄'}이 떨어집니다!`];
+    case 'shelling':
+      return ['적 박격포탄이 아군 진지에 떨어지기 시작했습니다.'];
+    case 'apc_fire':
+      return ['아군 진지 방향으로 적 직사화기 사격이 시작됐습니다.'];
+    case 'friendly_hit':
+      return [`탄착이 아군 ${n.pos + 1}소대 진지 70 m 이내! 아군 피해 발생${n.k ? ` — ${n.k}명 손실` : ''}.`];
     case 'lost':
       return [`${n.cause === 'friendly' ? '아군 포탄이 관측소에 떨어졌습니다.' : `적 ${FIRE[n.cause]} 사격에 관측반이 피격됐습니다.`} 관측반 전투 불능 — 임무 종료.`];
   }

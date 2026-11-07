@@ -5,7 +5,7 @@ import type { SimState } from './types';
 export const ACTS = ['radio_check', 'check_reply', 'call_ack', 'loc_readback', 'desc_readback', 'mto', 'ready',
   'shot', 'shot_readback', 'impact', 'adjust_open', 'corr_readback', 'rounds_complete', 'rounds_complete_readback',
   'effect_open', 'repeat_ack', 'dc_resend', 'shift_readback', 'move_readback', 'pos_readback',
-  'retaliation', 'retaliation_muzzle', 'end'] as const;
+  'retaliation', 'retaliation_muzzle', 'end', 'shell', 'shelling_note'] as const;
 export type Act = (typeof ACTS)[number];
 
 export interface Scheduled {

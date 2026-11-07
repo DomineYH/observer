@@ -10,6 +10,7 @@ import { announceDanger, markDanger, overCap } from './danger';
 import { lose } from './exposure';
 import { fromGrid } from './grid';
 import { strike } from './lethality';
+import { friendlyRound } from './losses';
 import { schedule, type Act } from './queue';
 import { noteDirection, noteImpact, noteTarget, report } from './report';
 import { EFFECTS, type Corrections, type CorrectionSlots, type DescriptionSlots, type Effect, type Flag, type Fuze, type LateralDir, type MtoSlots, type RadioUtterance, type RangeDir, type ShiftSlots, type Warning } from './radio';
@@ -20,11 +21,12 @@ import type { Flight, Mission, PostNote, SimState } from './types';
 
 export type Say = (u: RadioUtterance) => void;
 
-/** What the procedure works with besides the state: its two streams, the ground, the battery and the event outlets. */
+/** What the procedure works with besides the state: its streams, the ground, the battery and the event outlets. */
 export interface Ctx {
   fdc: Stream;
   bal: Stream;
   exp: Stream; // 발각 and the retaliation
+  ai: Stream; // 적/아군 행동: the enemy mortar's rounds on our positions too (B6)
   frontY: number; // 아군 전선, north m
   terrain: TerrainData;
   battery: Point;
@@ -279,6 +281,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       strike(s, x, y, fuze, ctx.bal, m.kills);
       // 아군 포탄 오사 (demo 659): within 45 m of the post, 60 % (a 탄도 draw only then)
       if (dist(x, y, s.op) < POST_HIT_M && next(ctx.bal) < 0.6) lose(s, ctx, 'friendly');
+      friendlyRound(s, ctx, x, y);
       ctx.landed(x, y, fuze);
       if (m.phase === 'adjust') {
         noteImpact(s, m, { x, y });

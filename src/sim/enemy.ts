@@ -1,8 +1,10 @@
 // 적 AI (demo lines 451–502): how each unit moves, deploys, halts and fires, one tick at a time, and where its members
-// stand, and how it reacts to our rounds (pinned, broken, destroyed: lethality.ts decides those). Overrunning, mortar
-// impacts and APC fire damage come with the friendly-losses slice.
+// stand, and how it reacts to our rounds (pinned, broken, destroyed: lethality.ts decides those). The mortar's rounds
+// on our positions: losses.ts. Overrunning comes with the end conditions.
 import { atan2, cos, exp, sin } from './math';
-import { next, type Stream } from './rng';
+import { fireShells } from './losses';
+import type { Ctx } from './procedure';
+import { next } from './rng';
 import { heightAt, type TerrainData } from './terrain';
 import type { FieldEffect, Platoon, SimState } from './types';
 
@@ -16,6 +18,7 @@ const MORTAR_FIRST_TICK = 210 * TICKS_PER_S;
 const DUST_TICKS = 30; // a moving vehicle raises dust every 1.5 s
 const LIFE = { dust: 9 * TICKS_PER_S, apcMuzzle: 3 * TICKS_PER_S, mortarMuzzle: 11 * TICKS_PER_S };
 const WAYPOINT_M = 25;
+const APC_FIRE_POINTS = -3; // 적 직사, a burst
 
 const ticks = (s: number) => Math.round(s * TICKS_PER_S);
 const toGoal = (p: Platoon) => {
@@ -71,7 +74,8 @@ export const mortarFlash = (st: SimState, t: TerrainData, pid: number) => emit(s
 const canFire = (p: Platoon) => p.members.some((q) => q.kind === 'tube' && q.alive) && p.members.filter((q) => q.kind === 'man' && q.alive).length >= 2;
 
 /** One tick of unit `pid`. Draws only from the enemy-action stream. */
-export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: number): void {
+export function updatePlatoon(st: SimState, ctx: Ctx, pid: number): void {
+  const { terrain: t, ai } = ctx;
   const p = st.platoons[pid]!;
   const tick = st.tick;
   if (p.state === 'wait') {
@@ -102,14 +106,17 @@ export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: num
       }
     } else if (p.state === 'support' && tick >= p.nextFire) {
       p.nextFire = tick + ticks(8 + next(ai) * 8);
+      if (st.platoons.every((q) => q.type !== 'apc' || q.lastFire < 0)) ctx.note({ what: 'apc_fire' }); // the first of the game
+      st.score += APC_FIRE_POINTS;
       p.lastFire = tick;
       emit(st, t, p, pid, 'muzzle', 'veh', 1.5, LIFE.apcMuzzle, true);
     }
   } else if (p.type === 'mortar' && p.state === 'emplaced' && tick >= MORTAR_FIRST_TICK && tick >= p.nextFire && !pinned && canFire(p)) {
     p.nextFire = tick + ticks(45 + next(ai) * 25);
-    // ponytail: the impacts on friendly posts come with friendly losses.
+    const first = p.lastFire < 0;
     p.lastFire = tick;
     mortarFlash(st, t, pid);
+    fireShells(st, ctx, p.members.filter((q) => q.kind === 'tube' && q.alive).length, first);
   }
   // 무력화: once up again, back towards where it set off, straight (the mortar section stays dug in)
   const retreat = p.state === 'broken' && !pinned && p.type !== 'mortar';

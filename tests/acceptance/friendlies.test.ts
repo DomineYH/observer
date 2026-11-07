@@ -110,12 +110,15 @@ describe('F-27: 아군 직사화기', () => {
     expect(shooter).toBeDefined();
     expect(dist(shooter!, home(shooter!))).toBeLessThan(0.5);
     expect(first).toMatchObject({ pid: -1, life: 10, small: true });
-    // Within 600 m the platoon bleeds until it breaks (무력화 +100, before its assault +50 too).
+    // Within 600 m the platoon bleeds until it breaks (무력화 +100, before its assault +50 too; inside 400 m its fire
+    // costs us 10 a man, #35).
     const score = sim.state.score;
+    const men = sim.state.friendlies.filter((m) => m.alive).length;
     for (let k = 0; k < 20000 && sim.state.platoons[0]!.state !== 'broken'; k++) sim.step([]);
     expect(sim.state.platoons[0]!.state).toBe('broken');
     expect(dead(sim)).toBeGreaterThanOrEqual(9);
-    expect(sim.state.score - score).toBeGreaterThanOrEqual(100);
+    const lost = men - sim.state.friendlies.filter((m) => m.alive).length;
+    expect(sim.state.score - score + 10 * lost).toBe(sim.state.platoons[0]!.assaultTick < 0 ? 150 : 100);
   });
 
   // Model numbers (pure): friendly losses come with #35, so `alive` cannot change in a run yet; #35 adds the run check.

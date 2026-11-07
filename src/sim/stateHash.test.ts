@@ -163,3 +163,25 @@ test('상태 해시: 아군 병사·보급 트럭·아군 섬광이 해시에 �
   ];
   for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
 });
+
+test('상태 해시: 날아가는 적 박격포탄과 진지의 엎드림이 해시에 든다', () => {
+  const FRIEND = { x: 1280, y: 1200 };
+  const mortar = { ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }), nais: [{ x: 1280, y: 2400, r: 100, conf: 'low' as const }], friends: [FRIEND] };
+  const sim = startedWith(mortar, { seed: 3, terrain: flatTerrain({ n: 256 }) });
+  while (!sim.state.shells.length || !sim.state.shelledUntil[0]) sim.step([]); // a round in the air after one has landed
+  const state = structuredClone(sim.state) as SimState;
+  const base = hashState(state);
+  const differs = (change: (s: SimState) => void) => {
+    const s = structuredClone(state);
+    change(s);
+    return hashState(s);
+  };
+  const changes: [string, (s: SimState) => void][] = [
+    ['shells length', (s) => s.shells.pop()],
+    ['shell.pos', (s) => s.shells[0]!.pos++],
+    ['shell.at', (s) => s.shells[0]!.at++],
+    ['shelledUntil length', (s) => s.shelledUntil.push(0)],
+    ['shelledUntil', (s) => s.shelledUntil[0]!++],
+  ];
+  for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
+});
