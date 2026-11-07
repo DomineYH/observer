@@ -218,6 +218,30 @@ describe('F-07: 수정 스냅', () => {
     expect(spoken(radioSentence(none, NAMES))).toBe('방향 하나여섯공공, 동제원, 이상.');
   });
 
+  test('다음 수정탄은 맞춘 값만큼 옮겨 떨어진다', () => {
+    const dir = trueDirection();
+    const a = (dir * Math.PI) / 3200;
+    /** The next round's impact after the first correction with these raw values. */
+    const next = (lr: string, lat: number, rr: string, rng: number) => {
+      const sim = adjusting();
+      expect(send(sim, corr(dir, lr, lat, rr, rng, 'adjust')).ok).toBe(true);
+      return untilImpact(sim).impact;
+    };
+    const stay = next('right', 0, 'add', 0); // the twin: 동제원
+    // Raw values → the snapped move (+ right, + add) along the observer's 방향; under half a step moves nothing.
+    for (const [lr, lat, rr, rng, right, add] of [
+      ['left', 14, 'add', 74, -10, 50],
+      ['right', 15, 'drop', 75, 20, -100],
+      ['right', 4, 'add', 24, 0, 0],
+      ['left', 5, 'drop', 25, -10, -50],
+    ] as const) {
+      const hit = next(lr, lat, rr, rng);
+      const label = `${lr} ${lat}, ${rr} ${rng}`;
+      expect(Math.abs(hit.x - stay.x - (right * Math.cos(a) + add * Math.sin(a))), label).toBeLessThanOrEqual(1);
+      expect(Math.abs(hit.y - stay.y - (-right * Math.sin(a) + add * Math.cos(a))), label).toBeLessThanOrEqual(1);
+    }
+  });
+
   test('범위 밖 값과 효력사는 받지 않는다', () => {
     for (const v of [
       ['right', 801, 'add', 0, 'adjust'],

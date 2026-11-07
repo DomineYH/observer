@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
@@ -98,9 +98,9 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   await expect(targets).toContainText('탐지 · 최초 탐지');
 });
 
-test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
-  // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
-  test.setTimeout(150_000);
+/** From a fresh page on a fixed seed: occupy the post, then 조정 · 찰리호텔 4720 3150 · 미상 표적 포대 삼발 with `control`,
+ * until 기러기's 포대 사격준비 끝. */
+async function toReady(page: Page, control: 'ready' | 'amc') {
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
@@ -125,10 +125,45 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   await expect(preview).toContainText('찰리호텔 넷칠둘공 삼하나오공');
   await send.click();
   await expect(composer.getByLabel('표적성질')).toHaveValue('{"targetType":"unknown"}');
-  await expect(preview).toHaveText('미상 표적, 포대 삼발, 이상.');
+  await composer.getByLabel('통제').selectOption(control);
+  await expect(preview).toHaveText(control === 'amc' ? '미상 표적, 포대 삼발, 지명사, 이상.' : '미상 표적, 포대 삼발, 이상.');
   await send.click();
   await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 }); // 9–12 s
   await expect(log).toContainText('포대 사격준비 끝.', { timeout: 60_000 });
+  return { log, composer, preview, send };
+}
+
+/** The log's lines from the first one containing `from`, without their time. */
+const linesFrom = async (log: Locator, from: string) => {
+  const all = (await log.locator('li').allTextContents()).map((t) => t.replace(/^\d\d:\d\d /, ''));
+  return all.slice(all.findIndex((t) => t.includes(from)));
+};
+
+test('F-07: F 키', async ({ page, context }) => {
+  test.setTimeout(120_000);
+  // Two runs on the same seed, post and transmissions, side by side: one fires with the button, the other with F.
+  const other = await context.newPage();
+  const [button, key] = await Promise.all([toReady(page, 'amc'), toReady(other, 'amc')]);
+  const fire = button.composer.getByRole('button', { name: '준비 쏴' });
+  await expect(fire).toBeVisible();
+  await expect(key.composer.getByRole('button', { name: '준비 쏴' })).toBeVisible();
+  await fire.click();
+  // F with the focus on the page itself, not in a field.
+  await other.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  expect(await other.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await other.keyboard.press('f');
+
+  const after = ['갈매기 준비 쏴.', '기러기 하나발 떳다, 이상.', '갈매기 하나발 떳다, 잠깐대기.'];
+  for (const run of [button, key]) await expect(run.log).toContainText(after.at(-1)!.replace(/^\S+ /, ''), { timeout: 15_000 });
+  const lines = await Promise.all([button, key].map((run) => linesFrom(run.log, '포대 사격준비 끝.')));
+  expect(lines[0]).toEqual(lines[1]);
+  expect(lines[0]!.slice(1)).toEqual(after);
+});
+
+test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
+  // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
+  test.setTimeout(150_000);
+  const { log, composer, preview, send } = await toReady(page, 'ready');
 
   // 준비되는 대로: the adjusting round goes by itself. Once it lands the correction form opens (standard mode: 방향 empty).
   await expect(log).toContainText('하나발 떳다', { timeout: 10_000 });

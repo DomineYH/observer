@@ -93,6 +93,8 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
     after(s, 9 + next(fdc) * 3, 'mto');
     after(s, 24 + next(fdc) * 14, 'ready');
   } else if (a === 'corr' && stage === 'adjust' && (typeof v![0] === 'number') === (m!.direction === null)) {
+    // The guard: 방향 only with the first correction. A later corr carrying one is rejected, not trimmed, so the accepted
+    // record stays canonical (ADR 0003); the composer never sends it.
     m!.correction = correct(m!, v!);
     say({ speaker: 'observer', ending: 'over', kind: 'correction', slots: { ...m!.correction } });
     // Two draws, in this order: readback, 사격준비 끝.
