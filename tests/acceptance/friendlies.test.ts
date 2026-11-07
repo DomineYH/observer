@@ -38,6 +38,15 @@ describe('F-27: 아군 소대', () => {
       expect(Math.abs(m.hy - FRIEND.y)).toBeLessThan(8 + 12);
     }
     expect(men.filter((m) => m.walker)).toHaveLength(5); // every fifth man walks behind the position
+    // The base scenario's three positions: 24 men each, around their own position.
+    const base = started({ ...BASE_SCENARIO, units: [] }).state.friendlies;
+    expect(base).toHaveLength(3 * 24);
+    BASE_SCENARIO.friends.forEach((f, pos) => {
+      const own = base.filter((m) => m.pos === pos);
+      expect(own).toHaveLength(24);
+      for (const m of own) expect(Math.abs(m.hx - f.x) < 7 * 12 + 8 && Math.abs(m.hy - f.y) < 8 + 12).toBe(true);
+      expect(own.filter((m) => m.walker)).toHaveLength(5);
+    });
     // No threat yet: walkers stroll off behind the position, the rest stay put and nobody lies down.
     let strolled = false;
     for (let k = 0; k < 3000; k++) {
@@ -277,4 +286,39 @@ describe('F-27: 아군 묘사', () => {
     expect(sim.step([press]).accepted).toEqual([true]);
     expect(sim.state.platoons[0]!.intel.stage).toBe(1);
   });
+});
+
+describe('F-27: 아군의 난수', () => {
+  test('F-27: 아군 행동은 행동 스트림만 쓴다', () => {
+    // Every friendly path in one game, with no artillery mission: strolling, running home, firing (flashes), direct-fire
+    // kills, and the truck driving both ways (the enemy within 1.5 km sends it back). The post stays > 1100 m from the
+    // enemy, so the 발각 check draws nothing either.
+    const sim = started({ ...scenario(), supplyRoad: 1 }, { terrain: roadField() });
+    const before = structuredClone(sim.state.rng);
+    let strolled = false;
+    let ran = false;
+    let fired = false;
+    let up = false;
+    let down = false;
+    let y = sim.state.truck!.y;
+    for (let k = 0; k < 20000 && sim.state.platoons[0]!.state !== 'broken'; k++) {
+      sim.step([]);
+      const fight = threat(sim) < 1000;
+      if (sim.state.friendlies.some((m) => m.moving)) {
+        if (fight) ran = true;
+        else strolled = true;
+      }
+      if (flashes(sim).length) fired = true;
+      const ty = sim.state.truck!.y;
+      if (ty > y) up = true;
+      if (ty < y) down = true;
+      y = ty;
+    }
+    expect([strolled, ran, fired, up, down]).toEqual([true, true, true, true, true]);
+    expect(dead(sim)).toBeGreaterThanOrEqual(9); // broken by direct fire alone
+    const { ai, ...others } = sim.state.rng;
+    const { ai: ai0, ...others0 } = before;
+    expect(ai.count).toBeGreaterThan(ai0.count);
+    expect(others).toEqual(others0); // bal, fdc, exp, scn and las untouched
+  }, 30000);
 });

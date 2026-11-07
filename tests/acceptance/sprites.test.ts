@@ -1,6 +1,8 @@
 // 적 움직임 묘사 (F-27): the sprites come from the simulation's state, and only what it decided is seen is drawn.
 import { describe, expect, test } from 'vitest';
-import type { FieldEffect, ReadonlySimState, Sim } from '@sim';
+import type { FieldEffect, ReadonlySimState, Sim, TerrainData } from '@sim';
+import { drawMap, type MapContext, type MapMarks } from '@render/map';
+import { FULL_VIEW } from '@render/mapView';
 import { CLEAR_WEATHER } from '@app/clearWeather';
 import { focalOf, MIL, type ViewGeometry } from '@render/projection';
 import { drawEffects } from '@render/effects';
@@ -121,6 +123,18 @@ const aimAt = (p: { x: number; y: number }, bino: boolean): ViewGeometry => ({
   cx: W / 2,
   hor: (W * 9) / 32,
 });
+/** The 아군 진지 boxes (14 × 8 strokeRects) the map draws from `sim`'s state. */
+function mapBoxes(sim: Sim, scenario: MapMarks['scenario'], t: TerrainData) {
+  const rects: number[][] = [];
+  const ctx = new Proxy({ strokeRect: (x: number, y: number, w: number, h: number) => void rects.push([x, y, w, h]) } as Record<string, unknown>, {
+    get: (o, k) => (k in o ? o[k as string] : () => {}),
+    set: () => true,
+  }) as unknown as MapContext;
+  const s = sim.state;
+  const marks: MapMarks = { scenario, op: s.op, knownOp: s.knownOp, dest: null, az: s.aim.az, fovMil: 1066, pin: null, platoons: s.platoons, mode: s.mode, missions: s.missions, tick: s.tick };
+  drawMap(ctx, t, {} as CanvasImageSource, FULL_VIEW, marks);
+  return rects.filter((r) => r[2] === 14 && r[3] === 8);
+}
 /** Every fillRect's colour and box. */
 function fills(list: Sprite[]) {
   const out: { col: string; w: number; h: number }[] = [];
@@ -146,17 +160,32 @@ const near = (kind: Sprite['kind'], side: Sprite['side'], rel = 0): Sprite => ({
 
 describe('F-27: 아군', () => {
   test('F-27: 아군 묘사', () => {
-    // A friendly position 660 m from the post, seen by eye; no enemy, so the walkers stroll.
+    // A friendly position 660 m from the post, seen by eye; no enemy, so the walkers stroll. A road north from
+    // (400, 400) carries the supply truck, 113 m from the post.
     const FRIEND = { x: 640, y: 900 };
-    const scenario = { ...oneUnit({ type: 'recon', route: 'A', t0: 9999 }), friends: [FRIEND] };
-    const sim = started(scenario, { terrain: flatTerrain({ n: 256 }) });
+    const scenario = { ...oneUnit({ type: 'recon', route: 'A', t0: 9999 }), friends: [FRIEND], supplyRoad: 1 };
+    const field = (rows: number[] = []) => {
+      const t = { ...flatTerrain({ n: 256 }), roads: [[], [{ x: 400, y: 400 }, { x: 400, y: 1400 }]] };
+      for (const j of rows) for (let i = 0; i < t.n; i++) t.surface[j * t.n + i]! += 50;
+      return t;
+    };
+    const open = field();
+    const sim = started(scenario, { terrain: open });
     run(sim, 6);
     const v = aimAt(FRIEND, false);
-    const friends = (s: Sim) => spritesOf(s.state, v, flatTerrain({ n: 256 }), CLEAR_WEATHER).filter((x) => x.side === 'friend');
+    const friends = (s: Sim) => spritesOf(s.state, v, open, CLEAR_WEATHER).filter((x) => x.side === 'friend' && x.kind === 'man');
     const seen = sim.state.friendlies.filter((m) => m.vis).length;
     expect(seen).toBe(24);
     expect(friends(sim)).toHaveLength(seen);
-    expect(friends(sim).every((x) => x.kind === 'man' && !x.prone)).toBe(true);
+    expect(friends(sim).every((x) => !x.prone)).toBe(true);
+    // The map from the same state: a 아군 진지 box for each position with seen men (0.2 px/m on this 2.56 km field).
+    const boxes = mapBoxes(sim, scenario, open);
+    const shown = [...new Set(sim.state.friendlies.filter((m) => m.vis).map((m) => m.pos))];
+    expect(shown).toEqual([0]);
+    for (const pos of shown) {
+      const f = scenario.friends[pos]!;
+      expect(boxes).toContainEqual([f.x * 0.2 - 7, 512 - f.y * 0.2 - 4, 14, 8]);
+    }
     // Walking: a strolling man's legs move at 1.2 × 3 rad/s, the others stand still.
     until(sim, () => friends(sim).some((x) => x.moving));
     const a = friends(sim);
@@ -165,14 +194,26 @@ describe('F-27: 아군', () => {
     const match = (x: Sprite) => a.reduce((m, y) => (Math.abs(y.sx - x.sx) < Math.abs(m.sx - x.sx) ? y : m));
     for (const x of b.filter((x) => x.moving && match(x).moving)) expect(x.ph - match(x).ph).toBeCloseTo(0.05 * 1.2 * 3, 9);
     for (const x of b.filter((x) => !x.moving && !match(x).moving)) expect(x.ph).toBe(match(x).ph);
-    // Behind a wall across the field none is seen, and none is drawn.
-    const wall = flatTerrain({ n: 256 });
-    for (const j of [60, 61]) for (let i = 0; i < wall.n; i++) wall.surface[j * wall.n + i]! += 50;
+    // The truck, from the simulation's truck: one sprite facing its heading, up the road and back down.
+    const trucks = (s: Sim, t = open, tv = aimAt(s.state.truck!, false)) => spritesOf(s.state, tv, t, CLEAR_WEATHER).filter((x) => x.kind === 'truck');
+    for (const north of [true, false]) {
+      until(sim, () => sim.state.truck!.moving && sim.state.truck!.vis && (north ? Math.cos(sim.state.truck!.dir) > 0.9 : Math.cos(sim.state.truck!.dir) < -0.9), 10000);
+      const k = sim.state.truck!;
+      const list = trucks(sim);
+      expect(list).toHaveLength(1);
+      expect(list[0]).toMatchObject({ side: 'friend', moving: true });
+      expect(list[0]!.rel).toBeCloseTo(k.dir - aimAt(k, false).h / MIL, 9);
+    }
+    // Behind a wall across the field in front of the post nothing is seen, and nothing is drawn.
+    const wall = field([35, 36]);
     const hidden = started(scenario, { terrain: wall });
+    until(hidden, () => hidden.state.truck!.moving);
     run(hidden, 6);
     expect(hidden.state.friendlies.some((m) => m.vis)).toBe(false);
+    expect(hidden.state.truck!.vis).toBe(false);
     expect(spritesOf(hidden.state, v, wall, CLEAR_WEATHER).filter((x) => x.side === 'friend')).toEqual([]);
-  });
+    expect(trucks(hidden, wall)).toEqual([]);
+  }, 30000);
 
   test('F-27: 아군 묘사 — 아군 색, 트럭의 진행 방향 모양', () => {
     // Close up and fog-free: friends in their own greens, the enemy in its olive (demo SPR_COL).
