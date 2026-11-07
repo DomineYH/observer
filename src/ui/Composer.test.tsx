@@ -7,7 +7,7 @@ import { aimedAt, isImpact, NEAR, toEffect, watch } from '../../tests/acceptance
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer, type ComposerForm } from './Composer';
 import { RadioLog } from './RadioLog';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetOptions, type DescForm } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const GRID = flatTerrain().grid;
@@ -204,29 +204,16 @@ test('F-07: 임무끝 — 입력기', () => {
   expect(logged(r.events[0]!)).toBe(preview);
 });
 
-test('F-07: 극좌표 위치법 — 입력기', () => {
-  // The draft says what the simulation says for its input (거리 snapped to 10 m), and the log line is the preview.
-  const sim = started();
-  openRadio(sim);
-  send(sim, CALL_ADJUST);
-  answered(sim, 'call');
-  const draft = polarDraft(800, 1004);
-  const r = send(sim, draft.input);
-  expect(r.ok).toBe(true);
-  const said = r.events.find((e) => e.utterance.speaker === 'observer')!;
-  expect(said.utterance).toEqual(draft.utterance);
-  expect(logged(said)).toBe('극좌표, 방위각 공팔공공, 거리 하나공공공, 이상.');
-
-  // At 표적위치 the newest lase that met something fills 극좌표 (and in training the grid of the point it measured).
+// Static render: training has no switch in the app until #38; the polar path itself is the e2e `F-07: 극좌표 위치법 — 입력기`.
+test('F-05: 훈련 모드는 레이저 측정점의 좌표를 넣어 둔다', () => {
+  // At 표적위치 the newest lase that met something fills the grid in training (demo lines 958–966), not in standard.
   const hit: Lase = { tick: 9, az: 8003, el: -20, range: { dist: 1004, vm: -2, x: 805, y: 805, target: true } };
   const miss: Lase = { tick: 10, az: 100, el: 50, range: null };
-  const at = (mode: Mode, initial: Partial<ComposerForm>) =>
+  const at = (mode: Mode) =>
     renderToStaticMarkup(
-      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit] }} initial={initial} />,
+      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit] }} />,
     );
   const preview = (html: string) => text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
-  expect(preview(at('standard', { method: 'polar' }))).toBe(logged(said));
-  expect(at('standard', { method: 'polar' })).toMatch(/aria-label="방위각" [^>]*value="0800"/);
-  expect(preview(at('training', { method: 'grid' }))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.') // training adds the numerals;
-  expect(preview(at('standard', { method: 'grid' }))).toBe('동·북 네 자리씩');
+  expect(preview(at('training'))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.'); // training adds the numerals
+  expect(preview(at('standard'))).toBe('동·북 네 자리씩');
 });

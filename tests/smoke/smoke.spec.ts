@@ -192,6 +192,32 @@ test('F-05: R 키', async ({ page, context }) => {
   await expect(line(button)).not.toContainText('표적 반사');
 });
 
+test('F-07: 극좌표 위치법 — 입력기', async ({ page }) => {
+  test.setTimeout(60_000);
+  const view = await occupied(page);
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.', { timeout: 10_000 }); // 5.5 s in
+  const composer = page.getByRole('region', { name: '입력기' });
+  const preview = composer.getByLabel('보낼 문장');
+  const send = composer.getByRole('button', { name: '송신' });
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람');
+
+  // A lase fills 극좌표; then the observer types their own 방위각 and 거리 (거리 goes out to the nearest 10 m).
+  await view.getByRole('button', { name: '레이저' }).click();
+  await expect(view.getByLabel('레이저 측정').locator('p')).toContainText('레이저: 방위각 0020 밀');
+  await composer.getByLabel('극좌표').check();
+  await expect(composer.getByLabel('방위각')).toHaveValue('0020');
+  await composer.getByLabel('방위각').fill('0800');
+  await composer.getByLabel('거리').fill('1004');
+  await expect(preview).toHaveText('극좌표, 방위각 공팔공공, 거리 하나공공공, 이상.');
+  const said = (await preview.textContent())!;
+  await send.click();
+  // The log shows the observer's line exactly as previewed, then 기러기's readback of it.
+  await expect(log.locator('li', { hasText: `갈매기 ${said}` })).toHaveCount(1);
+  await expect(log.locator('li', { hasText: `기러기 ${said}` })).toHaveCount(1, { timeout: 10_000 }); // 2.5–4 s
+});
+
 test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
   // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
   test.setTimeout(150_000);

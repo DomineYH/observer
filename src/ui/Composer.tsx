@@ -35,9 +35,7 @@ const targetLabel = (t: Target) =>
 /** The form's starting values (a sent form keeps its values for the next mission). `target` is an option's JSON. */
 export interface ComposerForm {
   warning: Warning;
-  method: 'grid' | 'polar';
   grid: { e: string; n: string };
-  polar: { az: string; dist: string };
   target: string;
   rounds: number;
   fuzeRequest: FuzeRequest;
@@ -64,9 +62,9 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   // its values until the next such lase.
   const hit = state.lases.find((l): l is Hit => l.range !== null);
   const fill = hit && filled(hit, gridRef);
-  const [method, setMethod] = useState(initial.method ?? 'grid');
+  const [method, setMethod] = useState<'grid' | 'polar'>('grid');
   const [grid, setGrid] = useState(initial.grid ?? (fill && mode === 'training' ? fill.grid : { e: '', n: '' }));
-  const [polar, setPolar] = useState(initial.polar ?? fill?.polar ?? { az: '', dist: '' });
+  const [polar, setPolar] = useState(fill?.polar ?? { az: '', dist: '' });
   const [lastHit, setLastHit] = useState(hit);
   if (hit !== lastHit) {
     setLastHit(hit);
