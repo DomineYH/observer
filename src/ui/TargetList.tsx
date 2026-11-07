@@ -1,5 +1,6 @@
 // 표적 탭 (demo lines 1088–1099): the units found, in the order found, described only as far as they have been watched.
 import type { Activity, ReadonlySimState, Unit, UnitType } from '@sim';
+import { clock } from './clock';
 
 const STAGE = ['', '탐지', '병종 식별', '적정 확인'] as const;
 const ACTIVITY: Record<Activity, string> = { attacking: '공격중', moving: '이동중', halted: '정지중', firing: '사격중' };
@@ -12,12 +13,6 @@ const SIZE: Record<Unit, (n: number) => string> = {
   vehicles: (n) => `${n}대`,
   tubes: (n) => `${n}문`,
   none: () => '(문수 미상)',
-};
-
-/** mm:ss of a tick (50 ms each). */
-const clock = (tick: number) => {
-  const s = Math.floor(tick / 20);
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
 export function TargetList({ platoons }: { platoons: ReadonlySimState['platoons'] }) {

@@ -9,10 +9,8 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(tick).toHaveText('0');
   await page.waitForTimeout(500);
   await expect(tick).toHaveText('0');
-  // 무전 기록 패널에 예시 문장이 보인다.
-  await expect(page.getByRole('region', { name: '무전 기록' })).toContainText(
-    '방향 넷칠둘공, 우로 여섯십, 줄이기 둘백, 효력사, 이상.',
-  );
+  // 무전 기록 is empty until the operation starts.
+  await expect(page.getByRole('region', { name: '무전 기록' })).toHaveText('');
 
   // 지도 패널에 지형이 그려진다
   const map = page.getByRole('img', { name: '지도' });
@@ -98,4 +96,36 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
   await expect(targets).toContainText('표적 1 미상');
   await expect(targets).toContainText('탐지 · 최초 탐지');
+});
+
+test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 온다', async ({ page }) => {
+  test.setTimeout(90_000); // 기러기 answers 사격준비 끝 24–38 s after the third transmission
+  await page.goto('/?seed=20261106');
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+
+  // 통신 점검: 기러기 asks 4 s in and 감명 양호 goes out by itself.
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await expect(log).toContainText('작전 개시.');
+  await expect(log).toContainText('갈매기, 여기는 기러기, 감명 보고, 이상.');
+  await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.');
+
+  const composer = page.getByRole('region', { name: '입력기' });
+  const preview = composer.getByLabel('보낼 문장');
+  const send = composer.getByRole('button', { name: '송신' });
+  await expect(preview).toHaveText('기러기, 여기는 갈매기, 조정, 이상.');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람');
+  await composer.getByLabel('동', { exact: true }).fill('4720');
+  await composer.getByLabel('북', { exact: true }).fill('3150');
+  await expect(preview).toContainText('찰리호텔 넷칠둘공 삼하나오공');
+  await send.click();
+  await expect(composer.getByLabel('표적성질')).toHaveValue('{"targetType":"unknown"}');
+  await expect(preview).toHaveText('미상 표적, 포대 삼발, 이상.');
+  await send.click();
+  await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 }); // 9–12 s
+  await expect(log).toContainText('포대 사격준비 끝.', { timeout: 60_000 });
 });

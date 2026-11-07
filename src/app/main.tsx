@@ -2,15 +2,15 @@
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSim } from '@sim';
-import type { RadioUtterance } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { terrainColours } from '@render/shade';
+import { Composer } from '@ui/Composer';
 import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel } from '@ui/PrepPanel';
-import { RadioLog } from '@ui/RadioLog';
+import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { selectBackend } from './backend';
@@ -47,8 +47,19 @@ const onFrame = (draw: (now: number) => void) => {
   frameListeners.add(draw);
   return () => void frameListeners.delete(draw);
 };
+// 무전 기록: a new array on every append, so its identity is a valid snapshot.
+let log: readonly LogLine[] = [];
+let started = false;
+const step = () => {
+  const events = session.step();
+  if (!started && sim.state.phase === 'live') {
+    started = true;
+    log = [...log, { type: 'system', tick: sim.state.tick, text: '작전 개시.' }];
+  }
+  if (events.length) log = [...log, ...events];
+};
 let lastPublish = 0;
-startLoop(session.step, (now) => {
+startLoop(step, (now) => {
   frameListeners.forEach((draw) => draw(now));
   if (now - lastPublish < PUBLISH_MS) return;
   lastPublish = now;
@@ -60,16 +71,6 @@ const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사�
 
 // Placeholders until the account slice (callsign) and the terrain slice (방안 기준) arrive.
 const CALLSIGN = '갈매기';
-// A fixed example until the radio state machine emits real utterances (M1-8a).
-const EXAMPLE: RadioUtterance[] = [
-  {
-    speaker: 'observer',
-    ending: 'over',
-    kind: 'correction',
-    slots: { direction: 4720, lateralDir: 'right', lateral: 60, rangeDir: 'drop', range: 200, next: 'ffe' },
-  },
-];
-
 function App() {
   const tick = useSyncExternalStore(subscribe, () => sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
@@ -77,6 +78,9 @@ function App() {
   const op = useSyncExternalStore(subscribe, () => sim.state.op);
   const picked = useSyncExternalStore(subscribe, () => sim.state.picked);
   const reportDue = useSyncExternalStore(subscribe, () => sim.state.reportDue);
+  const stage = useSyncExternalStore(subscribe, () => sim.state.radio.stage);
+  const lines = useSyncExternalStore(subscribe, () => log);
+  const names = { callsign: CALLSIGN, gridLetters: terrain.grid.letters };
   return (
     <>
       <TickCounter tick={tick} />
@@ -102,7 +106,8 @@ function App() {
       />
       <TargetList platoons={sim.state.platoons} /* re-rendered with the tick above */ />
       <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={session.send} onFrame={onFrame} />
-      <RadioLog utterances={EXAMPLE} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
+      <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} mode={sim.state.mode} send={session.send} />
+      <RadioLog lines={lines} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
     </>
   );
 }
