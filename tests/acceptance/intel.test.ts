@@ -1,7 +1,7 @@
 // 탐지와 적정 (F-04): the `id` input carries angles only and the simulation picks the target, then watching it through
 // the binoculars reveals type, activity and size. Through the simulation's public interface only.
 import { describe, expect, test } from 'vitest';
-import { createSim, validateReplay, type Member, type Point, type Scenario, type Sim, type Weather } from '@sim';
+import { createSim, signalAt, validateReplay, type Member, type Point, type Scenario, type Sim, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
 import { CLEAR_WEATHER } from '@app/clearWeather';
 import { drawEffects } from '@render/effects';
@@ -275,17 +275,20 @@ describe('F-04', () => {
     expect(puffs).toHaveLength(3);
     expect(sim.step([idAt(puffs[1]!)]).accepted).toEqual([true]);
     expect(intel(sim)).toMatchObject({ stage: 1, cue: 'muzzle' });
-    // Anywhere on the painted disc counts: 6 mils east of the east puff's centre is still the puff. Past its edge
-    // and the binoculars' 3 mil reach beyond it, nothing is pressed.
-    const pressEast = (dAz: (east: { half: number }) => number) => {
+    // Anywhere on the painted disc counts: 6 mils east of the east puff's centre is still the puff, and so is a
+    // press within the binoculars' 3 × 4.5 mil reach of its edge. Past that, nothing is pressed, diagonally too.
+    const pressEast = (dAz: (east: { half: number }) => number, dEl = 0) => {
       const s = behindWall(CLEAR_WEATHER);
       run(s, 99);
       const east = painted(s, CLEAR_WEATHER, 13, 20)[2]!;
       expect(east.half).toBeGreaterThan(90); // 10.5 m at 1 km
-      return s.step([idAt(east, dAz(east))]).accepted[0];
+      return s.step([idAt(east, dAz(east), dEl)]).accepted[0];
     };
     expect(pressEast(() => 60)).toBe(true);
+    expect(pressEast((east) => east.half + 30 - 5)).toBe(true);
     expect(pressEast((east) => east.half + 30 + 5)).toBe(false);
+    // (12.9, 14.4) mils off a ≈ 10.5 mil disc: within radius + reach on each axis, but 8.8 mils out from its edge.
+    expect(pressEast(() => 129, 144)).toBe(false);
 
     // A 20 m/s wind from the west carries the smoke about 100 m (≈ 100 mils) east in 5 s. Watching counts where the
     // smoke is seen, at half rate: aimed at the drifted plume it counts, aimed at where it was fired it does not.
@@ -304,5 +307,35 @@ describe('F-04', () => {
     };
     expect(watched('plume')).toBe(10);
     expect(watched('origin')).toBe(0);
+  });
+
+  test('F-04: 연기의 모서리는 연기가 아니다', () => {
+    // The mortar in the open, 1 km north, 5 ticks after its volley: one of its crew stands just outside a puff's
+    // ≈ 3 mil disc, within the square around it. A press a little past him, still within that square, is outside the
+    // disc too: the puff counts only as near as its edge, so the man nearer the press is found, not the smoke.
+    const sim = started(mortarAt({ x: 320, y: 1320 }));
+    sim.step([BINO_ON]);
+    until(sim, () => sim.state.effects.length > 0, 5000);
+    run(sim, 5);
+    const k = 32000 / Math.PI;
+    const { op, tick } = sim.state;
+    const discs = sim.state.effects.map((e) => {
+      const c = signalAt(e, tick, CLEAR_WEATHER);
+      const d = Math.hypot(c.x - op.x, c.y - op.y);
+      return { az: Math.atan2(c.x - op.x, c.y - op.y) * k, el: Math.atan2(c.z - 103.5, d) * k, r: Math.atan2(c.r, d) * k };
+    });
+    expect(sim.state.effects.every((e) => e.vis)).toBe(true);
+    const corner = sim.state.platoons[0]!.members.flatMap((m) => {
+      const a = angleTo(sim, m);
+      return m.vis && m.kind === 'man' ? discs.map((c) => ({ a, c, da: (a.az - c.az) / c.r, de: (a.el - c.el) / c.r })) : [];
+    }).find(({ da, de }) => Math.abs(da) < 1 && Math.abs(de) < 1 && Math.hypot(da, de) > 1.05)!;
+    expect(corner).toBeDefined();
+    // 3 tenths of a mil on outwards, away from the puff's centre.
+    const h = Math.hypot(corner.da, corner.de);
+    const press = { az: corner.a.az + (corner.da / h) * 3, el: corner.a.el + (corner.de / h) * 3 };
+    expect(Math.abs(press.az - corner.c.az)).toBeLessThan(corner.c.r);
+    expect(Math.abs(press.el - corner.c.el)).toBeLessThan(corner.c.r);
+    expect(sim.step([idAt(press)]).accepted).toEqual([true]);
+    expect(intel(sim).cue).toBe('man');
   });
 });

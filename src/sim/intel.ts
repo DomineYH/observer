@@ -40,9 +40,12 @@ export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly num
     const a = wrap(atan2(dx, dy) * MIL - az);
     const e = atan2(z - eye.z, d) * MIL - el;
     const r = rm > 0 ? atan2(rm, d) * MIL : 0; // the disc as painted, mils
-    if (Math.abs(a) > ra + r || Math.abs(e) > re + r) return;
-    const oa = Math.max(0, Math.abs(a) - r) / ra;
-    const oe = Math.max(0, Math.abs(e) - r) / re;
+    // From the nearest point of the disc, then judged as a member is: the reach box and the score.
+    const h = Math.sqrt(a * a + e * e);
+    const k = h > r ? (h - r) / h : 0;
+    if (Math.abs(k * a) > ra || Math.abs(k * e) > re) return; // k is 1 for a member: its rule is unchanged
+    const oa = (k * a) / ra;
+    const oe = (k * e) / re;
     const score = Math.sqrt(oa * oa + oe * oe);
     const mid = Math.sqrt((a / ra) * (a / ra) + (e / re) * (e / re));
     if (score < best || (score === best && mid < bestMid)) {
