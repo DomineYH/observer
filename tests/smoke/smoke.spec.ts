@@ -83,6 +83,17 @@ const mapPixels = (map: Locator) =>
     return out.join(';');
   });
 
+/** The map's pixels once it has settled: the map redraws every 120 ms, so a pick shows up a frame or two after its text. */
+async function settledMap(page: Page, map: Locator): Promise<string> {
+  let last = await mapPixels(map);
+  for (;;) {
+    await page.waitForTimeout(300);
+    const now = await mapPixels(map);
+    if (now === last) return now;
+    last = now;
+  }
+}
+
 /** Whether the lower view is drawn in 2-pixel blocks: 보통 renders 480 internal pixels, stretched to a 960-wide canvas. */
 const doubled = (view: Locator) =>
   view.evaluate((c: HTMLCanvasElement) => {
@@ -124,7 +135,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
-  const fresh = await mapPixels(map);
+  const fresh = await settledMap(page, map);
   // 화질 is the player's, not the game's: 보통 chosen in prep stays through the weather change.
   await quality('보통').click();
   await expect(quality('보통')).toHaveAttribute('aria-pressed', 'true');
