@@ -2,7 +2,7 @@
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
-import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, LOCATION_METHODS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
 import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
@@ -96,11 +96,14 @@ export function hashState(state: SimState): string {
   h.u32(state.missions.length);
   for (const m of state.missions) {
     h.u32(WARNINGS.indexOf(m.warning));
-    const l = m.location; // grid only until the polar method comes
-    h.u32(l && l.method === 'grid' ? 1 : 0);
+    const l = m.location; // none 0 · grid 1 · polar 2, then its values
+    h.u32(l ? LOCATION_METHODS.indexOf(l.method) + 1 : 0);
     if (l && l.method === 'grid') {
       h.u32(l.easting);
       h.u32(l.northing);
+    } else if (l) {
+      h.u32(l.azimuth);
+      h.u32(l.distance);
     }
     const d = m.description;
     h.u32(d ? 1 : 0);

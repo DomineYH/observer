@@ -68,6 +68,20 @@ describe('F-05: 레이저 측정', () => {
     expect(sim.state.rng.las.count).toBe(las);
   });
 
+  test('위아래로는 3 밀 안의 적만 반사한다', () => {
+    const sim = started(mortarAt({ x: 320, y: 1020 }));
+    // The man seen highest: no other seen member lies above him. Straight at his azimuth, only higher.
+    const men = sim.state.platoons[0]!.members.filter((m) => m.kind === 'man' && m.vis);
+    const top = men.reduce((a, b) => (angleTo(sim, b).el > angleTo(sim, a).el ? b : a));
+    const at = angleTo(sim, top);
+    sim.step([LASE(at.az, at.el + 29)]);
+    expect(sim.state.lases[0]!.range!.target).toBe(true); // 2.9 mils above: still the man
+    sim.step([LASE(at.az, at.el + 31)]);
+    const over = sim.state.lases[0]!.range!;
+    expect(over.target).toBe(false); // 3.1 mils above: the ground beyond him
+    expect(over.dist).toBeGreaterThan(Math.hypot(top.x - sim.state.op.x, top.y - sim.state.op.y) + 100);
+  });
+
   test('최근 다섯 번만 새것부터 남긴다', () => {
     const { sim } = crewSim();
     for (let k = 0; k < 6; k++) sim.step([LASE(k * 100, -100)]);

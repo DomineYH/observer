@@ -253,6 +253,18 @@ describe('F-07: 극좌표 위치법', () => {
     expect(sim.state.missions[0]!.direction).toBe(800);
   });
 
+  test('거리만 다른 두 극좌표 표적위치는 상태 해시가 다르다', () => {
+    const near = called();
+    const far = called();
+    expect(send(near, POLAR(800, 1000)).ok).toBe(true);
+    expect(send(far, POLAR(800, 1100)).ok).toBe(true);
+    expect(near.hash()).not.toBe(far.hash());
+    // 1004 snaps to the same 1000 m: the same state.
+    const same = called();
+    expect(send(same, POLAR(800, 1004)).ok).toBe(true);
+    expect(same.hash()).toBe(near.hash());
+  });
+
   test('범위 밖의 방위각·거리는 무시된다', () => {
     for (const v of [POLAR(6400, 1000), POLAR(800, 99), POLAR(800, 15001)]) {
       const sim = called();
