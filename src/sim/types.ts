@@ -185,7 +185,7 @@ export interface Mission {
   kills: (number | null)[]; // members this mission's rounds killed, by unit; null: none of them landed within 220 m
   // 임무 요약 (사후강평, 기록)
   target: number; // the unit nearest the sent grid (within 600 m) when it was sent; −1 none
-  firstError: number | null; // 초탄 오차, m: the first adjusting round from the target's centre; null for 바로 효력사
+  firstError: number | null; // 초탄 오차, m: the first adjusting round that had a unit to measure from (demo); null for 바로 효력사
   directionError: number | null; // 방향 오차, mils: the sent 방향 from the target's true azimuth; null without either
   rangeCorrections: number[]; // 수정열: each correction's 사거리 (snapped, m) when it had one, in order
   corrections: number; // corrections accepted

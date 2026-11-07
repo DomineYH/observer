@@ -29,7 +29,8 @@ function nearest(s: SimState, at: Point, max: number): number {
 /** 표적위치 accepted: the unit the observer means. */
 export const noteTarget = (s: SimState, m: Mission) => (m.target = nearest(s, m.aim!, TARGET_M));
 
-/** The first adjusting round landed at `at`: 초탄 오차 from the target's centre (or the nearest unit's), m. */
+/** An adjusting round landed at `at`: 초탄 오차 from the target's centre (or the nearest unit's), m. Demo rule: the first
+ * adjusting round with a unit to measure from sets it (`firstErr == null`, demo 778–786); a round with none leaves it open. */
 export function noteImpact(s: SimState, m: Mission, at: Point): void {
   if (m.firstError !== null) return;
   const p = s.platoons[m.target >= 0 ? m.target : nearest(s, at, NEAR_M)];

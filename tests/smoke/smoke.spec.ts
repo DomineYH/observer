@@ -184,7 +184,7 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   await expect(log).toContainText('방향 공팔공공, 우로 오십, 잠깐대기.', { timeout: 10_000 }); // 기러기's readback, 2.5–4 s
 });
 
-test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳다가 온다', async ({ page }) => {
+test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳다가 오고, 재효력사를 보내면 기러기가 복창한다', async ({ page }) => {
   // 사격준비 끝 24–38 s, the adjusting round about 20 s, 신관 사격준비 끝 14–22 s after the correction, 마감탄 떳다 ~25 s later.
   test.setTimeout(180_000);
   const { log, composer, preview, send } = await toReady(page, 'ready');
@@ -199,6 +199,16 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
   await expect(log).toContainText('기러기 마감탄 떳다, 이상.', { timeout: 40_000 });
   await expect(log).toContainText('갈매기 마감탄 떳다, 잠깐대기.', { timeout: 5_000 });
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 40_000 });
+
+  // 재효력사: the line the log shows is the one previewed, target name included, then 기러기's readback.
+  await composer.getByLabel('효과').selectOption('neutralized');
+  await composer.getByLabel('다음 조치').selectOption('repeat');
+  await composer.getByLabel('발수').selectOption('1');
+  const said = (await preview.textContent())!;
+  expect(said).toMatch(/^(표적|적 \S+) 무력화, 재효력사, 동제원, 포대 하나발, 이상\.$/);
+  await send.click();
+  await expect(log.locator('li', { hasText: `갈매기 ${said}` })).toHaveCount(1);
+  await expect(log).toContainText('기러기 동제원 포대 하나발, 잠깐대기.', { timeout: 10_000 }); // 3 s
 });
 
 test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 보내고, 임무끝으로 임무를 맺는다', async ({ page }) => {
