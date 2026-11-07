@@ -1,9 +1,9 @@
 // 입력기 (demo lines 905–1044): the form for the transmission the 교신 단계 takes, and the sentence it will send.
 import { useEffect, useState } from 'react';
-import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Target, Warning } from '@sim';
+import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Warning } from '@sim';
 import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetOptions, type Draft } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetLabel, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
@@ -26,11 +26,6 @@ const filled = (l: Hit, g: GridRef) => {
   const at = gridOf(g, l.range);
   return { polar: { az: four(Math.round(l.az / 10) % 6400), dist: String(l.range.dist) }, grid: { e: four(at.e), n: four(at.n) } };
 };
-
-const targetLabel = (t: Target) =>
-  t.targetType === 'unknown'
-    ? W.targetType.unknown.text
-    : `${W.activity[t.activity].text}인 적 ${W.targetType[t.targetType].text}${t.unit === 'none' ? '' : ` ${'count' in t ? t.count : ''}${W.unit[t.unit].text}`}`;
 
 /** The form's starting values (a sent form keeps its values for the next mission). `target` is an option's JSON. */
 export interface ComposerForm {

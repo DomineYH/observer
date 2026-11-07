@@ -1,6 +1,9 @@
 // 입력기 초안: one form's values as the input to send and the observer's 교신 한 마디 the simulation will say for it, so
 // the preview is made from the same utterance as the log line (F-07). Pure.
+import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import type { Activity, Control, Effect, Flag, FuzeRequest, Input, RadioUtterance, Target, TargetNameSlots, TargetType, Unit, UnitType, Warning } from '@sim';
+
+const W = RADIO_GRAMMAR.tables;
 
 export interface Draft {
   input: Input;
@@ -31,10 +34,19 @@ export const polarDraft = (azimuth: number, distance: number): Draft => ({
   utterance: { speaker: 'observer', ending: 'over', kind: 'location', slots: { method: 'polar', azimuth, distance: Math.round(distance / 10) * 10 } },
 });
 
+/** A target as input values (the tail of `desc` and `shift`). */
+export const targetValues = (t: Target): (string | number)[] =>
+  t.targetType === 'unknown' ? [t.targetType] : [t.targetType, t.activity, t.unit, ...('count' in t ? [t.count] : [])];
+
+/** A 표적성질 choice as the form lists it. */
+export const targetLabel = (t: Target) =>
+  t.targetType === 'unknown'
+    ? W.targetType.unknown.text
+    : `${W.activity[t.activity].text}인 적 ${W.targetType[t.targetType].text}${t.unit === 'none' ? '' : ` ${'count' in t ? t.count : ''}${W.unit[t.unit].text}`}`;
+
 export function descDraft({ target, ...head }: DescForm): Draft {
-  const t = target.targetType === 'unknown' ? [] : [target.activity, target.unit, ...('count' in target ? [target.count] : [])];
   return {
-    input: { a: 'desc', v: [head.rounds, head.fuzeRequest, head.control, head.dangerClose, target.targetType, ...t] },
+    input: { a: 'desc', v: [head.rounds, head.fuzeRequest, head.control, head.dangerClose, ...targetValues(target)] },
     utterance: { speaker: 'observer', ending: 'over', kind: 'description', slots: { ...head, ...target } },
   };
 }

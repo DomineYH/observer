@@ -1,15 +1,19 @@
 // 수정 입력 (demo lines 778–792, 799–818, 909–916, 985–991): the correction form's sentence and input, and the
 // training-mode help (탄착 편의, 수정값 제안, 미리 채운 방향). Pure.
-import type { CorrectionSlots, Effect, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
+import type { Corrections, CorrectionSlots, Effect, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
 import type { Draft } from './radio/drafts';
 
-/** The form's fields as typed: numbers stay strings until sent. */
-export interface CorrForm {
-  direction: string;
+/** 좌우·사거리 as typed: numbers stay strings until sent. */
+export interface Amount {
   lateralDir: LateralDir;
   lateral: string;
   rangeDir: RangeDir;
   range: string;
+}
+
+/** The correction form's fields as typed. */
+export interface CorrForm extends Amount {
+  direction: string;
   next: Next; // 조정 · 효력사
 }
 
@@ -69,23 +73,30 @@ function field(text: string, min: number, max: number): number | null {
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
 }
 
+/** The meters as sent (raw, the simulation snaps them) and the 수정량 as said (snapped; an axis at 0 is left out), or null
+ * while a field is out of range. */
+export function amounts(f: Amount): { lateral: number; range: number; slots: Corrections } | null {
+  const lateral = field(f.lateral, 0, MAX.lateral);
+  const range = field(f.range, 0, MAX.range);
+  if (lateral === null || range === null) return null;
+  const [l, r] = [snap(lateral, 10), snap(range, 50)];
+  const slots = { ...(l > 0 ? { lateralDir: f.lateralDir, lateral: l } : {}), ...(r > 0 ? { rangeDir: f.rangeDir, range: r } : {}) } as Corrections;
+  return { lateral, range, slots };
+}
+
+/** A 방향 field: 1–4 digits, 0–6399; else null. */
+export const directionOf = (text: string): number | null => (/^\d{1,4}$/.test(text.trim()) ? field(text, 0, MAX.direction) : null);
+
 /** The correction to send, or null while the form cannot be sent (the first correction has no valid 방향). With `effect`
  * it is 수정 후 효력사: the 효과 rides along in the input, not in the sentence. */
 export function corrDraft(f: CorrForm, mission: { direction: number | null }, effect?: Effect): Draft | null {
   const first = mission.direction === null;
-  const direction = first ? (/^\d{1,4}$/.test(f.direction.trim()) ? field(f.direction, 0, MAX.direction) : null) : null;
-  const lateral = field(f.lateral, 0, MAX.lateral);
-  const range = field(f.range, 0, MAX.range);
-  if ((first && direction === null) || lateral === null || range === null) return null;
-  const [l, r] = [snap(lateral, 10), snap(range, 50)];
-  const slots = {
-    ...(direction !== null ? { direction } : {}),
-    ...(l > 0 ? { lateralDir: f.lateralDir, lateral: l } : {}),
-    ...(r > 0 ? { rangeDir: f.rangeDir, range: r } : {}),
-    next: f.next,
-  } as CorrectionSlots;
+  const direction = first ? directionOf(f.direction) : null;
+  const a = amounts(f);
+  if ((first && direction === null) || a === null) return null;
+  const slots = { ...(direction !== null ? { direction } : {}), ...a.slots, next: f.next } as CorrectionSlots;
   return {
-    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, lateral, f.rangeDir, range, f.next, ...(effect ? [effect] : [])] },
+    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, a.lateral, f.rangeDir, a.range, f.next, ...(effect ? [effect] : [])] },
     utterance: { speaker: 'observer', ending: 'over', kind: 'correction', slots },
   };
 }
