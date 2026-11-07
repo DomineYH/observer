@@ -64,6 +64,9 @@ function emit(st: SimState, t: TerrainData, p: Platoon, pid: number, kind: Field
     if (q.kind === of && q.alive) st.effects.push({ kind, x: q.x, y: q.y, gz: heightAt(t, q.x, q.y) + lift, tick: st.tick, life, pid, small, vt: false, vis: false });
 }
 
+/** 사격 섬광 of the mortar section's live tubes. */
+export const mortarFlash = (st: SimState, t: TerrainData, pid: number) => emit(st, t, st.platoons[pid]!, pid, 'muzzle', 'tube', 1, LIFE.mortarMuzzle, false);
+
 /** A mortar section fires its live tubes while two of its crew live. */
 const canFire = (p: Platoon) => p.members.some((q) => q.kind === 'tube' && q.alive) && p.members.filter((q) => q.kind === 'man' && q.alive).length >= 2;
 
@@ -106,7 +109,7 @@ export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: num
     p.nextFire = tick + ticks(45 + next(ai) * 25);
     // ponytail: the impacts on friendly posts come with friendly losses.
     p.lastFire = tick;
-    emit(st, t, p, pid, 'muzzle', 'tube', 1, LIFE.mortarMuzzle, false);
+    mortarFlash(st, t, pid);
   }
   // 무력화: once up again, back towards where it set off, straight (the mortar section stays dug in)
   const retreat = p.state === 'broken' && !pinned && p.type !== 'mortar';

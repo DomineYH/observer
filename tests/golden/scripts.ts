@@ -40,4 +40,30 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       totalTicks: 4600,
     },
   },
+  {
+    // ②: 레이저 at the mortar section (the ground on the ridge short of it answers: 5425 m) → 극좌표 조정 → 수정 0과 함께
+    // 효력사 → 임무끝 → 전이 with 위험근접 declared (one adjusting round first) → 100 m 수정과 함께 효력사 → 임무끝 →
+    // 관측소 이동 80 m east (behind the front: 78 s on foot, 30 s setup) → 위치 보고 at its grid. Each input about 200
+    // ticks after its stage opens (probe, SIM_VERSION 12: loc 427, desc 682, adjust 2371, effect 4139, shift's adjust 5840,
+    // effect 7399, set up 9968, readback 10231); no 발각 on this seed.
+    file: '2-polar-move.json',
+    replay: {
+      ...HEAD,
+      inputs: [
+        START,
+        { t: 150, a: 'lase', v: [987, -14] },
+        { t: 351, a: 'call', v: ['adjust'] },
+        { t: 627, a: 'loc', v: ['polar', 99, 5425] },
+        { t: 882, a: 'desc', v: [3, 'none', 'ready', 0, 'mortar', 'halted', 'none'] },
+        { t: 2571, a: 'corr', v: ['left', 0, 'drop', 0, 'ffe'] },
+        { t: 4339, a: 'eom', v: ['neutralized'] },
+        { t: 4540, a: 'shift', v: [99, 'left', 200, 'add', 300, 2, 1, 'unknown'] },
+        { t: 6040, a: 'corr', v: ['right', 100, 'drop', 100, 'ffe'] },
+        { t: 7599, a: 'eom', v: ['ineffective'] },
+        { t: 7800, a: 'move', v: [5200, 1800] },
+        { t: 10168, a: 'pos', v: [4520, 3180] },
+      ],
+      totalTicks: 10631,
+    },
+  },
 ];

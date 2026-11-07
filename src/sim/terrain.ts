@@ -74,6 +74,9 @@ export const heightAt = (t: TerrainData, x: number, y: number): number => sample
 /** 표면 높이 (ground + forest + buildings) at a point (m). */
 export const surfaceAt = (t: TerrainData, x: number, y: number): number => sample(t.surface, t, x, y);
 
+/** 숲 속 (demo's one test, surface − ground > 3 m): slows the walk, hides the post from the enemy and the view from it. */
+export const underCanopy = (t: TerrainData, x: number, y: number): boolean => surfaceAt(t, x, y) - heightAt(t, x, y) > 3;
+
 /** 가시선 between two points at absolute heights z (m): blocked by terrain, forest and buildings. Endpoints are not sampled. */
 export function lineOfSight(t: TerrainData, a: Point & { z: number }, b: Point & { z: number }): boolean {
   const dx = b.x - a.x;

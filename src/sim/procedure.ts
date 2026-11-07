@@ -7,6 +7,7 @@
 // are part of the golden records.
 import { drawBias, fall, SHEAF, shifted, snap, tofSec } from './ballistics';
 import { announceDanger, markDanger, overCap } from './danger';
+import { lose } from './exposure';
 import { fromGrid } from './grid';
 import { strike } from './lethality';
 import { schedule, type Act } from './queue';
@@ -15,7 +16,7 @@ import { EFFECTS, type Corrections, type CorrectionSlots, type DescriptionSlots,
 import { next, type Stream } from './rng';
 import { corrections, corrSlots, descSlots, targetSlots } from './slots';
 import { heightAt, type Point, type TerrainData } from './terrain';
-import type { Flight, Mission, SimState } from './types';
+import type { Flight, Mission, PostNote, SimState } from './types';
 
 export type Say = (u: RadioUtterance) => void;
 
@@ -23,10 +24,13 @@ export type Say = (u: RadioUtterance) => void;
 export interface Ctx {
   fdc: Stream;
   bal: Stream;
+  exp: Stream; // 발각 and the retaliation
+  frontY: number; // 아군 전선, north m
   terrain: TerrainData;
   battery: Point;
   say: Say;
   landed: (x: number, y: number, fuze: Fuze) => void;
+  note: (n: PostNote) => void;
   friends: readonly Point[]; // 아군 진지, for 위험근접
 }
 
@@ -37,6 +41,8 @@ const BURST_TICKS = 320; // 탄착 섬광 and its smoke last 16 s
 const GUN_INTERVAL_S = 9; // 효력사: each gun fires a round every 9 s …
 const GUN_JITTER_S = 2.2; // … each round up to 2.2 s late
 const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + secTicks(sec), act);
+const POST_HIT_M = 45;
+const dist = (x: number, y: number, p: Point) => Math.sqrt((x - p.x) * (x - p.x) + (y - p.y) * (y - p.y));
 
 /** 작전 개시: 기러기 asks for a radio check 4 s later. */
 export const openProcedure = (s: SimState) => after(s, 4, 'radio_check');
@@ -83,6 +89,9 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   const { fdc, say } = ctx;
   const stage = s.radio.stage;
   const m = s.missions[s.missions.length - 1];
+  // 사격요구 waits for a set-up post that 기러기 knows (or was told to keep): moving, setting up, or before the
+  // 위치 보고 or its skipping, neither a call nor a 전이 goes (demo 713; its ui hides the 전이 then).
+  if ((a === 'call' || a === 'shift') && (s.post.state !== 'ready' || s.reportDue)) return false;
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const bias = drawBias(ctx.bal);
@@ -268,6 +277,8 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vt: fuze === 'vt', vis: false });
       m.impacts.push({ x, y, tick: s.tick });
       strike(s, x, y, fuze, ctx.bal, m.kills);
+      // 아군 포탄 오사 (demo 659): within 45 m of the post, 60 % (a 탄도 draw only then)
+      if (dist(x, y, s.op) < POST_HIT_M && next(ctx.bal) < 0.6) lose(s, ctx, 'friendly');
       ctx.landed(x, y, fuze);
       if (m.phase === 'adjust') {
         noteImpact(s, m, { x, y });

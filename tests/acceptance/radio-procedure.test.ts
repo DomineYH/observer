@@ -4,7 +4,7 @@ import { validateReplay, type Input, type RadioEvent, type Sim } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { radioSentence, spoken } from '@ui/radio/sentence';
 import { replayData, START } from './init';
-import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, openRadio, radioEvents, send, started, toReady, unstarted } from './mission';
+import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, LOC, openRadio, POS_SKIP, radioEvents, send, started, toReady, unstarted } from './mission';
 
 const said = (events: readonly RadioEvent[]) =>
   events.map((e) => ({ tick: e.tick, speaker: e.utterance.speaker, kind: e.utterance.kind, ending: e.utterance.ending }));
@@ -32,6 +32,7 @@ describe('F-09: 통신 점검', () => {
   test('점검이 끝나야 호출을 받는다', () => {
     const sim = started();
     const twin = started();
+    for (const s of [sim, twin]) s.step([POS_SKIP]); // the post is not the planned one: no 위치 보고 (F-21)
     for (const t of [1, 80, 109]) {
       while (sim.state.tick < t) {
         sim.step([]);

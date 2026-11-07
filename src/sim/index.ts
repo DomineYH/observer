@@ -5,7 +5,8 @@ export { signalAt } from './visibility';
 export type { StreamName } from './rng';
 export type * from './types';
 export { replay, validateReplay, CHECKPOINT_TICKS } from './replay';
-export { COVER, EYE_HEIGHT, heightAt, surfaceAt, lineOfSight, terrainHash } from './terrain';
+export { COVER, EYE_HEIGHT, heightAt, surfaceAt, lineOfSight, terrainHash, underCanopy } from './terrain';
+export { moveCheck, planMove, type MoveBlock } from './post';
 export type * from './terrain';
 export { toGrid, fromGrid } from './grid';
 export {

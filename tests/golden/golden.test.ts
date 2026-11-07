@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { createSim, replay, SIM_VERSION, terrainHash, validateReplay, type SimEvent } from '@sim';
+import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { goldenFiles, readGolden } from './golden';
@@ -35,4 +35,27 @@ describe('골든', () => {
     expect(events.some((e) => e.type === 'radio' && e.utterance.kind === 'end_of_mission')).toBe(true);
     expect(sim.state.missions[0]).toMatchObject({ report: 'neutralized', truth: 'neutralized' });
   });
+
+  test('골든: ② 극좌표·레이저·전이·위험근접·이동', () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('2-polar-move.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0);
+    const terrain = generateTerrain(data.seed);
+    expect(terrainHash(terrain)).toBe(header);
+    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    // The script does what it says.
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const events: SimEvent[] = [];
+    for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
+    const said = (speaker: string, kind: string) => events.some((e) => e.type === 'radio' && e.utterance.speaker === speaker && e.utterance.kind === kind);
+    expect(sim.state.lases.some((l) => l.range !== null)).toBe(true);
+    expect(events.some((e) => e.type === 'radio' && e.utterance.kind === 'location' && e.utterance.slots.method === 'polar')).toBe(true);
+    expect(said('observer', 'shift')).toBe(true);
+    expect(said('fdc', 'danger_close_adjust_first')).toBe(true);
+    expect(said('observer', 'move_notice') && said('fdc', 'move_notice')).toBe(true);
+    expect(said('fdc', 'position_report')).toBe(true);
+    expect(sim.state.knownOp).toEqual(fromGrid(4520, 3180, terrain.grid));
+    expect(sim.state.op).toEqual({ x: 5200, y: 1800 });
+    expect(sim.state.observerLost).toBe(false);
+  }, 30000);
 });

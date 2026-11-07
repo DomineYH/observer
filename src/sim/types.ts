@@ -96,7 +96,7 @@ export interface Intel {
 
 /** 먼지 (a moving vehicle) or 사격 섬광·연기 (APC: `small`, mortar), seen like members. */
 export interface FieldEffect {
-  kind: 'dust' | 'muzzle' | 'burst'; // burst: our own round's 탄착 (pid −1)
+  kind: 'dust' | 'muzzle' | 'burst'; // burst: a 탄착, ours or the enemy mortar's at the post (pid −1: no unit's cue)
   x: number;
   y: number;
   gz: number; // height it starts from, m
@@ -108,7 +108,24 @@ export interface FieldEffect {
   vis: boolean;
 }
 
-export type Phase = 'prep' | 'live';
+/** ended: 관측반 손실 (and, from M1-14, the other end conditions): the clock stops and every input is ignored. */
+export type Phase = 'prep' | 'live' | 'ended';
+
+/** 관측소 상태: ready (equipment set up), moving (도보 이동: 육안 only), setup (장비 설치, 30 s after arrival). */
+export type PostState = 'ready' | 'moving' | 'setup';
+
+/** A 관측소 이동 as planned when accepted (demo planMove): equal steps of at most 20 m from the post, each with the
+ * walking time to it (s); `total` s, `dist` m, `forest` m of it under canopy. */
+export interface MovePlan {
+  to: Point;
+  pts: { x: number; y: number; t: number }[];
+  total: number;
+  dist: number;
+  forest: number;
+}
+
+/** Who fires at a compromised post: the enemy mortar section, or infantry/APC direct fire. */
+export type Shooter = 'mortar' | 'direct';
 
 /** 기상 값, all integers in spec units. */
 export interface Weather {
@@ -148,8 +165,17 @@ export interface ImpactEvent {
   fuze: Fuze; // vt: 공중 파열
 }
 
+/** What happened to the post or the 관측반, for the log (the texts are the ui's): arrived · set up (장비 설치 끝) ·
+ * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost. */
+export type PostNote =
+  | { what: 'arrived' | 'set_up' }
+  | { what: 'compromised'; pid: number; fire: Shooter | null }
+  | { what: 'near_miss'; fire: Shooter }
+  | { what: 'lost'; cause: Shooter | 'friendly' };
+export type PostEvent = { type: 'post'; tick: number } & PostNote;
+
 /** 사건. */
-export type SimEvent = RadioEvent | ImpactEvent;
+export type SimEvent = RadioEvent | ImpactEvent | PostEvent;
 
 export interface StepResult {
   events: readonly SimEvent[];
@@ -211,13 +237,25 @@ export interface SimState {
   /** Stays 0 through 작전 준비: the tick advances only once the operation has started. */
   tick: number;
   phase: Phase;
-  /** 관측소: in prep the candidate (the planned one until a pick), once started the occupied one. */
+  /** 관측소: in prep the candidate (the planned one until a pick), once started the occupied one; while moving, where
+   * the 관측반 walks now (a new object every tick it moves). */
   op: Point;
   /** 기러기가 아는 관측소 위치: the planned post until a 위치 보고 (M1-12). Polar 표적위치 are taken from here. */
   knownOp: Point;
   picked: boolean;
-  /** 위치 보고 required: the operation started away from the planned observation post. */
+  /** 위치 보고 required: the operation started away from the planned post, or the post moved; until 기러기 reads back
+   * a 위치 보고 or the report is skipped, no 사격요구 is taken. */
   reportDue: boolean;
+  /** 관측소 이동: `departed` tick the move was taken, `until` tick the setup ends, `moves` taken so far. */
+  post: { state: PostState; move: MovePlan | null; departed: number; until: number; moves: number };
+  /** The last 위치 보고 sent (기러기 reads it back and takes it as the known post); null before any. */
+  posReport: { easting: number; northing: number } | null;
+  /** 발각: tick of the last one (150 s pass before the next can count), −1 never. */
+  compromised: number;
+  /** 보복 under way: who fires, at the post as it stood when found (`at`), the unit that fires, rounds fired so far. */
+  fire: { shooter: Shooter; at: Point; pid: number; fired: number } | null;
+  /** 관측반 전투 불능: the operation ends 4 s later. */
+  observerLost: boolean;
   platoons: Platoon[];
   effects: FieldEffect[]; // oldest first
   targets: number; // units found so far: the last 표적 번호 given

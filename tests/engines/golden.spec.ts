@@ -5,6 +5,7 @@ import { goldenFiles, readGolden } from '../golden/golden';
 for (const [file, name] of [
   ['0-empty.json', '골든: 0번 빈 판 (실행 환경)'],
   ['1-grid-eom.json', '골든: ① 좌표법 조정에서 임무끝까지 (실행 환경)'],
+  ['2-polar-move.json', '골든: ② 극좌표·레이저·전이·위험근접·이동 (실행 환경)'],
 ] as const) {
   test(name, async ({ page }) => {
     await page.goto('/');
@@ -19,7 +20,7 @@ for (const [file, name] of [
 
 // Every golden file has its test above.
 test('골든: 모든 골든 기록이 실행 환경 검사에 걸린다', () => {
-  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json']);
+  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json']);
 });
 
 // The page generates each golden record's terrain in this browser; its hash must equal the golden header.

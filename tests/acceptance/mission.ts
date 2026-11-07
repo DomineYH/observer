@@ -44,8 +44,17 @@ export function untilSaid(sim: Sim, speaker: Speaker, kind: RadioKind, limit = 2
   throw new Error(`${speaker} ${kind} not said in ${limit} ticks`);
 }
 
-/** Runs until 감명 양호 has gone out: from the next step 기러기 takes calls. */
-export const openRadio = (sim: Sim) => untilSaid(sim, 'observer', 'radio_check_reply');
+/** Runs until 감명 양호 has gone out: from the next step 기러기 takes calls. The flat-terrain post is not the planned
+ * one, so the 위치 보고 is skipped on the way (no draw, no utterance): 기러기 keeps the planned post for 극좌표. */
+export function openRadio(sim: Sim): RadioEvent[] {
+  const out: RadioEvent[] = [];
+  if (sim.state.reportDue) {
+    const r = sim.step([POS_SKIP]);
+    if (!r.accepted[0]) throw new Error('pos_skip ignored');
+    out.push(...radio(r.events));
+  }
+  return [...out, ...untilSaid(sim, 'observer', 'radio_check_reply')];
+}
 
 /** 기러기's answer that lets the next transmission go: call → 호출 복창, loc → 좌표 복창, desc → 사격준비 끝. */
 export const ANSWER = { call: 'call_ack', loc: 'location', desc: 'ready' } as const satisfies Record<string, RadioKind>;
@@ -115,3 +124,8 @@ export function ended(sim: Sim, call: Input = CALL_FFE, loc: Input = LOC, d: Inp
   toReady(sim, d, call, loc);
   untilTaken(sim, EOM('ineffective'));
 }
+
+/** 관측소 이동 to [동, 북] m, 위치 보고 [동, 북] 4자리, 위치 보고 생략. */
+export const MOVE = (x: number, y: number): Input => ({ a: 'move', v: [x, y] });
+export const POS = (e: number, n: number): Input => ({ a: 'pos', v: [e, n] });
+export const POS_SKIP: Input = { a: 'pos_skip' };

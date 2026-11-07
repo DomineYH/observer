@@ -3,10 +3,12 @@ import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
 import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, LOCATION_METHODS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS, type Target } from './radio';
-import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
+import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, PostState, RadioStage, RouteKey, Shooter, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
-const PHASES: readonly Phase[] = ['prep', 'live'];
+const PHASES: readonly Phase[] = ['prep', 'live', 'ended'];
+const POST_STATES: readonly PostState[] = ['ready', 'moving', 'setup'];
+const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
@@ -30,12 +32,47 @@ export function hashState(state: SimState): string {
   const h = new Hasher();
   h.u32(state.tick);
   h.u32(PHASES.indexOf(state.phase));
-  h.i32(state.op.x);
-  h.i32(state.op.y);
+  h.f64(state.op.x); // a walking post stands between whole metres
+  h.f64(state.op.y);
   h.f64(state.knownOp.x);
   h.f64(state.knownOp.y);
   h.u32(bit(state.picked));
   h.u32(bit(state.reportDue));
+  const post = state.post;
+  h.u32(POST_STATES.indexOf(post.state));
+  h.i32(post.departed);
+  h.i32(post.until);
+  h.u32(post.moves);
+  h.u32(post.move ? 1 : 0);
+  if (post.move) {
+    const m = post.move;
+    h.f64(m.to.x);
+    h.f64(m.to.y);
+    h.u32(m.pts.length);
+    for (const q of m.pts) {
+      h.f64(q.x);
+      h.f64(q.y);
+      h.f64(q.t);
+    }
+    h.f64(m.total);
+    h.f64(m.dist);
+    h.f64(m.forest);
+  }
+  h.u32(state.posReport ? 1 : 0);
+  if (state.posReport) {
+    h.u32(state.posReport.easting);
+    h.u32(state.posReport.northing);
+  }
+  h.i32(state.compromised);
+  h.u32(state.fire ? 1 : 0);
+  if (state.fire) {
+    h.u32(SHOOTERS.indexOf(state.fire.shooter));
+    h.f64(state.fire.at.x);
+    h.f64(state.fire.at.y);
+    h.u32(state.fire.pid);
+    h.u32(state.fire.fired);
+  }
+  h.u32(bit(state.observerLost));
   for (const p of state.platoons) {
     h.u32(UNIT_TYPES.indexOf(p.type));
     h.u32(p.route === null ? 0 : ROUTE_KEYS.indexOf(p.route) + 1);

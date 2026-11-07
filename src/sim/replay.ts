@@ -85,7 +85,8 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
 }
 
 /** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller regenerates the terrain from the
- * seed and passes the scenario the header names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit at t 0. */
+ * seed and passes the scenario the header names. Every replayed tick must advance until the game ends (its clock then
+ * stops): all 작전 준비 inputs and `start` sit at t 0. */
 export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
   if (scenario.id !== d.scenario.id || scenario.version !== d.scenario.version)
@@ -99,7 +100,7 @@ export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario):
     const start = i;
     while (i < d.inputs.length && d.inputs[i]!.t === t) i++;
     for (const ok of sim.step(d.inputs.slice(start, i)).accepted) if (!ok) ignored++;
-    if (sim.state.tick !== t + 1) throw new Error(`replay: game not started at tick 0 (tick ${t} did not advance)`);
+    if (sim.state.tick !== t + 1 && sim.state.phase !== 'ended') throw new Error(`replay: game not started at tick 0 (tick ${t} did not advance)`);
     const hash = sim.hash();
     chain.u32(parseInt(hash.slice(0, 8), 16));
     chain.u32(parseInt(hash.slice(8), 16));

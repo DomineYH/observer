@@ -43,6 +43,9 @@ const FORMATS = new Map<string, Format>([
   ['repeat', [[EFFECTS, range('rounds')]]], // 재효력사: 효과, 발수
   ['eom', [[EFFECTS]]], // 임무끝: 효과
   ['shift', targeted(SHIFT_HEAD)], // 전이사격
+  ['move', [[[0, 99999], [0, 99999]]]], // 관측소 이동: 동 · 북 m
+  ['pos', [[range('easting'), range('northing')]]], // 위치 보고: 동 · 북 4자리
+  ['pos_skip', [[]]], // 위치 보고 생략: no values
 ]);
 
 function fits(f: Field, x: unknown): boolean {
