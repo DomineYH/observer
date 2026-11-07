@@ -10,6 +10,8 @@ import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
 import { EffectForm } from './EffectForm';
+import { PositionForm } from './PositionForm';
+import { postStatus, staleKnown } from './post';
 import { ShiftForm } from './ShiftForm';
 
 const W = RADIO_GRAMMAR.tables;
@@ -49,7 +51,7 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission (and in training for the correction help). */
-  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases'>;
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
   initial?: Partial<ComposerForm>;
 }
 
@@ -91,8 +93,12 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
 
   const options = targetOptions(platoons);
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
+  // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
+  const ready = state.post.state === 'ready';
+  const reporting = stage === 'idle' && ready && state.reportDue;
+  const callable = stage === 'idle' && ready && !state.reportDue;
   let draft: Draft | null = null;
-  if (stage === 'idle') draft = callDraft(warning);
+  if (callable) draft = callDraft(warning);
   else if (stage === 'loc' && method === 'grid' && GRID_FIELD.test(grid.e) && GRID_FIELD.test(grid.n)) draft = locDraft(Number(grid.e), Number(grid.n));
   else if (stage === 'loc' && method === 'polar' && AZ_FIELD.test(polar.az) && Number(polar.az) < 6400 && DIST_FIELD.test(polar.dist)) {
     const d = Number(polar.dist);
@@ -105,6 +111,12 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
       <section aria-label="입력기">
         {stage === 'off' && live && <p>기러기 통신 점검 대기…</p>}
         {stage === 'wait' && <p>기러기 응답 대기…</p>}
+        {stage === 'idle' && !ready && (
+          <p>
+            {postStatus(state)}. {state.post.state === 'moving' ? '이동 중에는 쌍안경·레이저·사격요구를 쓸 수 없습니다.' : '설치가 끝나야 레이저와 사격요구를 씁니다.'}
+          </p>
+        )}
+        {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} />}
         {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
         {amc && (
           <button type="button" onClick={() => send(FIRE)}>
@@ -127,7 +139,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             send={send}
           />
         )}
-        {stage === 'idle' && (
+        {callable && (
           <label>
             경고명령{' '}
             <select value={warning} onChange={(e) => setWarning(e.target.value as Warning)}>
@@ -215,11 +227,14 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             </label>
           </>
         )}
-        {(stage === 'idle' || stage === 'loc' || stage === 'desc') && (
+        {stage === 'loc' && method === 'polar' && staleKnown(state) && (
+          <p>기러기는 관측소 위치를 다른 지점으로 알고 있습니다. 극좌표로 보낸 표적 위치가 어긋납니다.</p>
+        )}
+        {(callable || stage === 'loc' || stage === 'desc') && (
           <Preview draft={draft} empty={stage === 'loc' && method === 'polar' ? '방위각(밀)과 거리(m)를 입력' : '동·북 네 자리씩'} names={names} mode={mode} send={send} />
         )}
       </section>
-      {stage === 'idle' && mission?.mto && (
+      {callable && mission?.mto && (
         <ShiftForm targetNumber={mission.mto.targetNumber} options={options} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
       )}
     </>

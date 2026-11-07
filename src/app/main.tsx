@@ -1,7 +1,7 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createSim } from '@sim';
+import { createSim, underCanopy } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
@@ -13,6 +13,7 @@ import { PrepPanel } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
+import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
 import { selectBackend } from './backend';
 import { CLEAR_WEATHER } from './clearWeather';
 import { startLoop } from './loop';
@@ -51,13 +52,31 @@ const onFrame = (draw: (now: number) => void) => {
 let log: readonly LogLine[] = [];
 let started = false;
 const step = () => {
+  const due = sim.state.reportDue;
   const events = session.step();
-  if (!started && sim.state.phase === 'live') {
+  const s = sim.state;
+  const lines: LogLine[] = [];
+  const say = (texts: readonly (string | null)[]) => {
+    for (const text of texts) if (text) lines.push({ type: 'system', tick: s.tick, text });
+  };
+  if (!started && s.phase === 'live') {
     started = true;
-    log = [...log, { type: 'system', tick: sim.state.tick, text: '작전 개시.' }];
+    say(['작전 개시.']);
   }
-  const said = events.filter((e) => e.type === 'radio');
-  if (said.length) log = [...log, ...said];
+  let readBack = false;
+  for (const e of events) {
+    if (e.type === 'post') say(postNote(e, s.platoons, underCanopy(terrain, s.op.x, s.op.y)));
+    if (e.type !== 'radio') continue;
+    lines.push(e);
+    const u = e.utterance;
+    if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, BASE_SCENARIO.frontY));
+    if (u.kind === 'position_report' && u.speaker === 'fdc') {
+      readBack = true;
+      say([reportError(s.knownOp, s.op, s.mode)]);
+    }
+  }
+  if (due && !s.reportDue && !readBack) say([SKIPPED]);
+  if (lines.length) log = [...log, ...lines];
 };
 let lastPublish = 0;
 startLoop(step, (now) => {

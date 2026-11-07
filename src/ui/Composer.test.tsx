@@ -10,12 +10,14 @@ import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
+/** A set-up post 기러기 knows: the composer offers a call at idle. */
+const POST = { post: { state: 'ready', move: null, departed: 0, until: 0, moves: 0 }, reportDue: false, tick: 0, knownOp: { x: 0, y: 0 } } as const;
 const GRID = flatTerrain().grid;
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
 /** The sentence the composer shows at `stage`, starting from `initial`. */
 function shown(stage: 'idle' | 'loc' | 'desc', platoons: Parameters<typeof targetOptions>[0], initial: Partial<ComposerForm>) {
   const html = renderToStaticMarkup(
-    <Composer stage={stage} live platoons={platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [] }} initial={initial} />,
+    <Composer stage={stage} live platoons={platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [], ...POST }} initial={initial} />,
   );
   return text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
 }
@@ -211,7 +213,7 @@ test('F-05: 훈련 모드는 레이저 측정점의 좌표를 넣어 둔다', ()
   const miss: Lase = { tick: 10, az: 100, el: 50, range: null };
   const at = (mode: Mode) =>
     renderToStaticMarkup(
-      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit] }} />,
+      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit], ...POST }} />,
     );
   const preview = (html: string) => text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
   expect(preview(at('training'))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.'); // training adds the numerals

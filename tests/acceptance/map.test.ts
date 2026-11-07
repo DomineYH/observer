@@ -153,7 +153,7 @@ describe('F-06', () => {
 
   test('F-06: 관측 시야 부채꼴과 아군 진지', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m on the whole map
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0 };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0 };
     const { strokes, texts, rects } = draw(t, FULL_VIEW, marks);
     // The line of sight, due north 7 km from the post at (256, 422), inside the wedge.
     expect(strokes).toContainEqual([[256, 422], [256, 72]]);
@@ -164,6 +164,18 @@ describe('F-06', () => {
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
+  });
+
+  test('B3: 훈련 지도의 기러기가 아는 위치', () => {
+    const t = flatTerrain({ n: 1024 }); // 0.05 px/m: the post (5120, 1800) at (256, 422)
+    const base: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5000, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'training', missions: [], tick: 0 };
+    const label = (m: MapMarks) => draw(t, FULL_VIEW, m).texts.find((x) => x.text === '기러기가 아는 위치');
+    // 훈련: 120 m off, the post 기러기 knows is marked where it is; within 30 m, or in 표준, it is not.
+    expect(label(base)).toMatchObject({ x: 258, y: 426 });
+    expect(label({ ...base, knownOp: { x: 5100, y: 1800 } })).toBeUndefined();
+    expect(label({ ...base, mode: 'standard' })).toBeUndefined();
+    // While walking, a dashed line from the post to where it is going.
+    expect(draw(t, FULL_VIEW, { ...base, dest: { x: 5200, y: 1800 } }).dashes).toContainEqual([[256, 422], [260, 422]]);
   });
 
   test('F-06: 표준은 방위각 선만', () => {
@@ -182,6 +194,8 @@ describe('F-06', () => {
     const marks = (sim: ReturnType<typeof found>): MapMarks => ({
       scenario: BASE_SCENARIO,
       op: sim.state.op,
+      knownOp: sim.state.op,
+      dest: null,
       az: 0,
       fovMil: 1066,
       pin: null,
@@ -227,6 +241,8 @@ describe('F-06', () => {
     const marks = (): MapMarks => ({
       scenario: BASE_SCENARIO,
       op: sim.state.op,
+      knownOp: sim.state.op,
+      dest: null,
       az: 0,
       fovMil: 1066,
       pin: null,

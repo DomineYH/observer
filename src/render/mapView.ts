@@ -4,6 +4,9 @@ import { toGrid, type GridRef, type Point, type TerrainData } from '@sim';
 /** 8자리 방안좌표 of a point, by the one conversion pair. */
 export const gridOf = (g: GridRef, p: Point): { e: number; n: number } => toGrid(p.x, p.y, g);
 
+/** A map press's 관측소 이동: the simulation's own plan, guard and forest test, so the preview is what it will do. */
+export { moveCheck, planMove, underCanopy } from '@sim';
+
 /** 지도 보기 (demo `MV`): zoom 1–8 and the top-left visible cell, counted from the west and from the north edge. */
 export interface MapView {
   z: number;

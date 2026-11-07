@@ -10,6 +10,7 @@ import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
+import { postStatus } from './post';
 import { LaseReadout } from './Laser';
 
 const TAP_PX = 5;
@@ -87,6 +88,17 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         }
       }
       drawOverlay(c, geom.focal, W / buf.w, a, on, dpr, fps, splashOf(state));
+      const status = postStatus(state); // 관측소 이동 중 / 장비 설치 중 (demo 1228)
+      if (status) {
+        c.font = `${Math.round(14 * dpr)}px monospace`;
+        c.textAlign = 'center';
+        const w = c.measureText(status).width;
+        c.fillStyle = 'rgba(0,0,0,.6)';
+        c.fillRect(W / 2 - w / 2 - 10 * dpr, H / 2 - 14 * dpr, w + 20 * dpr, 28 * dpr);
+        c.fillStyle = '#62aee6';
+        c.fillText(status, W / 2, H / 2 + 5 * dpr);
+        c.textAlign = 'left';
+      }
     });
   }, [quality, terrain, colours, weather, state, aim, onFrame, showFps]);
 
@@ -132,10 +144,10 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         }}
         onPointerCancel={() => (drag.current = null)}
       />
-      <button type="button" aria-pressed={bino} onClick={() => aim.toggleBino()}>
+      <button type="button" aria-pressed={bino} disabled={state.post.state === 'moving'} onClick={() => aim.toggleBino()}>
         쌍안경
       </button>
-      <button type="button" disabled={state.phase !== 'live'} onClick={() => aim.lase()}>
+      <button type="button" disabled={state.phase !== 'live' || state.post.state !== 'ready'} onClick={() => aim.lase()}>
         레이저 <kbd>R</kbd>
       </button>
       <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} />

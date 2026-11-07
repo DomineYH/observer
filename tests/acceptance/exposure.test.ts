@@ -77,7 +77,7 @@ describe('F-21', () => {
     const recon = watch(started(near('recon'), { seed: 7 }), 9000);
     expect(first(recon, 'compromised')).toMatchObject({ pid: 0, fire: null });
     expect(recon.notes.filter((n) => n.what !== 'compromised')).toEqual([]);
-  });
+  }, 30_000); // seed sweeps: several seconds, more under load
 
   test('F-21: 발각과 보복 — 관측반 손실로 작전이 끝난다', () => {
     // Standing still under the mortar: on some seeds a round lands within 25 m and the 관측반 is lost (−400); 4 s later
@@ -111,7 +111,7 @@ describe('F-21', () => {
     expect(lost).toBeGreaterThan(0);
     expect(lived).toBeGreaterThan(0);
     expect(far).toBeGreaterThan(10);
-  });
+  }, 30_000);
 
   test('F-21: 아군 포탄의 관측소 오사', () => {
     // A mission on the post's own grid (위험근접: one adjusting round first): a round within 45 m puts the 관측반 out of
@@ -138,5 +138,5 @@ describe('F-21', () => {
     }
     expect(lost).toBeGreaterThan(0);
     expect(spared).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });

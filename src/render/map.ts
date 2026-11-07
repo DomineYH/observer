@@ -74,6 +74,8 @@ export type MapContext = Pick<
 export interface MapMarks {
   scenario: Scenario;
   op: Point;
+  knownOp: Point; // 기러기가 아는 관측소 위치: 훈련 marks it when it is off the post
+  dest: Point | null; // where the post is walking to
   az: number; // line of sight, 0.1 mil
   fovMil: number;
   pin: Point | null; // 좌표자
@@ -89,6 +91,7 @@ const BEARING_LABEL_M = 1800;
 const TYPE_MARK: Record<UnitType, string> = { inf: '보', recon: '보', apc: '장', mortar: '박' };
 const TAU = Math.PI * 2;
 const IMPACT_TICKS = 3000; // a 탄착 stays on the map 150 s
+const KNOWN_SHOWN_M = 30; // 훈련 marks the post 기러기 knows when it is farther than this off (demo)
 
 /** Draws the map (demo drawMap, lines 1281–1310) at a zoom and scroll: `base` holds mapBase's pixels, then roads,
  * 방안선 and 지명. */
@@ -265,6 +268,30 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
   c.stroke();
   c.fillStyle = '#0c1a2a';
   c.fillText('OP', ox + 8, oy + 4);
+  if (m.dest) {
+    c.strokeStyle = 'rgba(98,174,230,.95)';
+    c.setLineDash([4, 3]);
+    c.beginPath();
+    c.moveTo(ox, oy);
+    c.lineTo(mx(m.dest.x), my(m.dest.y));
+    c.stroke();
+    c.setLineDash([]);
+  }
+  if (m.mode === 'training' && Math.hypot(m.knownOp.x - m.op.x, m.knownOp.y - m.op.y) > KNOWN_SHOWN_M) {
+    const fx = mx(m.knownOp.x);
+    const fy = my(m.knownOp.y);
+    c.strokeStyle = '#62aee6';
+    c.setLineDash([2, 2]);
+    c.beginPath();
+    c.moveTo(fx, fy - 7);
+    c.lineTo(fx - 6, fy + 5);
+    c.lineTo(fx + 6, fy + 5);
+    c.closePath();
+    c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = '#0c1a2a';
+    c.fillText('기러기가 아는 위치', fx + 8, fy + 4);
+  }
   if (m.pin) {
     const x = mx(m.pin.x);
     const y = my(m.pin.y);

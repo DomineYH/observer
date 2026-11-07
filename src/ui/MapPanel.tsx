@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Input, Point, ReadonlySimState, Scenario, TerrainData } from '@sim';
 import { drawMap, MAP_PX, mapBase } from '@render/map';
-import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
+import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView } from '@render/mapView';
 import { fovOf } from '@render/projection';
+import { BLOCKED, moveLabel } from './post';
 import { gridLabel } from './radio/readings';
 
 const REDRAW_MS = 120; // the demo's map rate
@@ -35,7 +36,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelPr
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick });
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick });
   }, [terrain, base, view, scenario, state, pin]);
 
   useEffect(() => {
@@ -120,6 +121,21 @@ export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelPr
           좌표자: {gridLabel(terrain.grid.letters, pin)}
         </p>
       )}
+      {pin && state.phase === 'live' && <MoveTo terrain={terrain} state={state} to={{ x: Math.round(pin.x), y: Math.round(pin.y) }} send={send} />}
     </section>
+  );
+}
+
+/** 관측소 이동 to the 좌표자 point (demo 1417–1419): distance, walking time and forest on the way, or why not. */
+function MoveTo({ terrain, state, to, send }: { terrain: TerrainData; state: ReadonlySimState; to: Point; send: (input: Input) => void }) {
+  const block = moveCheck(state, terrain, to);
+  if (block) return <p>이동 불가: {BLOCKED[block]}</p>;
+  return (
+    <p>
+      <button type="button" onClick={() => send({ a: 'move', v: [to.x, to.y] })}>
+        {moveLabel(planMove(terrain, state.op, to))}
+      </button>
+      {underCanopy(terrain, to.x, to.y) && ' 도착지가 숲 속 — 시야가 가립니다'}
+    </p>
   );
 }

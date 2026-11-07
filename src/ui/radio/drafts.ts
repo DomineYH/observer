@@ -91,3 +91,12 @@ export function targetOptions(platoons: readonly Seen[]): Target[] {
   }
   return [...out.values(), { targetType: 'unknown' }];
 }
+
+const GRID4 = /^\d{4}$/;
+/** 위치 보고: 동·북 as typed, four digits each, else nothing to send. */
+export function posDraft(e: string, n: string): Draft | null {
+  if (!GRID4.test(e) || !GRID4.test(n)) return null;
+  const slots = { easting: Number(e), northing: Number(n) };
+  return { input: { a: 'pos', v: [slots.easting, slots.northing] }, utterance: { speaker: 'observer', ending: 'over', kind: 'position_report', slots } };
+}
+export const POS_SKIP: Input = { a: 'pos_skip' };
