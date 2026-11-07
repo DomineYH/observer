@@ -1,10 +1,11 @@
 // 관측소 이동과 위치 보고 (F-21, B2): through the simulation's public interface only. The flat test terrain is 640 m
 // square with the post at its middle (320, 320); destinations must stay 200 m inside every side.
 import { describe, expect, test } from 'vitest';
-import { fromGrid, type Input, type Point, type RadioEvent, type Sim, type SimEvent } from '@sim';
+import { createSim, fromGrid, type Input, type Point, type RadioEvent, type Sim, type SimEvent } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
 import { planMove } from '@sim/post';
 import { answered, CALL_ADJUST, CALL_FFE, corr, DESC_UNKNOWN, ended, EOM, LOC, LOC_CLEAR, MOVE, POLAR, openRadio, POS, POS_SKIP, SHIFT, send, started, toAdjust, toReady, unstarted, untilSaid, untilTaken } from './mission';
+import { init, START } from './init';
 import { flatTerrain } from './terrain';
 
 /** 토블러 × 장비 휴대 0.85, km/h, at a grade (PRD 6: 6·exp(−3.5·|경사 + 0.05|) km/h). */
@@ -45,6 +46,16 @@ function movedPair(): [Sim, Sim] {
 }
 const SH = SHIFT(800, 'left', 0, 'add', 200, 3, 0, 'unknown');
 
+/** Ticks from the step that takes `MOVE(440, 320)` from the post at (320, 320) to the post's arrival note. */
+function arrivalTicks(terrain: ReturnType<typeof flatTerrain>): number {
+  const sim = createSim({ ...init(7, terrain), scenario: { ...BASE_SCENARIO, units: [] } });
+  sim.step([START]);
+  openRadio(sim);
+  const k = sim.state.tick;
+  expect(sim.step([MOVE(440, 320)]).accepted).toEqual([true]);
+  return untilNote(sim, null, 'arrived') - k;
+}
+
 /** Steps `sim` with `input` and `twin` with nothing: `input` is ignored and the two stay equal. */
 function ignored(sim: Sim, twin: Sim, input: Input): void {
   expect(sim.step([input]).accepted, JSON.stringify(input)).toEqual([false]);
@@ -82,6 +93,20 @@ describe('F-21', () => {
     for (let j = 0; j < ramp.n; j++) for (let i = 0; i < ramp.n; i++) ramp.ground[j * ramp.n + i] = ramp.surface[j * ramp.n + i] = 100 + j;
     expect(kmh(planMove(ramp, { x: 300, y: 200 }, { x: 300, y: 600 }))).toBeCloseTo(tobler(0.1), 6);
     expect(kmh(planMove(ramp, { x: 300, y: 600 }, { x: 300, y: 200 }))).toBeCloseTo(tobler(-0.1), 6);
+
+    // Through the simulation: from (320, 320), 120 m east to (440, 320), the post reports its arrival at the tick the
+    // walk takes. On the flat that is 120 m at 6·exp(−0.175)·0.85 ≈ 4.28 km/h (PRD 6: "평지 약 4.4 km/h" rounds this; the
+    // 0.85 is inside it, so not 4.4 × 0.85): 100.9 s, 2018 ticks.
+    const v = tobler(0) / 3.6; // m/s
+    expect(arrivalTicks(flatTerrain())).toBeGreaterThanOrEqual(Math.ceil((120 / v) * 20) - 1);
+    expect(arrivalTicks(flatTerrain())).toBeLessThanOrEqual(Math.ceil((120 / v) * 20) + 1);
+    // A forest band (cells 35–40, x 350–405 m) on the way: the 20 m steps ending at x 360, 380, 400 are under the canopy,
+    // so 60 m go at 0.7 × the speed and 60 m at full speed: 60/v + 60/(0.7 v) ≈ 123.3 s, 2466 ticks.
+    const band = flatTerrain();
+    for (let j = 0; j < band.n; j++) for (let i = 35; i <= 40; i++) band.surface[j * band.n + i] = 105;
+    const forestTicks = Math.ceil((60 / v + 60 / (0.7 * v)) * 20);
+    expect(arrivalTicks(band)).toBeGreaterThanOrEqual(forestTicks - 1);
+    expect(arrivalTicks(band)).toBeLessThanOrEqual(forestTicks + 1);
   });
 
   test('F-21: 도보 속도 — 관측소는 그 속도로 걷고 도착한다', () => {

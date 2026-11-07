@@ -77,6 +77,38 @@ describe('F-21', () => {
     const recon = watch(started(near('recon'), { seed: 7 }), 9000);
     expect(first(recon, 'compromised')).toMatchObject({ pid: 0, fire: null });
     expect(recon.notes.filter((n) => n.what !== 'compromised')).toEqual([]);
+
+    // Detection rate through the simulation, over 300 seeds: a recon team about 300 m north (its route jittered by the
+    // seed) sees the post at the checks of ticks 100, 200, 300. Expected per seed from the table: 1 − Π(1 − p) over those
+    // checks, p = 0.12 × (1 − d/1.1 km) × 1.6 (정찰조) × 1.3 when the post stands ahead of the front, d its distance then.
+    // About 0.36 behind and 0.45 ahead; ±0.09 is over 3σ for 300 runs.
+    const rate = (frontY: number) => {
+      let seen = 0;
+      let expected = 0;
+      for (let seed = 1; seed <= 300; seed++) {
+        const sim = started({ ...near('recon'), frontY }, { seed });
+        let found = false;
+        let miss = 1;
+        while (sim.state.tick < 300) {
+          const notes = post(sim.step([]).events);
+          if (notes.some((n) => n.what === 'compromised')) found = true;
+          if (sim.state.tick % 100 === 0) {
+            const d = dist(sim.state.platoons[0]!, sim.state.op);
+            miss *= 1 - 0.12 * (1 - d / 1100) * 1.6 * (sim.state.op.y > frontY ? 1.3 : 1);
+          }
+        }
+        if (found) seen++;
+        expected += 1 - miss;
+      }
+      return { seen: seen / 300, expected: expected / 300 };
+    };
+    const behind = rate(3650);
+    const ahead = rate(300); // the post at y 320 stands north of this front
+    expect(behind.expected).toBeCloseTo(0.36, 1);
+    expect(ahead.expected).toBeCloseTo(0.45, 1);
+    expect(Math.abs(behind.seen - behind.expected), `behind ${behind.seen} vs ${behind.expected}`).toBeLessThan(0.09);
+    expect(Math.abs(ahead.seen - ahead.expected), `ahead ${ahead.seen} vs ${ahead.expected}`).toBeLessThan(0.09);
+    expect(ahead.seen).toBeGreaterThan(behind.seen);
   }, 30_000); // seed sweeps: several seconds, more under load
 
   test('F-21: 발각과 보복 — 관측반 손실로 작전이 끝난다', () => {
@@ -105,8 +137,14 @@ describe('F-21', () => {
       const tick = sim.state.tick;
       expect(sim.step([{ a: 'cam', v: [100, 0] }]).accepted).toEqual([false]);
       expect(sim.state.tick).toBe(tick);
-      // The replayer runs such a game to its end: the record stops at the end.
-      if (lost === 1) expect(replay(replayData([{ t: 0, ...START }], tick + 200, seed), flatTerrain(), withMortar).record.ticks).toBe(tick);
+      // Replay: the game's record ends at its terminal tick. Exactly that many ticks replay, one hash each; any tick past
+      // the end does not exist, so a longer totalTicks is a format error.
+      if (lost === 1) {
+        const exact = replay(replayData([{ t: 0, ...START }], tick, seed), flatTerrain(), withMortar);
+        expect(exact.record.ticks).toBe(tick);
+        expect(exact.checkpoints.at(-1)!.tick).toBe(Math.floor(tick / 200) * 200);
+        expect(() => replay(replayData([{ t: 0, ...START }], tick + 1, seed), flatTerrain(), withMortar)).toThrow(`replay: the game ended at tick ${tick}, before totalTicks ${tick + 1}`);
+      }
     }
     expect(lost).toBeGreaterThan(0);
     expect(lived).toBeGreaterThan(0);
