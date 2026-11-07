@@ -25,6 +25,8 @@ export interface AimControl {
   drag(dx: number, dy: number, cssWidth: number): void;
   /** Asks for 쌍안경 the other way. */
   toggleBino(): void;
+  /** 레이저 on the live aim (the R key and the button). */
+  lase(): void;
 }
 
 /** `state` is the simulation's live state; nothing is sent until the aim moves from its aim (0.1 mils). */
@@ -60,6 +62,9 @@ export function createAimControl(state: Pick<ReadonlySimState, 'aim' | 'tick' | 
     drag(dx, dy, cssWidth) {
       const k = fovOf(bino()) / cssWidth;
       moved(-dx * k, dy * k);
+    },
+    lase() {
+      send({ a: 'lase', v: [Math.round(h * 10) % 64000, Math.round(p * 10)] });
     },
     toggleBino() {
       sentBino = { on: !bino(), tick: state.tick };

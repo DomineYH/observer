@@ -1,8 +1,9 @@
 // 입력기 (demo lines 905–1044): the form for the transmission the 교신 단계 takes, and the sentence it will send.
 import { useEffect, useState } from 'react';
-import type { Control, Flag, FuzeRequest, Input, Mode, RadioStage, ReadonlySimState, Target, Warning } from '@sim';
+import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Target, Warning } from '@sim';
+import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type Draft } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
@@ -15,6 +16,16 @@ const CONTROL_LABEL: Record<Control, string> = { ready: '준비되는 대로', a
 const ROUNDS = [1, 2, 3, 4, 5];
 const keys = <K extends string>(o: Record<K, unknown>) => Object.keys(o) as K[];
 const GRID_FIELD = /^\d{4}$/;
+const AZ_FIELD = /^\d{1,4}$/;
+const DIST_FIELD = /^\d{3,5}$/;
+const four = (n: number) => String(n).padStart(4, '0');
+
+type Hit = Lase & { range: NonNullable<Lase['range']> };
+/** What a lase fills in: 방위각 · 거리 for 극좌표, and the measured point's grid (used in training). */
+const filled = (l: Hit, g: GridRef) => {
+  const at = gridOf(g, l.range);
+  return { polar: { az: four(Math.round(l.az / 10) % 6400), dist: String(l.range.dist) }, grid: { e: four(at.e), n: four(at.n) } };
+};
 
 const targetLabel = (t: Target) =>
   t.targetType === 'unknown'
@@ -24,7 +35,9 @@ const targetLabel = (t: Target) =>
 /** The form's starting values (a sent form keeps its values for the next mission). `target` is an option's JSON. */
 export interface ComposerForm {
   warning: Warning;
+  method: 'grid' | 'polar';
   grid: { e: string; n: string };
+  polar: { az: string; dist: string };
   target: string;
   rounds: number;
   fuzeRequest: FuzeRequest;
@@ -37,16 +50,31 @@ interface Props {
   live: boolean;
   platoons: Parameters<typeof targetOptions>[0];
   names: RadioNames;
+  grid: GridRef;
   mode: Mode;
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission (and in training for the correction help). */
-  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons'>;
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases'>;
   initial?: Partial<ComposerForm>;
 }
 
-export function Composer({ stage, live, platoons, names, mode, send, state, initial = {} }: Props) {
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, initial = {} }: Props) {
   const [warning, setWarning] = useState<Warning>(initial.warning ?? 'adjust');
-  const [grid, setGrid] = useState(initial.grid ?? { e: '', n: '' });
+  // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966); typing keeps
+  // its values until the next such lase.
+  const hit = state.lases.find((l): l is Hit => l.range !== null);
+  const fill = hit && filled(hit, gridRef);
+  const [method, setMethod] = useState(initial.method ?? 'grid');
+  const [grid, setGrid] = useState(initial.grid ?? (fill && mode === 'training' ? fill.grid : { e: '', n: '' }));
+  const [polar, setPolar] = useState(initial.polar ?? fill?.polar ?? { az: '', dist: '' });
+  const [lastHit, setLastHit] = useState(hit);
+  if (hit !== lastHit) {
+    setLastHit(hit);
+    if (fill) {
+      setPolar(fill.polar);
+      if (mode === 'training') setGrid(fill.grid);
+    }
+  }
   const [target, setTarget] = useState(initial.target ?? '');
   const [rounds, setRounds] = useState(initial.rounds ?? 3);
   const [fuzeRequest, setFuze] = useState<FuzeRequest>(initial.fuzeRequest ?? 'none');
@@ -70,7 +98,11 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
   let draft: Draft | null = null;
   if (stage === 'idle') draft = callDraft(warning);
-  else if (stage === 'loc' && GRID_FIELD.test(grid.e) && GRID_FIELD.test(grid.n)) draft = locDraft(Number(grid.e), Number(grid.n));
+  else if (stage === 'loc' && method === 'grid' && GRID_FIELD.test(grid.e) && GRID_FIELD.test(grid.n)) draft = locDraft(Number(grid.e), Number(grid.n));
+  else if (stage === 'loc' && method === 'polar' && AZ_FIELD.test(polar.az) && Number(polar.az) < 6400 && DIST_FIELD.test(polar.dist)) {
+    const d = Number(polar.dist);
+    if (d >= 100 && d <= 15000) draft = polarDraft(Number(polar.az), d);
+  }
   else if (stage === 'desc') draft = descDraft({ rounds, fuzeRequest, control, dangerClose, target: chosen });
 
   return (
@@ -113,13 +145,31 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
       )}
       {stage === 'loc' && (
         <>
-          표적위치 좌표{' '}
-          {(['e', 'n'] as const).map((k) => (
-            <label key={k}>
-              {k === 'e' ? '동' : '북'}{' '}
-              <input inputMode="numeric" maxLength={4} size={4} value={grid[k]} onChange={(ev) => setGrid({ ...grid, [k]: ev.target.value })} />
+          표적위치{' '}
+          {(['grid', 'polar'] as const).map((m) => (
+            <label key={m}>
+              <input type="radio" name="loc-method" checked={method === m} onChange={() => setMethod(m)} /> {m === 'grid' ? '좌표' : '극좌표'}
             </label>
-          ))}
+          ))}{' '}
+          {method === 'grid'
+            ? (['e', 'n'] as const).map((k) => (
+                <label key={k}>
+                  {k === 'e' ? '동' : '북'}{' '}
+                  <input inputMode="numeric" maxLength={4} size={4} value={grid[k]} onChange={(ev) => setGrid({ ...grid, [k]: ev.target.value })} />
+                </label>
+              ))
+            : (
+                <>
+                  <label>
+                    방위각{' '}
+                    <input aria-label="방위각" inputMode="numeric" maxLength={4} size={4} value={polar.az} onChange={(ev) => setPolar({ ...polar, az: ev.target.value })} />
+                  </label>{' '}
+                  <label>
+                    거리(m){' '}
+                    <input aria-label="거리" inputMode="numeric" maxLength={5} size={5} value={polar.dist} onChange={(ev) => setPolar({ ...polar, dist: ev.target.value })} />
+                  </label>
+                </>
+              )}
         </>
       )}
       {stage === 'desc' && (
@@ -170,7 +220,7 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
         </>
       )}
       {(stage === 'idle' || stage === 'loc' || stage === 'desc') && (
-        <Preview draft={draft} empty="동·북 네 자리씩" names={names} mode={mode} send={send} />
+        <Preview draft={draft} empty={stage === 'loc' && method === 'polar' ? '방위각(밀)과 거리(m)를 입력' : '동·북 네 자리씩'} names={names} mode={mode} send={send} />
       )}
     </section>
   );

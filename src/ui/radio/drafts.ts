@@ -25,6 +25,12 @@ export const locDraft = (easting: number, northing: number): Draft => ({
   utterance: { speaker: 'observer', ending: 'over', kind: 'location', slots: { method: 'grid', easting, northing } },
 });
 
+/** 극좌표법: 방위각 mils and 거리 m as typed; the simulation (and so the sentence) takes 거리 to the nearest 10 m. */
+export const polarDraft = (azimuth: number, distance: number): Draft => ({
+  input: { a: 'loc', v: ['polar', azimuth, distance] },
+  utterance: { speaker: 'observer', ending: 'over', kind: 'location', slots: { method: 'polar', azimuth, distance: Math.round(distance / 10) * 10 } },
+});
+
 export function descDraft({ target, ...head }: DescForm): Draft {
   const t = target.targetType === 'unknown' ? [] : [target.activity, target.unit, ...('count' in target ? [target.count] : [])];
   return {

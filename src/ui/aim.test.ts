@@ -112,3 +112,18 @@ test('F-03: 쌍안경은 아직 적용되지 않은 입력을 따른다', () => 
   refused.c.toggleBino();
   expect(refused.sent).toEqual([{ a: 'bino', v: [1] }, { a: 'bino', v: [1] }]);
 });
+
+test('F-05: 레이저 측정 — 입력기', () => {
+  // The lase goes out on the live aim, in 0.1 mils, even before the aim has been sent as 조준 (under 1 mil moved).
+  const { sent, c } = control(63990, -220);
+  c.key('ArrowRight', false); // 6399 + 20 mils, through north: 19 mils
+  c.lase();
+  expect(sent.at(-1)).toEqual({ a: 'lase', v: [190, -220] });
+  c.drag(0.02, 0, 960); // a hair: no 조준 sent, the lase still follows it
+  const n = sent.length;
+  c.lase();
+  expect(sent).toHaveLength(n + 1);
+  const [az, el] = sent.at(-1)!.v as number[];
+  expect(az).toBe(Math.round(c.aim().h * 10) % 64000);
+  expect(el).toBe(-220);
+});

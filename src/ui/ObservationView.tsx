@@ -10,6 +10,7 @@ import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
+import { LaseReadout } from './Laser';
 
 const TAP_PX = 5;
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
@@ -93,6 +94,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
     const down = (e: KeyboardEvent) => {
       if (aim.key(e.key, e.shiftKey)) e.preventDefault();
       else if (e.key === 'b' || e.key === 'B') aim.toggleBino();
+      else if ((e.key === 'r' || e.key === 'R') && !e.repeat && state.phase === 'live') aim.lase();
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
@@ -133,6 +135,10 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       <button type="button" aria-pressed={bino} onClick={() => aim.toggleBino()}>
         쌍안경
       </button>
+      <button type="button" disabled={state.phase !== 'live'} onClick={() => aim.lase()}>
+        레이저 <kbd>R</kbd>
+      </button>
+      <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} />
       <span role="group" aria-label="화질">
         {(Object.keys(QUALITIES) as Quality[]).map((q) => (
           <button key={q} type="button" aria-pressed={q === quality} onClick={() => setQuality(q)}>

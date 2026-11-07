@@ -164,6 +164,34 @@ test('F-07: F 키', async ({ page, context }) => {
   expect(lines[0]!.slice(1)).toEqual(after);
 });
 
+/** From a fresh page on a fixed seed: occupy the post north of 1번 고지 and wait for the clock to run. */
+async function occupied(page: Page) {
+  await page.goto('/?seed=20261106');
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  const tick = page.getByRole('status', { name: '틱' });
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+  return page.getByRole('region', { name: '관측' });
+}
+
+test('F-05: R 키', async ({ page, context }) => {
+  test.setTimeout(60_000);
+  // Two runs on the same seed and post, the view untouched: one lases with the button, the other with R.
+  const other = await context.newPage();
+  const [button, key] = await Promise.all([occupied(page), occupied(other)]);
+  await button.getByRole('button', { name: '레이저' }).click();
+  await other.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await other.keyboard.press('r');
+  // The opening line of sight, 22 mils down, meets the ground: 방위각 0020, a range, no target.
+  const line = (view: typeof button) => view.getByLabel('레이저 측정').locator('p');
+  await expect(line(button)).toContainText('레이저: 방위각 0020 밀 · 거리 ');
+  await expect(line(key)).toContainText('레이저: 방위각 0020 밀 · 거리 ');
+  expect(await line(key).textContent()).toBe(await line(button).textContent());
+  await expect(line(button)).not.toContainText('표적 반사');
+});
+
 test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
   // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
   test.setTimeout(150_000);

@@ -1,19 +1,21 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import type { Activity, RadioEvent, Target, Unit, UnitType, Warning } from '@sim';
+import type { Activity, Lase, Mode, RadioEvent, Target, Unit, UnitType, Warning } from '@sim';
 import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_AMC, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
 import { oneUnit } from '../../tests/acceptance/enemy';
 import { aimedAt, isImpact, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
+import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer, type ComposerForm } from './Composer';
 import { RadioLog } from './RadioLog';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetOptions, type DescForm } from './radio/drafts';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
+const GRID = flatTerrain().grid;
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
 /** The sentence the composer shows at `stage`, starting from `initial`. */
 function shown(stage: 'idle' | 'loc' | 'desc', platoons: Parameters<typeof targetOptions>[0], initial: Partial<ComposerForm>) {
   const html = renderToStaticMarkup(
-    <Composer stage={stage} live platoons={platoons} names={NAMES} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 } }} initial={initial} />,
+    <Composer stage={stage} live platoons={platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [] }} initial={initial} />,
   );
   return text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
 }
@@ -100,7 +102,7 @@ test('F-07: F 키', () => {
     openRadio(sim);
     toReady(sim, d, CALL_ADJUST);
     const html = renderToStaticMarkup(
-      <Composer stage="ready" live platoons={[]} names={NAMES} mode="standard" send={() => {}} state={sim.state} />,
+      <Composer stage="ready" live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={sim.state} />,
     );
     return { sim, html };
   };
@@ -119,7 +121,7 @@ test('F-07: 훈련 편의와 제안 — 입력기', () => {
   toReady(sim, DESC_UNKNOWN, CALL_ADJUST);
   toAdjust(sim);
   const form = (mode: 'training' | 'standard') =>
-    renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} mode={mode} send={() => {}} state={sim.state} />);
+    renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={sim.state} />);
   const az = String(Math.round(sim.state.aim.az / 10) % 6400);
   // Training: the help line and 방향 filled in from the view; the preview already reads that 방향 (동제원 until changed).
   expect(text(form('training'))).toContain('탄착 부근에 표적 없음');
@@ -137,14 +139,14 @@ test('F-07: 효력사 — 입력기', () => {
   openRadio(sim);
   toReady(sim, DESC_UNKNOWN, CALL_ADJUST);
   toAdjust(sim);
-  const adjust = renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} mode="standard" send={() => {}} state={sim.state} />);
+  const adjust = renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={sim.state} />);
   expect(adjust).toMatch(/<select aria-label="다음">.*<option value="adjust" selected="">조정<\/option><option value="ffe">효력사<\/option><\/select>/);
 
   // 지명사 효력사 waits for 준비 쏴 too: the button is there at 사격준비 끝.
   const ffe = started();
   openRadio(ffe);
   toReady(ffe, DESC_AMC, CALL_FFE);
-  const ready = renderToStaticMarkup(<Composer stage="ready" live platoons={[]} names={NAMES} mode="standard" send={() => {}} state={ffe.state} />);
+  const ready = renderToStaticMarkup(<Composer stage="ready" live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={ffe.state} />);
   expect(ready).toMatch(/<button[^>]*>준비 쏴/);
   expect(send(ffe, FIRE).ok).toBe(true);
 });
@@ -158,7 +160,7 @@ test('F-12: 훈련 모드의 실제 사상', () => {
   const dead = p.members.filter((m) => !m.alive).length;
   expect(dead).toBeGreaterThan(0);
   const at = (mode: 'training' | 'standard') =>
-    text(renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} mode={mode} send={() => {}} state={sim.state} />));
+    text(renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={sim.state} />));
   expect(at('training')).toContain(`(훈련) 적 보병 실제 사상 ${dead}/30 (${Math.round((dead / 30) * 100)}%)`);
   expect(at('standard')).not.toContain('실제 사상');
   expect(at('standard')).toContain('효과를 관측하십시오.');
@@ -173,7 +175,7 @@ test('F-12: 훈련 모드의 실제 사상 — 빗나가도 220 m 안이면 0명
     let nearest = Infinity;
     for (let k = 0; k < 2000; k++)
       for (const i of sim.step([]).events.filter(isImpact)) nearest = Math.min(nearest, Math.hypot(i.x - p.x, i.y - p.y));
-    const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} mode="training" send={() => {}} state={sim.state} />);
+    const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} grid={GRID} mode="training" send={() => {}} state={sim.state} />);
     return { nearest, dead: p.members.filter((m) => !m.alive).length, line: text(html) };
   };
   const near = run(190);
@@ -192,7 +194,7 @@ test('F-07: 임무끝 — 입력기', () => {
   const sim = aimedAt(NEAR, 2, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
   toEffect(sim);
   watch(sim, 0, 3);
-  const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} mode="standard" send={() => {}} state={sim.state} />);
+  const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={sim.state} />);
   expect(html).toMatch(/<select aria-label="효과">.*<option value="neutralized" selected="">무력화<\/option>/);
   expect(html).toMatch(/<select aria-label="다음 조치">.*<option value="eom" selected="">임무끝<\/option><option value="repeat">재효력사<\/option><option value="corr">수정 후 효력사<\/option><\/select>/);
   const preview = text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
@@ -200,4 +202,31 @@ test('F-07: 임무끝 — 입력기', () => {
   const r = send(sim, { a: 'eom', v: ['neutralized'] });
   expect(r.ok).toBe(true);
   expect(logged(r.events[0]!)).toBe(preview);
+});
+
+test('F-07: 극좌표 위치법 — 입력기', () => {
+  // The draft says what the simulation says for its input (거리 snapped to 10 m), and the log line is the preview.
+  const sim = started();
+  openRadio(sim);
+  send(sim, CALL_ADJUST);
+  answered(sim, 'call');
+  const draft = polarDraft(800, 1004);
+  const r = send(sim, draft.input);
+  expect(r.ok).toBe(true);
+  const said = r.events.find((e) => e.utterance.speaker === 'observer')!;
+  expect(said.utterance).toEqual(draft.utterance);
+  expect(logged(said)).toBe('극좌표, 방위각 공팔공공, 거리 하나공공공, 이상.');
+
+  // At 표적위치 the newest lase that met something fills 극좌표 (and in training the grid of the point it measured).
+  const hit: Lase = { tick: 9, az: 8003, el: -20, range: { dist: 1004, vm: -2, x: 805, y: 805, target: true } };
+  const miss: Lase = { tick: 10, az: 100, el: 50, range: null };
+  const at = (mode: Mode, initial: Partial<ComposerForm>) =>
+    renderToStaticMarkup(
+      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit] }} initial={initial} />,
+    );
+  const preview = (html: string) => text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  expect(preview(at('standard', { method: 'polar' }))).toBe(logged(said));
+  expect(at('standard', { method: 'polar' })).toMatch(/aria-label="방위각" [^>]*value="0800"/);
+  expect(preview(at('training', { method: 'grid' }))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.') // training adds the numerals;
+  expect(preview(at('standard', { method: 'grid' }))).toBe('동·북 네 자리씩');
 });
