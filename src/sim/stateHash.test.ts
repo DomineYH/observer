@@ -185,3 +185,20 @@ test('상태 해시: 날아가는 적 박격포탄과 진지의 엎드림이 해
   ];
   for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
 });
+
+test('상태 해시: 섬멸 시각·종료 예정 틱·진지 돌파가 해시에 든다', () => {
+  const sim = startedWith(oneUnit({ type: 'inf', route: 'B', t0: 0 }), { seed: 3, terrain: flatTerrain() });
+  const state = structuredClone(sim.state) as SimState;
+  const base = hashState(state);
+  const differs = (change: (s: SimState) => void) => {
+    const s = structuredClone(state);
+    change(s);
+    return hashState(s);
+  };
+  const changes: [string, (s: SimState) => void][] = [
+    ['clearTick', (s) => (s.clearTick = 100)],
+    ['endAt', (s) => (s.endAt = 100)],
+    ['overran', (s) => (s.platoons[0]!.state = 'overran')],
+  ];
+  for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
+});

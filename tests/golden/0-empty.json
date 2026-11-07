@@ -2,7 +2,7 @@
   "terrainHash": "069cd970fa0564a1",
   "replay": {
     "format": 1,
-    "simVersion": 14,
+    "simVersion": 15,
     "seed": 20261106,
     "seedKind": "daily",
     "scenario": {
@@ -39,18 +39,38 @@
   },
   "record": {
     "ticks": 400,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "cleared": false,
+    "clearTick": null,
+    "roundsTotal": 0,
+    "missions": 0,
+    "adjustRounds": 0,
+    "firstErrorAvg": null,
+    "directionErrorAvg": null,
+    "reportAccuracyPct": null,
+    "roundsPerUnit": null,
+    "neutralized": 0,
+    "combatUnits": 4,
+    "earlyDefeats": 0,
+    "friendlyHits": 0,
+    "friendlyLosses": 0,
+    "dangerCloseMissed": 0,
+    "observerLost": false,
+    "postMoves": 0,
+    "compromised": false,
     "score": 0
   },
   "ignored": 0,
-  "chain": "ab8f71ed13447500",
+  "chain": "8f2deb0a83a57193",
   "checkpoints": [
     {
       "tick": 200,
-      "hash": "957137272c8211f2"
+      "hash": "d20c190fae54ba7a"
     },
     {
       "tick": 400,
-      "hash": "707f3e5a8e88982b"
+      "hash": "e3a4cb22e4fbf4b3"
     }
   ]
 }

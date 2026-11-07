@@ -1,6 +1,6 @@
 // 적 AI (demo lines 451–502): how each unit moves, deploys, halts and fires, one tick at a time, and where its members
 // stand, and how it reacts to our rounds (pinned, broken, destroyed: lethality.ts decides those). The mortar's rounds
-// on our positions: losses.ts. Overrunning comes with the end conditions.
+// on our positions: losses.ts. 진지 돌파 here; what it means for the game's end: end.ts.
 import { atan2, cos, exp, sin } from './math';
 import { fireShells } from './losses';
 import type { Ctx } from './procedure';
@@ -19,6 +19,7 @@ const DUST_TICKS = 30; // a moving vehicle raises dust every 1.5 s
 const LIFE = { dust: 9 * TICKS_PER_S, apcMuzzle: 3 * TICKS_PER_S, mortarMuzzle: 11 * TICKS_PER_S };
 const WAYPOINT_M = 25;
 const APC_FIRE_POINTS = -3; // 적 직사, a burst
+const OVERRUN = { m: 80, strength: 0.7, points: -300 }; // 진지 돌파: this close to its objective, more of it alive
 
 const ticks = (s: number) => Math.round(s * TICKS_PER_S);
 const toGoal = (p: Platoon) => {
@@ -92,6 +93,12 @@ export function updatePlatoon(st: SimState, ctx: Ctx, pid: number): void {
     }
     // 접근 2.2 m/s; 돌격 3.1 m/s tiring towards 1.9 m/s
     speed = p.state === 'approach' ? 2.2 : 1.9 + 1.2 * exp(-((tick - p.assaultTick) * DT) / 120);
+    // 진지 돌파: it still walks this tick (demo), then holds there for good
+    if (dist < OVERRUN.m && p.members.filter((q) => q.alive).length / p.members.length > OVERRUN.strength) {
+      p.state = 'overran';
+      st.score += OVERRUN.points;
+      ctx.note({ what: 'overrun', pid });
+    }
     const want = dist < DEPLOY_M ? 1 : 0;
     p.form += (want - p.form) * Math.min(1, DT / DEPLOY_S);
   } else if (p.type === 'recon' && p.state === 'approach') {

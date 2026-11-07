@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import type { MovePlan, ReadonlySimState } from '@sim';
+import { createSim, type MovePlan, type ReadonlySimState } from '@sim';
+import { init } from '../../tests/acceptance/init';
 import { moveLabel, moveStarted, postNote, postStatus, reportError } from './post';
 
 const plan = (forest: number, y = 1800): MovePlan => ({ to: { x: 5200, y }, pts: [], total: 78.4, dist: 1234.4, forest });
@@ -36,4 +37,12 @@ test('F-29: 아군 피해 문구', () => {
   expect(postNote({ what: 'apc_fire' }, [], false)).toEqual(['아군 진지 방향으로 적 직사화기 사격이 시작됐습니다.']);
   expect(postNote({ what: 'friendly_hit', pos: 1, k: 3 }, [], false)).toEqual(['탄착이 아군 2소대 진지 70 m 이내! 아군 피해 발생 — 3명 손실.']);
   expect(postNote({ what: 'friendly_hit', pos: 0, k: 0 }, [], false)).toEqual(['탄착이 아군 1소대 진지 70 m 이내! 아군 피해 발생.']);
+});
+
+test('F-13: 진지 돌파 문구', () => {
+  // The base scenario's 적 1소대 walks route B onto our 2소대; its 2소대 takes route A or C (the seed decides).
+  const { platoons } = createSim(init(7)).state;
+  expect(postNote({ what: 'overrun', pid: 1 }, platoons, false)).toEqual(['적 1소대이(가) 아군 2소대 진지를 돌파했습니다.']);
+  const second = platoons[2]!.route === 'A' ? 1 : 3;
+  expect(postNote({ what: 'overrun', pid: 2 }, platoons, false)).toEqual([`적 2소대이(가) 아군 ${second}소대 진지를 돌파했습니다.`]);
 });

@@ -22,5 +22,5 @@ for (const { file, replay: data } of SCRIPTS) {
     const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, BASE_SCENARIO) };
     writeFileSync(url, JSON.stringify(golden, null, 2) + '\n');
     console.log(`${file}: written for simVersion ${SIM_VERSION}`);
-  });
+  }, 120000); // ③ replays 48 000 ticks
 }

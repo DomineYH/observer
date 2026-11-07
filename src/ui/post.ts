@@ -2,6 +2,7 @@
 // notes. Pure.
 import type { MoveBlock, MovePlan, Mode, Point, PostNote, ReadonlySimState, UnitType } from '@sim';
 import { clock } from './clock';
+import { unitName } from './debrief';
 
 /** The 위치 보고 hint (B3): what 기러기 really does with the report, or in 표준 how to find one's own grid. */
 export const POSITION_HINT: Record<Mode, string> = {
@@ -67,6 +68,10 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
       return ['아군 진지 방향으로 적 직사화기 사격이 시작됐습니다.'];
     case 'friendly_hit':
       return [`탄착이 아군 ${n.pos + 1}소대 진지 70 m 이내! 아군 피해 발생${n.k ? ` — ${n.k}명 손실` : ''}.`];
+    case 'overrun': {
+      const route = platoons[n.pid]!.route;
+      return [`${unitName(platoons, n.pid)}이(가) ${route ? `아군 ${'ABC'.indexOf(route) + 1}소대` : '아군'} 진지를 돌파했습니다.`]; // demo: route A/B/C ends on our 1/2/3소대
+    }
     case 'lost':
       return [`${n.cause === 'friendly' ? '아군 포탄이 관측소에 떨어졌습니다.' : `적 ${FIRE[n.cause]} 사격에 관측반이 피격됐습니다.`} 관측반 전투 불능 — 임무 종료.`];
   }

@@ -158,13 +158,14 @@ describe('F-29: 아군 손실', () => {
   }, 60000);
 
   test('F-29: 적 보병 사격에 의한 손실 — 엎드린 적은 쏘지 않는다', () => {
-    // The platoon halts 100 m from the position; our adjusting rounds 150 m behind it keep it down, and while it is
+    // The platoon halts some 180 m from the position; our adjusting rounds 150 m behind it keep it down, and while it is
     // down nobody of ours falls.
     const halt = { x: FRIEND.x, y: FRIEND.y + 100 };
     const sc: Scenario = { ...oneUnit({ type: 'inf', route: 'B', t0: 0 }, [{ x: 1280, y: 1900 }, { x: 1280, y: 1500 }, halt]), friends: [FRIEND] };
     const probe = started(sc, { seed: 7, terrain: field() });
-    const end = probe.state.platoons[0]!.path.at(-1)!;
-    until(probe, () => dist(probe.state.platoons[0]!, end) < 1.5);
+    // Unbroken, it overruns that objective 80 m short of it (진지 돌파, #36) and holds there: that is where it halts.
+    until(probe, () => probe.state.platoons[0]!.state === 'overran');
+    const end = { x: probe.state.platoons[0]!.x, y: probe.state.platoons[0]!.y };
     const sim = adjusting({ x: end.x, y: end.y + 150 }, 7, sc, probe.state.tick - 600);
     let pinned = 0;
     const count = (ticks: number) => {

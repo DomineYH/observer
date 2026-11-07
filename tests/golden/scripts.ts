@@ -66,4 +66,11 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       totalTicks: 10631,
     },
   },
+  {
+    // ③: 개시 at the planned post, then nothing until the 40분 한도 ends the game at tick 48 000 (probe, SIM_VERSION 15:
+    // no 발각; 적 1소대 overruns our 2소대 at 29 338, 적 2소대 falls to our direct fire, the APCs and the mortar stay up;
+    // score −1263).
+    file: '3-time-limit.json',
+    replay: { ...HEAD, inputs: [START], totalTicks: 48000 },
+  },
 ];

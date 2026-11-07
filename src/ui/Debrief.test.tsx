@@ -1,0 +1,96 @@
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { ReactElement } from 'react';
+import { expect, test } from 'vitest';
+import type { Sim } from '@sim';
+import { INF_RECON, FFE5, playOut } from '../../tests/acceptance/end';
+import { CALL_ADJUST, corr, EOM, started, untilTaken } from '../../tests/acceptance/mission';
+import { aimedAt, untilLanded } from '../../tests/acceptance/strike';
+import { flatTerrain } from '../../tests/acceptance/terrain';
+import { clock } from './clock';
+import { Debrief } from './Debrief';
+import { bracket } from './debrief';
+import { HeadBand } from './HeadBand';
+
+/** The markup as text: a line per row or heading, cells split by ' | '. */
+const text = (el: ReactElement) =>
+  renderToStaticMarkup(el)
+    .replace(/<\/t[dh]>/g, ' | ')
+    .replace(/<\/(tr|h2|h3|p|div)>/g, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&#x27;/g, "'")
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+const debrief = (sim: Sim) => text(<Debrief state={sim.state} record={sim.record()} grid={flatTerrain().grid} />);
+const mils = (p: { x: number; y: number }) => (Math.round((Math.atan2(p.x - 320, p.y - 320) * 3200) / Math.PI) + 6400) % 6400;
+
+test('F-13: 사후강평 화면', () => {
+  // INF_RECON's platoon: one adjusting round 100 m off, 좌로 100 with 방향 and 효력사, reported as it is; the game ends.
+  const sim = aimedAt(INF_RECON, 2, 0, CALL_ADJUST, FFE5, { x: 100, y: 0 });
+  untilLanded(sim);
+  untilTaken(sim, corr(mils(sim.state.platoons[0]!), 'left', 100, 'add', 0, 'ffe'));
+  untilTaken(sim, EOM('neutralized'), 3000); // at the 효과 관측's first tick: the game ends 8 s after it opens
+  playOut(sim);
+  const p = sim.state.platoons[0]!;
+  const cas = Math.round((100 * p.members.filter((m) => !m.alive).length) / p.members.length);
+  expect(sim.state.phase).toBe('ended');
+  expect(p.state).toBe('broken'); // seed 2: 30–60 % down
+  const m = sim.state.missions[0]!;
+  const r = sim.record();
+  const lines = debrief(sim);
+  expect(lines[0]).toBe('사후강평');
+  expect(lines).toContain(`경과 ${clock(sim.state.tick)} · 사용 탄 ${r.roundsTotal}발 · 점수 ${sim.state.score} · 시드 일일 2`);
+  // 적 부대: what was found of each, its losses and its fate; and where the enemy really came.
+  expect(lines).toContain('적 부대 | 적정 | 사상 | 결과 |');
+  expect(lines).toContain(`적 1소대 | 미탐지 | ${cas}% | 무력화 · 조기 |`);
+  expect(lines).toContain('적 정찰조 | 미탐지 | 0% | 공격 계속 |');
+  expect(lines).toContain('실제 배치: 적 1소대 중앙 접근로 · 적 정찰조 서측 접근로');
+  // 사격 임무: one row a mission that fired.
+  expect(lines).toContain('표적번호 | 경고명령 | 수정 | 탄 | 초탄 오차 | 방향 오차 | 협차 | 보고 | 실제 |  |');
+  expect(lines).toContain(`AB1001 | 조정 | 1 | ${r.roundsTotal} | ${m.firstError} m | ${m.directionError} 밀 | — | 무력화 | 무력화 (${cas}%) | 일치 |`);
+  expect(lines).toContain('아군 진지 없음 · 관측소 이동 0회 · 위험근접 미선언 0회 · 아군 근접 탄착 0회');
+  // 기록
+  expect(lines).toContain(`적 섬멸 시간 | ${clock(r.clearTick!)} |`);
+  expect(lines).toContain(`사용 포탄 | ${r.roundsTotal}발 |`);
+  expect(lines).toContain(`초탄 오차 평균 | ${m.firstError} m |`);
+  expect(lines).toContain(`방향 오차 평균 | ${m.directionError} 밀 |`);
+  expect(lines).toContain('아군 손실 | 0명 |');
+  expect(lines).toContain('조기 격퇴 | 1개 소대 |');
+  expect(lines).toContain('전과 보고 정확도 | 100% |');
+  expect(lines).toContain(`부대당 탄 | ${r.roundsTotal} |`);
+  expect(lines).toContain('격멸·제압 | 1/1 |');
+  expect(lines.join('\n')).not.toContain('관측반 전투 불능');
+});
+
+test('F-13: 사후강평 화면 — 사격 없이 시간 한도까지', () => {
+  // The base scenario's positions with no enemy: the game runs to the 40분 한도 and nobody fires.
+  const sim = started();
+  while (sim.state.phase === 'live') sim.step([]);
+  const lines = debrief(sim);
+  expect(lines).toContain(`경과 40:00 · 사용 탄 0발 · 점수 ${sim.state.score} · 시드 일일 7`);
+  expect(lines).toContain('사격 임무 없음');
+  expect(lines).toContain('아군 1소대 24/24 · 아군 2소대 24/24 · 아군 3소대 24/24 (손실 0명) · 관측소 이동 0회 · 위험근접 미선언 0회 · 아군 근접 탄착 0회');
+  expect(lines).toContain('적 섬멸 시간 | 미섬멸 |');
+  expect(lines).toContain('초탄 오차 평균 | — |');
+  expect(lines).toContain('전과 보고 정확도 | — |');
+  expect(lines).toContain('부대당 탄 | — |');
+  expect(lines).toContain('격멸·제압 | 0/0 |');
+}, 30000);
+
+test('F-13: 머리띠의 경과·점수·사용 탄', () => {
+  const band = (sim: Sim) => text(<HeadBand tick={sim.state.tick} score={sim.state.score} rounds={sim.record().roundsTotal} />);
+  const sim = aimedAt(INF_RECON, 2, 0, CALL_ADJUST, FFE5, { x: 100, y: 0 });
+  expect(band(sim)).toEqual([`경과 ${clock(sim.state.tick)} · 점수 0 · 사용 탄 0발`]);
+  untilLanded(sim);
+  expect(band(sim)).toEqual([`경과 ${clock(sim.state.tick)} · 점수 ${sim.state.score} · 사용 탄 1발`]);
+});
+
+test('F-13: 사후강평 화면 — 협차 준수', () => {
+  // Each 사거리 수정 at most half the one before (+1 m): the bracket was kept (demo brk).
+  expect(bracket([400, 200, 100, 50])).toBe('400→200→100→50 ✓');
+  expect(bracket([400, 201])).toBe('400→201 ✓');
+  expect(bracket([400, 202])).toBe('400→202 ✗');
+  expect(bracket([200, 100, 100])).toBe('200→100→100 ✗');
+  expect(bracket([200])).toBe('200');
+  expect(bracket([])).toBe('—');
+});

@@ -52,8 +52,9 @@ export interface Member {
 
 /** wait: before its start time · approach/assault: infantry on the move · hold: the recon at its post ·
  * support: APCs halted and firing · emplaced: the mortar section · broken: 무력화 (30% casualties): it stops, then
- * falls back · destroyed: 파괴 (60%): it stays where it is and does nothing more. */
-export type PlatoonState = 'wait' | 'approach' | 'assault' | 'hold' | 'support' | 'emplaced' | 'broken' | 'destroyed';
+ * falls back · destroyed: 파괴 (60%): it stays where it is and does nothing more · overran: 진지 돌파 (infantry within
+ * 80 m of its objective with under 30% casualties): it stays there, is never judged again, and the game is no 섬멸. */
+export type PlatoonState = 'wait' | 'approach' | 'assault' | 'hold' | 'support' | 'emplaced' | 'broken' | 'destroyed' | 'overran';
 
 /** 실제 배치 of one unit, decided by the seed when the simulation is created, and how it moves since. */
 export interface Platoon {
@@ -110,7 +111,8 @@ export interface FieldEffect {
   vis: boolean;
 }
 
-/** ended: 관측반 손실 (and, from M1-14, the other end conditions): the clock stops and every input is ignored. */
+/** ended (종료): every combat unit down (8 s after nothing is owed or in the air), the 40분 한도, or 관측반 손실: the clock
+ * stops and every input is ignored. */
 export type Phase = 'prep' | 'live' | 'ended';
 
 /** 관측소 상태: ready (equipment set up), moving (도보 이동: 육안 only), setup (장비 설치, 30 s after arrival). */
@@ -206,7 +208,8 @@ export interface ImpactEvent {
 /** What happened to the post or the 관측반, for the log (the texts are the ui's): arrived · set up (장비 설치 끝) ·
  * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost.
  * And to our positions: the enemy mortar's rounds begin to fall (26 s after its first volley) · our round fell within
- * 70 m of position `pos` and `k` men fell to it · the first enemy APC burst of the game. */
+ * 70 m of position `pos` and `k` men fell to it · the first enemy APC burst of the game · unit `pid` overran its
+ * objective (진지 돌파). */
 export type PostNote =
   | { what: 'arrived' | 'set_up' }
   | { what: 'compromised'; pid: number; fire: Shooter | null }
@@ -214,7 +217,8 @@ export type PostNote =
   | { what: 'lost'; cause: Shooter | 'friendly' }
   | { what: 'shelling' }
   | { what: 'apc_fire' }
-  | { what: 'friendly_hit'; pos: number; k: number };
+  | { what: 'friendly_hit'; pos: number; k: number }
+  | { what: 'overrun'; pid: number };
 export type PostEvent = { type: 'post'; tick: number } & PostNote;
 
 /** 사건. */
@@ -299,6 +303,10 @@ export interface SimState {
   fire: { shooter: Shooter; at: Point; pid: number; fired: number } | null;
   /** 관측반 전투 불능: the operation ends 4 s later. */
   observerLost: boolean;
+  /** The tick every combat unit was down with no 진지 돌파 (섬멸 if the 관측반 lives on); −1 not (yet). */
+  clearTick: number;
+  /** The tick a game whose combat units are all down ends, while nothing is owed or in the air; −1 none. */
+  endAt: number;
   platoons: Platoon[];
   friendlies: FriendlyMan[]; // 아군 소대, 24 men per position, in position order
   truck: Truck | null; // null when the terrain has no supply road
@@ -321,9 +329,29 @@ export interface SimState {
 type DeepReadonly<T> = { readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K] };
 export type ReadonlySimState = DeepReadonly<SimState>;
 
-/** 판 기록 (no creation time; the record store stamps it). */
+/** 판 기록 (PRD 10.2; no creation time: the record store stamps it). */
 export interface GameRecord {
   ticks: number;
+  seed: number;
+  seedKind: SeedKind;
+  cleared: boolean; // 섬멸: every combat unit 격멸·제압, no 진지 돌파, the 관측반 alive
+  clearTick: number | null; // 섬멸 시간, ticks from 작전 개시; null unless cleared
+  roundsTotal: number; // 사용 포탄: every round fired, adjusting and 효력사 (those in the air too)
+  missions: number; // missions that fired
+  adjustRounds: number; // corrections, over the missions that fired
+  firstErrorAvg: number | null; // 초탄 오차 평균, m (rounded); null: no mission had one
+  directionErrorAvg: number | null; // 방향 오차 평균, mils (rounded)
+  reportAccuracyPct: number | null; // 전과 보고 정확도: reports that matched the truth, % of those judged
+  roundsPerUnit: number | null; // 부대당 탄: rounds ÷ units neutralized, one decimal
+  neutralized: number; // 격멸·제압: combat units broken or destroyed
+  combatUnits: number; // … of all combat units (the 정찰조 is none)
+  earlyDefeats: number; // 조기 격퇴: infantry platoons down before their assault
+  friendlyHits: number; // 아군 근접 탄착: rounds within 70 m of a position, a round per position
+  friendlyLosses: number; // 아군 손실, men
+  dangerCloseMissed: number; // 위험근접 미선언, missions
+  observerLost: boolean;
+  postMoves: number; // 관측소 이동
+  compromised: boolean; // 발각된 적이 있음
   score: number;
 }
 

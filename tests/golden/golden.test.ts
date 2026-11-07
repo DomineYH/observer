@@ -58,4 +58,19 @@ describe('골든', () => {
     expect(sim.state.op).toEqual({ x: 5200, y: 1800 });
     expect(sim.state.observerLost).toBe(false);
   }, 30000);
+
+  test('골든: ③ 사격 없이 시간 한도까지', () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('3-time-limit.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(data.inputs).toHaveLength(1); // 개시 only: nothing is fired
+    expect(data.totalTicks).toBe(48000); // the 40분 한도 is the terminal tick (#33: no padding past it)
+    const terrain = generateTerrain(data.seed);
+    expect(terrainHash(terrain)).toBe(header);
+    const result = replay(data, terrain, BASE_SCENARIO);
+    expect(result).toEqual(expected);
+    // The script does what it says, read off its record: the limit ended it, no round was fired, the 관측반 lived.
+    expect(result.record).toMatchObject({ ticks: 48000, roundsTotal: 0, missions: 0, observerLost: false, cleared: false, clearTick: null });
+    expect(result.checkpoints.at(-1)!.tick).toBe(48000);
+  }, 60000); // one replay hashing every tick (~10 s alone)
 });
+

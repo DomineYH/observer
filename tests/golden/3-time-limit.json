@@ -1,0 +1,1028 @@
+{
+  "terrainHash": "069cd970fa0564a1",
+  "replay": {
+    "format": 1,
+    "simVersion": 15,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "scenario": {
+      "id": "base",
+      "version": 1
+    },
+    "guns": {
+      "id": "base",
+      "version": 1
+    },
+    "weather": {
+      "visibilityM": 24000,
+      "cloudPct": 15,
+      "windFromDeg": 285,
+      "windSpeedTenthMs": 26,
+      "tempTenthC": 94,
+      "precipTenthMmH": 0,
+      "pressureHpa": 1023,
+      "humidityPct": 48
+    },
+    "mode": "standard",
+    "stepMs": 50,
+    "inputs": [
+      {
+        "t": 0,
+        "a": "start",
+        "v": [
+          5120,
+          1800
+        ]
+      }
+    ],
+    "totalTicks": 48000
+  },
+  "record": {
+    "ticks": 48000,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "cleared": false,
+    "clearTick": null,
+    "roundsTotal": 0,
+    "missions": 0,
+    "adjustRounds": 0,
+    "firstErrorAvg": null,
+    "directionErrorAvg": null,
+    "reportAccuracyPct": null,
+    "roundsPerUnit": 0,
+    "neutralized": 1,
+    "combatUnits": 4,
+    "earlyDefeats": 0,
+    "friendlyHits": 0,
+    "friendlyLosses": 12,
+    "dangerCloseMissed": 0,
+    "observerLost": false,
+    "postMoves": 0,
+    "compromised": false,
+    "score": -1263
+  },
+  "ignored": 0,
+  "chain": "ee625d6c94dbc4f9",
+  "checkpoints": [
+    {
+      "tick": 200,
+      "hash": "d20c190fae54ba7a"
+    },
+    {
+      "tick": 400,
+      "hash": "e3a4cb22e4fbf4b3"
+    },
+    {
+      "tick": 600,
+      "hash": "ad7b8284c7d8b811"
+    },
+    {
+      "tick": 800,
+      "hash": "354a5def9dd2b67a"
+    },
+    {
+      "tick": 1000,
+      "hash": "7ec4122c6e4874a5"
+    },
+    {
+      "tick": 1200,
+      "hash": "0995d7f5451b5294"
+    },
+    {
+      "tick": 1400,
+      "hash": "a3858e5b53915aaa"
+    },
+    {
+      "tick": 1600,
+      "hash": "34e53a4950a09178"
+    },
+    {
+      "tick": 1800,
+      "hash": "4a5c1143407e672e"
+    },
+    {
+      "tick": 2000,
+      "hash": "c3a0f02eaa30e27f"
+    },
+    {
+      "tick": 2200,
+      "hash": "bb9d07b4811ea5a9"
+    },
+    {
+      "tick": 2400,
+      "hash": "efd6f529e6c710b0"
+    },
+    {
+      "tick": 2600,
+      "hash": "19c0e26a4fd23f9b"
+    },
+    {
+      "tick": 2800,
+      "hash": "f3f421c0618f7c41"
+    },
+    {
+      "tick": 3000,
+      "hash": "9f1ae391767ab9f4"
+    },
+    {
+      "tick": 3200,
+      "hash": "3c72e3dac22fb85b"
+    },
+    {
+      "tick": 3400,
+      "hash": "6daf29c0ed7183b9"
+    },
+    {
+      "tick": 3600,
+      "hash": "6beccb7b5e2275de"
+    },
+    {
+      "tick": 3800,
+      "hash": "12192f4bbdc11d46"
+    },
+    {
+      "tick": 4000,
+      "hash": "cc231a1dda1f6de0"
+    },
+    {
+      "tick": 4200,
+      "hash": "770fad35983e0ac4"
+    },
+    {
+      "tick": 4400,
+      "hash": "e34ed1bf5fc470fe"
+    },
+    {
+      "tick": 4600,
+      "hash": "457e62b1faf9f934"
+    },
+    {
+      "tick": 4800,
+      "hash": "3a30ef98a815e765"
+    },
+    {
+      "tick": 5000,
+      "hash": "779f6070a0511c31"
+    },
+    {
+      "tick": 5200,
+      "hash": "f6eb7ad6670948a3"
+    },
+    {
+      "tick": 5400,
+      "hash": "b176bd42182e0b33"
+    },
+    {
+      "tick": 5600,
+      "hash": "21959999ea9c5e38"
+    },
+    {
+      "tick": 5800,
+      "hash": "12fc925effd2e14b"
+    },
+    {
+      "tick": 6000,
+      "hash": "6f41d0ea9ef6437b"
+    },
+    {
+      "tick": 6200,
+      "hash": "3b810932b60a76d7"
+    },
+    {
+      "tick": 6400,
+      "hash": "1cb6d24268ef786b"
+    },
+    {
+      "tick": 6600,
+      "hash": "502d43384611db59"
+    },
+    {
+      "tick": 6800,
+      "hash": "db2ac29e8d4dbf57"
+    },
+    {
+      "tick": 7000,
+      "hash": "38cb32daf8ae5e07"
+    },
+    {
+      "tick": 7200,
+      "hash": "ed10645cec3b9501"
+    },
+    {
+      "tick": 7400,
+      "hash": "54ec5faa2d186cf3"
+    },
+    {
+      "tick": 7600,
+      "hash": "d9dba30c4b36bb5d"
+    },
+    {
+      "tick": 7800,
+      "hash": "b0ae231302185eea"
+    },
+    {
+      "tick": 8000,
+      "hash": "9303969723d7fd7a"
+    },
+    {
+      "tick": 8200,
+      "hash": "301ac25077ce9d95"
+    },
+    {
+      "tick": 8400,
+      "hash": "4631bf0cbad8a285"
+    },
+    {
+      "tick": 8600,
+      "hash": "fd5d4a2531817984"
+    },
+    {
+      "tick": 8800,
+      "hash": "b383d788aa621a15"
+    },
+    {
+      "tick": 9000,
+      "hash": "5ac5239a8a13669f"
+    },
+    {
+      "tick": 9200,
+      "hash": "042f5a8362e5b30a"
+    },
+    {
+      "tick": 9400,
+      "hash": "e380733f3b6dc6ca"
+    },
+    {
+      "tick": 9600,
+      "hash": "a81ecec407a143b5"
+    },
+    {
+      "tick": 9800,
+      "hash": "6b6613297fc3fcc4"
+    },
+    {
+      "tick": 10000,
+      "hash": "cac69f3d865eaafc"
+    },
+    {
+      "tick": 10200,
+      "hash": "39336ebfd72b623a"
+    },
+    {
+      "tick": 10400,
+      "hash": "fe3218b59eba69b0"
+    },
+    {
+      "tick": 10600,
+      "hash": "297f886344adfc3e"
+    },
+    {
+      "tick": 10800,
+      "hash": "06fcc860b7b9d4b9"
+    },
+    {
+      "tick": 11000,
+      "hash": "649aa1c86134d4bd"
+    },
+    {
+      "tick": 11200,
+      "hash": "eb3e7d1320b6cbf2"
+    },
+    {
+      "tick": 11400,
+      "hash": "3a489c133e7e0e3e"
+    },
+    {
+      "tick": 11600,
+      "hash": "fbd396fa5930405b"
+    },
+    {
+      "tick": 11800,
+      "hash": "586acb642e7cc8e5"
+    },
+    {
+      "tick": 12000,
+      "hash": "d18ce04ea1b8dee3"
+    },
+    {
+      "tick": 12200,
+      "hash": "6470de702704abb1"
+    },
+    {
+      "tick": 12400,
+      "hash": "6a304481e5c34534"
+    },
+    {
+      "tick": 12600,
+      "hash": "81bbe185ffca6694"
+    },
+    {
+      "tick": 12800,
+      "hash": "60d12862bb087b43"
+    },
+    {
+      "tick": 13000,
+      "hash": "0babb02a010549df"
+    },
+    {
+      "tick": 13200,
+      "hash": "8c7e6e6a4bf19037"
+    },
+    {
+      "tick": 13400,
+      "hash": "8a84bbade1bd387c"
+    },
+    {
+      "tick": 13600,
+      "hash": "ba594b2ad668f603"
+    },
+    {
+      "tick": 13800,
+      "hash": "46bdf616287b7687"
+    },
+    {
+      "tick": 14000,
+      "hash": "d0d3359d99aa69f4"
+    },
+    {
+      "tick": 14200,
+      "hash": "e00987cd605d85bc"
+    },
+    {
+      "tick": 14400,
+      "hash": "cd6166552a1ee59c"
+    },
+    {
+      "tick": 14600,
+      "hash": "d10b63e490b39e85"
+    },
+    {
+      "tick": 14800,
+      "hash": "15c613c9d3965428"
+    },
+    {
+      "tick": 15000,
+      "hash": "895b43adc9263ba8"
+    },
+    {
+      "tick": 15200,
+      "hash": "ff7ff5fae4c7c79b"
+    },
+    {
+      "tick": 15400,
+      "hash": "fcfba82c7215f8b5"
+    },
+    {
+      "tick": 15600,
+      "hash": "981c436479251149"
+    },
+    {
+      "tick": 15800,
+      "hash": "319c9dfba909f046"
+    },
+    {
+      "tick": 16000,
+      "hash": "eed47d5d7b593f4c"
+    },
+    {
+      "tick": 16200,
+      "hash": "445134243b8067c5"
+    },
+    {
+      "tick": 16400,
+      "hash": "56113f7138a419f0"
+    },
+    {
+      "tick": 16600,
+      "hash": "f1362b8d3a333650"
+    },
+    {
+      "tick": 16800,
+      "hash": "9e9677d8e335702d"
+    },
+    {
+      "tick": 17000,
+      "hash": "ae5815297e6ed6c4"
+    },
+    {
+      "tick": 17200,
+      "hash": "3b8709d1b7b3e4e4"
+    },
+    {
+      "tick": 17400,
+      "hash": "41825d793868ad7c"
+    },
+    {
+      "tick": 17600,
+      "hash": "f5f8a3b79e8d257a"
+    },
+    {
+      "tick": 17800,
+      "hash": "f9fe31ae0950c8f3"
+    },
+    {
+      "tick": 18000,
+      "hash": "ee62f8e81a4b35d9"
+    },
+    {
+      "tick": 18200,
+      "hash": "83bf734e2f4da367"
+    },
+    {
+      "tick": 18400,
+      "hash": "8ab7f77bbb77a75e"
+    },
+    {
+      "tick": 18600,
+      "hash": "50ad31186b9de0f9"
+    },
+    {
+      "tick": 18800,
+      "hash": "b903f4af3517a5de"
+    },
+    {
+      "tick": 19000,
+      "hash": "8f764d54b200ba3d"
+    },
+    {
+      "tick": 19200,
+      "hash": "14e4fecadfd9c923"
+    },
+    {
+      "tick": 19400,
+      "hash": "876ae3c2fb77742f"
+    },
+    {
+      "tick": 19600,
+      "hash": "175754b8cf4bedc1"
+    },
+    {
+      "tick": 19800,
+      "hash": "121866ae7fad35d3"
+    },
+    {
+      "tick": 20000,
+      "hash": "cb99ec487487745d"
+    },
+    {
+      "tick": 20200,
+      "hash": "cd7978a11ee97234"
+    },
+    {
+      "tick": 20400,
+      "hash": "30fd310113e93088"
+    },
+    {
+      "tick": 20600,
+      "hash": "a8d6c4064858698b"
+    },
+    {
+      "tick": 20800,
+      "hash": "66cd347c19f023f5"
+    },
+    {
+      "tick": 21000,
+      "hash": "a46c8c84a3b6cb25"
+    },
+    {
+      "tick": 21200,
+      "hash": "d8dae321db945900"
+    },
+    {
+      "tick": 21400,
+      "hash": "5bf3ea88bb743635"
+    },
+    {
+      "tick": 21600,
+      "hash": "bb6da4e8fe2a8aa5"
+    },
+    {
+      "tick": 21800,
+      "hash": "c0acb1f81d582659"
+    },
+    {
+      "tick": 22000,
+      "hash": "b99b7fccb1dd97a9"
+    },
+    {
+      "tick": 22200,
+      "hash": "93e100964a362e9b"
+    },
+    {
+      "tick": 22400,
+      "hash": "1c87bb036ae90fbe"
+    },
+    {
+      "tick": 22600,
+      "hash": "e5465c239a19ce56"
+    },
+    {
+      "tick": 22800,
+      "hash": "a8bc007097b39ef1"
+    },
+    {
+      "tick": 23000,
+      "hash": "e8faa4c5bd94d7dc"
+    },
+    {
+      "tick": 23200,
+      "hash": "7166f6958c608984"
+    },
+    {
+      "tick": 23400,
+      "hash": "a80d6f5bc530484e"
+    },
+    {
+      "tick": 23600,
+      "hash": "e1df019c3e198fcd"
+    },
+    {
+      "tick": 23800,
+      "hash": "18adff28350798e9"
+    },
+    {
+      "tick": 24000,
+      "hash": "d75358bf9f832606"
+    },
+    {
+      "tick": 24200,
+      "hash": "e09fa9a9c7f62dd8"
+    },
+    {
+      "tick": 24400,
+      "hash": "bc0ea2363db11f5f"
+    },
+    {
+      "tick": 24600,
+      "hash": "53e98279f2e93cd8"
+    },
+    {
+      "tick": 24800,
+      "hash": "5e3538ab08c7f756"
+    },
+    {
+      "tick": 25000,
+      "hash": "f14f0ae18e42ec28"
+    },
+    {
+      "tick": 25200,
+      "hash": "bee1431caf2e1e75"
+    },
+    {
+      "tick": 25400,
+      "hash": "eff7dd7735fcc4ea"
+    },
+    {
+      "tick": 25600,
+      "hash": "05c33923447303fa"
+    },
+    {
+      "tick": 25800,
+      "hash": "33acaef9c1779868"
+    },
+    {
+      "tick": 26000,
+      "hash": "1cea085aefccdab7"
+    },
+    {
+      "tick": 26200,
+      "hash": "f6d7731c3e7fb815"
+    },
+    {
+      "tick": 26400,
+      "hash": "4af301d1ad9550cc"
+    },
+    {
+      "tick": 26600,
+      "hash": "642f973a1446296b"
+    },
+    {
+      "tick": 26800,
+      "hash": "67292ab2ff6c5dc7"
+    },
+    {
+      "tick": 27000,
+      "hash": "03ae77cd339b6b98"
+    },
+    {
+      "tick": 27200,
+      "hash": "cd4e07b4bbeb21b5"
+    },
+    {
+      "tick": 27400,
+      "hash": "e62f86e27d5fee2b"
+    },
+    {
+      "tick": 27600,
+      "hash": "5a95416f466377f6"
+    },
+    {
+      "tick": 27800,
+      "hash": "00cc9846797162bf"
+    },
+    {
+      "tick": 28000,
+      "hash": "99ae1f24339dde8d"
+    },
+    {
+      "tick": 28200,
+      "hash": "4fd73076c27f862f"
+    },
+    {
+      "tick": 28400,
+      "hash": "2afb09d9dee691fc"
+    },
+    {
+      "tick": 28600,
+      "hash": "e5662149ee366650"
+    },
+    {
+      "tick": 28800,
+      "hash": "9656219346813bc2"
+    },
+    {
+      "tick": 29000,
+      "hash": "eff052dbf62b168a"
+    },
+    {
+      "tick": 29200,
+      "hash": "04c8d6e064afcd81"
+    },
+    {
+      "tick": 29400,
+      "hash": "26aa6e8eb41acfdb"
+    },
+    {
+      "tick": 29600,
+      "hash": "35039bbb875154f6"
+    },
+    {
+      "tick": 29800,
+      "hash": "b111bb3e98111963"
+    },
+    {
+      "tick": 30000,
+      "hash": "97a26a018bf07d4c"
+    },
+    {
+      "tick": 30200,
+      "hash": "a73ee5ad72ecb280"
+    },
+    {
+      "tick": 30400,
+      "hash": "dd94042d6dfa1d20"
+    },
+    {
+      "tick": 30600,
+      "hash": "9facee33a51ac9f6"
+    },
+    {
+      "tick": 30800,
+      "hash": "7b59d2d03aae6e95"
+    },
+    {
+      "tick": 31000,
+      "hash": "bd5af0d36def2f36"
+    },
+    {
+      "tick": 31200,
+      "hash": "ff6638d63b5815a7"
+    },
+    {
+      "tick": 31400,
+      "hash": "45f98884a14695dd"
+    },
+    {
+      "tick": 31600,
+      "hash": "3553369f2df61ba2"
+    },
+    {
+      "tick": 31800,
+      "hash": "12a9a335a5d7a238"
+    },
+    {
+      "tick": 32000,
+      "hash": "a3ea3696cac9149b"
+    },
+    {
+      "tick": 32200,
+      "hash": "f8717ae066df5ae5"
+    },
+    {
+      "tick": 32400,
+      "hash": "347fb61cfe23ff65"
+    },
+    {
+      "tick": 32600,
+      "hash": "05eaddcbe1621142"
+    },
+    {
+      "tick": 32800,
+      "hash": "2ee9ad3c7135e5f5"
+    },
+    {
+      "tick": 33000,
+      "hash": "ad5eb8db854c9a32"
+    },
+    {
+      "tick": 33200,
+      "hash": "ce1e2185c0ecf760"
+    },
+    {
+      "tick": 33400,
+      "hash": "6df713f9a3b31c98"
+    },
+    {
+      "tick": 33600,
+      "hash": "a01bf45db2ed6388"
+    },
+    {
+      "tick": 33800,
+      "hash": "5d10596b3b828212"
+    },
+    {
+      "tick": 34000,
+      "hash": "3048a19fa6404076"
+    },
+    {
+      "tick": 34200,
+      "hash": "f7ead4ac8a2c1d21"
+    },
+    {
+      "tick": 34400,
+      "hash": "b1b90e58be05a905"
+    },
+    {
+      "tick": 34600,
+      "hash": "fcd51ce7676027ae"
+    },
+    {
+      "tick": 34800,
+      "hash": "23143569c082f3c0"
+    },
+    {
+      "tick": 35000,
+      "hash": "6e4f1ddbc6bea686"
+    },
+    {
+      "tick": 35200,
+      "hash": "468db6c6d507bc97"
+    },
+    {
+      "tick": 35400,
+      "hash": "a792855387cf47fe"
+    },
+    {
+      "tick": 35600,
+      "hash": "c3bbf6a44225d5a9"
+    },
+    {
+      "tick": 35800,
+      "hash": "a9beae9f12f51742"
+    },
+    {
+      "tick": 36000,
+      "hash": "a26801fcaa6fce29"
+    },
+    {
+      "tick": 36200,
+      "hash": "eb6edd49323700c0"
+    },
+    {
+      "tick": 36400,
+      "hash": "f559df0994967dc0"
+    },
+    {
+      "tick": 36600,
+      "hash": "257a565089c7f871"
+    },
+    {
+      "tick": 36800,
+      "hash": "9d3a7a54a875cdf9"
+    },
+    {
+      "tick": 37000,
+      "hash": "a830ec59398aff70"
+    },
+    {
+      "tick": 37200,
+      "hash": "7599db0a8884ea23"
+    },
+    {
+      "tick": 37400,
+      "hash": "a31b62a419e16a8d"
+    },
+    {
+      "tick": 37600,
+      "hash": "5c70fd0c84530819"
+    },
+    {
+      "tick": 37800,
+      "hash": "840ad0c72150a7ea"
+    },
+    {
+      "tick": 38000,
+      "hash": "4b291d039b90e49e"
+    },
+    {
+      "tick": 38200,
+      "hash": "8f1175134b8796e2"
+    },
+    {
+      "tick": 38400,
+      "hash": "05bfede697bf7043"
+    },
+    {
+      "tick": 38600,
+      "hash": "44f02e111f64e064"
+    },
+    {
+      "tick": 38800,
+      "hash": "7136b8abb0ef9ace"
+    },
+    {
+      "tick": 39000,
+      "hash": "504030158319963c"
+    },
+    {
+      "tick": 39200,
+      "hash": "c4512b73465d2cce"
+    },
+    {
+      "tick": 39400,
+      "hash": "9adb75a8abf225d5"
+    },
+    {
+      "tick": 39600,
+      "hash": "b83938da164e018b"
+    },
+    {
+      "tick": 39800,
+      "hash": "de59c0058482b520"
+    },
+    {
+      "tick": 40000,
+      "hash": "6de3afc11b4c8b74"
+    },
+    {
+      "tick": 40200,
+      "hash": "4729eaab8b2f0f72"
+    },
+    {
+      "tick": 40400,
+      "hash": "d909cacef5332b53"
+    },
+    {
+      "tick": 40600,
+      "hash": "819dfd810b909d64"
+    },
+    {
+      "tick": 40800,
+      "hash": "4d66a207ea60399e"
+    },
+    {
+      "tick": 41000,
+      "hash": "d7aace57e1d423fa"
+    },
+    {
+      "tick": 41200,
+      "hash": "eeab0979670f3fa0"
+    },
+    {
+      "tick": 41400,
+      "hash": "1042ebea1a067a8b"
+    },
+    {
+      "tick": 41600,
+      "hash": "e96c2e1427e8be19"
+    },
+    {
+      "tick": 41800,
+      "hash": "f8d3bd2c28d47995"
+    },
+    {
+      "tick": 42000,
+      "hash": "867926ba131f440f"
+    },
+    {
+      "tick": 42200,
+      "hash": "deb15ec05e3505bd"
+    },
+    {
+      "tick": 42400,
+      "hash": "b046dfbc94c71651"
+    },
+    {
+      "tick": 42600,
+      "hash": "4cd510358181a258"
+    },
+    {
+      "tick": 42800,
+      "hash": "aaef205d0a2f5078"
+    },
+    {
+      "tick": 43000,
+      "hash": "653068e9b5b8165c"
+    },
+    {
+      "tick": 43200,
+      "hash": "b0f86590faad10c5"
+    },
+    {
+      "tick": 43400,
+      "hash": "2cfe326298c45563"
+    },
+    {
+      "tick": 43600,
+      "hash": "280fd83c2052f45d"
+    },
+    {
+      "tick": 43800,
+      "hash": "d9f64051edb3e528"
+    },
+    {
+      "tick": 44000,
+      "hash": "d720f76e0a70202f"
+    },
+    {
+      "tick": 44200,
+      "hash": "c16ca3f1a1a399a0"
+    },
+    {
+      "tick": 44400,
+      "hash": "a6c8e987bab9b206"
+    },
+    {
+      "tick": 44600,
+      "hash": "076e8a7652894a7b"
+    },
+    {
+      "tick": 44800,
+      "hash": "5e770b5a7c2714d3"
+    },
+    {
+      "tick": 45000,
+      "hash": "2796ee99fe2c67c4"
+    },
+    {
+      "tick": 45200,
+      "hash": "d07541563684074b"
+    },
+    {
+      "tick": 45400,
+      "hash": "1875dadcf5c4b6b5"
+    },
+    {
+      "tick": 45600,
+      "hash": "b1f2bde7d30648ce"
+    },
+    {
+      "tick": 45800,
+      "hash": "e9583542fc7d0c9b"
+    },
+    {
+      "tick": 46000,
+      "hash": "44f6df0d6e229770"
+    },
+    {
+      "tick": 46200,
+      "hash": "464b499d7ade8454"
+    },
+    {
+      "tick": 46400,
+      "hash": "261a391ffdf0dac2"
+    },
+    {
+      "tick": 46600,
+      "hash": "34b99312979064eb"
+    },
+    {
+      "tick": 46800,
+      "hash": "fbd50e74dce35dcd"
+    },
+    {
+      "tick": 47000,
+      "hash": "6154c0a4f33ac6f1"
+    },
+    {
+      "tick": 47200,
+      "hash": "82cd53b101ecd108"
+    },
+    {
+      "tick": 47400,
+      "hash": "a563d35cfb548f75"
+    },
+    {
+      "tick": 47600,
+      "hash": "f044b657cc47dff2"
+    },
+    {
+      "tick": 47800,
+      "hash": "bbbe6daef0a6ab53"
+    },
+    {
+      "tick": 48000,
+      "hash": "d30c5cf26456b057"
+    }
+  ]
+}

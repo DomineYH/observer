@@ -5,7 +5,7 @@ import { exp } from './math';
 import type { Ctx } from './procedure';
 import { schedule } from './queue';
 import { gauss, next, type Stream } from './rng';
-import { heightAt } from './terrain';
+import { heightAt, type Point } from './terrain';
 import type { FriendlyMan, Platoon, SimState } from './types';
 
 const DT = 0.05;
@@ -19,6 +19,9 @@ const LOSS_POINTS = -10;
 const SHELL_POINTS = -5; // 박격포 피탄, a round
 const ENEMY_M = 400; // 적 보병 사격: within this of a position
 const OURS = { m: 70, points: -200 }; // 아군 포탄: a round this close to a position
+
+/** 아군 근접 탄착: a round at (x, y) within 70 m of position `f`. */
+export const nearFriend = (f: Point, x: number, y: number) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) < OURS.m * OURS.m;
 
 /** 적 보병 사격 (PRD 6장): the chance per tick that one of our men falls to an enemy platoon `d` m from his position with
  * `ea` of its men left: 0.12 % per second × ea × (400 − d)/400, halved lying down. */
@@ -105,7 +108,7 @@ export function runLossAct(s: SimState, ctx: Ctx, act: 'shell' | 'shelling_note'
 /** Our round at (x, y): for each position within 70 m, −200 and the men within 30 m of it may fall (탄도 draws). */
 export function friendlyRound(s: SimState, ctx: Ctx, x: number, y: number): void {
   ctx.friends.forEach((f, pos) => {
-    if ((f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) >= OURS.m * OURS.m) return;
+    if (!nearFriend(f, x, y)) return;
     s.score += OURS.points;
     ctx.note({ what: 'friendly_hit', pos, k: hitFriendlies(s, x, y, 'ours', ctx.bal) });
   });

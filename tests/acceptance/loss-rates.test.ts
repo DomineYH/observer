@@ -10,7 +10,7 @@
 import { describe, expect, test } from 'vitest';
 import { enemyFireChance, friendlyLossChance, type Point, type Scenario, type UnitDef } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { dist, started } from './enemy';
+import { dist, RESERVE, started } from './enemy';
 import { flatTerrain } from './terrain';
 
 interface Pool {
@@ -49,6 +49,7 @@ describe('F-29: 아군 손실의 확률', () => {
     const standing = pool();
     const prone = pool();
     while (sim.state.tick < 16000) {
+      if (sim.state.phase !== 'live') throw new Error(`game over at ${sim.state.tick}`);
       const was = sim.state.friendlies.map((m) => ({ alive: m.alive, prone: m.prone }));
       sim.step([]);
       const t = sim.state.tick;
@@ -68,17 +69,20 @@ describe('F-29: 아군 손실의 확률', () => {
 
   test('F-29: 적 보병 사격에 의한 손실 — 잔존률·근접도·엎드림', () => {
     // Three spots 1.1 km apart, each with two positions 60 m apart and twelve enemy platoons parked on it: about 30 m
-    // from the positions at the two outer spots, 190–250 m at the middle one. Nothing else hurts our men. Our direct
-    // fire thins each platoon from whole to 40 % (파괴), and about half our men lie down in their places.
+    // from the positions at the two outer spots, 190–250 m at the middle one. Nothing else hurts our men. Parked on their
+    // objectives, the platoons overrun them at once (진지 돌파: never judged again, still firing); our direct fire thins
+    // them from whole, and about half our men lie down in their places. The RESERVE keeps the game going.
     const spots: Point[] = [{ x: 800, y: 2000 }, { x: 1900, y: 2000 }, { x: 3000, y: 2000 }];
     const friends = spots.flatMap((f) => [f, { x: f.x, y: f.y + 60 }]);
     const parked = (f: Point, d: number) => [{ x: f.x, y: f.y + d }, { x: f.x, y: f.y + d + 1 }];
     const routes = { A: parked(spots[0]!, 30), B: parked(spots[1]!, 250), C: parked(spots[2]!, 30) };
     const units: UnitDef[] = (['A', 'B', 'C'] as const).flatMap((route) => Array.from({ length: 12 }, () => ({ type: 'inf' as const, route, t0: 0 })));
+    units.push(RESERVE);
     const sim = started({ ...BASE_SCENARIO, routes, units, friends }, { seed: 1, terrain: flatTerrain({ n: 384 }) });
     const far = (pos: number) => pos === 2 || pos === 3;
     const P = { standing: pool(), prone: pool(), near: pool(), far: pool(), whole: pool(), thinned: pool() };
     while (sim.state.tick < 10000) {
+      if (sim.state.phase !== 'live') throw new Error(`game over at ${sim.state.tick}`);
       const was = sim.state.friendlies.map((m) => ({ alive: m.alive, prone: m.prone }));
       sim.step([]);
       // Per position, the platoons firing on it this tick: infantry, set off, not destroyed, not down, within 400 m.

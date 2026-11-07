@@ -18,6 +18,8 @@ import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
+import { HeadBand } from '@ui/HeadBand';
+import { Debrief } from '@ui/Debrief';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
 import { selectBackend } from './backend';
 import { CLEAR_WEATHER } from './clearWeather';
@@ -106,6 +108,8 @@ function App() {
   const tick = useSyncExternalStore(subscribe, () => sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
   const phase = useSyncExternalStore(subscribe, () => sim.state.phase);
+  const score = useSyncExternalStore(subscribe, () => sim.state.score);
+  const rounds = useSyncExternalStore(subscribe, () => sim.record().roundsTotal);
   const op = useSyncExternalStore(subscribe, () => sim.state.op);
   const picked = useSyncExternalStore(subscribe, () => sim.state.picked);
   const reportDue = useSyncExternalStore(subscribe, () => sim.state.reportDue);
@@ -114,7 +118,9 @@ function App() {
   const names = { callsign: CALLSIGN, gridLetters: terrain.grid.letters };
   return (
     <>
+      {phase === 'ended' && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} />}
       <TickCounter tick={tick} />
+      <HeadBand tick={tick} score={score} rounds={rounds} />
       <SoundToggles sound={sound} />
       <ObservationView
         terrain={terrain}

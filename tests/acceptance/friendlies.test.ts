@@ -91,7 +91,9 @@ const dead = (sim: Sim) => sim.state.platoons[0]!.members.filter((m) => !m.alive
 
 describe('F-27: 아군 직사화기', () => {
   test('F-27: 아군 직사', () => {
-    const sim = started(scenario(), { terrain: field() });
+    // On through the position to an objective 1 km behind it: a platoon reaching its objective unbroken overruns it (#36).
+    const through = [...ROUTE, { x: 1280, y: 200 }];
+    const sim = started(scenario({ routes: { A: through, B: through, C: through } }), { terrain: field() });
     // Until 750 m nobody fires, and until 600 m no enemy falls (no artillery in this run).
     let first: ReturnType<typeof flashes>[number] | undefined;
     while (threat(sim) >= 750) {

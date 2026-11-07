@@ -30,7 +30,7 @@ test('F-09: 효과 보고의 표적 이름 — 입력기', () => {
   expect(reportName(struck(3)().state)).toEqual({ targetName: 'infantry', named: 1 });
   // 400 m off: no round lands within 220 m of it, so the report is about the unit the grid was sent for.
   const missed = struck(3, 400)();
-  expect(missed.state.missions[0]!.kills).toEqual([null]);
+  expect(missed.state.missions[0]!.kills).toEqual([null, null]); // the platoon and the reserve: none within 220 m
   expect(reportName(missed.state)).toEqual({ targetName: 'infantry', named: 1 });
   same(struck(3, 400));
   // No unit near: 표적.

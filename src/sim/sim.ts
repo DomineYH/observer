@@ -1,4 +1,5 @@
 import { deploy } from './deploy';
+import { checkEnd } from './end';
 import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
 import { exposureTick, runExposureAct } from './exposure';
@@ -10,11 +11,12 @@ import { applyMove, applyReport, runPostAct, updatePost } from './post';
 import { applyPrep } from './prep';
 import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
 import { takeDue } from './queue';
+import { recordOf } from './record';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
 import { updateVisibility } from './visibility';
 import type { RadioEvent } from './radio';
-import type { GameRecord, ImpactEvent, PostNote, Sim, SimInit, SimState, StepResult } from './types';
+import type { ImpactEvent, PostNote, Sim, SimInit, SimState, StepResult } from './types';
 
 export const STEP_MS = 50;
 const VIS_TICKS = 6;
@@ -35,6 +37,8 @@ export function createSim(init: SimInit): Sim {
     compromised: -1,
     fire: null,
     observerLost: false,
+    clearTick: -1,
+    endAt: -1,
     platoons: deploy(init.scenario, init.terrain, rng.scn),
     friendlies: [],
     truck: makeTruck(init.terrain.roads[init.scenario.supplyRoad]),
@@ -114,12 +118,11 @@ export function createSim(init: SimInit): Sim {
         updateIntel(state, init.weather);
         exposureTick(state, ctx); // every 5 s: does the enemy see the post?
         for (const p of state.platoons) p.activity = activityOf(p, state.tick);
+        checkEnd(state); // last (demo order)
       }
       return { events: out.map((e) => ({ ...e, tick: state.tick })), accepted };
     },
-    record(): GameRecord {
-      return { ticks: state.tick, score: state.score };
-    },
+    record: () => recordOf(state, init),
     hash: () => hashState(state),
   };
 }

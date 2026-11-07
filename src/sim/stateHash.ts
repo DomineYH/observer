@@ -12,7 +12,7 @@ const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
-const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced', 'broken', 'destroyed'];
+const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced', 'broken', 'destroyed', 'overran'];
 const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle', 'burst'];
 const CUES: readonly (Cue | null)[] = [null, 'man', 'veh', 'dust', 'muzzle'];
 const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready', 'flight', 'adjust', 'effect'];
@@ -73,6 +73,8 @@ export function hashState(state: SimState): string {
     h.u32(state.fire.fired);
   }
   h.u32(bit(state.observerLost));
+  h.i32(state.clearTick);
+  h.i32(state.endAt);
   for (const p of state.platoons) {
     h.u32(UNIT_TYPES.indexOf(p.type));
     h.u32(p.route === null ? 0 : ROUTE_KEYS.indexOf(p.route) + 1);
