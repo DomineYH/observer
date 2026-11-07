@@ -33,9 +33,9 @@ const intel = (sim: Sim, i = 0) => sim.state.platoons[i]!.intel;
 const eastmost = (sim: Sim, i = 0) =>
   sim.state.platoons[i]!.members.reduce((a, b) => (signed(angleTo(sim, b).az) > signed(angleTo(sim, a).az) ? b : a)) as Member;
 
-/** Centres of the dust and smoke discs the view paints, as `id` angles (0.1 mils), west to east: a 640 px view from
- * the flat-terrain observer aimed at `h`, `p` mils. */
-function painted(sim: Sim, w: Weather, h: number, p: number): { az: number; el: number }[] {
+/** Centres of the dust and smoke discs the view paints, as `id` angles (0.1 mils), west to east, with their painted
+ * half-width `half` (0.1 mils): a 640 px view from the flat-terrain observer aimed at `h`, `p` mils. */
+function painted(sim: Sim, w: Weather, h: number, p: number): { az: number; el: number; half: number }[] {
   const W = 640;
   const focal = focalOf(W, sim.state.bino);
   const geom = { eye: { x: 320, y: 320, z: 103.5 }, h, focal, cx: W / 2, hor: (W * 9) / 32 + Math.tan(p / MIL) * focal };
@@ -43,14 +43,15 @@ function painted(sim: Sim, w: Weather, h: number, p: number): { az: number; el: 
   drawEffects(buf, geom, sim.state, w);
   const lit = (x: number, y: number) => buf.pix[(y * W + x) * 4] !== 0;
   const cols = [...Array(W).keys()].map((x) => [...Array(buf.h).keys()].filter((y) => lit(x, y)));
-  const out: { az: number; el: number }[] = [];
+  const out: { az: number; el: number; half: number }[] = [];
   for (let x = 0; x < W; x++) {
     if (!cols[x]!.length || (x > 0 && cols[x - 1]!.length)) continue;
     let x1 = x;
     while (x1 + 1 < W && cols[x1 + 1]!.length) x1++;
     const ys = cols.slice(x, x1 + 1).flat();
     expect(x > 0 && x1 < W - 1 && Math.min(...ys) > 0 && Math.max(...ys) < buf.h - 1).toBe(true); // wholly in view
-    out.push(angleAt(geom, 1, (x + x1 + 1) / 2, (Math.min(...ys) + Math.max(...ys) + 1) / 2));
+    const y = (Math.min(...ys) + Math.max(...ys) + 1) / 2;
+    out.push({ ...angleAt(geom, 1, (x + x1 + 1) / 2, y), half: signed(angleAt(geom, 1, x1 + 1, y).az - angleAt(geom, 1, x, y).az) / 2 });
   }
   return out;
 }
@@ -274,6 +275,17 @@ describe('F-04', () => {
     expect(puffs).toHaveLength(3);
     expect(sim.step([idAt(puffs[1]!)]).accepted).toEqual([true]);
     expect(intel(sim)).toMatchObject({ stage: 1, cue: 'muzzle' });
+    // Anywhere on the painted disc counts: 6 mils east of the east puff's centre is still the puff. Past its edge
+    // and the binoculars' 3 mil reach beyond it, nothing is pressed.
+    const pressEast = (dAz: (east: { half: number }) => number) => {
+      const s = behindWall(CLEAR_WEATHER);
+      run(s, 99);
+      const east = painted(s, CLEAR_WEATHER, 13, 20)[2]!;
+      expect(east.half).toBeGreaterThan(90); // 10.5 m at 1 km
+      return s.step([idAt(east, dAz(east))]).accepted[0];
+    };
+    expect(pressEast(() => 60)).toBe(true);
+    expect(pressEast((east) => east.half + 30 + 5)).toBe(false);
 
     // A 20 m/s wind from the west carries the smoke about 100 m (≈ 100 mils) east in 5 s. Watching counts where the
     // smoke is seen, at half rate: aimed at the drifted plume it counts, aimed at where it was fired it does not.

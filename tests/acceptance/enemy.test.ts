@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { Sim } from '@sim';
 import { CLEAR_WEATHER } from '@app/clearWeather';
 import { dist, mortarAt, oneUnit, run, started, until, wallTerrain } from './enemy';
+import { flatTerrain } from './terrain';
 
 // A straight approach from the north onto the observer's position, 3 km long, waypoint in the middle.
 const NORTH = [
@@ -181,6 +182,24 @@ describe('F-04', () => {
     expect(walled.state.effects.map((e) => e.vis)).toEqual([false, false, false]); // just fired: still behind the wall
     until(walled, () => walled.state.effects.some((e) => e.vis), 220);
     expect(seen(walled, 'man')).toEqual([false]);
+  });
+
+  test('F-04: 신호는 데모의 탐지 크기로 본다', () => {
+    // A fresh APC muzzle signal is 1.5 m for detection: 1.6–1.7 mils at 875–920 m, seen by eye the tick it is made.
+    const apc = started(oneUnit({ type: 'apc', route: 'B', t0: 0 }, [{ x: 320, y: 2000 }, { x: 320, y: -100 }]));
+    until(apc, () => apc.state.effects.some((e) => e.kind === 'muzzle'));
+    const shots = apc.state.effects.filter((e) => e.kind === 'muzzle');
+    for (const e of shots) expect(Math.abs(dist(e, apc.state.op) - 900)).toBeLessThan(30);
+    expect(shots.map((e) => [e.small, e.vis])).toEqual([[true, true], [true, true]]);
+  });
+
+  test('F-04: 신호는 데모의 탐지 높이로 본다', () => {
+    // Fresh dust is looked for 3 m above where it rises: a 2.5 m ridge 15–55 m short of it hides 1.5 m, but not 3 m.
+    const ridge = flatTerrain({ n: 256 }); // 2.5 km square, so the ridge is on the map
+    for (let j = 120; j <= 124; j++) for (let i = 0; i < ridge.n; i++) ridge.surface[j * ridge.n + i]! += 2.5; // north 1,200–1,240
+    const dusty = started(oneUnit({ type: 'apc', route: 'B', t0: 0 }, [{ x: 320, y: 1320 }, { x: 320, y: 3320 }]), { terrain: ridge });
+    until(dusty, () => dusty.state.effects.length > 0);
+    expect(dusty.state.effects.map((e) => [e.kind, Math.round(e.y), e.vis])).toEqual([['dust', 1299, true], ['dust', 1254, true]]);
   });
 
   test('F-04: 가시 여부는 6틱마다, 쌍안경을 바꾸면 바로', () => {

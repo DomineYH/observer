@@ -12,7 +12,7 @@ const HEIGHT: Record<Member['kind'], number> = { man: 1.7, veh: 2.3, tube: 1.0 }
 const PRONE_M = 0.45;
 
 /** Where a dust cloud or smoke puff is at `tick` (demo drawing, lines 1162–1176): its centre, carried downwind
- * (dust at 80% of the wind) and rising, and its radius, m. It is drawn, seen, pressed and watched there. */
+ * (dust at 80% of the wind) and rising, and its radius, m. It is drawn, pressed and watched there. */
 export function signalAt(e: Pick<FieldEffect, 'kind' | 'x' | 'y' | 'gz' | 'small' | 'tick'>, tick: number, w: Weather) {
   const age = (tick - e.tick) * 0.05;
   const to = ((w.windFromDeg + 180) * Math.PI) / 180; // the wind blows towards `windFromDeg` + 180°
@@ -23,6 +23,15 @@ export function signalAt(e: Pick<FieldEffect, 'kind' | 'x' | 'y' | 'gz' | 'small
     z: e.kind === 'dust' ? e.gz + 1.5 + age * 0.8 : e.gz + 1 + age * (e.small ? 1.2 : 5),
     r: (e.kind === 'dust' ? 3 : e.small ? 1.2 : 2.5) + age * 1.6,
   };
+}
+
+/** How a signal is detected (demo effSize/effTop, lines 544–551): its size, m, and the height the sight line must
+ * reach, both at where it was made. The demo detects with these, apart from its drawing, so detection keeps them. */
+export function signalDetect(e: Pick<FieldEffect, 'kind' | 'gz' | 'small' | 'tick'>, tick: number) {
+  const age = (tick - e.tick) * 0.05;
+  return e.kind === 'muzzle'
+    ? { size: (e.small ? 1.5 : 3) + age * 1.6, top: e.gz + 1 + age * (e.small ? 1.2 : 5) }
+    : { size: 3 + age * 1.6, top: e.gz + 3 };
 }
 
 /** Recomputes 보임 for every member (`all`) or only for effects made this tick. */
@@ -47,7 +56,7 @@ export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: b
     }
   for (const e of s.effects) {
     if (!all && e.tick !== s.tick) continue;
-    const c = signalAt(e, s.tick, w);
-    e.vis = visOf(c.x, c.y, c.r, c.z); // the radius stands for its size, as in the demo; the sight line ends at its centre
+    const d = signalDetect(e, s.tick);
+    e.vis = visOf(e.x, e.y, d.size, d.top);
   }
 }

@@ -19,27 +19,35 @@ const wrap = (mil: number) => ((((mil + 3200) % 6400) + 6400) % 6400) - 3200;
 const eyeOf = (s: SimState, t: TerrainData) => ({ x: s.op.x, y: s.op.y, z: heightAt(t, s.op.x, s.op.y) + EYE_HEIGHT });
 const azFrom = (s: SimState, p: Platoon) => (atan2(p.x - s.op.x, p.y - s.op.y) * MIL + 6400) % 6400;
 
-/** 식별 `[az, el]` in 0.1 mils: the seen member or signal nearest the press, in reach, is found. False when none is. */
+/** 식별 `[az, el]` in 0.1 mils: the seen member, or painted signal disc, nearest the press, in reach, is found. False
+ * when none is. */
 export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly number[]): boolean {
   if (s.phase !== 'live') return false;
   const eye = eyeOf(s, t);
   const az = v[0]! / 10;
   const el = v[1]! / 10;
   const [ra, re] = REACH[s.bino ? 'bino' : 'eye'];
-  let best = Infinity;
+  let best = Infinity; // how far the best hit so far lies outside its shape, in reaches
+  let bestMid = Infinity; // and from its centre: a tie goes to the nearer centre
   let pid = -1; // the unit of the best hit so far
   let cue: Cue = 'man';
-  const test = (x: number, y: number, z: number, of: number, what: Cue) => {
+  /** A seen thing centred at x, y, z; a signal is a disc of `rm` metres, a member a point. */
+  const test = (x: number, y: number, z: number, rm: number, of: number, what: Cue) => {
     const dx = x - eye.x;
     const dy = y - eye.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d < 5) return;
     const a = wrap(atan2(dx, dy) * MIL - az);
     const e = atan2(z - eye.z, d) * MIL - el;
-    if (Math.abs(a) > ra || Math.abs(e) > re) return;
-    const score = Math.sqrt((a / ra) * (a / ra) + (e / re) * (e / re));
-    if (score < best) {
+    const r = rm > 0 ? atan2(rm, d) * MIL : 0; // the disc as painted, mils
+    if (Math.abs(a) > ra + r || Math.abs(e) > re + r) return;
+    const oa = Math.max(0, Math.abs(a) - r) / ra;
+    const oe = Math.max(0, Math.abs(e) - r) / re;
+    const score = Math.sqrt(oa * oa + oe * oe);
+    const mid = Math.sqrt((a / ra) * (a / ra) + (e / re) * (e / re));
+    if (score < best || (score === best && mid < bestMid)) {
       best = score;
+      bestMid = mid;
       pid = of;
       cue = what;
     }
@@ -47,12 +55,12 @@ export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly num
   s.platoons.forEach((p, i) => {
     if (p.state === 'wait') return;
     for (const q of p.members)
-      if (q.vis) test(q.x, q.y, heightAt(t, q.x, q.y) + (q.kind === 'veh' ? PICK_Z.veh : q.prone ? PICK_Z.prone : PICK_Z.other), i, q.kind === 'veh' ? 'veh' : 'man');
+      if (q.vis) test(q.x, q.y, heightAt(t, q.x, q.y) + (q.kind === 'veh' ? PICK_Z.veh : q.prone ? PICK_Z.prone : PICK_Z.other), 0, i, q.kind === 'veh' ? 'veh' : 'man');
   });
   for (const e of s.effects) {
     if (!e.vis) continue;
-    const c = signalAt(e, s.tick, w); // where the view draws it
-    test(c.x, c.y, c.z, e.pid, e.kind);
+    const c = signalAt(e, s.tick, w); // where and how large the view draws it
+    test(c.x, c.y, c.z, c.r, e.pid, e.kind);
   }
   if (pid < 0) return false;
   const p = s.platoons[pid]!;
