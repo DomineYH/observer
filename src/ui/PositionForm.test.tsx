@@ -26,7 +26,8 @@ test('B3: 위치 보고 훈련 힌트', () => {
 });
 
 test('F-21: 위치 보고 — 입력기', () => {
-  // 훈련 fills in the post's own grid; 표준 leaves it to the player.
+  // 훈련 fills in the post's own grid; 표준 leaves it to the player. The app has no 훈련 until the mode switch: the
+  // real-UI check of this prefill belongs to #38 (with #29's casualty line).
   expect(form('training')).toContain('value="4040"');
   expect(form('training')).toContain('value="3032"');
   expect(form('standard')).not.toContain('value="4040"');

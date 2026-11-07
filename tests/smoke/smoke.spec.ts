@@ -115,8 +115,11 @@ async function toReady(page: Page, control: 'ready' | 'amc', warning: 'adjust' |
   await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.');
 
   const composer = page.getByRole('region', { name: '입력기' });
-  // Not the planned post: the 위치 보고 comes first; going on without it keeps the planned post for 극좌표 (F-21).
+  // Not the planned post: the 위치 보고 comes first and no call can go; going on without it keeps the planned post for
+  // 극좌표 (F-21).
+  await expect(composer.getByLabel('경고명령')).toHaveCount(0);
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+  await expect(log).toContainText('위치 보고 생략');
   const preview = composer.getByLabel('보낼 문장');
   const send = composer.getByRole('button', { name: '송신' });
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 조정, 이상.');
@@ -221,48 +224,6 @@ test('F-07: 극좌표 위치법 — 입력기', async ({ page }) => {
   await expect(log.locator('li', { hasText: `기러기 ${said}` })).toHaveCount(1, { timeout: 10_000 }); // 2.5–4 s
 });
 
-test('스모크: 관측소를 옮기고 위치를 보고한다', async ({ page }) => {
-  // About 20 m on foot (~17 s), 30 s setup, then the 위치 보고 and 기러기's readback: no speed-up needed.
-  test.setTimeout(120_000);
-  await occupied(page);
-  const log = page.getByRole('region', { name: '무전 기록' });
-  const composer = page.getByRole('region', { name: '입력기' });
-  await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.', { timeout: 10_000 });
-  // Started off the plan: the report form is up and no call can go; skip it this time.
-  await expect(composer.getByLabel('경고명령')).toHaveCount(0);
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
-  await expect(log).toContainText('위치 보고 생략');
-  await expect(composer.getByLabel('경고명령')).toBeVisible();
-
-  // Press the map a little east of the post: the 좌표자 offers the move with its distance and time.
-  const mapPanel = page.getByRole('region', { name: '지도 패널' });
-  await mapPanel.getByRole('button', { name: '관측소로' }).click();
-  const map = mapPanel.getByRole('img', { name: '지도' });
-  const box = (await map.boundingBox())!;
-  await map.click({ position: { x: box.width / 2 + 3, y: box.height / 2 } });
-  const ruler = (await mapPanel.getByText(/^좌표자:/).textContent())!;
-  const [, e, n] = ruler.match(/(\d{4}) (\d{4})/)!;
-  const move = mapPanel.getByRole('button', { name: /^여기로 관측소 이동 · \d+ m · 약 \d\d:\d\d/ });
-  await move.click();
-  await expect(log).toContainText('관측소 이동 시작 — 거리');
-  await expect(log).toContainText('기러기, 여기는 갈매기, 관측소 이동, 이상.');
-  await expect(log).toContainText('갈매기, 여기는 기러기, 관측소 이동, 이상.', { timeout: 10_000 });
-  await expect(composer).toContainText('관측소 이동 중');
-  await expect(log).toContainText('관측소 도착.', { timeout: 40_000 });
-  await expect(log).toContainText('관측소 설치 끝.', { timeout: 40_000 });
-
-  // The 위치 보고: the grid the 좌표자 read, previewed as the log will show it, then 기러기's readback.
-  const report = composer.getByRole('region', { name: '위치 보고' });
-  await report.getByLabel('동', { exact: true }).fill(e!);
-  await report.getByLabel('북', { exact: true }).fill(n!);
-  const said = (await report.getByLabel('보낼 문장').textContent())!;
-  expect(said).toMatch(/^기러기, 여기는 갈매기, 관측소 이동 끝, 현 위치 좌표 찰리호텔 .+, 이상\.$/);
-  await report.getByRole('button', { name: '송신' }).click();
-  await expect(log.locator('li', { hasText: said })).toHaveCount(1);
-  await expect(log).toContainText(said.replace('기러기, 여기는 갈매기', '갈매기, 여기는 기러기'), { timeout: 10_000 }); // 3–4 s
-  await expect(composer.getByLabel('경고명령')).toBeVisible();
-});
-
 test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
   // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
   test.setTimeout(150_000);
@@ -311,8 +272,9 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
 });
 
 test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 보내고, 임무끝으로 임무를 맺는다', async ({ page }) => {
-  // 사격준비 끝 24–38 s, the volley lands ~40 s later; after the correction 14–22 s, then the volley again.
-  test.setTimeout(300_000);
+  // 사격준비 끝 24–38 s, the volley lands ~40 s later; after the correction 14–22 s, then the volley again; the move a few
+  // seconds and its 30 s setup.
+  test.setTimeout(360_000);
   const { log, composer, preview, send } = await toReady(page, 'ready', 'ffe');
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
 
@@ -340,6 +302,35 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
   await expect(log.locator('li').last()).toContainText(said!);
   await expect(composer.getByLabel('경고명령')).toBeVisible();
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.'); // the form keeps the last mission's values
+
+  await test.step('F-21: 관측소 이동과 위치 보고', async () => {
+    // After 임무끝 the post may move: press the map 1 px east of it (a few metres: the shortest walk the map gives; B2
+    // limits only the map edges), walk, wait the 30 s setup, then report the grid the 좌표자 read.
+    const mapPanel = page.getByRole('region', { name: '지도 패널' });
+    await mapPanel.getByRole('button', { name: '관측소로' }).click();
+    const map = mapPanel.getByRole('img', { name: '지도' });
+    const box = (await map.boundingBox())!;
+    await map.click({ position: { x: box.width / 2 + 1, y: box.height / 2 } });
+    const ruler = (await mapPanel.getByText(/^좌표자:/).textContent())!;
+    const [, e, n] = ruler.match(/(\d{4}) (\d{4})/)!;
+    await mapPanel.getByRole('button', { name: /^여기로 관측소 이동 · \d+ m · 약 \d\d:\d\d/ }).click();
+    await expect(log).toContainText('관측소 이동 시작 — 거리');
+    await expect(log).toContainText('기러기, 여기는 갈매기, 관측소 이동, 이상.');
+    await expect(log).toContainText('갈매기, 여기는 기러기, 관측소 이동, 이상.', { timeout: 10_000 });
+    await expect(log).toContainText('관측소 도착.', { timeout: 30_000 });
+    await expect(composer).toContainText('관측 장비 설치 중');
+    await expect(composer.getByLabel('경고명령')).toHaveCount(0);
+    await expect(log).toContainText('관측소 설치 끝.', { timeout: 40_000 });
+    const report = composer.getByRole('region', { name: '위치 보고' });
+    await report.getByLabel('동', { exact: true }).fill(e!);
+    await report.getByLabel('북', { exact: true }).fill(n!);
+    const said = (await report.getByLabel('보낼 문장').textContent())!;
+    expect(said).toMatch(/^기러기, 여기는 갈매기, 관측소 이동 끝, 현 위치 좌표 찰리호텔 .+, 이상\.$/);
+    await report.getByRole('button', { name: '송신' }).click();
+    await expect(log.locator('li', { hasText: said })).toHaveCount(1);
+    await expect(log).toContainText(said.replace('기러기, 여기는 갈매기', '갈매기, 여기는 기러기'), { timeout: 10_000 }); // 3–4 s
+    await expect(composer.getByLabel('경고명령')).toBeVisible();
+  });
 
   await test.step('F-07: 전이사격 — 입력기', async () => {
     // From the mission just ended (AB1001): one transmission, previewed as the log will show it; 기러기 reads it back
