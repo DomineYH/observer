@@ -3,6 +3,8 @@ import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createSim, underCanopy } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
+import { silentVoice } from '@adapters/mock/voice';
+import { webSpeech } from '@adapters/webSpeech';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { terrainColours } from '@render/shade';
@@ -11,6 +13,9 @@ import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
+import { webAudio } from '@ui/audio';
+import { createSound } from '@ui/sound';
+import { SoundToggles } from '@ui/SoundToggles';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
@@ -48,6 +53,13 @@ const onFrame = (draw: (now: number) => void) => {
   frameListeners.add(draw);
   return () => void frameListeners.delete(draw);
 };
+// Placeholders until the account slice (callsign) and the terrain slice (방안 기준) arrive.
+const CALLSIGN = '갈매기';
+const NAMES = { callsign: CALLSIGN, gridLetters: terrain.grid.letters };
+// 음성 출력 is the user's 음성 setting, not the backend variable; browsers without speech synthesis get the 무음 어댑터.
+const audio = webAudio();
+const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(), audio, NAMES);
+for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audio.unlock, { once: true });
 // 무전 기록: a new array on every append, so its identity is a valid snapshot.
 let log: readonly LogLine[] = [];
 let started = false;
@@ -55,6 +67,7 @@ const step = () => {
   const due = sim.state.reportDue;
   const events = session.step();
   const s = sim.state;
+  sound.hear(events, s);
   const lines: LogLine[] = [];
   const say = (texts: readonly (string | null)[]) => {
     for (const text of texts) if (text) lines.push({ type: 'system', tick: s.tick, text });
@@ -89,8 +102,6 @@ startLoop(step, (now) => {
 const colours = terrainColours(terrain, CLEAR_WEATHER);
 const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사람 검수용 fps 표시
 
-// Placeholders until the account slice (callsign) and the terrain slice (방안 기준) arrive.
-const CALLSIGN = '갈매기';
 function App() {
   const tick = useSyncExternalStore(subscribe, () => sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
@@ -104,6 +115,7 @@ function App() {
   return (
     <>
       <TickCounter tick={tick} />
+      <SoundToggles sound={sound} />
       <ObservationView
         terrain={terrain}
         colours={colours}
