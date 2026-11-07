@@ -6,6 +6,7 @@ import { Sentence } from './RadioLog';
 import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { corrDraft, deviation, prefillDirection, suggestion, type CorrForm } from './correction';
+import { casualtyNote } from './effect';
 
 const W = RADIO_GRAMMAR.tables;
 const FUZE_LABEL: Record<FuzeRequest, string> = { none: '신관 요청 없음', quick: W.fuze.quick.text, vt: W.fuze.vt.text };
@@ -52,8 +53,8 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
   const [dangerClose, setDangerClose] = useState<Flag>(initial.dangerClose ?? 0);
 
   const mission = state.missions.at(-1);
-  // 지명사: 기러기 waits for 준비 쏴 (the simulation's own rule: an adjusting round with control amc).
-  const amc = stage === 'ready' && mission?.warning === 'adjust' && mission.mto?.control === 'amc';
+  // 지명사: 기러기 waits for 준비 쏴, for the adjusting round and for 효력사 alike (the simulation's own rule).
+  const amc = stage === 'ready' && mission?.mto?.control === 'amc';
   useEffect(() => {
     if (!amc) return;
     const down = (e: KeyboardEvent) => {
@@ -82,6 +83,8 @@ export function Composer({ stage, live, platoons, names, mode, send, state, init
         </button>
       )}
       {stage === 'flight' && <p>탄착을 관측하십시오.</p>}
+      {stage === 'effect' && <p>효과를 관측하십시오.</p>}
+      {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
       {stage === 'adjust' && mission && (
         <CorrectionForm
           sent={mission.direction}
@@ -190,6 +193,7 @@ function Preview({ draft, empty, names, mode, send }: PreviewProps) {
 
 const LATERAL_LABEL = { left: W.lateralDir.left.text, right: W.lateralDir.right.text };
 const RANGE_LABEL = { drop: W.rangeDir.drop.text, add: W.rangeDir.add.text };
+const NEXT_LABEL = { adjust: W.warning.adjust.text, ffe: W.warning.ffe.text }; // 조정 · 효력사
 
 interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
   sent: number | null; // the mission's 방향, once sent with the first correction
@@ -201,6 +205,7 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
 function CorrectionForm({ sent, help, prefill, names, mode, send }: CorrectionProps) {
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
+    next: 'adjust',
     ...(help?.form ?? { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
   }));
   const set = (patch: Partial<CorrForm>) => setForm({ ...form, ...patch });
@@ -230,7 +235,14 @@ function CorrectionForm({ sent, help, prefill, names, mode, send }: CorrectionPr
           </option>
         ))}
       </select>
-      <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m
+      <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m{' '}
+      <select aria-label="다음" value={form.next} onChange={(e) => set({ next: e.target.value as CorrForm['next'] })}>
+        {keys(NEXT_LABEL).map((k) => (
+          <option key={k} value={k}>
+            {NEXT_LABEL[k]}
+          </option>
+        ))}
+      </select>
       <Preview
         draft={draft}
         empty={sent === null ? '방향(밀)을 먼저 입력' : '좌우 0–800 m, 사거리 0–1500 m'}

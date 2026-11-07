@@ -1,12 +1,13 @@
 import { expect, test } from 'vitest';
 import type { RadioEvent } from '@sim';
 import { CALL_ADJUST, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady, untilSaid } from '../../tests/acceptance/mission';
+import { radioSentence, spoken } from './radio/sentence';
 import { corrDraft, deviation, prefillDirection, suggestion, type CorrForm } from './correction';
 
 const OP = { x: 0, y: 0 };
 const platoon = (x: number, y: number, state = 'approach' as const) => ({ x, y, state });
 const landed = (x: number, y: number) => [{ impacts: [{ x: 500, y: 500, tick: 10 }, { x, y, tick: 90 }] }];
-const FORM: CorrForm = { direction: '', lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' };
+const FORM: CorrForm = { direction: '', lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0', next: 'adjust' };
 const SAID = { speaker: 'observer', ending: 'over', kind: 'correction' } as const;
 const observer = (events: readonly RadioEvent[]) => events.find((e) => e.utterance.speaker === 'observer')!.utterance;
 
@@ -46,7 +47,7 @@ test('F-07: 훈련 편의와 제안', () => {
   expect(corrDraft({ ...FORM, direction: '800', range: '1501' }, mission())).toBeNull();
   expect(corrDraft({ ...FORM, direction: '800', lateral: '12.5' }, mission())).toBeNull();
   // The draft's sentence is the one the simulation says for its input (the simulation snaps 14 → 10, 74 → 50).
-  const first = corrDraft({ direction: '0800', lateralDir: 'right', lateral: '14', rangeDir: 'add', range: '74' }, mission())!;
+  const first = corrDraft({ ...FORM, direction: '0800', lateralDir: 'right', lateral: '14', rangeDir: 'add', range: '74' }, mission())!;
   expect(first.input).toEqual({ a: 'corr', v: [800, 'right', 14, 'add', 74, 'adjust'] });
   expect(first.utterance).toEqual({
     ...SAID,
@@ -58,10 +59,25 @@ test('F-07: 훈련 편의와 제안', () => {
   // Later corrections go along the 방향 already sent: a 방향 in the form is not sent again. Both under → 동제원.
   untilSaid(sim, 'fdc', 'ready');
   toAdjust(sim);
-  const later = corrDraft({ direction: '1200', lateralDir: 'left', lateral: '4', rangeDir: 'drop', range: '' }, mission())!;
+  const later = corrDraft({ ...FORM, direction: '1200', lateralDir: 'left', lateral: '4', rangeDir: 'drop', range: '' }, mission())!;
   expect(later.input).toEqual({ a: 'corr', v: ['left', 4, 'drop', 0, 'adjust'] });
   expect(later.utterance).toEqual({ ...SAID, slots: { next: 'adjust' } });
   const r2 = send(sim, later.input);
   expect(r2.ok).toBe(true);
   expect(observer(r2.events)).toEqual(later.utterance);
+});
+
+test('F-07: 수정 뒤 효력사 — 입력기', () => {
+  const sim = started();
+  openRadio(sim);
+  toReady(sim, DESC_UNKNOWN, CALL_ADJUST);
+  toAdjust(sim);
+  // 다음 효력사: the draft ends ", 효력사", and it is what the simulation takes and says for that input.
+  const d = corrDraft({ ...FORM, direction: '0800', lateralDir: 'right', lateral: '50', next: 'ffe' }, sim.state.missions.at(-1)!)!;
+  expect(d.input).toEqual({ a: 'corr', v: [800, 'right', 50, 'drop', 0, 'ffe'] });
+  expect(spoken(radioSentence(d.utterance, { callsign: '갈매기', gridLetters: 'CH' }))).toBe('방향 공팔공공, 우로 오십, 효력사, 이상.');
+  const r = send(sim, d.input);
+  expect(r.ok).toBe(true);
+  expect(observer(r.events)).toEqual(d.utterance);
+  expect(untilSaid(sim, 'fdc', 'ready').at(-1)!.utterance).toMatchObject({ kind: 'ready', slots: { fuze: 'quick' } });
 });

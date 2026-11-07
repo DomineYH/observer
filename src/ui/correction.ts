@@ -1,6 +1,6 @@
 // 수정 입력 (demo lines 778–792, 799–818, 909–916, 985–991): the correction form's sentence and input, and the
 // training-mode help (탄착 편의, 수정값 제안, 미리 채운 방향). Pure.
-import type { CorrectionSlots, LateralDir, Mode, Point, RangeDir } from '@sim';
+import type { CorrectionSlots, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
 import type { Draft } from './radio/drafts';
 
 /** The form's fields as typed: numbers stay strings until sent. */
@@ -10,6 +10,7 @@ export interface CorrForm {
   lateral: string;
   rangeDir: RangeDir;
   range: string;
+  next: Next; // 조정 · 효력사
 }
 
 /** Where the last round landed from the nearest platoon, m: + right and + over along the observer–platoon line. */
@@ -47,7 +48,7 @@ export function deviation(s: {
 const snap = (v: number, step: number) => Math.round(v / step) * step; // as the simulation snaps a correction
 
 /** 탄착 편의 and the correction that would bring the round onto the platoon (10 m across, 50 m in range). */
-export function suggestion(dev: Deviation | null): { text: string; form: Omit<CorrForm, 'direction'> | null } {
+export function suggestion(dev: Deviation | null): { text: string; form: Omit<CorrForm, 'direction' | 'next'> | null } {
   if (!dev) return { text: '탄착 부근에 표적 없음', form: null };
   const lateral = snap(Math.abs(dev.lat), 10);
   const range = snap(Math.abs(dev.rng), 50);
@@ -80,10 +81,10 @@ export function corrDraft(f: CorrForm, mission: { direction: number | null }): D
     ...(direction !== null ? { direction } : {}),
     ...(l > 0 ? { lateralDir: f.lateralDir, lateral: l } : {}),
     ...(r > 0 ? { rangeDir: f.rangeDir, range: r } : {}),
-    next: 'adjust',
+    next: f.next,
   } as CorrectionSlots;
   return {
-    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, lateral, f.rangeDir, range, 'adjust'] },
+    input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, lateral, f.rangeDir, range, f.next] },
     utterance: { speaker: 'observer', ending: 'over', kind: 'correction', slots },
   };
 }

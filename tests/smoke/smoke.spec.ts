@@ -179,3 +179,20 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   await expect(log).toContainText('방향 공팔공공, 우로 오십, 이상.');
   await expect(log).toContainText('방향 공팔공공, 우로 오십, 잠깐대기.', { timeout: 10_000 }); // 기러기's readback, 2.5–4 s
 });
+
+test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳다가 온다', async ({ page }) => {
+  // 사격준비 끝 24–38 s, the adjusting round about 20 s, 신관 사격준비 끝 14–22 s after the correction, 마감탄 떳다 ~25 s later.
+  test.setTimeout(180_000);
+  const { log, composer, preview, send } = await toReady(page, 'ready');
+  const direction = composer.getByLabel('방향');
+  await expect(direction).toBeVisible({ timeout: 50_000 });
+  await direction.fill('0800');
+  await composer.getByLabel('다음').selectOption('ffe');
+  await expect(preview).toHaveText('방향 공팔공공, 동제원, 효력사, 이상.');
+  await send.click();
+  await expect(log).toContainText('방향 공팔공공, 동제원, 효력사, 잠깐대기.', { timeout: 10_000 });
+  await expect(log).toContainText('순발신관 사격준비 끝.', { timeout: 30_000 });
+  await expect(log).toContainText('기러기 마감탄 떳다, 이상.', { timeout: 40_000 });
+  await expect(log).toContainText('갈매기 마감탄 떳다, 잠깐대기.', { timeout: 5_000 });
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 40_000 });
+});

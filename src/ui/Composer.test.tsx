@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import type { Activity, RadioEvent, Target, Unit, UnitType, Warning } from '@sim';
-import { answered, CALL_ADJUST, DESC_AMC, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
+import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_AMC, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
+import { oneUnit } from '../../tests/acceptance/enemy';
+import { aimedAt } from '../../tests/acceptance/strike';
 import { Composer, type ComposerForm } from './Composer';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
@@ -127,4 +129,36 @@ test('F-07: 훈련 편의와 제안 — 입력기', () => {
   expect(text(form('standard'))).not.toContain('탄착 부근');
   expect(text(form('standard'))).toContain('방향(밀)을 먼저 입력');
   expect(form('standard')).toMatch(/<button type="button" disabled="">송신/);
+});
+
+test('F-07: 효력사 — 입력기', () => {
+  // The correction form offers 다음: 조정 or 효력사.
+  const sim = started();
+  openRadio(sim);
+  toReady(sim, DESC_UNKNOWN, CALL_ADJUST);
+  toAdjust(sim);
+  const adjust = renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} mode="standard" send={() => {}} state={sim.state} />);
+  expect(adjust).toMatch(/<select aria-label="다음">.*<option value="adjust" selected="">조정<\/option><option value="ffe">효력사<\/option><\/select>/);
+
+  // 지명사 효력사 waits for 준비 쏴 too: the button is there at 사격준비 끝.
+  const ffe = started();
+  openRadio(ffe);
+  toReady(ffe, DESC_AMC, CALL_FFE);
+  const ready = renderToStaticMarkup(<Composer stage="ready" live platoons={[]} names={NAMES} mode="standard" send={() => {}} state={ffe.state} />);
+  expect(ready).toMatch(/<button[^>]*>준비 쏴/);
+  expect(send(ffe, FIRE).ok).toBe(true);
+});
+
+test('F-12: 훈련 모드의 실제 사상', () => {
+  // A 효력사 on one platoon, run until 효과 관측: training shows the real casualties of the unit it hit most.
+  const sim = aimedAt(oneUnit({ type: 'inf', route: 'B', t0: 0 }), 2, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
+  for (let k = 0; k < 2000; k++) sim.step([]);
+  const p = sim.state.platoons[0]!;
+  const dead = p.members.filter((m) => !m.alive).length;
+  expect(dead).toBeGreaterThan(0);
+  const at = (mode: 'training' | 'standard') =>
+    text(renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} mode={mode} send={() => {}} state={sim.state} />));
+  expect(at('training')).toContain(`(훈련) 적 보병 실제 사상 ${dead}/30 (${Math.round((dead / 30) * 100)}%)`);
+  expect(at('standard')).not.toContain('실제 사상');
+  expect(at('standard')).toContain('효과를 관측하십시오.');
 });
