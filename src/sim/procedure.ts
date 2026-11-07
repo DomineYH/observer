@@ -81,7 +81,7 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const bias = drawBias(ctx.bal);
-    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => 0) });
+    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => null) });
     say({ speaker: 'observer', ending: 'over', kind: 'call', slots: { warning } });
     after(s, 2.5 + next(fdc) * 1.5, 'call_ack');
   } else if (a === 'loc' && stage === 'loc') {

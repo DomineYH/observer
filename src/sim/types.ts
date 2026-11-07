@@ -182,7 +182,7 @@ export interface Mission {
   correction: CorrectionSlots | null; // the last correction as sent (snapped), for 기러기's readback
   flights: Flight[]; // rounds in the air, by landing tick (ties in firing order)
   impacts: { x: number; y: number; tick: number }[];
-  kills: number[]; // members this mission's rounds killed, by unit
+  kills: (number | null)[]; // members this mission's rounds killed, by unit; null: none of them landed within 220 m
 }
 
 export interface SimState {

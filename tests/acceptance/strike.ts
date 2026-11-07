@@ -51,7 +51,7 @@ export function aimedAt(scenario: Scenario, seed: number, pid: number, call: Inp
   const sim = run(opened(scenario, seed));
   if (!send(sim, call).ok) throw new Error('call ignored');
   answered(sim, 'call');
-  const b = sim.state.missions[0]!.bias;
+  const b = sim.state.missions[0]!.bias; // setup, not an assertion: the F-12 criteria are stated at 0 m aim error
   if (!send(sim, gridAt({ x: x + offset.x - b.x, y: y + offset.y - b.y })).ok) throw new Error('loc ignored');
   answered(sim, 'loc');
   if (!send(sim, d).ok) throw new Error('desc ignored');

@@ -44,13 +44,13 @@ export function killMembers(members: Target[], x: number, y: number, fuze: Fuze,
 }
 
 /** What one round landing at (x, y) does (demo impact): every unit that has set off and whose centre is within 220 m
- * loses members to it (counted in `kills`, by unit) and, unless it is the APCs, goes to ground for 35–65 s from the
+ * loses members to it (counted in `kills`, by unit: struck, even if nobody fell) and, unless it is the APCs, goes to ground for 35–65 s from the
  * next tick. Draws from the ballistics stream unit by unit: the kill draws, then the pinning draw. */
-export function strike(s: SimState, x: number, y: number, fuze: Fuze, bal: Stream, kills: number[]): void {
+export function strike(s: SimState, x: number, y: number, fuze: Fuze, bal: Stream, kills: (number | null)[]): void {
   s.platoons.forEach((p, pid) => {
     if (p.state === 'wait') return;
     if ((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) > PIN_M * PIN_M) return;
-    kills[pid]! += killMembers(p.members, x, y, fuze, bal);
+    kills[pid] = (kills[pid] ?? 0) + killMembers(p.members, x, y, fuze, bal);
     if (p.type !== 'apc') p.pinnedUntil = Math.max(p.pinnedUntil, s.tick + Math.ceil((PIN_S.min + next(bal) * PIN_S.spread) * 20));
     judge(s, p);
   });

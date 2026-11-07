@@ -148,13 +148,19 @@ describe('F-12: 무력화와 파괴', () => {
 
   test('사상 30–60%면 무력화: 엎드림이 끝나면 출발점으로 물러난다', () => {
     const sim = aimedAt(INF, SEED, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
-    const r = judged(sim, true);
+    const r = judged(sim, true, 1200); // 60 s: the volley has landed, and the platoon is still down
     expect(r.cas >= 0.3 && r.cas < 0.6, `casualties ${r.cas}`).toBe(true);
     expect(r.score).toBe(150);
     const p = sim.state.platoons[0]!;
     const home = p.path[0]!;
-    // pinned first, then 0.8 m/s back the way it came
-    while (sim.state.tick < p.pinnedUntil) sim.step([]);
+    // Down and still first; once the living stand up again, 0.8 m/s back the way it came.
+    const down = centre(sim);
+    expect(liveMen(p).every((m) => m.prone)).toBe(true);
+    for (let k = 0; k < 1400 && liveMen(p).some((m) => m.prone); k++) {
+      expect(centre(sim)).toEqual(down);
+      sim.step([]);
+    }
+    expect(liveMen(p).some((m) => m.prone)).toBe(false);
     const d0 = dist(centre(sim), home);
     for (let k = 0; k < 400; k++) sim.step([]);
     expect(d0 - dist(centre(sim), home)).toBeCloseTo(0.8 * 20, 0);

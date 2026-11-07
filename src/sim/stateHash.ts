@@ -153,7 +153,7 @@ export function hashState(state: SimState): string {
       h.i32(im.tick);
     }
     h.u32(m.kills.length);
-    for (const k of m.kills) h.u32(k);
+    for (const k of m.kills) h.u32(k === null ? 0 : 1 + k);
   }
   h.u32(state.queue.length);
   for (const q of state.queue) {
