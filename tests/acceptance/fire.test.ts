@@ -242,11 +242,11 @@ describe('F-07: 수정 스냅', () => {
     }
   });
 
-  test('범위 밖 값과 효력사는 받지 않는다', () => {
+  test('범위 밖 값과 모르는 다음은 받지 않는다', () => {
     for (const v of [
       ['right', 801, 'add', 0, 'adjust'],
       ['right', 0, 'add', 1501, 'adjust'],
-      ['right', 0, 'add', 50, 'ffe'], // 효력사 comes with the fire-for-effect slice
+      ['right', 0, 'add', 50, 'repeat'], // 다음 is 조정 or 효력사 only
       ['up', 10, 'add', 50, 'adjust'],
       ['right', 10.5, 'add', 50, 'adjust'],
     ] as const) {

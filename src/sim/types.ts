@@ -1,4 +1,4 @@
-import type { Activity, CorrectionSlots, DescriptionSlots, LocationSlots, MtoSlots, RadioEvent, Unit, Warning } from './radio';
+import type { Activity, CorrectionSlots, DescriptionSlots, Fuze, LocationSlots, MtoSlots, Next, RadioEvent, Unit, Warning } from './radio';
 import type { Scheduled } from './queue';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
@@ -44,13 +44,15 @@ export interface Member {
   x: number; // where it stands now, from the unit's centre, heading and formation
   y: number;
   prone: boolean;
+  alive: boolean; // a dead member lies still, is never seen and never comes back
   /** 보임: decided by the simulation every 6 ticks (가시선 · 각크기 · 시정). The renderer draws only these. */
   vis: boolean;
 }
 
 /** wait: before its start time · approach/assault: infantry on the move · hold: the recon at its post ·
- * support: APCs halted and firing · emplaced: the mortar section. */
-export type PlatoonState = 'wait' | 'approach' | 'assault' | 'hold' | 'support' | 'emplaced';
+ * support: APCs halted and firing · emplaced: the mortar section · broken: 무력화 (30% casualties): it stops, then
+ * falls back · destroyed: 파괴 (60%): it stays where it is and does nothing more. */
+export type PlatoonState = 'wait' | 'approach' | 'assault' | 'hold' | 'support' | 'emplaced' | 'broken' | 'destroyed';
 
 /** 실제 배치 of one unit, decided by the seed when the simulation is created, and how it moves since. */
 export interface Platoon {
@@ -70,6 +72,7 @@ export interface Platoon {
   nextFire: number; // tick of the next shot (APC, mortar)
   lastFire: number; // tick of the last shot, −1 never
   dustTick: number; // tick of the last dust cloud
+  pinnedUntil: number; // 피격 반응: down and still (the APCs excepted) while the tick is below this
   activity: Activity; // what it is doing now, as the observer would report it
   intel: Intel;
 }
@@ -101,6 +104,7 @@ export interface FieldEffect {
   life: number; // ticks it lasts
   pid: number; // index of the platoon that made it
   small: boolean;
+  vt: boolean; // a 접근신관 burst, 7 m above the ground
   vis: boolean;
 }
 
@@ -141,6 +145,7 @@ export interface ImpactEvent {
   tick: number; // the simulation's tick when the step that saw it land ends
   x: number;
   y: number;
+  fuze: Fuze; // vt: 공중 파열
 }
 
 /** 사건. */
@@ -152,9 +157,17 @@ export interface StepResult {
 }
 
 /** 교신 단계: off until 감명 양호 has gone out · idle takes a call · wait for 기러기 · loc · desc take those
- * transmissions · ready once 사격준비 끝 has come (지명사: takes 준비 쏴) · flight while the round flies · adjust takes a
- * correction. */
-export type RadioStage = 'off' | 'idle' | 'wait' | 'loc' | 'desc' | 'ready' | 'flight' | 'adjust';
+ * transmissions · ready once 사격준비 끝 has come (지명사: takes 준비 쏴) · flight while rounds fly · adjust takes a
+ * correction · effect once the last round of the 효력사 has landed (효과 관측). */
+export type RadioStage = 'off' | 'idle' | 'wait' | 'loc' | 'desc' | 'ready' | 'flight' | 'adjust' | 'effect';
+
+/** A round in the air: where and at which tick it lands, and its fuze. */
+export interface Flight {
+  x: number;
+  y: number;
+  at: number;
+  fuze: Fuze;
+}
 
 /** 사격 임무: what the observer sent and what 기러기 decided, filled in as the procedure goes. */
 export interface Mission {
@@ -162,12 +175,14 @@ export interface Mission {
   location: LocationSlots | null;
   description: DescriptionSlots | null;
   mto: MtoSlots | null;
+  phase: Next; // what the battery fires next: the adjusting round, or 효력사 (called so, or a correction ending 효력사)
   bias: Point; // 비표준 조건 오차, m: drawn when the call is accepted
   aim: Point | null; // 조준점: the sent grid, then moved by each correction
   direction: number | null; // 방향 the observer sent with the first correction, mils: the corrections' 기준선
   correction: CorrectionSlots | null; // the last correction as sent (snapped), for 기러기's readback
-  flight: { x: number; y: number; at: number } | null; // the round in the air: where and at which tick it lands
+  flights: Flight[]; // rounds in the air, by landing tick (ties in firing order)
   impacts: { x: number; y: number; tick: number }[];
+  kills: number[]; // members this mission's rounds killed, by unit
 }
 
 export interface SimState {

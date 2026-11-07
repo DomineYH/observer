@@ -45,7 +45,7 @@ export function createSim(init: SimInit): Sim {
     terrain: init.terrain,
     battery: init.scenario.battery,
     say: (utterance) => out.push({ type: 'radio', utterance }),
-    landed: (x, y) => out.push({ type: 'impact', x, y }),
+    landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
   };
 
   return {

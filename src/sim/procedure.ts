@@ -1,14 +1,16 @@
 // 사격요구 교신 (demo lines 692–818, 1440; PRD 4.3, 4.4): 통신 점검, the observer's three transmissions, 기러기's
-// replies, the adjusting round and the corrections. 기러기's delays are drawn from the fdc stream when the observer
-// sends, in the order the replies are queued; the bal stream gives each mission its bias at the call (2 draws) and each
-// round its 공산오차 at the shot (2 gaussians). Both draw orders are part of the golden records.
-import { drawBias, fall, shifted, snap, tofSec } from './ballistics';
+// replies, the adjusting round, the corrections and 효력사. 기러기's delays are drawn from the fdc stream when the
+// observer sends, in the order the replies are queued, and each 효력사 round's firing jitter at the shot; the bal stream
+// gives each mission its bias at the call (2 draws) and each round its 공산오차 at the shot (2 gaussians), the 효력사
+// rounds gun by gun and round by round within a gun. Both draw orders are part of the golden records.
+import { drawBias, fall, SHEAF, shifted, snap, tofSec } from './ballistics';
 import { fromGrid } from './grid';
+import { strike } from './lethality';
 import { schedule, type Act } from './queue';
 import type { CorrectionSlots, DescriptionSlots, Fuze, LateralDir, MtoSlots, Next, RadioUtterance, RangeDir, Warning } from './radio';
 import { next, type Stream } from './rng';
 import { heightAt, type Point, type TerrainData } from './terrain';
-import type { Mission, SimState } from './types';
+import type { Flight, Mission, SimState } from './types';
 
 export type Say = (u: RadioUtterance) => void;
 
@@ -19,13 +21,15 @@ export interface Ctx {
   terrain: TerrainData;
   battery: Point;
   say: Say;
-  landed: (x: number, y: number) => void;
+  landed: (x: number, y: number, fuze: Fuze) => void;
 }
 
 const TICKS_PER_S = 20;
 /** A delay in seconds as whole ticks, rounded up: the demo runs an event in the first step at or past its time. */
 export const secTicks = (sec: number) => Math.ceil(sec * TICKS_PER_S);
 const BURST_TICKS = 320; // 탄착 섬광 and its smoke last 16 s
+const GUN_INTERVAL_S = 9; // 효력사: each gun fires a round every 9 s …
+const GUN_JITTER_S = 2.2; // … each round up to 2.2 s late
 const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + secTicks(sec), act);
 
 /** 작전 개시: 기러기 asks for a radio check 4 s later. */
@@ -77,7 +81,7 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const bias = drawBias(ctx.bal);
-    s.missions.push({ warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flight: null, impacts: [] });
+    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => 0) });
     say({ speaker: 'observer', ending: 'over', kind: 'call', slots: { warning } });
     after(s, 2.5 + next(fdc) * 1.5, 'call_ack');
   } else if (a === 'loc' && stage === 'loc') {
@@ -97,10 +101,13 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
     // record stays canonical (ADR 0003); the composer never sends it.
     m!.correction = correct(m!, v!);
     say({ speaker: 'observer', ending: 'over', kind: 'correction', slots: { ...m!.correction } });
-    // Two draws, in this order: readback, 사격준비 끝.
+    // Two draws, in this order: readback, 사격준비 끝 (효력사 takes longer: the fuzes are set for the whole battery).
     after(s, 2.5 + next(fdc) * 1.5, 'corr_readback');
-    after(s, 11 + next(fdc) * 6, 'ready');
-  } else if (a === 'fire' && stage === 'ready' && m!.warning === 'adjust' && m!.mto!.control === 'amc') {
+    if (m!.correction.next === 'ffe') {
+      m!.phase = 'ffe';
+      after(s, 14 + next(fdc) * 8, 'ready');
+    } else after(s, 11 + next(fdc) * 6, 'ready');
+  } else if (a === 'fire' && stage === 'ready' && m!.mto!.control === 'amc') {
     say({ speaker: 'observer', ending: 'none', kind: 'fire' });
     after(s, 1 + next(fdc), 'shot');
   } else return false;
@@ -136,35 +143,65 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       m.mto = decideMto(s, m.description!, fdc);
       say({ speaker: 'fdc', ending: 'wait', kind: 'mto', slots: { ...m.mto } });
       break;
-    case 'ready': // 사격준비 끝: the fuze is named only when firing for effect at once (M1-9a fires those)
-      say({ speaker: 'fdc', ending: 'none', kind: 'ready', slots: m.warning === 'ffe' ? { fuze: m.mto!.fuze } : {} });
+    case 'ready': // 사격준비 끝: the fuze is named only for 효력사
+      say({ speaker: 'fdc', ending: 'none', kind: 'ready', slots: m.phase === 'ffe' ? { fuze: m.mto!.fuze } : {} });
       s.radio.stage = 'ready';
-      if (m.warning === 'adjust' && m.mto!.control === 'ready') after(s, 1.5, 'shot'); // 준비되는 대로
+      if (m.mto!.control === 'ready') after(s, 1.5, 'shot'); // 준비되는 대로
       break;
-    case 'shot': { // 수정탄: the centre gun, one round, quick fuze
+    case 'shot': {
       const aim = m.aim!;
       const dx = aim.x - ctx.battery.x;
       const dy = aim.y - ctx.battery.y;
-      const at = s.tick + secTicks(tofSec(Math.sqrt(dx * dx + dy * dy)));
-      m.flight = { ...fall(aim, ctx.battery, m.bias, ctx.bal), at };
+      const tof = tofSec(Math.sqrt(dx * dx + dy * dy));
       say({ speaker: 'fdc', ending: 'over', kind: 'shot' });
       s.radio.stage = 'flight';
       after(s, 1.2, 'shot_readback');
-      schedule(s, at, 'impact');
+      if (m.phase === 'adjust') { // 수정탄: the centre gun, one round, quick fuze
+        const at = s.tick + secTicks(tof);
+        m.flights = [{ ...fall(aim, ctx.battery, m.bias, ctx.bal), at, fuze: 'quick' }];
+        schedule(s, at, 'impact');
+        break;
+      }
+      // 효력사: six guns, `rounds` each, 9 s apart with a jitter; every round laid now (fdc jitter, then bal 공산오차).
+      let last = 0;
+      for (const sheaf of SHEAF)
+        for (let k = 0; k < m.mto!.rounds; k++) {
+          const dt = k * GUN_INTERVAL_S + next(fdc) * GUN_JITTER_S;
+          last = Math.max(last, dt);
+          const f: Flight = { ...fall(aim, ctx.battery, m.bias, ctx.bal, sheaf), at: s.tick + secTicks(dt + tof), fuze: m.mto!.fuze };
+          let i = m.flights.length;
+          while (i > 0 && m.flights[i - 1]!.at > f.at) i--;
+          m.flights.splice(i, 0, f);
+          schedule(s, f.at, 'impact');
+        }
+      const done = s.tick + secTicks(last + 2.3); // 마감탄 떳다, 2.3 s after the last gun fired
+      schedule(s, done, 'rounds_complete');
+      // 효과 관측 2.5 s after the last round lands, and not before 2 s after 마감탄 떳다
+      schedule(s, Math.max(done + secTicks(2), m.flights.at(-1)!.at + secTicks(2.5)), 'effect_open');
       break;
     }
     case 'shot_readback': // 하나발 떳다, 잠깐대기: the observer's readback goes out by itself
       say({ speaker: 'observer', ending: 'wait', kind: 'shot' });
       break;
     case 'impact': {
-      const { x, y } = m.flight!;
-      s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vis: false });
+      const { x, y, fuze } = m.flights.shift()!;
+      s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vt: fuze === 'vt', vis: false });
       m.impacts.push({ x, y, tick: s.tick });
-      m.flight = null;
-      ctx.landed(x, y);
-      after(s, 1.5, 'adjust_open');
+      strike(s, x, y, fuze, ctx.bal, m.kills);
+      ctx.landed(x, y, fuze);
+      if (m.phase === 'adjust') after(s, 1.5, 'adjust_open');
       break;
     }
+    case 'rounds_complete':
+      say({ speaker: 'fdc', ending: 'over', kind: 'rounds_complete' });
+      after(s, 1.2, 'rounds_complete_readback');
+      break;
+    case 'rounds_complete_readback': // 마감탄 떳다, 잠깐대기: the observer's readback goes out by itself
+      say({ speaker: 'observer', ending: 'wait', kind: 'rounds_complete' });
+      break;
+    case 'effect_open':
+      s.radio.stage = 'effect';
+      break;
     case 'corr_readback':
       say({ speaker: 'fdc', ending: 'wait', kind: 'correction', slots: { ...m.correction! } });
       break;

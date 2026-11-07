@@ -135,7 +135,7 @@ export function updateIntel(s: SimState, w: Weather): void {
 /** 활동 (demo actOf): infantry assaulting attacks; APCs fired within 30 s and the mortar within 70 s are firing. */
 export function activityOf(p: Platoon, tick: number): Activity {
   const fired = (s: number) => p.lastFire >= 0 && tick - p.lastFire < s * 20;
-  if (p.type === 'inf' && p.state === 'assault') return 'attacking';
+  if (p.type === 'inf' && p.state === 'assault' && tick >= p.pinnedUntil) return 'attacking';
   if (p.type === 'apc' && !p.moving && fired(30)) return 'firing';
   if (p.type === 'mortar') return fired(70) ? 'firing' : 'halted';
   return p.moving ? 'moving' : 'halted';

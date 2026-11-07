@@ -9,9 +9,9 @@ export interface Splash {
   urgent: boolean;
 }
 
-/** The countdown of the current mission's round in the air, or null when none flies. */
+/** The countdown to the current mission's next round to land, or null when none flies. */
 export function splashOf(s: ReadonlySimState): Splash | null {
-  const f = s.missions.at(-1)?.flight;
+  const f = s.missions.at(-1)?.flights[0];
   if (!f) return null;
   const sec = Math.ceil((f.at - s.tick) / 20);
   return { sec, urgent: sec <= 5 };

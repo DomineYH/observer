@@ -10,10 +10,10 @@ const PHASES: readonly Phase[] = ['prep', 'live'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
-const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced'];
+const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced', 'broken', 'destroyed'];
 const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle', 'burst'];
 const CUES: readonly (Cue | null)[] = [null, 'man', 'veh', 'dust', 'muzzle'];
-const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready', 'flight', 'adjust'];
+const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready', 'flight', 'adjust', 'effect'];
 const bit = (b: boolean) => (b ? 1 : 0);
 /** Index + 1 of an optional enum value, 0 when absent. */
 const opt = <T>(list: readonly T[], x: T | undefined) => (x === undefined ? 0 : list.indexOf(x) + 1);
@@ -47,6 +47,7 @@ export function hashState(state: SimState): string {
       h.f64(m.x);
       h.f64(m.y);
       h.u32(bit(m.prone));
+      h.u32(bit(m.alive));
       h.u32(bit(m.vis));
     }
     h.u32(PLATOON_STATES.indexOf(p.state));
@@ -59,6 +60,7 @@ export function hashState(state: SimState): string {
     h.i32(p.nextFire);
     h.i32(p.lastFire);
     h.i32(p.dustTick);
+    h.i32(p.pinnedUntil);
     h.u32(ACTIVITIES.indexOf(p.activity));
     const I = p.intel;
     h.u32(I.stage);
@@ -83,6 +85,7 @@ export function hashState(state: SimState): string {
     h.i32(e.life);
     h.u32(e.pid);
     h.u32(bit(e.small));
+    h.u32(bit(e.vt));
     h.u32(bit(e.vis));
   }
   h.u32(state.targets);
@@ -117,6 +120,7 @@ export function hashState(state: SimState): string {
       h.u32(CONTROLS.indexOf(t.control));
       h.u32(t.targetNumber);
     }
+    h.u32(NEXTS.indexOf(m.phase));
     h.f64(m.bias.x);
     h.f64(m.bias.y);
     h.u32(m.aim ? 1 : 0);
@@ -135,12 +139,12 @@ export function hashState(state: SimState): string {
       h.u32(c.range ?? 0);
       h.u32(NEXTS.indexOf(c.next));
     }
-    const f = m.flight;
-    h.u32(f ? 1 : 0);
-    if (f) {
+    h.u32(m.flights.length);
+    for (const f of m.flights) {
       h.f64(f.x);
       h.f64(f.y);
       h.i32(f.at);
+      h.u32(FUZES.indexOf(f.fuze));
     }
     h.u32(m.impacts.length);
     for (const im of m.impacts) {
@@ -148,6 +152,8 @@ export function hashState(state: SimState): string {
       h.f64(im.y);
       h.i32(im.tick);
     }
+    h.u32(m.kills.length);
+    for (const k of m.kills) h.u32(k);
   }
   h.u32(state.queue.length);
   for (const q of state.queue) {

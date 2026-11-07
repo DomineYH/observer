@@ -1,6 +1,6 @@
 // 적 AI (demo lines 451–502): how each unit moves, deploys, halts and fires, one tick at a time, and where its members
-// stand. Hits, pinning, breaking and overrunning come with the fire-for-effect slice; mortar impacts and APC fire
-// damage with the friendly-losses slice.
+// stand, and how it reacts to our rounds (pinned, broken, destroyed: lethality.ts decides those). Overrunning, mortar
+// impacts and APC fire damage come with the friendly-losses slice.
 import { atan2, cos, exp, sin } from './math';
 import { next, type Stream } from './rng';
 import { heightAt, type TerrainData } from './terrain';
@@ -48,9 +48,9 @@ export function layout(p: Platoon, tick: number, speed: number): void {
   const f = p.form;
   const g = 1 - f;
   const t = tick * DT;
+  const pinned = tick < p.pinnedUntil;
   p.members.forEach((q, i) => {
-    // ponytail: only the holding recon lies down here; hits and pinning add their causes in the fire-for-effect slice.
-    q.prone = q.kind === 'man' && p.type === 'recon' && p.state === 'hold' && i > 0;
+    q.prone = q.kind === 'man' && (!q.alive || pinned || p.state === 'destroyed' || (p.type === 'recon' && p.state === 'hold' && i > 0));
     const sway = speed > 0 && q.kind === 'man' ? sin(t * 1.3 + q.ph) * 2 : 0;
     const uu = q.u * f + q.uc * g + sway;
     const vv = q.v * f + q.vc * g;
@@ -61,8 +61,11 @@ export function layout(p: Platoon, tick: number, speed: number): void {
 
 function emit(st: SimState, t: TerrainData, p: Platoon, pid: number, kind: FieldEffect['kind'], of: 'veh' | 'tube', lift: number, life: number, small: boolean): void {
   for (const q of p.members)
-    if (q.kind === of) st.effects.push({ kind, x: q.x, y: q.y, gz: heightAt(t, q.x, q.y) + lift, tick: st.tick, life, pid, small, vis: false });
+    if (q.kind === of && q.alive) st.effects.push({ kind, x: q.x, y: q.y, gz: heightAt(t, q.x, q.y) + lift, tick: st.tick, life, pid, small, vt: false, vis: false });
 }
+
+/** A mortar section fires its live tubes while two of its crew live. */
+const canFire = (p: Platoon) => p.members.some((q) => q.kind === 'tube' && q.alive) && p.members.filter((q) => q.kind === 'man' && q.alive).length >= 2;
 
 /** One tick of unit `pid`. Draws only from the enemy-action stream. */
 export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: number): void {
@@ -72,6 +75,7 @@ export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: num
     if (tick < p.t0) return;
     p.state = p.type === 'mortar' ? 'emplaced' : 'approach';
   }
+  const pinned = tick < p.pinnedUntil;
   let speed = 0;
   if (p.type === 'inf' && (p.state === 'approach' || p.state === 'assault')) {
     const dist = toGoal(p);
@@ -98,13 +102,24 @@ export function updatePlatoon(st: SimState, t: TerrainData, ai: Stream, pid: num
       p.lastFire = tick;
       emit(st, t, p, pid, 'muzzle', 'veh', 1.5, LIFE.apcMuzzle, true);
     }
-  } else if (p.type === 'mortar' && p.state === 'emplaced' && tick >= MORTAR_FIRST_TICK && tick >= p.nextFire) {
+  } else if (p.type === 'mortar' && p.state === 'emplaced' && tick >= MORTAR_FIRST_TICK && tick >= p.nextFire && !pinned && canFire(p)) {
     p.nextFire = tick + ticks(45 + next(ai) * 25);
-    // ponytail: every tube fires; the crew-of-two check and the impacts on friendly posts come with friendly losses.
+    // ponytail: the impacts on friendly posts come with friendly losses.
     p.lastFire = tick;
     emit(st, t, p, pid, 'muzzle', 'tube', 1, LIFE.mortarMuzzle, false);
   }
-  if (speed > 0) moveAlong(p, speed);
+  // 무력화: once up again, back towards where it set off, straight (the mortar section stays dug in)
+  const retreat = p.state === 'broken' && !pinned && p.type !== 'mortar';
+  if (retreat) {
+    const home = p.path[0]!;
+    speed = p.type === 'apc' ? 3 : 0.8;
+    p.dir = atan2(home.x - p.x, home.y - p.y);
+  }
+  if (pinned) speed = 0; // the APCs are never pinned (lethality.ts)
+  if (retreat) {
+    p.x += sin(p.dir) * speed * DT;
+    p.y += cos(p.dir) * speed * DT;
+  } else if (speed > 0) moveAlong(p, speed);
   p.moving = speed > 0;
   if (p.type === 'apc' && p.moving && tick - p.dustTick > DUST_TICKS) {
     p.dustTick = tick;

@@ -8,6 +8,9 @@ export const MIL = 3200 / Math.PI; // mils per radian
 const TAU = Math.PI * 2;
 const PE_TO_SD = 0.6745; // 공산오차 = 0.6745 standard deviations
 
+/** 포대 6문 W자 방열 (demo line 670): each gun's offset across (right +) and along (beyond +) the line of fire, m. */
+export const SHEAF: readonly (readonly [lat: number, rng: number])[] = [[-60, 22], [-36, -22], [-12, 22], [12, -22], [36, 22], [60, -22]];
+
 /** 비과시간, s, for a range of `d` m. */
 export const tofSec = (d: number) => 3 + (d / 1000) * 2.6;
 
@@ -19,16 +22,16 @@ export function drawBias(bal: Stream): Point {
   return { x: sin(a) * b, y: cos(a) * b };
 }
 
-/** Where one round from the centre gun falls: aim + bias + 공산오차 along the line of fire (range: 1.5 m/km + 2 m)
- * and across it (deflection: 0.5 m/km + 1 m). Range error is drawn first. */
-export function fall(aim: Point, battery: Point, bias: Point, bal: Stream): Point {
+/** Where one round falls: aim + bias + 공산오차 along the line of fire (range: 1.5 m/km + 2 m) and across it
+ * (deflection: 0.5 m/km + 1 m), plus the gun's `sheaf` offset (the centre gun has none). Range error is drawn first. */
+export function fall(aim: Point, battery: Point, bias: Point, bal: Stream, sheaf: readonly [lat: number, rng: number] = [0, 0]): Point {
   const gx = aim.x - battery.x;
   const gy = aim.y - battery.y;
   const gd = Math.sqrt(gx * gx + gy * gy);
   const ux = gx / gd;
   const uy = gy / gd;
-  const er = (gauss(bal) * ((1.5 * gd) / 1000 + 2)) / PE_TO_SD;
-  const ed = (gauss(bal) * ((0.5 * gd) / 1000 + 1)) / PE_TO_SD;
+  const er = (gauss(bal) * ((1.5 * gd) / 1000 + 2)) / PE_TO_SD + sheaf[1];
+  const ed = (gauss(bal) * ((0.5 * gd) / 1000 + 1)) / PE_TO_SD + sheaf[0];
   return { x: aim.x + bias.x + ux * er + uy * ed, y: aim.y + bias.y + uy * er - ux * ed };
 }
 

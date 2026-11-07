@@ -52,7 +52,7 @@ export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: b
       if (p.state === 'wait') continue;
       for (const q of p.members) {
         const hh = q.prone ? PRONE_M : HEIGHT[q.kind];
-        q.vis = visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT);
+        q.vis = q.alive && visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT); // the dead are not seen
       }
     }
   for (const e of s.effects) {
