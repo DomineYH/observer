@@ -111,8 +111,8 @@ async function toReady(page: Page, control: 'ready' | 'amc', warning: 'adjust' |
   // 통신 점검: 기러기 asks 4 s in and 감명 양호 goes out by itself.
   const log = page.getByRole('region', { name: '무전 기록' });
   await expect(log).toContainText('작전 개시.');
-  await expect(log).toContainText('갈매기, 여기는 기러기, 감명 보고, 이상.');
-  await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.');
+  await expect(log).toContainText('갈매기, 여기는 기러기, 감명 보고, 이상.', { timeout: 15_000 }); // 4 s in: margin for dropped frame time
+  await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.', { timeout: 15_000 }); // 5.5 s in
 
   const composer = page.getByRole('region', { name: '입력기' });
   // Not the planned post: the 위치 보고 comes first and no call can go; going on without it keeps the planned post for
@@ -128,7 +128,7 @@ async function toReady(page: Page, control: 'ready' | 'amc', warning: 'adjust' |
     await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.');
   }
   await send.click();
-  await expect(log).toContainText('좌표 송신바람');
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 }); // 2.5–4 s after the call
   await composer.getByLabel('동', { exact: true }).fill('4720');
   await composer.getByLabel('북', { exact: true }).fill('3150');
   await expect(preview).toContainText('찰리호텔 넷칠둘공 삼하나오공');
@@ -207,7 +207,7 @@ test('F-07: 극좌표 위치법 — 입력기', async ({ page }) => {
   const preview = composer.getByLabel('보낼 문장');
   const send = composer.getByRole('button', { name: '송신' });
   await send.click();
-  await expect(log).toContainText('좌표 송신바람');
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 }); // 2.5–4 s after the call
 
   // A lase fills 극좌표; then the observer types their own 방위각 and 거리 (거리 goes out to the nearest 10 m).
   await view.getByRole('button', { name: '레이저' }).click();
