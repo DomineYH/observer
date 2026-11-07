@@ -7,7 +7,6 @@ import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
 const INT32_MAX = 0x7fffffff;
-const INT32_MIN = -0x80000000;
 
 const HEADER_KEYS = ['format', 'simVersion', 'seed', 'seedKind', 'scenario', 'guns', 'weather', 'mode', 'stepMs', 'inputs', 'totalTicks'];
 const WEATHER_RANGES: readonly [key: string, min: number, max: number][] = [
@@ -69,10 +68,7 @@ function check(x: unknown): asserts x is ReplayData {
     int(input.t, last, (x.totalTicks as number) - 1, `${what}: tick (not decreasing, below totalTicks)`);
     last = input.t as number;
     if (typeof input.a !== 'string' || !/^[a-z_]+$/.test(input.a)) fail(`${what}.a: ASCII kind expected`);
-    if ('v' in input) {
-      if (!Array.isArray(input.v)) fail(`${what}.v: integer array expected`);
-      (input.v as unknown[]).forEach((n, j) => int(n, INT32_MIN, INT32_MAX, `${what}.v[${j}]`));
-    }
+    if ('v' in input && !Array.isArray(input.v)) fail(`${what}.v: array expected`); // each value is checked by its kind
     if (!validInput(input.a as string, input.v)) fail(`${what}: unknown kind or bad value`);
   });
 }

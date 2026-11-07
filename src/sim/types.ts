@@ -1,4 +1,5 @@
-import type { Activity, RadioEvent, Unit } from './radio';
+import type { Activity, DescriptionSlots, LocationSlots, MtoSlots, RadioEvent, Unit, Warning } from './radio';
+import type { Scheduled } from './queue';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
 
@@ -131,15 +132,27 @@ export interface SimInit {
 /** 입력. The kinds and their values are listed in inputs.ts; anything else is ignored. */
 export interface Input {
   a: string;
-  v?: readonly number[];
+  v?: readonly (number | string)[]; // integers, and enum identifiers as their ASCII strings
 }
 
-/** 사건. Nothing emits radio events until the radio state machine slice. */
+/** 사건. */
 export type SimEvent = RadioEvent;
 
 export interface StepResult {
   events: readonly SimEvent[];
   accepted: readonly boolean[]; // one per input, same order
+}
+
+/** 교신 단계: off until 감명 양호 has gone out · idle takes a call · wait for 기러기 · loc · desc take those
+ * transmissions · ready once 사격준비 끝 has come. */
+export type RadioStage = 'off' | 'idle' | 'wait' | 'loc' | 'desc' | 'ready';
+
+/** 사격 임무: what the observer sent and what 기러기 decided, filled in as the procedure goes. */
+export interface Mission {
+  warning: Warning;
+  location: LocationSlots | null;
+  description: DescriptionSlots | null;
+  mto: MtoSlots | null;
 }
 
 export interface SimState {
@@ -159,6 +172,9 @@ export interface SimState {
   /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */
   aim: { az: number; el: number };
   bino: boolean;
+  radio: { stage: RadioStage; lastTn: number }; // lastTn: the last 표적번호 기러기 gave (starts 1000, so AB1001)
+  missions: Mission[]; // one per accepted call; the last is the current one
+  queue: Scheduled[]; // 예약 이벤트, by tick
   rng: Record<StreamName, { a: number; count: number }>;
 }
 

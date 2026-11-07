@@ -3,6 +3,9 @@ import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
 import { isValid } from './inputs';
 import { applyPrep } from './prep';
+import { applyRadio, openProcedure, runAct } from './procedure';
+import { takeDue } from './queue';
+import type { RadioUtterance } from './radio';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
 import { updateVisibility } from './visibility';
@@ -28,6 +31,9 @@ export function createSim(init: SimInit): Sim {
     score: 0,
     aim: { ...INITIAL_AIM },
     bino: false,
+    radio: { stage: 'off', lastTn: 1000 },
+    missions: [],
+    queue: [],
     rng,
   };
 
@@ -35,13 +41,20 @@ export function createSim(init: SimInit): Sim {
     state,
     step(inputs): StepResult {
       const before = { bino: state.bino, phase: state.phase };
+      const said: RadioUtterance[] = [];
+      const say = (u: RadioUtterance) => said.push(u);
       const accepted = inputs.map((input) => {
         if (!isValid(input)) return false; // unknown kind or malformed value: ignored, nothing changes
-        const v = input.v!;
-        if (input.a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
-        else if (input.a === 'bino') state.bino = v[0] === 1;
-        else if (input.a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
-        else if (input.a === 'pick' || input.a === 'start') return applyPrep(state, init.terrain, init.scenario.plannedOp, input.a, v);
+        const a = input.a;
+        if (a === 'call' || a === 'loc' || a === 'desc') return applyRadio(state, a, input.v!, rng.fdc, say);
+        const v = input.v as readonly number[]; // every other kind carries integers only
+        if (a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
+        else if (a === 'bino') state.bino = v[0] === 1;
+        else if (a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
+        else if (a === 'pick' || a === 'start') {
+          if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
+          if (a === 'start') openProcedure(state);
+        }
         return true;
       });
       if (state.phase === 'live') {
@@ -53,8 +66,9 @@ export function createSim(init: SimInit): Sim {
         updateVisibility(state, init.terrain, init.weather, all);
         updateIntel(state, init.weather);
         for (const p of state.platoons) p.activity = activityOf(p, state.tick);
+        for (let act = takeDue(state); act; act = takeDue(state)) runAct(state, act, rng.fdc, say); // demo: runEvents after intel
       }
-      return { events: [], accepted };
+      return { events: said.map((utterance) => ({ type: 'radio', tick: state.tick, utterance })), accepted };
     },
     record(): GameRecord {
       return { ticks: state.tick, score: state.score };

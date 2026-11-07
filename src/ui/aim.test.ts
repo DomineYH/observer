@@ -44,7 +44,10 @@ test('F-03: 조준 입력 양자화', () => {
   const W = fovOf(true) * 10; // at this width one dragged pixel is 0.1 mil through binoculars
   const drag = (c: ReturnType<typeof createAimControl>, tenths: number) => c.drag(-tenths, 0, W); // dragging left turns right
   const valid = (sent: Input[]) =>
-    sent.every((i) => i.a === 'cam' && i.v!.every(Number.isInteger) && i.v![0]! >= 0 && i.v![0]! <= 63999 && Math.abs(i.v![1]!) <= 2000);
+    sent.every((i) => {
+      const v = i.v as number[];
+      return i.a === 'cam' && v.every(Number.isInteger) && v[0]! >= 0 && v[0]! <= 63999 && Math.abs(v[1]!) <= 2000;
+    });
 
   // Nothing is sent until the aim is 1 mil away from the last value sent (not from the last value seen).
   const a = control(10000, 0, true);

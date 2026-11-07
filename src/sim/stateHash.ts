@@ -1,8 +1,9 @@
 // 상태 해시: every field of the state in a fixed order, floats as their bits. Never iterate object keys here.
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
-import { ACTIVITIES, UNITS } from './radio';
-import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RouteKey, SimState, UnitType } from './types';
+import { ACTS } from './queue';
+import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, FUZES, TARGET_TYPES, UNITS, WARNINGS } from './radio';
+import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
 const PHASES: readonly Phase[] = ['prep', 'live'];
@@ -12,7 +13,10 @@ const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
 const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced'];
 const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle'];
 const CUES: readonly (Cue | null)[] = [null, 'man', 'veh', 'dust', 'muzzle'];
+const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready'];
 const bit = (b: boolean) => (b ? 1 : 0);
+/** Index + 1 of an optional enum value, 0 when absent. */
+const opt = <T>(list: readonly T[], x: T | undefined) => (x === undefined ? 0 : list.indexOf(x) + 1);
 
 export function hashState(state: SimState): string {
   const h = new Hasher();
@@ -82,6 +86,43 @@ export function hashState(state: SimState): string {
     h.u32(bit(e.vis));
   }
   h.u32(state.targets);
+  h.u32(RADIO_STAGES.indexOf(state.radio.stage));
+  h.u32(state.radio.lastTn);
+  h.u32(state.missions.length);
+  for (const m of state.missions) {
+    h.u32(WARNINGS.indexOf(m.warning));
+    const l = m.location; // grid only until the polar method comes
+    h.u32(l && l.method === 'grid' ? 1 : 0);
+    if (l && l.method === 'grid') {
+      h.u32(l.easting);
+      h.u32(l.northing);
+    }
+    const d = m.description;
+    h.u32(d ? 1 : 0);
+    if (d) {
+      h.u32(d.rounds);
+      h.u32(FUZE_REQUESTS.indexOf(d.fuzeRequest));
+      h.u32(CONTROLS.indexOf(d.control));
+      h.u32(d.dangerClose);
+      h.u32(TARGET_TYPES.indexOf(d.targetType));
+      h.u32(opt(ACTIVITIES, 'activity' in d ? d.activity : undefined));
+      h.u32(opt(UNITS, 'unit' in d ? d.unit : undefined));
+      h.u32('count' in d ? d.count : 0);
+    }
+    const t = m.mto;
+    h.u32(t ? 1 : 0);
+    if (t) {
+      h.u32(FUZES.indexOf(t.fuze));
+      h.u32(t.rounds);
+      h.u32(CONTROLS.indexOf(t.control));
+      h.u32(t.targetNumber);
+    }
+  }
+  h.u32(state.queue.length);
+  for (const q of state.queue) {
+    h.i32(q.at);
+    h.u32(ACTS.indexOf(q.act));
+  }
   h.u32(MODES.indexOf(state.mode));
   h.i32(state.aim.az);
   h.i32(state.aim.el);
