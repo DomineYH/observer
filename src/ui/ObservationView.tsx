@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
-import { drawOverlay, splashOf } from '@render/overlay';
+import { drawOverlay, drawRain, rainStreaks, splashOf } from '@render/overlay';
 import { angleAt, DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
 import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
@@ -79,6 +79,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       c.imageSmoothingEnabled = false;
       c.drawImage(low, 0, 0, W, H);
       drawSprites(c, spritesOf(state, geom, terrain, weather), W / buf.w, on, dpr, fog); // only what the simulation sees
+      drawRain(c, rainStreaks(weather, a.h, W, H, dpr, now / 1000), dpr);
       if (fps !== null) {
         frames++;
         if (now - since >= 1000) {

@@ -102,7 +102,7 @@ export interface Atmosphere {
 /** Fog and sky colours from the weather (demo setWeather). */
 export function atmosphere(w: Weather): Atmosphere {
   const c = w.cloudPct / 100;
-  const wet = w.precipTenthMmH > 0;
+  const wet = w.precipTenthMmH > 0 || w.humidityPct >= 95; // the demo wets fog by its weather code, not in our value
   const fog: RGB = [Math.round(198 - 22 * c - (wet ? 14 : 0)), Math.round(200 - 18 * c - (wet ? 10 : 0)), Math.round(196 - 8 * c - (wet ? 4 : 0))];
   return { sigma: 3.912 / w.visibilityM, fog, sky: [[Math.round(120 + 40 * c), Math.round(147 + 18 * c), Math.round(188 - 20 * c)], fog] };
 }

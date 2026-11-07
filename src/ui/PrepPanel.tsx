@@ -1,6 +1,7 @@
 // 작전 준비 (F-22, demo lines 922–936): the briefing, the seed and weather, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
 import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
+import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
 import { BRIEFING } from '@content/scenario';
 import { gridOf, underCanopy } from '@render/mapView';
 import { startInput } from './prep';
@@ -20,7 +21,12 @@ export interface PrepPanelProps {
   queued: readonly Input[];
   /** The simulation's live state, read when 작전 개시 is pressed. */
   live: Pick<ReadonlySimState, 'op'>;
+  /** The practice seed's preset in use (null for a daily seed), and choosing another one (F-30). */
+  preset: WeatherPreset | null;
+  onPreset: (p: WeatherPreset) => void;
 }
+
+const PRESET_NAMES: Record<WeatherPreset, string> = { clear: '맑음', haze: '박무', rain: '비', wind: '강한 북서풍', fog: '안개' };
 
 function weatherText(w: Weather): string {
   const parts = [
@@ -40,7 +46,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
@@ -81,6 +87,20 @@ export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, s
         <b>시드</b>{' '}
         {seedKind === 'daily' ? `일일 ${seed} — 오늘은 모두 같은 배치·기상·편차로 경쟁` : `연습 ${seed} — 랭킹 제외`}
       </p>
+      {seedKind === 'practice' && preset && (
+        <p>
+          <label>
+            기상 바꾸기{' '}
+            <select value={preset} onChange={(e) => onPreset(e.target.value as WeatherPreset)}>
+              {WEATHER_PRESETS.map((p) => (
+                <option key={p} value={p}>
+                  {PRESET_NAMES[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </p>
+      )}
       <p>
         <b>주의</b> {BRIEFING.caution} 계획된 관측소 1번 고지 {at(scenario.plannedOp)}.
       </p>

@@ -1,5 +1,6 @@
 // Fixtures for the radio procedure tests: an empty battlefield on the flat test terrain, started at its middle.
-import { createSim, type ImpactEvent, type Input, type RadioEvent, type RadioKind, type Sim, type SimEvent, type Speaker } from '@sim';
+import { createSim, type ImpactEvent, type Input, type RadioEvent, type RadioKind, type Sim, type SimEvent, type Speaker, type Weather } from '@sim';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, START } from './init';
 
@@ -8,8 +9,8 @@ import { init, START } from './init';
 export const NO_TROOPS = { ...BASE_SCENARIO, units: [], friends: [] };
 
 /** A started simulation with no enemy; only the radio procedure and the friendly troops draw from the streams. */
-export function started(seed = 7, scenario = { ...BASE_SCENARIO, units: [] }): Sim {
-  const sim = createSim({ ...init(seed), scenario });
+export function started(seed = 7, scenario = { ...BASE_SCENARIO, units: [] }, weather: Weather = CLEAR_WEATHER): Sim {
+  const sim = createSim({ ...init(seed), scenario, weather });
   sim.step([START]);
   return sim;
 }

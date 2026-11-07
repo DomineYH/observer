@@ -16,7 +16,7 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } })) =>
+const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } })) =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
@@ -28,8 +28,22 @@ const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', te
       send={() => {}}
       queued={[]}
       live={state}
+      preset={seedKind === 'practice' ? 'fog' : null}
+      onPreset={() => {}}
     />,
-  ).replace(/<[^>]*>/g, '');
+  );
+const text = (...a: Parameters<typeof markup>) => markup(...a).replace(/<[^>]*>/g, '');
+
+test('F-30: 연습 시드의 기상 선택 — 준비 화면', () => {
+  // Only a practice seed offers the five presets, with the one in use selected.
+  const practice = markup(1234, 'practice');
+  expect(practice).toContain('기상 바꾸기');
+  expect([...practice.matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map((m) => m[1])).toEqual(['맑음', '박무', '비', '강한 북서풍', '안개']);
+  expect(practice).toMatch(/<option value="fog" selected="">안개<\/option>/);
+  const daily = markup(20261106, 'daily');
+  expect(daily).not.toContain('<select');
+  expect(daily).not.toContain('기상 바꾸기');
+});
 
 test('F-30: 시드 종류 표시', () => {
   const practice = text(1234, 'practice');

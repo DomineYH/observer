@@ -1,6 +1,6 @@
 // 먼지와 사격 연기, our troops' small-arms flashes and our own 탄착 (demo lines 1162–1182, disc 392): drawn into the low-resolution view before the dot
 // look, only when the simulation has decided they are seen. Dust and smoke drift downwind and fade with age and
-// distance; a burst's smoke does not drift yet (smoke flow comes with the weather slice, M1-15). A 접근신관 burst
+// distance; a burst's smoke drifts with the full wind, its flash stays where it burst. A 접근신관 burst
 // flashes 7 m up and leaves a dark puff there over the earth thrown up below it.
 import { signalAt, type ReadonlySimState, type Weather } from '@sim';
 import { project, type ViewGeometry } from './projection';
@@ -37,6 +37,9 @@ const VT_HEIGHT_M = 7;
 
 export function drawEffects(buf: ViewBuffers, v: ViewGeometry, s: ReadonlySimState, w: Weather): void {
   const { sigma } = atmosphere(w);
+  const to = ((w.windFromDeg + 180) * Math.PI) / 180; // downwind
+  const wx = Math.sin(to) * (w.windSpeedTenthMs / 10);
+  const wy = Math.cos(to) * (w.windSpeedTenthMs / 10);
   for (const e of s.effects) {
     if (!e.vis) continue;
     const age = (s.tick - e.tick) * 0.05;
@@ -49,9 +52,11 @@ export function drawEffects(buf: ViewBuffers, v: ViewGeometry, s: ReadonlySimSta
       if (age <= 0.05) continue;
       const rise = 4 + age * 2.4;
       const r = (fwd: number) => Math.max(1.2, (6 + age * 2.2) * (v.focal / fwd));
-      const a = e.vt && project(v, { x: e.x, y: e.y, z: e.gz + up + rise });
+      const sx = e.x + wx * age; // demo 1176: the puff rides the wind
+      const sy = e.y + wy * age;
+      const a = e.vt && project(v, { x: sx, y: sy, z: e.gz + up + rise });
       if (a) disc(buf, a.sx, a.sy, r(a.fwd) * 0.9, AIRBURST, 0.8 * (1 - t) * tr, 7);
-      const p = project(v, { x: e.x, y: e.y, z: e.gz + rise * (e.vt ? 0.4 : 1) });
+      const p = project(v, { x: sx, y: sy, z: e.gz + rise * (e.vt ? 0.4 : 1) });
       if (p) disc(buf, p.sx, p.sy, r(p.fwd), EARTH, 0.78 * (1 - t) * tr, 3);
       continue;
     }

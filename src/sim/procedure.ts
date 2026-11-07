@@ -30,6 +30,7 @@ export interface Ctx {
   frontY: number; // 아군 전선, north m
   terrain: TerrainData;
   battery: Point;
+  residual: Point; // 기상 잔차, part of every mission's bias
   say: Say;
   landed: (x: number, y: number, fuze: Fuze) => void;
   note: (n: PostNote) => void;
@@ -96,7 +97,8 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   if ((a === 'call' || a === 'shift') && (s.post.state !== 'ready' || s.reportDue)) return false;
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
-    const bias = drawBias(ctx.bal);
+    const b = drawBias(ctx.bal);
+    const bias = { x: b.x + ctx.residual.x, y: b.y + ctx.residual.y };
     s.missions.push(newMission(s, warning, bias));
     say({ speaker: 'observer', ending: 'over', kind: 'call', slots: { warning } });
     after(s, 2.5 + next(fdc) * 1.5, 'call_ack');

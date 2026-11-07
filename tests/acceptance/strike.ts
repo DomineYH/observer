@@ -1,5 +1,6 @@
 // Fixtures for the fire-for-effect tests on enemy units: a mission sent so its rounds fall where a unit will stand.
-import { toGrid, type ImpactEvent, type Input, type Point, type Scenario, type Sim, type SimEvent } from '@sim';
+import { toGrid, type ImpactEvent, type Input, type Point, type Scenario, type Sim, type SimEvent, type Weather } from '@sim';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { answered, openRadio, send, toReady } from './mission';
 import { angleTo, idAt, oneUnit, started, until } from './enemy';
 import { flatTerrain } from './terrain';
@@ -7,8 +8,8 @@ import { flatTerrain } from './terrain';
 export const isImpact = (e: SimEvent): e is ImpactEvent => e.type === 'impact';
 
 /** A started simulation of `scenario` with its radio open. */
-export function opened(scenario: Scenario, seed: number): Sim {
-  const sim = started(scenario, { seed });
+export function opened(scenario: Scenario, seed: number, weather: Weather = CLEAR_WEATHER): Sim {
+  const sim = started(scenario, { seed, weather });
   openRadio(sim);
   return sim;
 }
@@ -33,22 +34,24 @@ export function untilLanded(sim: Sim, limit = 4000): readonly SimEvent[] {
  * and runs until 사격준비 끝. A twin with the same seed and inputs (grid: the unit now) tells the tick the first round
  * lands; a run without radio tells where the unit stands then (nothing the radio does reaches the enemy before a round
  * lands). The grid takes off the mission's 비표준 조건 오차, read once the call is accepted. `wait` ticks pass first.
+ * Calm at 15 °C: no 기상 잔차 (F-17's), so the 10 m grid's truncation leaves the aim these seeds were chosen with.
  */
+export const CALM: Weather = { ...CLEAR_WEATHER, windSpeedTenthMs: 0, tempTenthC: 150 };
 export function aimedAt(scenario: Scenario, seed: number, pid: number, call: Input, d: Input, offset: Point = { x: 0, y: 0 }, wait = 0): Sim {
   const run = (sim: Sim) => {
     for (let k = 0; k < wait; k++) sim.step([]);
     return sim;
   };
-  const twin = run(opened(scenario, seed));
+  const twin = run(opened(scenario, seed, CALM));
   toReady(twin, d, call, gridAt(twin.state.platoons[pid]!));
   untilLanded(twin);
   const tick = twin.state.tick;
 
-  const ghost = started(scenario, { seed });
+  const ghost = started(scenario, { seed, weather: CALM });
   while (ghost.state.tick < tick) ghost.step([]);
   const { x, y } = ghost.state.platoons[pid]!;
 
-  const sim = run(opened(scenario, seed));
+  const sim = run(opened(scenario, seed, CALM));
   if (!send(sim, call).ok) throw new Error('call ignored');
   answered(sim, 'call');
   const b = sim.state.missions[0]!.bias; // setup, not an assertion: the F-12 criteria are stated at 0 m aim error

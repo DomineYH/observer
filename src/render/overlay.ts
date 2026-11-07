@@ -1,7 +1,8 @@
 // 겹쳐 그리는 표시 of the observation view (demo lines 1197–1229): the binocular mil reticle, the azimuth tape and the
 // time to impact. Positions come from milToPx, the renderer's own projection.
-import type { ReadonlySimState } from '@sim';
-import { milToPx } from './projection';
+import type { ReadonlySimState, Weather } from '@sim';
+import { MIL, milToPx } from './projection';
+import { hash } from './shade';
 
 /** 탄착까지 남은 초 (F-11, demo line 1229), rounded up; `urgent` from 5 s down (SPLASH 대용). */
 export interface Splash {
@@ -74,6 +75,35 @@ function binoMask(W: number, H: number): HTMLCanvasElement {
     mask = { key, canvas };
   }
   return mask.canvas;
+}
+
+/** 빗줄기 (demo 1191–1193): 90 streaks per mm/h at display resolution, each 16 px long, falling and drifting with
+ * the crosswind seen at heading `h` mils; `tSec` moves them. Segments as [x0, y0, x1, y1]. */
+export function rainStreaks(w: Weather, h: number, W: number, H: number, dpr: number, tSec: number): [number, number, number, number][] {
+  const n = Math.round(9 * w.precipTenthMmH);
+  const to = ((w.windFromDeg + 180) * Math.PI) / 180;
+  const v = w.windSpeedTenthMs / 10;
+  const a = h / MIL;
+  const lean = (Math.sin(to) * v * Math.cos(a) - Math.cos(to) * v * Math.sin(a)) * 2.2 * dpr;
+  const out: [number, number, number, number][] = [];
+  for (let k = 0; k < n; k++) {
+    const x = (((hash(k, 1, 77) * W + tSec * lean * 20) % W) + W) % W;
+    const y = (hash(k, 2, 77) * H + tSec * 900 * dpr * (0.8 + hash(k, 3, 77) * 0.4)) % H;
+    out.push([x, y, x + lean, y + 16 * dpr]);
+  }
+  return out;
+}
+
+export function drawRain(c: CanvasRenderingContext2D, streaks: readonly (readonly number[])[], dpr: number): void {
+  if (!streaks.length) return;
+  c.strokeStyle = 'rgba(210,215,222,.35)';
+  c.lineWidth = dpr;
+  c.beginPath();
+  for (const [x0, y0, x1, y1] of streaks) {
+    c.moveTo(x0!, y0!);
+    c.lineTo(x1!, y1!);
+  }
+  c.stroke();
 }
 
 /** Draws the overlay at display resolution: `scale` display pixels per internal pixel, `aim` in mils. */

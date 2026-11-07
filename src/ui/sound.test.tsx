@@ -41,12 +41,13 @@ test('F-10: 폭음 지연', () => {
   const impact = impacts[0]!;
   const op = sim.state.op;
   const distance = Math.hypot(impact.x - op.x, impact.y - op.y);
-  // The round lands 6927 m from the post: 6927 ÷ 343 = 20.2 s, 404 ticks later the 폭음 is heard, once.
-  expect(Math.round(distance)).toBe(6927);
-  run(sim, 403);
+  // The round lands 6939 m from the post (with clear weather's 기상 잔차): 6939 ÷ 343 = 20.23 s, 405 ticks later the
+  // 폭음 is heard, once.
+  expect(Math.round(distance)).toBe(6939);
+  run(sim, 404);
   expect(played.filter((p) => p.kind === 'boom')).toEqual([]);
   run(sim, 100);
-  expect(played.filter((p) => p.kind === 'boom')).toEqual([{ kind: 'boom', tick: impact.tick + 404, distance }]);
+  expect(played.filter((p) => p.kind === 'boom')).toEqual([{ kind: 'boom', tick: impact.tick + 405, distance }]);
 });
 
 test('F-28: 기러기 교신을 읽는다', () => {

@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, signalAt, validateReplay, type Member, type Point, type Scenario, type Sim, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawEffects } from '@render/effects';
 import { angleAt, focalOf, MIL, project, QUALITIES } from '@render/projection';
 import { terrainColours } from '@render/shade';

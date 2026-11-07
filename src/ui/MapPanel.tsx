@@ -1,7 +1,7 @@
 // 지도 패널 (F-06, demo lines 1258–1320, 1390–1420): the map with the briefing and the post, zoomed by wheel or buttons
 // and dragged. Pressing it picks the 관측소 후보 in prep; once started it reads the 좌표자.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Input, Point, ReadonlySimState, Scenario, TerrainData } from '@sim';
+import type { Input, Point, ReadonlySimState, Scenario, TerrainData, Weather } from '@sim';
 import { drawMap, MAP_PX, mapBase } from '@render/map';
 import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView } from '@render/mapView';
 import { fovOf } from '@render/projection';
@@ -17,9 +17,10 @@ export interface MapPanelProps {
   state: ReadonlySimState;
   send: (input: Input) => void;
   onFrame: (draw: (now: number) => void) => () => void;
+  weather: Weather;
 }
 
-export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelProps) {
+export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: MapPanelProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<MapView>(FULL_VIEW);
   const [pin, setPin] = useState<(Point & { e: number; n: number }) | null>(null);
@@ -36,8 +37,8 @@ export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelPr
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick });
-  }, [terrain, base, view, scenario, state, pin]);
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather });
+  }, [terrain, base, view, scenario, state, pin, weather]);
 
   useEffect(() => {
     draw();

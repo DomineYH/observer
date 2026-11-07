@@ -2,7 +2,7 @@
 // Public interface only: create, step, events, read-only state, record.
 import { describe, expect, test } from 'vitest';
 import { directFireChance, EYE_HEIGHT, signalAt, type ReadonlySimState, type Scenario, type Sim } from '@sim';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { angleTo, dist, mortarAt, oneUnit, started } from './enemy';

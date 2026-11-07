@@ -1,5 +1,5 @@
 // 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
-import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType } from '@sim';
+import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType, type Weather } from '@sim';
 import { FULL_VIEW, projector, type MapView } from './mapView';
 
 const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
@@ -83,6 +83,7 @@ export interface MapMarks {
   mode: Mode;
   missions: ReadonlySimState['missions'];
   tick: number;
+  weather: Weather; // its wind is drawn as an arrow
 }
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
@@ -147,10 +148,41 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
   if (marks) {
     drawMarks(c, marks, k, mx, my);
     drawFire(c, marks, t, mx, my);
+    drawWind(c, marks.weather);
   }
 }
 
 /** 사격 임무 (demo 1302, 1305): each requested grid as a square with its 표적번호, and the recent 탄착 as ×. */
+/** 바람 화살표 (demo 1311–1316): bottom right, pointing downwind, 8 px + 1.4 px per m/s, the speed under it. */
+function drawWind(c: MapContext, w: Weather): void {
+  const x0 = MAP_PX - 34;
+  const y0 = MAP_PX - 34;
+  const a = ((w.windFromDeg + 180) * Math.PI) / 180;
+  const half = (8 + (w.windSpeedTenthMs / 10) * 1.4) / 2;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  c.fillStyle = 'rgba(255,255,255,.75)';
+  c.beginPath();
+  c.arc(x0, y0, 24, 0, TAU);
+  c.fill();
+  c.strokeStyle = c.fillStyle = '#123';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(x0 - dx * half, y0 - dy * half);
+  c.lineTo(x0 + dx * half, y0 + dy * half);
+  c.stroke();
+  const hx = x0 + dx * half;
+  const hy = y0 + dy * half;
+  c.beginPath();
+  c.moveTo(hx, hy);
+  c.lineTo(hx - Math.sin(a - 0.5) * 6, hy + Math.cos(a - 0.5) * 6);
+  c.lineTo(hx - Math.sin(a + 0.5) * 6, hy + Math.cos(a + 0.5) * 6);
+  c.fill();
+  c.font = '9px monospace';
+  c.textAlign = 'center';
+  c.fillText(`${Math.round(w.windSpeedTenthMs / 10)}m/s`, x0, y0 + 20);
+}
+
 function drawFire(c: MapContext, m: MapMarks, t: TerrainData, mx: (x: number) => number, my: (y: number) => number): void {
   c.lineWidth = 1;
   c.font = '10px monospace';

@@ -27,6 +27,8 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   // (The map's centre is forest on this seed: the eye stands under the canopy and sees only trees.)
   const prep = page.getByRole('region', { name: '작전 준비' });
   await expect(prep).toContainText('연습 20261106');
+  // 준비 화면에 기상이 보인다: a practice seed starts in clear weather.
+  await expect(prep).toContainText('기상 시정 24.0 km · 구름 15% · 바람 285° 2.6 m/s');
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
@@ -69,6 +71,25 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect.poll(pixels).not.toBe(eye);
   await page.keyboard.press('b');
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page }) => {
+  await page.goto('/?seed=20261106');
+  const tick = page.getByRole('status', { name: '틱' });
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  // 안개: the new game's weather is shown, the chosen 관측소 후보 is kept and the clock still stands at 0.
+  await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
+  await expect(prep).toContainText('기상 시정 2.5 km · 구름 100% · 바람 180° 0.7 m/s');
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await expect(tick).toHaveText('0');
+  // The new game starts from that post.
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+  await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3256 점령.');
 });
 
 test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {

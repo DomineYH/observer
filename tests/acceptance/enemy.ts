@@ -1,7 +1,7 @@
 // Fixtures for the enemy tests: one-unit scenarios on the flat test terrain, whose observer stands at (320, 320).
 import { createSim, EYE_HEIGHT, type Mode, type Point, type Scenario, type Sim, type SimInit, type UnitDef, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { init, START } from './init';
 import { flatTerrain } from './terrain';
 

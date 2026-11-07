@@ -25,6 +25,7 @@ export type UnitDef =
 export interface Scenario extends Ref {
   plannedOp: Point; // 계획된 관측소
   battery: Point; // 포대, off the map
+  fixedPoint: Point; // 고정점: the 기온 잔차 lies along the battery → here line
   frontY: number; // 아군 전선 (이동 한계선), north meters
   friends: readonly Point[]; // 아군 진지
   supplyRoad: number; // index into the terrain's roads the 보급 트럭 drives; no truck when the terrain has no such road

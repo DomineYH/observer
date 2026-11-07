@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { createSim, replay, validateReplay } from '@sim';
 import type { Input } from '@sim';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { createSession } from '@app/session';
 import { fovOf, pxToMil, QUALITIES } from '@render/projection';
 import { createAimControl } from '@ui/aim';

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { fromGrid, validateReplay, type Input, type RadioEvent, type Sim } from '@sim';
 import { radioSentence, spoken } from '@ui/radio/sentence';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawEffects } from '@render/effects';
 import { splashOf } from '@render/overlay';
 import { focalOf, MIL } from '@render/projection';
@@ -105,8 +105,10 @@ describe('F-10: 탄착 분포 수치', () => {
     const range: number[] = [];
     const defl: number[] = [];
     let gd = 0;
+    // Calm at 15 °C: no 기상 잔차, so the bias is the random part alone (the residual is F-17's).
+    const calm = { ...CLEAR_WEATHER, windSpeedTenthMs: 0, tempTenthC: 150 };
     for (let seed = 1; seed <= 300; seed++) {
-      const sim = started(seed, NO_TROOPS);
+      const sim = started(seed, NO_TROOPS, calm);
       openRadio(sim);
       const ready = toReady(sim).at(-1)!;
       const m = sim.state.missions[0]!;

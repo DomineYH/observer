@@ -5,7 +5,7 @@ import { START } from './init';
 import { cleared, FFE5, INF_RECON, playOut } from './end';
 import { started as noEnemy } from './mission';
 import { mortarAt, oneUnit, started } from './enemy';
-import { aimedAt, gridAt, isImpact, toEffect, untilLanded } from './strike';
+import { CALM, aimedAt, gridAt, isImpact, toEffect, untilLanded } from './strike';
 import { flatTerrain } from './terrain';
 import { CALL_ADJUST, CALL_FFE, corr, desc, EOM, openRadio, REPEAT, toReady, untilSaid, untilTaken } from './mission';
 import type { Point, PostEvent, Scenario, SimEvent } from '@sim';
@@ -82,7 +82,7 @@ describe('F-13: 종료', () => {
       units: [{ type: 'inf', route: 'A', t0: 0 }, { type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }],
       nais: [{ x: 320, y: 5320, r: 100, conf: 'low' }],
     };
-    const sim = started(two);
+    const sim = started(two, { weather: CALM }); // no 기상 잔차: the 효력사 below lands on the unit as the seed was chosen
     openRadio(sim);
     const p = sim.state.platoons[0]!;
     const goal = p.path.at(-1)!; // its objective: the route's end as this unit walks it

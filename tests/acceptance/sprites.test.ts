@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { FieldEffect, ReadonlySimState, Sim, TerrainData } from '@sim';
 import { drawMap, type MapContext, type MapMarks } from '@render/map';
 import { FULL_VIEW } from '@render/mapView';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { focalOf, MIL, type ViewGeometry } from '@render/projection';
 import { drawEffects } from '@render/effects';
 import { createViewBuffers } from '@render/voxel';
@@ -131,7 +131,7 @@ function mapBoxes(sim: Sim, scenario: MapMarks['scenario'], t: TerrainData) {
     set: () => true,
   }) as unknown as MapContext;
   const s = sim.state;
-  const marks: MapMarks = { scenario, op: s.op, knownOp: s.knownOp, dest: null, az: s.aim.az, fovMil: 1066, pin: null, platoons: s.platoons, mode: s.mode, missions: s.missions, tick: s.tick };
+  const marks: MapMarks = { scenario, op: s.op, knownOp: s.knownOp, dest: null, az: s.aim.az, fovMil: 1066, pin: null, platoons: s.platoons, mode: s.mode, missions: s.missions, tick: s.tick, weather: CLEAR_WEATHER };
   drawMap(ctx, t, {} as CanvasImageSource, FULL_VIEW, marks);
   return rects.filter((r) => r[2] === 14 && r[3] === 8);
 }

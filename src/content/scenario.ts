@@ -7,6 +7,7 @@ export const BASE_SCENARIO: Scenario = {
   version: 1,
   plannedOp: { x: 5120, y: 1800 }, // 1번 고지
   battery: { x: 4200, y: -4600 },
+  fixedPoint: { x: 5000, y: 5500 }, // demo line 698
   frontY: 3650,
   friends: [
     { x: 4350, y: 3380 },

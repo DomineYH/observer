@@ -3,6 +3,7 @@
 import { cos, sin } from './math';
 import { gauss, next, type Stream } from './rng';
 import type { Point } from './terrain';
+import type { Weather } from './types';
 
 export const MIL = 3200 / Math.PI; // mils per radian
 const TAU = Math.PI * 2;
@@ -14,8 +15,22 @@ export const SHEAF: readonly (readonly [lat: number, rng: number])[] = [[-60, 22
 /** 비과시간, s, for a range of `d` m. */
 export const tofSec = (d: number) => 3 + (d / 1000) * 2.6;
 
-/** 비표준 조건 오차 of one mission: 30–90 m in a random direction (two draws: size, then direction). The weather
- * residual comes with the weather slice (M1-15). */
+const WIND_M_PER_MS = 6; // 기상 잔차 (demo line 698): downwind, per m/s
+const TEMP_M_PER_C = 1.2; // and along the battery → 고정점 line, per °C off the standard 15 °C (cold falls short)
+const STD_TEMP_C = 15;
+
+/** 기상 잔차, m: the same for every mission of a game, added to each mission's random 비표준 조건 오차. */
+export function weatherResidual(w: Weather, battery: Point, fixed: Point): Point {
+  const to = ((w.windFromDeg + 180) * Math.PI) / 180; // the wind blows towards `windFromDeg` + 180°
+  const v = (w.windSpeedTenthMs / 10) * WIND_M_PER_MS;
+  const tk = (w.tempTenthC / 10 - STD_TEMP_C) * TEMP_M_PER_C;
+  const fx = fixed.x - battery.x;
+  const fy = fixed.y - battery.y;
+  const f = Math.sqrt(fx * fx + fy * fy);
+  return { x: sin(to) * v + (fx / f) * tk, y: cos(to) * v + (fy / f) * tk };
+}
+
+/** The random part of a mission's 비표준 조건 오차: 30–90 m in a random direction (two draws: size, then direction). */
 export function drawBias(bal: Stream): Point {
   const b = 30 + next(bal) * 60;
   const a = next(bal) * TAU;

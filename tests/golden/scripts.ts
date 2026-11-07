@@ -1,7 +1,7 @@
 import { SIM_VERSION, type ReplayData } from '@sim';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 
 const HEAD = {
   format: 1,

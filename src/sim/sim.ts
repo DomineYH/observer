@@ -1,3 +1,4 @@
+import { weatherResidual } from './ballistics';
 import { deploy } from './deploy';
 import { checkEnd } from './end';
 import { updatePlatoon } from './enemy';
@@ -68,6 +69,7 @@ export function createSim(init: SimInit): Sim {
     frontY: init.scenario.frontY,
     terrain: init.terrain,
     battery: init.scenario.battery,
+    residual: weatherResidual(init.weather, init.scenario.battery, init.scenario.fixedPoint),
     say: (utterance) => out.push({ type: 'radio', utterance }),
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
     note: (n) => out.push({ type: 'post', ...n }),
