@@ -1,11 +1,16 @@
 import { expect, test } from 'vitest';
-import type { GameRecord } from '@sim';
+import { validateReplay, type GameRecord } from '@sim';
+import { submissionOf } from '@app/records';
 import type { Board, RunRecord, Submission } from '../index';
 import { replayData } from '../../../tests/acceptance/init';
 import { memoryStorage } from '../../../tests/acceptance/storage';
+import { NO_ENEMY, oneMission } from '../../../tests/acceptance/session';
+import { init } from '../../../tests/acceptance/init';
 import { RESERVED } from './account';
 import { mockArchive } from './records';
 
+/** The sim's own format check, as the app passes it in. */
+const isReplay = (x: unknown) => validateReplay(x).ok;
 const BOARDS: Board[] = ['total', 'time', 'rounds', 'accuracy'];
 const RECORD: GameRecord = {
   ticks: 30000, seed: 20261106, seedKind: 'daily', cleared: true, clearTick: 20000, roundsTotal: 30, missions: 3,
@@ -24,12 +29,12 @@ const stored = (callsign: string, record: Partial<RunRecord>, createdAt: string,
 const seeded = (runs: unknown[]) => {
   const storage = memoryStorage();
   storage.setItem('observer.runs', JSON.stringify(runs));
-  return mockArchive(storage);
+  return mockArchive(storage, isReplay);
 };
 const callsigns = async (archive: ReturnType<typeof mockArchive>, b: Board) => (await archive.board(b)).map((r) => r.callsign);
 
 test('B5: 송골매는 예약어 — mock 랭킹에 없다', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), isReplay);
   for (const b of BOARDS) {
     const names = await callsigns(archive, b);
     expect(names.length).toBeGreaterThan(0);
@@ -40,7 +45,7 @@ test('B5: 송골매는 예약어 — mock 랭킹에 없다', async () => {
 
 test('F-31: 제출한 기록이 랭킹에 보인다', async () => {
   const storage = memoryStorage();
-  const archive = mockArchive(storage);
+  const archive = mockArchive(storage, isReplay);
   const before = new Date().toISOString();
   const stored = await archive.submit(run('참새12'));
   const after = new Date().toISOString();
@@ -52,11 +57,11 @@ test('F-31: 제출한 기록이 랭킹에 보인다', async () => {
   for (const b of BOARDS) expect(await callsigns(archive, b)).toContain('참새12');
   expect(await archive.mine()).toEqual([stored]);
   // Kept in this browser: a new archive over the same storage still has it.
-  expect(await callsigns(mockArchive(storage), 'total')).toContain('참새12');
+  expect(await callsigns(mockArchive(storage, isReplay), 'total')).toContain('참새12');
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 호출부호당 최고 기록 하나', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), isReplay);
   await archive.submit(run('참새12', { score: 1500, clearTick: 19000, roundsTotal: 40, firstErrorAvg: 30 }));
   await archive.submit(run('참새12', { score: 1900, clearTick: 25000, roundsTotal: 20, firstErrorAvg: 10 }));
   const mine = async (b: Board) => (await archive.board(b)).filter((r) => r.callsign === '참새12').map((r) => r.record);
@@ -84,7 +89,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 호출부호당 최고 �
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 보드별 자격', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), isReplay);
   await archive.submit(run('미섬멸', { cleared: false, clearTick: null, score: 5000 }));
   await archive.submit(run('무사격', { missions: 0, firstErrorAvg: null, score: 4000 }));
   expect((await callsigns(archive, 'total')).slice(0, 2)).toEqual(['미섬멸', '무사격']);
@@ -100,7 +105,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 보드별 자격', async
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장 공간이 차면 오래된 기록부터 지운다', async () => {
   const one = JSON.stringify([{ ...run('참새00'), createdAt: new Date().toISOString(), ranked: true }]).length;
-  const archive = mockArchive(memoryStorage(one * 3));
+  const archive = mockArchive(memoryStorage(one * 3), isReplay);
   for (let i = 0; i < 5; i++) await archive.submit(run(`참새0${i}`));
   const kept = (await archive.mine()).map((r) => r.callsign);
   expect(kept[0]).toBe('참새04');
@@ -108,11 +113,11 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장 공간이 차면 
   expect(kept.length).toBeLessThan(5);
   expect(kept).toEqual([...kept].sort().reverse()); // the oldest went first
   // A run that does not fit even alone is refused, and nothing kept is lost.
-  const tiny = mockArchive(memoryStorage(10));
+  const tiny = mockArchive(memoryStorage(10), isReplay);
   await expect(tiny.submit(run('참새'))).rejects.toThrow();
   expect(await tiny.mine()).toEqual([]);
   // The newest 20 are kept.
-  const many = mockArchive(memoryStorage());
+  const many = mockArchive(memoryStorage(), isReplay);
   for (let i = 0; i < 22; i++) await many.submit(run(`대원${i}`));
   const mine = await many.mine();
   expect(mine.length).toBe(20);
@@ -120,7 +125,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장 공간이 차면 
 });
 
 test('F-30: 랭킹 자격', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), isReplay);
   const training = await archive.submit(run('훈련병', { mode: 'training', score: 9000 }));
   const practice = await archive.submit(run('연습생', { seedKind: 'practice', score: 9000 }));
   expect([training.ranked, practice.ranked]).toEqual([false, false]);
@@ -161,13 +166,15 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 동점은 그 기록을 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장소가 깨져 있으면 빈 기록', async () => {
   const storage = memoryStorage();
   storage.setItem('observer.runs', '{broken');
-  expect(await mockArchive(storage).mine()).toEqual([]);
+  expect(await mockArchive(storage, isReplay).mine()).toEqual([]);
   storage.setItem('observer.runs', JSON.stringify({ callsign: 'x' }));
-  expect(await mockArchive(storage).mine()).toEqual([]);
+  expect(await mockArchive(storage, isReplay).mine()).toEqual([]);
 });
 
+const MISSION = { targetNumber: 1001, corrections: 1, rounds: 19, firstError: 73, directionError: null, rangeCorrections: [60], report: 'ineffective' };
+
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 기록의 모양이 틀리면 버린다', async () => {
-  const good = stored('<b>x</b>', {}, '2026-11-01T09:00:00.000Z');
+  const good = { ...stored('<b>x</b>', {}, '2026-11-01T09:00:00.000Z'), missions: [MISSION, { ...MISSION, targetNumber: null, report: null, rangeCorrections: [] }] };
   const { record } = good;
   const bad: unknown[] = [
     { callsign: 'x', record: {} },
@@ -189,6 +196,18 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 기록의 모�
     { ...good, record: { ...record, seedKind: 'custom' } },
     { ...good, record: { ...record, firstErrorAvg: undefined } },
     { ...good, record: Object.fromEntries(Object.entries(record).filter(([k]) => k !== 'roundsTotal')) },
+    // 임무 요약 and 재생 자료 are checked too, not only that they are there.
+    { ...good, missions: [null] },
+    { ...good, missions: [{ ...MISSION, corrections: '1' }] },
+    { ...good, missions: [{ ...MISSION, firstError: undefined }] },
+    { ...good, missions: [{ ...MISSION, rangeCorrections: [60, 'x'] }] },
+    { ...good, missions: [{ ...MISSION, rangeCorrections: 60 }] },
+    { ...good, missions: [{ ...MISSION, report: 'great' }] },
+    { ...good, missions: [MISSION, { ...MISSION, targetNumber: '1001' }] },
+    { ...good, replay: {} },
+    { ...good, replay: { ...good.replay, format: 2 } },
+    { ...good, replay: { ...good.replay, seedKind: 'custom' } },
+    { ...good, replay: { ...good.replay, inputs: [{ t: 0, a: 'start', v: ['x'] }] } },
   ];
   const archive = seeded([...bad, good]);
   expect(await archive.mine()).toEqual([good]);
@@ -196,4 +215,19 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 기록의 모�
   // A new submission keeps the valid runs and drops the rest from storage.
   await archive.submit(run('참새12'));
   expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새12', '<b>x</b>']);
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 시뮬레이션에서 온 기록은 저장하고 다시 읽어도 그대로', async () => {
+  const g = oneMission();
+  const submission = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
+  expect(submission.missions).toHaveLength(1);
+  expect(submission.replay.inputs.length).toBeGreaterThan(1);
+  const storage = memoryStorage();
+  const kept = await mockArchive(storage, isReplay).submit(submission);
+  // Read back from storage by a new archive: the same run, replay and 임무 요약 included.
+  expect(await mockArchive(storage, isReplay).mine()).toEqual([kept]);
+  expect(validateReplay((await mockArchive(storage, isReplay).mine())[0]!.replay).ok).toBe(true);
+  // The next save keeps it as it was.
+  await mockArchive(storage, isReplay).submit(run('참새34'));
+  expect((await mockArchive(storage, isReplay).mine())[1]).toEqual(kept);
 });

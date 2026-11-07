@@ -1,5 +1,6 @@
 // 기록 보관소 mock (demo lines 1457–1460, 1495–1503; PRD 10.2): this browser's runs plus fake rows, ranked by board.
-import type { Board, RankRow, RecordArchive, RunRecord, StoredRun } from '../index';
+import type { Effect } from '@sim';
+import type { Board, MissionSummary, RankRow, RecordArchive, RunRecord, StoredRun } from '../index';
 
 const fake = (
   callsign: string,
@@ -60,27 +61,38 @@ const RECORD: Record<keyof RunRecord, (x: unknown) => boolean> = {
   compromised: flag, score: count, mode: oneOf('training', 'standard'),
 };
 const RECORD_KEYS = Object.keys(RECORD) as (keyof RunRecord)[];
-/** Storage can be edited by hand: only an entry of the stored shape is a run. */
-const isRun = (r: unknown): r is StoredRun =>
+const EFFECTS: Record<Effect, true> = { destroyed: true, neutralized: true, ineffective: true }; // the compiler keeps it whole
+// 임무 요약, field by field as RECORD.
+const MISSION: Record<keyof MissionSummary, (x: unknown) => boolean> = {
+  targetNumber: countOrNull, corrections: count, rounds: count, firstError: countOrNull, directionError: countOrNull,
+  rangeCorrections: (x) => Array.isArray(x) && x.every(count),
+  report: (x) => x === null || Object.hasOwn(EFFECTS, x as string),
+};
+const MISSION_KEYS = Object.keys(MISSION) as (keyof MissionSummary)[];
+const fits = <K extends string>(x: unknown, keys: readonly K[], check: Record<K, (v: unknown) => boolean>) =>
+  isObject(x) && keys.every((k) => check[k](x[k]));
+/** Storage can be edited by hand: only an entry of the stored shape is a run. `isReplay` is the sim's 재생 자료 format
+ * check (adapters take sim types only, so the assembly point passes it in). */
+const isRun = (r: unknown, isReplay: (x: unknown) => boolean): r is StoredRun =>
   isObject(r) &&
   typeof r.callsign === 'string' &&
   typeof r.createdAt === 'string' &&
   !Number.isNaN(Date.parse(r.createdAt)) &&
   flag(r.ranked) &&
   Array.isArray(r.missions) &&
-  isObject(r.replay) &&
-  isObject(r.record) &&
-  RECORD_KEYS.every((k) => RECORD[k]((r.record as Record<string, unknown>)[k]));
+  r.missions.every((m) => fits(m, MISSION_KEYS, MISSION)) &&
+  isReplay(r.replay) &&
+  fits(r.record, RECORD_KEYS, RECORD);
 /** 랭킹 자격 (PRD 10.2): 표준 모드 and 일일 시드, read off the record itself. */
 const rankable = (r: RunRecord) => r.mode === 'standard' && r.seedKind === 'daily';
 const byTime = (a: RankRow, z: RankRow) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0);
 
-export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>): RecordArchive {
+export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isReplay: (x: unknown) => boolean): RecordArchive {
   // Oldest first, valid runs only.
   const load = (): StoredRun[] => {
     try {
       const v: unknown = JSON.parse(storage.getItem(KEY) ?? '[]');
-      return Array.isArray(v) ? v.filter(isRun) : [];
+      return Array.isArray(v) ? v.filter((r) => isRun(r, isReplay)) : [];
     } catch {
       return [];
     }

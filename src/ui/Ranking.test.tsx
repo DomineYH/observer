@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { expect, test } from 'vitest';
+import { validateReplay } from '@sim';
 import type { Board, RecordArchive } from '@adapters/index';
 import { mockArchive } from '@adapters/mock/records';
 import { submissionOf } from '@app/records';
@@ -23,7 +24,7 @@ const shown = async (archive: RecordArchive, board: Board, callsign = '참새12'
 );
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 랭킹 창', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
   const g = oneMission();
   const sub = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
   await archive.submit(sub);
@@ -56,7 +57,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 랭킹 창', async () =>
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 문자열은 글자로 보인다', async () => {
   const storage = memoryStorage();
-  const archive = mockArchive(storage);
+  const archive = mockArchive(storage, (x) => validateReplay(x).ok);
   const g = oneMission();
   const sub = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
   await archive.submit(sub);

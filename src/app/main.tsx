@@ -1,7 +1,7 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createSim, underCanopy, type ReplayData } from '@sim';
+import { createSim, underCanopy, validateReplay, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
 import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
@@ -57,7 +57,7 @@ const onFrame = (draw: (now: number) => void) => {
 // 계정 and 기록 보관소 (M1: this browser's storage). Until a callsign is set the radio uses the placeholder 갈매기.
 // NAMES is one object the sound holds too, so a new callsign reaches it in place.
 const account = mockAccount(localStorage);
-const archive = mockArchive(localStorage);
+const archive = mockArchive(localStorage, (x) => validateReplay(x).ok); // the sim's 재생 자료 format check
 const NAMES = { callsign: (await account.callsign()) ?? '갈매기', gridLetters: terrain.grid.letters };
 const claim: typeof account.claim = async (c) => {
   const r = await account.claim(c);

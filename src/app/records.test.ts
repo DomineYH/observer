@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { replay, type SimInit } from '@sim';
+import { replay, validateReplay, type SimInit } from '@sim';
 import { mockArchive } from '@adapters/mock/records';
 import { init, START } from '../../tests/acceptance/init';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, POS_SKIP } from '../../tests/acceptance/mission';
@@ -29,7 +29,7 @@ test('F-31: 받아들인 입력만 기록된다', () => {
 });
 
 test('F-30: 랭킹 자격 — 시뮬레이션에서 온 기록', async () => {
-  const archive = mockArchive(memoryStorage());
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
   const daily = oneMission();
   const practiceInit: SimInit = { ...init(42), seedKind: 'practice', scenario: NO_ENEMY };
   const practice = play(practiceInit);

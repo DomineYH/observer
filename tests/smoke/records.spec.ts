@@ -3,6 +3,10 @@ import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_SCENARIO } from '../../src/content/scenario';
 
+// A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).
+const REPLAY = {"format":1,"simVersion":15,"seed":20261106,"seedKind":"daily","scenario":{"id":"base","version":1},"guns":{"id":"base","version":1},"weather":{"visibilityM":24000,"cloudPct":15,"windFromDeg":285,"windSpeedTenthMs":26,"tempTenthC":94,"precipTenthMmH":0,"pressureHpa":1023,"humidityPct":48},"mode":"standard","stepMs":50,"inputs":[{"t":0,"a":"start","v":[320,320]},{"t":1,"a":"pos_skip"},{"t":110,"a":"call","v":["ffe"]},{"t":186,"a":"loc","v":["grid",4080,3080]},{"t":241,"a":"desc","v":[3,"none","ready",0,"unknown"]},{"t":1861,"a":"eom","v":["ineffective"]}],"totalTicks":1862};
+const MISSIONS = [{"targetNumber":1001,"corrections":0,"rounds":18,"firstError":null,"directionError":null,"rangeCorrections":[],"report":"ineffective"}];
+
 /** A run as 기록 보관소 keeps it in this browser (the stored shape), standard · daily unless `record` says otherwise. */
 const stored = (callsign: string, record: object = {}, createdAt = '2026-11-01T09:00:00.000Z') => ({
   callsign,
@@ -12,8 +16,8 @@ const stored = (callsign: string, record: object = {}, createdAt = '2026-11-01T0
     combatUnits: 4, earlyDefeats: 1, friendlyHits: 0, friendlyLosses: 0, dangerCloseMissed: 0, observerLost: false,
     postMoves: 0, compromised: false, score: 5000, mode: 'standard', ...record,
   },
-  missions: [],
-  replay: {},
+  missions: MISSIONS,
+  replay: REPLAY,
   createdAt,
   ranked: true, // the board does not trust it
 });
@@ -160,12 +164,23 @@ test('F-30: 랭킹 자격 — 실제 화면', async ({ page }) => {
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 모양이 틀린 저장 기록', async ({ page }) => {
-  await seed(page, [{ callsign: 'x', record: {} }, null, 7, { ...stored('깨진'), createdAt: 3 }, { ...stored('빈칸'), record: { score: 1 } }, stored('멀쩡')]);
+  await seed(page, [
+    { callsign: 'x', record: {} },
+    null,
+    7,
+    { ...stored('깨진'), createdAt: 3 },
+    { ...stored('빈칸'), record: { score: 1 } },
+    { ...stored('겉만'), replay: {} }, // the nested 재생 자료 and 임무 요약 are checked too
+    { ...stored('임무만'), missions: [null] },
+    stored('멀쩡'),
+  ]);
   const { dialog, errors } = await openRanking(page);
   await expect(dialog.getByRole('table').first().getByRole('row').filter({ hasText: '멀쩡' })).toHaveCount(1);
   await expect(dialog.getByRole('table').nth(1).getByRole('row')).toHaveCount(2); // header + the one valid run
   await expect(dialog).not.toContainText('깨진');
   await expect(dialog).not.toContainText('빈칸');
+  await expect(dialog).not.toContainText('겉만');
+  await expect(dialog).not.toContainText('임무만');
   expect(errors).toEqual([]);
 });
 
