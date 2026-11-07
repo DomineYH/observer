@@ -2,7 +2,7 @@
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
-import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
 import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
@@ -154,6 +154,16 @@ export function hashState(state: SimState): string {
     }
     h.u32(m.kills.length);
     for (const k of m.kills) h.u32(k === null ? 0 : 1 + k);
+    h.i32(m.target);
+    h.u32(m.firstError === null ? 0 : 1 + m.firstError);
+    h.u32(m.directionError === null ? 0 : 1 + m.directionError);
+    h.u32(m.rangeCorrections.length);
+    for (const r of m.rangeCorrections) h.u32(r);
+    h.u32(m.corrections);
+    h.u32(opt(EFFECTS, m.report ?? undefined));
+    h.u32(opt(EFFECTS, m.truth ?? undefined));
+    h.i32(m.truthPct);
+    h.i32(m.score);
   }
   h.u32(state.queue.length);
   for (const q of state.queue) {

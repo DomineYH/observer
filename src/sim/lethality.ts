@@ -9,8 +9,8 @@ const VT_HEIGHT_M = 7; // 접근신관 파열고
 const PIN_M = 220; // 피격 반응: a round this close to a unit's centre pins it …
 const PIN_S = { min: 35, spread: 30 }; // … for 35–65 s
 /** 판정 척도 (one scale, also the truth of the effect report): casualties for 무력화 and 파괴, and their points. */
-const NEUTRALIZED = 0.3;
-const DESTROYED = 0.6;
+export const NEUTRALIZED = 0.3;
+export const DESTROYED = 0.6;
 const POINTS = { broken: 100, destroyed: 150, early: 50 };
 
 /** 0.92 · exp(−(r/R)²) for men, the burst `r` m away (a VT burst `VT_HEIGHT_M` above the ground). Vehicles take only a

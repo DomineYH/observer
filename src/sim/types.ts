@@ -1,4 +1,4 @@
-import type { Activity, CorrectionSlots, DescriptionSlots, Fuze, LocationSlots, MtoSlots, Next, RadioEvent, Unit, Warning } from './radio';
+import type { Activity, CorrectionSlots, DescriptionSlots, Effect, Fuze, LocationSlots, MtoSlots, Next, RadioEvent, Unit, Warning } from './radio';
 import type { Scheduled } from './queue';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
@@ -183,6 +183,16 @@ export interface Mission {
   flights: Flight[]; // rounds in the air, by landing tick (ties in firing order)
   impacts: { x: number; y: number; tick: number }[];
   kills: (number | null)[]; // members this mission's rounds killed, by unit; null: none of them landed within 220 m
+  // 임무 요약 (사후강평, 기록)
+  target: number; // the unit nearest the sent grid (within 600 m) when it was sent; −1 none
+  firstError: number | null; // 초탄 오차, m: the first adjusting round from the target's centre; null for 바로 효력사
+  directionError: number | null; // 방향 오차, mils: the sent 방향 from the target's true azimuth; null without either
+  rangeCorrections: number[]; // 수정열: each correction's 사거리 (snapped, m) when it had one, in order
+  corrections: number; // corrections accepted
+  report: Effect | null; // the last 전과 보고 sent (재효력사 · 임무끝 · 수정 후 효력사)
+  truth: Effect | null; // the reported unit's real effect at that report; null when there was no unit to judge
+  truthPct: number; // its casualties then, %; −1 when no unit
+  score: number; // this mission's 전과 보고 points (also in the game's score)
 }
 
 export interface SimState {

@@ -56,7 +56,7 @@ export function createSim(init: SimInit): Sim {
       const accepted = inputs.map((input) => {
         if (!isValid(input)) return false; // unknown kind or malformed value: ignored, nothing changes
         const a = input.a;
-        if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr') return applyRadio(state, ctx, a, input.v);
+        if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom') return applyRadio(state, ctx, a, input.v);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
         else if (a === 'bino') state.bino = v[0] === 1;

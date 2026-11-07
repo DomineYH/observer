@@ -87,3 +87,17 @@ export function toAdjust(sim: Sim): ImpactEvent {
   radioEvents(sim, 30);
   return impact;
 }
+
+/** Sends `input` every step until one is accepted (at most `limit` ticks); returns that step's events. Ignored inputs
+ * change nothing, so a twin without them stays equal up to here. */
+export function untilTaken(sim: Sim, input: Input, limit = 6000): SimEvent[] {
+  for (let k = 0; k < limit; k++) {
+    const r = sim.step([input]);
+    if (r.accepted[0]) return [...r.events];
+  }
+  throw new Error(`${input.a} not taken in ${limit} ticks`);
+}
+
+/** 임무끝 and 재효력사 with their 전과 보고. */
+export const EOM = (effect: string): Input => ({ a: 'eom', v: [effect] });
+export const REPEAT = (effect: string, rounds: number): Input => ({ a: 'repeat', v: [effect, rounds] });

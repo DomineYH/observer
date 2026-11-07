@@ -209,8 +209,7 @@ describe('F-09: 사격지휘통보와 표적번호', () => {
   const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
   const find = (events: readonly RadioEvent[], kind: string) => events.find((e) => e.utterance.speaker === 'fdc' && e.utterance.kind === kind)!.utterance;
 
-  // 임무마다 번호가 는다: a second mission needs 임무끝 (#30), which first returns the radio to a new call; #30 extends
-  // this test with mission 2 → AB1002 (host decision, #29 Q2).
+  // 임무마다 번호가 는다: mission 2 → AB1002 is in effect.test.ts, next to F-07: 임무끝 (a second mission needs 임무끝).
   test('첫 임무의 표적번호는 AB1001이다', () => {
     const sim = started();
     openRadio(sim);

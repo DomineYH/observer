@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { replay, SIM_VERSION, terrainHash, validateReplay } from '@sim';
+import { createSim, replay, SIM_VERSION, terrainHash, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { goldenFiles, readGolden } from './golden';
@@ -18,5 +18,21 @@ describe('골든', () => {
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
     expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+  });
+
+  test('골든: ① 좌표법 조정에서 임무끝까지', () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('1-grid-eom.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0); // every scripted transmission was taken
+    const terrain = generateTerrain(data.seed);
+    expect(terrainHash(terrain)).toBe(header);
+    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    // The script does what it says: a 접근신관 효력사 lands and the mission ends with 임무끝.
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const events: SimEvent[] = [];
+    for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
+    expect(events.some((e) => e.type === 'impact' && e.fuze === 'vt')).toBe(true);
+    expect(events.some((e) => e.type === 'radio' && e.utterance.kind === 'end_of_mission')).toBe(true);
+    expect(sim.state.missions[0]).toMatchObject({ report: 'neutralized', truth: 'neutralized' });
   });
 });
