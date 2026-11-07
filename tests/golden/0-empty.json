@@ -1,0 +1,56 @@
+{
+  "terrainHash": "069cd970fa0564a1",
+  "replay": {
+    "format": 1,
+    "simVersion": 5,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "scenario": {
+      "id": "base",
+      "version": 1
+    },
+    "guns": {
+      "id": "base",
+      "version": 1
+    },
+    "weather": {
+      "visibilityM": 24000,
+      "cloudPct": 15,
+      "windFromDeg": 285,
+      "windSpeedTenthMs": 26,
+      "tempTenthC": 94,
+      "precipTenthMmH": 0,
+      "pressureHpa": 1023,
+      "humidityPct": 48
+    },
+    "mode": "standard",
+    "stepMs": 50,
+    "inputs": [
+      {
+        "t": 0,
+        "a": "start",
+        "v": [
+          5120,
+          1800
+        ]
+      }
+    ],
+    "totalTicks": 400
+  },
+  "record": {
+    "ticks": 400,
+    "score": 0
+  },
+  "ignored": 0,
+  "chain": "377908f373ed60a6",
+  "checkpoints": [
+    {
+      "tick": 200,
+      "hash": "954242b0ca44c769"
+    },
+    {
+      "tick": 400,
+      "hash": "a11862d7bcc2996a"
+    }
+  ]
+}
