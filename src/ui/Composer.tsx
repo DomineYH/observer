@@ -1,10 +1,11 @@
 // 입력기 (demo lines 905–1044): the form for the transmission the 교신 단계 takes, and the sentence it will send.
-import { useState } from 'react';
-import type { Control, Flag, FuzeRequest, Input, Mode, RadioStage, Target, Warning } from '@sim';
+import { useEffect, useState } from 'react';
+import type { Control, Flag, FuzeRequest, Input, Mode, RadioStage, ReadonlySimState, Target, Warning } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
-import { callDraft, descDraft, locDraft, targetOptions, type Draft } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
+import { corrDraft, deviation, prefillDirection, suggestion, type CorrForm } from './correction';
 
 const W = RADIO_GRAMMAR.tables;
 const FUZE_LABEL: Record<FuzeRequest, string> = { none: '신관 요청 없음', quick: W.fuze.quick.text, vt: W.fuze.vt.text };
@@ -36,10 +37,12 @@ interface Props {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  /** The simulation's state, read for the current mission (and in training for the correction help). */
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons'>;
   initial?: Partial<ComposerForm>;
 }
 
-export function Composer({ stage, live, platoons, names, mode, send, initial = {} }: Props) {
+export function Composer({ stage, live, platoons, names, mode, send, state, initial = {} }: Props) {
   const [warning, setWarning] = useState<Warning>(initial.warning ?? 'adjust');
   const [grid, setGrid] = useState(initial.grid ?? { e: '', n: '' });
   const [target, setTarget] = useState(initial.target ?? '');
@@ -47,6 +50,19 @@ export function Composer({ stage, live, platoons, names, mode, send, initial = {
   const [fuzeRequest, setFuze] = useState<FuzeRequest>(initial.fuzeRequest ?? 'none');
   const [control, setControl] = useState<Control>(initial.control ?? 'ready');
   const [dangerClose, setDangerClose] = useState<Flag>(initial.dangerClose ?? 0);
+
+  const mission = state.missions.at(-1);
+  // 지명사: 기러기 waits for 준비 쏴 (the simulation's own rule: an adjusting round with control amc).
+  const amc = stage === 'ready' && mission?.warning === 'adjust' && mission.mto?.control === 'amc';
+  useEffect(() => {
+    if (!amc) return;
+    const down = (e: KeyboardEvent) => {
+      const input = fireKey(e.key);
+      if (input && !e.repeat) send(input);
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, [amc, send]);
 
   const options = targetOptions(platoons);
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
@@ -59,7 +75,23 @@ export function Composer({ stage, live, platoons, names, mode, send, initial = {
     <section aria-label="입력기">
       {stage === 'off' && live && <p>기러기 통신 점검 대기…</p>}
       {stage === 'wait' && <p>기러기 응답 대기…</p>}
-      {stage === 'ready' && <p>사격준비 끝.</p>}
+      {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
+      {amc && (
+        <button type="button" onClick={() => send(FIRE)}>
+          준비 쏴 <kbd>F</kbd>
+        </button>
+      )}
+      {stage === 'flight' && <p>탄착을 관측하십시오.</p>}
+      {stage === 'adjust' && mission && (
+        <CorrectionForm
+          sent={mission.direction}
+          help={mode === 'training' ? suggestion(deviation(state)) : null}
+          prefill={prefillDirection({ mode, aim: state.aim })}
+          names={names}
+          mode={mode}
+          send={send}
+        />
+      )}
       {stage === 'idle' && (
         <label>
           경고명령{' '}
@@ -131,13 +163,81 @@ export function Composer({ stage, live, platoons, names, mode, send, initial = {
         </>
       )}
       {(stage === 'idle' || stage === 'loc' || stage === 'desc') && (
-        <>
-          <p aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : '동·북 네 자리씩'}</p>
-          <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
-            송신
-          </button>
-        </>
+        <Preview draft={draft} empty="동·북 네 자리씩" names={names} mode={mode} send={send} />
       )}
     </section>
+  );
+}
+
+interface PreviewProps {
+  draft: Draft | null;
+  empty: string; // shown while there is nothing to send
+  names: RadioNames;
+  mode: Mode;
+  send: (input: Input) => void;
+}
+
+function Preview({ draft, empty, names, mode, send }: PreviewProps) {
+  return (
+    <>
+      <p aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
+      <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
+        송신
+      </button>
+    </>
+  );
+}
+
+const LATERAL_LABEL = { left: W.lateralDir.left.text, right: W.lateralDir.right.text };
+const RANGE_LABEL = { drop: W.rangeDir.drop.text, add: W.rangeDir.add.text };
+
+interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
+  sent: number | null; // the mission's 방향, once sent with the first correction
+  help: ReturnType<typeof suggestion> | null; // training only
+  prefill: string;
+}
+
+/** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
+function CorrectionForm({ sent, help, prefill, names, mode, send }: CorrectionProps) {
+  const [form, setForm] = useState<CorrForm>(() => ({
+    direction: prefill,
+    ...(help?.form ?? { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
+  }));
+  const set = (patch: Partial<CorrForm>) => setForm({ ...form, ...patch });
+  const draft = corrDraft(form, { direction: sent });
+  return (
+    <>
+      {help && <p aria-label="탄착 편의">{help.text}</p>}
+      {sent === null ? (
+        <label>
+          방향 <input inputMode="numeric" maxLength={4} size={4} value={form.direction} onChange={(e) => set({ direction: e.target.value })} /> 밀
+        </label>
+      ) : (
+        <p>방향 {String(sent).padStart(4, '0')} 밀 (송신함)</p>
+      )}
+      <select aria-label="좌우" value={form.lateralDir} onChange={(e) => set({ lateralDir: e.target.value as CorrForm['lateralDir'] })}>
+        {keys(LATERAL_LABEL).map((k) => (
+          <option key={k} value={k}>
+            {LATERAL_LABEL[k]}
+          </option>
+        ))}
+      </select>
+      <input aria-label="좌우 거리" inputMode="numeric" size={4} value={form.lateral} onChange={(e) => set({ lateral: e.target.value })} /> m{' '}
+      <select aria-label="사거리" value={form.rangeDir} onChange={(e) => set({ rangeDir: e.target.value as CorrForm['rangeDir'] })}>
+        {keys(RANGE_LABEL).map((k) => (
+          <option key={k} value={k}>
+            {RANGE_LABEL[k]}
+          </option>
+        ))}
+      </select>
+      <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m
+      <Preview
+        draft={draft}
+        empty={sent === null ? '방향(밀)을 먼저 입력' : '좌우 0–800 m, 사거리 0–1500 m'}
+        names={names}
+        mode={mode}
+        send={send}
+      />
+    </>
   );
 }

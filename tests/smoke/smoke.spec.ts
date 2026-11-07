@@ -98,8 +98,9 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   await expect(targets).toContainText('탐지 · 최초 탐지');
 });
 
-test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 온다', async ({ page }) => {
-  test.setTimeout(90_000); // 기러기 answers 사격준비 끝 24–38 s after the third transmission
+test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝이 오고, 수정탄을 보고 수정을 한 번 보낸다', async ({ page }) => {
+  // 기러기 answers 사격준비 끝 24–38 s after the third transmission; the round then flies about 20 s.
+  test.setTimeout(150_000);
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
@@ -128,4 +129,18 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   await send.click();
   await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 }); // 9–12 s
   await expect(log).toContainText('포대 사격준비 끝.', { timeout: 60_000 });
+
+  // 준비되는 대로: the adjusting round goes by itself. Once it lands the correction form opens (standard mode: 방향 empty).
+  await expect(log).toContainText('하나발 떳다', { timeout: 10_000 });
+  const direction = composer.getByLabel('방향');
+  await expect(direction).toBeVisible({ timeout: 40_000 });
+  await expect(direction).toHaveValue('');
+  await expect(send).toBeDisabled();
+  await direction.fill('0800');
+  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
+  await composer.getByLabel('좌우 거리').fill('50');
+  await expect(preview).toHaveText('방향 공팔공공, 우로 오십, 이상.');
+  await send.click();
+  await expect(log).toContainText('방향 공팔공공, 우로 오십, 이상.');
+  await expect(log).toContainText('방향 공팔공공, 우로 오십, 잠깐대기.', { timeout: 10_000 }); // 기러기's readback, 2.5–4 s
 });

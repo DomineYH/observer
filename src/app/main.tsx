@@ -107,7 +107,7 @@ function App() {
       />
       <TargetList platoons={sim.state.platoons} /* re-rendered with the tick above */ />
       <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={session.send} onFrame={onFrame} />
-      <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} mode={sim.state.mode} send={session.send} />
+      <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} mode={sim.state.mode} send={session.send} state={sim.state} />
       <RadioLog lines={lines} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
     </>
   );

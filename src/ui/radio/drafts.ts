@@ -33,6 +33,10 @@ export function descDraft({ target, ...head }: DescForm): Draft {
   };
 }
 
+/** 발사 (준비 쏴): the "준비 쏴" button and the F key send this same input. */
+export const FIRE: Input = { a: 'fire' };
+export const fireKey = (key: string): Input | null => (key === 'f' || key === 'F' ? FIRE : null);
+
 const TYPE: Record<UnitType, Exclude<TargetType, 'unknown'>> = { inf: 'infantry', recon: 'infantry', apc: 'apc', mortar: 'mortar' };
 const COUNTED: readonly Unit[] = ['men', 'vehicles', 'tubes'];
 
