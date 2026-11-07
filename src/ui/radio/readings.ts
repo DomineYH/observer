@@ -31,3 +31,7 @@ export function phonetic(letters: string): string {
     })
     .join('');
 }
+
+/** 좌표 표기 (화면용): CH, 4512·3180 → 찰리호텔 4512 3180. */
+export const gridLabel = (letters: string, g: { e: number; n: number }): string =>
+  `${phonetic(letters)} ${String(g.e).padStart(4, '0')} ${String(g.n).padStart(4, '0')}`;

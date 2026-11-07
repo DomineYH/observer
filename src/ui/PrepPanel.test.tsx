@@ -15,12 +15,12 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const text = (seed: number, seedKind: SeedKind, state = PREP) =>
+const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH') =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
       scenario={BASE_SCENARIO}
-      grid={{ letters: 'CH', e0: 40000, n0: 30000 }}
+      grid={{ letters, e0: 40000, n0: 30000 }}
       seed={seed}
       seedKind={seedKind}
       weather={WEATHER}
@@ -58,6 +58,13 @@ test('F-22: 작전 준비 화면', () => {
   const live = { ...PREP, phase: 'live' as const, op: { x: 3000, y: 2500 }, reportDue: true };
   expect(text(20261106, 'daily', live)).toContain('작전 개시 — 찰리호텔 4300 3250 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
   expect(text(20261106, 'daily', { ...live, reportDue: false })).not.toContain('위치를 보고');
+});
+
+test('F-22: 방안 문자는 지형 자료에서 온다 (ADR 0006)', () => {
+  const prep = text(20261106, 'daily', PREP, 'AB');
+  expect(prep).toContain('계획된 관측소 1번 고지 알파브라보 4512 3180');
+  expect(text(20261106, 'daily', { ...PREP, phase: 'live' }, 'AB')).toContain('작전 개시 — 알파브라보 4512 3180 점령.');
+  expect(prep).not.toContain('찰리호텔');
 });
 
 test('F-22: 작전 개시 단추는 패널이 그린 상태가 아니라 지금의 관측소를 보낸다', () => {

@@ -4,6 +4,7 @@ import type { GridRef, Input, Point, ReadonlySimState, Scenario, SeedKind, Weath
 import { BRIEFING } from '@content/scenario';
 import { gridOf } from '@render/mapView';
 import { startInput } from './prep';
+import { gridLabel } from './radio/readings';
 
 export type PrepState = Pick<ReadonlySimState, 'phase' | 'op' | 'picked' | 'reportDue'>;
 
@@ -20,8 +21,6 @@ export interface PrepPanelProps {
   /** The simulation's live state, read when 작전 개시 is pressed. */
   live: Pick<ReadonlySimState, 'op'>;
 }
-
-const pad4 = (n: number) => String(n).padStart(4, '0');
 
 function weatherText(w: Weather): string {
   const parts = [
@@ -42,10 +41,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
 }
 
 export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
-  const at = (p: Point) => {
-    const g = gridOf(grid, p);
-    return `찰리호텔 ${pad4(g.e)} ${pad4(g.n)}`;
-  };
+  const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
     return (
       <section aria-label="작전 준비">

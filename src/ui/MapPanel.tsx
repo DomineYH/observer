@@ -5,10 +5,10 @@ import type { Input, Point, ReadonlySimState, Scenario, TerrainData } from '@sim
 import { drawMap, MAP_PX, mapBase } from '@render/map';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { fovOf } from '@render/projection';
+import { gridLabel } from './radio/readings';
 
 const REDRAW_MS = 120; // the demo's map rate
 const DRAG_PX = 5; // a press that moves farther is a drag, not a click
-const pad4 = (n: number) => String(n).padStart(4, '0');
 
 export interface MapPanelProps {
   terrain: TerrainData;
@@ -117,7 +117,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame }: MapPanelPr
       </div>
       {pin && (
         <p>
-          좌표자: 찰리호텔 {pad4(pin.e)} {pad4(pin.n)}
+          좌표자: {gridLabel(terrain.grid.letters, pin)}
         </p>
       )}
     </section>
