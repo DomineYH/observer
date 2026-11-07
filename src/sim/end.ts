@@ -5,6 +5,7 @@ import type { Platoon, SimState } from './types';
 const LIMIT_TICKS = 40 * 60 * 20; // 작전 시간 한도 40분 (모의 시간)
 const SETTLE_TICKS = 8 * 20; // all down: the game ends once nothing has been owed or in the air this long
 
+// 진지 돌파 counts as down and settles 8 s like the rest; it only withholds 섬멸 (demo checkEnd lines 1349–1352).
 const down = (p: Platoon) => p.state === 'broken' || p.state === 'destroyed' || p.state === 'overran';
 
 /** Runs last in each live tick. */

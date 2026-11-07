@@ -57,6 +57,7 @@ describe('골든', () => {
     expect(sim.state.knownOp).toEqual(fromGrid(4520, 3180, terrain.grid));
     expect(sim.state.op).toEqual({ x: 5200, y: 1800 });
     expect(sim.state.observerLost).toBe(false);
+    expect(sim.record().compromised).toBe(false); // no 발각 on this seed (scripts.ts): a regenerated golden must keep it
   }, 30000);
 
   test('골든: ③ 사격 없이 시간 한도까지', () => {
@@ -68,8 +69,9 @@ describe('골든', () => {
     expect(terrainHash(terrain)).toBe(header);
     const result = replay(data, terrain, BASE_SCENARIO);
     expect(result).toEqual(expected);
-    // The script does what it says, read off its record: the limit ended it, no round was fired, the 관측반 lived.
-    expect(result.record).toMatchObject({ ticks: 48000, roundsTotal: 0, missions: 0, observerLost: false, cleared: false, clearTick: null });
+    // The script does what it says, read off its record: the limit ended it, no round was fired, the post was never found
+    // and the 관측반 lived.
+    expect(result.record).toMatchObject({ ticks: 48000, roundsTotal: 0, missions: 0, compromised: false, observerLost: false, cleared: false, clearTick: null });
     expect(result.checkpoints.at(-1)!.tick).toBe(48000);
   }, 60000); // one replay hashing every tick (~10 s alone)
 });
