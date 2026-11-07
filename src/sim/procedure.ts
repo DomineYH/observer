@@ -10,8 +10,9 @@ import { fromGrid } from './grid';
 import { strike } from './lethality';
 import { schedule, type Act } from './queue';
 import { noteDirection, noteImpact, noteTarget, report } from './report';
-import { EFFECTS, type CorrectionSlots, type DescriptionSlots, type Effect, type Fuze, type LateralDir, type MtoSlots, type Next, type RadioUtterance, type RangeDir, type Warning } from './radio';
+import { EFFECTS, type CorrectionSlots, type DescriptionSlots, type Effect, type Fuze, type MtoSlots, type RadioUtterance, type Warning } from './radio';
 import { next, type Stream } from './rng';
+import { corrSlots, descSlots } from './slots';
 import { heightAt, type Point, type TerrainData } from './terrain';
 import type { Flight, Mission, SimState } from './types';
 
@@ -39,14 +40,6 @@ const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + secTi
 /** 작전 개시: 기러기 asks for a radio check 4 s later. */
 export const openProcedure = (s: SimState) => after(s, 4, 'radio_check');
 
-/** The `desc` values (inputs.ts) as slots: only the target's own slots are present. */
-function descSlots(v: readonly (number | string)[]): DescriptionSlots {
-  const [rounds, fuzeRequest, control, dangerClose, targetType, activity, unit, count] = v;
-  const head = { rounds, fuzeRequest, control, dangerClose };
-  const target = targetType === 'unknown' ? { targetType } : count === undefined ? { targetType, activity, unit } : { targetType, activity, unit, count };
-  return { ...head, ...target } as DescriptionSlots;
-}
-
 /** 사격지휘통보 (demo decideMTO): 기러기 may put VT on exposed troops and fire one round fewer. Draws only where the
  * demo's short-circuits do. */
 function decideMto(s: SimState, d: DescriptionSlots, fdc: Stream): MtoSlots {
@@ -57,21 +50,6 @@ function decideMto(s: SimState, d: DescriptionSlots, fdc: Stream): MtoSlots {
   else if (ask === 'quick' && exposed && next(fdc) < 0.35) fuze = 'vt';
   const rounds = d.rounds > 1 && next(fdc) < 0.15 ? d.rounds - 1 : d.rounds;
   return { fuze, rounds, control: d.control, targetNumber: ++s.radio.lastTn };
-}
-
-/** A 수정 as sent (demo sendCorr, lines 799–818): snapped to 10 m across and 50 m in range; an axis that snaps to 0 is
- * left out (both out reads 동제원). 방향 only with the mission's first correction. */
-function corrSlots(m: Mission, v: readonly (number | string)[]): CorrectionSlots {
-  const first = m.direction === null;
-  const [lateralDir, rawLat, rangeDir, rawRng, nextStep] = (first ? v.slice(1) : v) as [LateralDir, number, RangeDir, number, Next];
-  const lateral = snap(rawLat, 10);
-  const range = snap(rawRng, 50);
-  return {
-    ...(first ? { direction: v[0] as number } : {}),
-    ...(lateral > 0 ? { lateralDir, lateral } : {}),
-    ...(range > 0 ? { rangeDir, range } : {}),
-    next: nextStep,
-  } as CorrectionSlots;
 }
 
 /** 수정 taken: keeps the first 방향 as the 기준선 and moves the aim along it. */
