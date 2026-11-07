@@ -118,6 +118,7 @@ type SlotsOfKind<K extends RadioKind> = Extract<RadioBody, { kind: K; slots: unk
 export type LocationSlots = SlotsOfKind<'location'>;
 export type DescriptionSlots = SlotsOfKind<'description'>;
 export type MtoSlots = SlotsOfKind<'mto'>;
+export type CorrectionSlots = SlotsOfKind<'correction'>;
 
 export interface RadioEvent {
   type: 'radio';

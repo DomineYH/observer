@@ -1,6 +1,6 @@
 // 입력 종류 and their value formats (재생 자료 format 1, spec 입력 기록). The one kind table: the replay format check
 // and the simulation's step both use it. Kinds are added by the slices that use them.
-import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, SLOT_RANGES, TARGET_TYPES, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, LATERAL_DIRS, RANGE_DIRS, SLOT_RANGES, TARGET_TYPES, WARNINGS } from './radio';
 import type { Input } from './types';
 
 /** An integer in range, or one of the enum identifiers (ASCII strings, spec 열거형 식별자). */
@@ -12,6 +12,9 @@ const range = (k: keyof typeof SLOT_RANGES): Field => [SLOT_RANGES[k].min, SLOT_
 /** 표적성질 input: 발수, 신관(요청), 통제, 위험근접, then the target as its slots (radio.ts `Target`). */
 const DESC_HEAD: readonly Field[] = [range('rounds'), FUZE_REQUESTS, CONTROLS, [0, 1]];
 const KNOWN: readonly Field[] = [TARGET_TYPES.filter((t) => t !== 'unknown'), ACTIVITIES];
+/** 수정 input: 좌우·거리, 사거리·거리 as raw meters (the simulation snaps them), 다음. Only 조정 until the
+ * fire-for-effect slice (M1-9a) adds 효력사 and 효과. */
+const CORR: readonly Field[] = [LATERAL_DIRS, [0, SLOT_RANGES.lateral.max], RANGE_DIRS, [0, SLOT_RANGES.range.max], ['adjust']];
 
 // A Map, so no kind name can reach an inherited object key.
 const FORMATS = new Map<string, Format>([
@@ -27,6 +30,8 @@ const FORMATS = new Map<string, Format>([
     [...DESC_HEAD, ...KNOWN, ['platoon', 'platoon_minus', 'squad', 'none']],
     [...DESC_HEAD, ...KNOWN, ['men', 'vehicles', 'tubes'], range('count')],
   ]],
+  ['fire', [[]]], // 발사 (준비 쏴): no values
+  ['corr', [CORR, [range('direction'), ...CORR]]], // 수정: 방향 only with the mission's first correction
 ]);
 
 function fits(f: Field, x: unknown): boolean {

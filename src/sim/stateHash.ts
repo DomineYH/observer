@@ -2,7 +2,7 @@
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
-import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, FUZES, TARGET_TYPES, UNITS, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
 import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
@@ -11,9 +11,9 @@ const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
 const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced'];
-const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle'];
+const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle', 'burst'];
 const CUES: readonly (Cue | null)[] = [null, 'man', 'veh', 'dust', 'muzzle'];
-const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready'];
+const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc', 'ready', 'flight', 'adjust'];
 const bit = (b: boolean) => (b ? 1 : 0);
 /** Index + 1 of an optional enum value, 0 when absent. */
 const opt = <T>(list: readonly T[], x: T | undefined) => (x === undefined ? 0 : list.indexOf(x) + 1);
@@ -116,6 +116,37 @@ export function hashState(state: SimState): string {
       h.u32(t.rounds);
       h.u32(CONTROLS.indexOf(t.control));
       h.u32(t.targetNumber);
+    }
+    h.f64(m.bias.x);
+    h.f64(m.bias.y);
+    h.u32(m.aim ? 1 : 0);
+    if (m.aim) {
+      h.f64(m.aim.x);
+      h.f64(m.aim.y);
+    }
+    h.u32(m.direction === null ? 0 : 1 + m.direction);
+    const c = m.correction;
+    h.u32(c ? 1 : 0);
+    if (c) {
+      h.u32(c.direction === undefined ? 0 : 1 + c.direction);
+      h.u32(opt(LATERAL_DIRS, c.lateralDir));
+      h.u32(c.lateral ?? 0);
+      h.u32(opt(RANGE_DIRS, c.rangeDir));
+      h.u32(c.range ?? 0);
+      h.u32(NEXTS.indexOf(c.next));
+    }
+    const f = m.flight;
+    h.u32(f ? 1 : 0);
+    if (f) {
+      h.f64(f.x);
+      h.f64(f.y);
+      h.i32(f.at);
+    }
+    h.u32(m.impacts.length);
+    for (const im of m.impacts) {
+      h.f64(im.x);
+      h.f64(im.y);
+      h.i32(im.tick);
     }
   }
   h.u32(state.queue.length);

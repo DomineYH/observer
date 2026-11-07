@@ -1,6 +1,21 @@
-// 겹쳐 그리는 표시 of the observation view (demo lines 1197–1222): the binocular mil reticle and the azimuth tape.
-// Positions come from milToPx, the renderer's own projection.
+// 겹쳐 그리는 표시 of the observation view (demo lines 1197–1229): the binocular mil reticle, the azimuth tape and the
+// time to impact. Positions come from milToPx, the renderer's own projection.
+import type { ReadonlySimState } from '@sim';
 import { milToPx } from './projection';
+
+/** 탄착까지 남은 초 (F-11, demo line 1229), rounded up; `urgent` from 5 s down (SPLASH 대용). */
+export interface Splash {
+  sec: number;
+  urgent: boolean;
+}
+
+/** The countdown of the current mission's round in the air, or null when none flies. */
+export function splashOf(s: ReadonlySimState): Splash | null {
+  const f = s.missions.at(-1)?.flight;
+  if (!f) return null;
+  const sec = Math.ceil((f.at - s.tick) / 20);
+  return { sec, urgent: sec <= 5 };
+}
 
 export interface Reticle {
   h: { mil: number; x: number; major: boolean }[]; // ticks on the horizontal scale
@@ -70,6 +85,7 @@ export function drawOverlay(
   bino: boolean,
   dpr: number,
   fps: number | null,
+  splash: Splash | null = null,
 ): void {
   const { width: W, height: H } = c.canvas;
   const fpx = focal * scale;
@@ -140,9 +156,11 @@ export function drawOverlay(
   c.fillRect(pad - 4 * dpr, top - 10 * dpr, c.measureText(text).width + 8 * dpr, 20 * dpr);
   c.fillStyle = 'rgba(232,176,74,.95)';
   c.fillText(text, pad, top);
-  if (fps !== null) {
-    c.textAlign = 'right';
-    c.fillText(`${fps} fps`, W - pad, top);
+  c.textAlign = 'right';
+  if (fps !== null) c.fillText(`${fps} fps`, W - pad, top);
+  if (splash) {
+    c.fillStyle = splash.urgent ? 'rgba(226,96,74,1)' : 'rgba(232,176,74,.95)';
+    c.fillText(`탄착까지 ${splash.sec}초${splash.urgent ? ' — 관측!' : ''}`, W - pad, top + 20 * dpr);
   }
   c.restore();
 }

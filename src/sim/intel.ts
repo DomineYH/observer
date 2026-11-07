@@ -61,7 +61,7 @@ export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly num
       if (q.vis) test(q.x, q.y, heightAt(t, q.x, q.y) + (q.kind === 'veh' ? PICK_Z.veh : q.prone ? PICK_Z.prone : PICK_Z.other), 0, i, q.kind === 'veh' ? 'veh' : 'man');
   });
   for (const e of s.effects) {
-    if (!e.vis) continue;
+    if (!e.vis || e.kind === 'burst') continue; // our own 탄착 points at no enemy unit
     const c = signalAt(e, s.tick, w); // where and how large the view draws it
     test(c.x, c.y, c.z, c.r, e.pid, e.kind);
   }
@@ -98,7 +98,7 @@ export function updateIntel(s: SimState, w: Weather): void {
   const inView = (x: number, y: number) => Math.abs(wrap(atan2(x - s.op.x, y - s.op.y) * MIL - aim)) <= WATCH_MIL;
   const signal = new Set<number>();
   for (const e of s.effects) {
-    if (!e.vis) continue;
+    if (!e.vis || e.kind === 'burst') continue;
     const c = signalAt(e, s.tick, w); // where it is seen now, not where it was made
     if (inView(c.x, c.y)) signal.add(e.pid);
   }

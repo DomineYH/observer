@@ -3,13 +3,13 @@ import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
 import { isValid } from './inputs';
 import { applyPrep } from './prep';
-import { applyRadio, openProcedure, runAct } from './procedure';
+import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
 import { takeDue } from './queue';
-import type { RadioUtterance } from './radio';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
 import { updateVisibility } from './visibility';
-import type { GameRecord, Sim, SimInit, SimState, StepResult } from './types';
+import type { RadioEvent } from './radio';
+import type { GameRecord, ImpactEvent, Sim, SimInit, SimState, StepResult } from './types';
 
 export const STEP_MS = 50;
 const VIS_TICKS = 6;
@@ -37,16 +37,26 @@ export function createSim(init: SimInit): Sim {
     rng,
   };
 
+  // This step's events, stamped with the tick the step ends at.
+  let out: (Omit<RadioEvent, 'tick'> | Omit<ImpactEvent, 'tick'>)[] = [];
+  const ctx: Ctx = {
+    fdc: rng.fdc,
+    bal: rng.bal,
+    terrain: init.terrain,
+    battery: init.scenario.battery,
+    say: (utterance) => out.push({ type: 'radio', utterance }),
+    landed: (x, y) => out.push({ type: 'impact', x, y }),
+  };
+
   return {
     state,
     step(inputs): StepResult {
       const before = { bino: state.bino, phase: state.phase };
-      const said: RadioUtterance[] = [];
-      const say = (u: RadioUtterance) => said.push(u);
+      out = [];
       const accepted = inputs.map((input) => {
         if (!isValid(input)) return false; // unknown kind or malformed value: ignored, nothing changes
         const a = input.a;
-        if (a === 'call' || a === 'loc' || a === 'desc') return applyRadio(state, a, input.v!, rng.fdc, say);
+        if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr') return applyRadio(state, ctx, a, input.v);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'cam') state.aim = { az: v[0]!, el: v[1]! };
         else if (a === 'bino') state.bino = v[0] === 1;
@@ -61,14 +71,15 @@ export function createSim(init: SimInit): Sim {
         state.tick++; // 작전 준비: the clock stands still
         for (let i = 0; i < state.platoons.length; i++) updatePlatoon(state, init.terrain, rng.ai, i);
         state.effects = state.effects.filter((e) => state.tick - e.tick <= e.life);
+        // Due acts run before 보임 so a round landing now is seen now; no act reads this tick's 보임 or 적정.
+        for (let act = takeDue(state); act; act = takeDue(state)) runAct(state, ctx, act);
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
         const all = state.tick % VIS_TICKS === 0 || state.bino !== before.bino || before.phase === 'prep';
         updateVisibility(state, init.terrain, init.weather, all);
         updateIntel(state, init.weather);
         for (const p of state.platoons) p.activity = activityOf(p, state.tick);
-        for (let act = takeDue(state); act; act = takeDue(state)) runAct(state, act, rng.fdc, say); // demo: runEvents after intel
       }
-      return { events: said.map((utterance) => ({ type: 'radio', tick: state.tick, utterance })), accepted };
+      return { events: out.map((e) => ({ ...e, tick: state.tick })), accepted };
     },
     record(): GameRecord {
       return { ticks: state.tick, score: state.score };

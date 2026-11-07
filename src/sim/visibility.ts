@@ -25,13 +25,14 @@ export function signalAt(e: Pick<FieldEffect, 'kind' | 'x' | 'y' | 'gz' | 'small
   };
 }
 
-/** How a signal is detected (demo effSize/effTop, lines 544–551): its size, m, and the height the sight line must
- * reach, both at where it was made. The demo detects with these, apart from its drawing, so detection keeps them. */
+/** How a signal or a burst is detected (demo effSize/effTop, lines 544–551): its size, m, and the height the sight
+ * line must reach, both at where it was made. The demo detects with these, apart from its drawing, so detection keeps
+ * them. */
 export function signalDetect(e: Pick<FieldEffect, 'kind' | 'gz' | 'small' | 'tick'>, tick: number) {
   const age = (tick - e.tick) * 0.05;
-  return e.kind === 'muzzle'
-    ? { size: (e.small ? 1.5 : 3) + age * 1.6, top: e.gz + 1 + age * (e.small ? 1.2 : 5) }
-    : { size: 3 + age * 1.6, top: e.gz + 3 };
+  if (e.kind === 'muzzle') return { size: (e.small ? 1.5 : 3) + age * 1.6, top: e.gz + 1 + age * (e.small ? 1.2 : 5) };
+  if (e.kind === 'burst') return { size: 6 + age * 2.2, top: e.gz + 6 };
+  return { size: 3 + age * 1.6, top: e.gz + 3 };
 }
 
 /** Recomputes 보임 for every member (`all`) or only for effects made this tick. */

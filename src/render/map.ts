@@ -79,6 +79,8 @@ export interface MapMarks {
   pin: Point | null; // 좌표자
   platoons: ReadonlySimState['platoons'];
   mode: Mode;
+  missions: ReadonlySimState['missions'];
+  tick: number;
 }
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
@@ -86,6 +88,7 @@ const BEARING_M = 7500; // a target's bearing line, and where along it its label
 const BEARING_LABEL_M = 1800;
 const TYPE_MARK: Record<UnitType, string> = { inf: '보', recon: '보', apc: '장', mortar: '박' };
 const TAU = Math.PI * 2;
+const IMPACT_TICKS = 3000; // a 탄착 stays on the map 150 s
 
 /** Draws the map (demo drawMap, lines 1281–1310) at a zoom and scroll: `base` holds mapBase's pixels, then roads,
  * 방안선 and 지명. */
@@ -138,7 +141,40 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     c.strokeText(v.name, x, y);
     c.fillText(v.name, x, y);
   }
-  if (marks) drawMarks(c, marks, k, mx, my);
+  if (marks) {
+    drawMarks(c, marks, k, mx, my);
+    drawFire(c, marks, t, mx, my);
+  }
+}
+
+/** 사격 임무 (demo 1302, 1305): each requested grid as a square with its 표적번호, and the recent 탄착 as ×. */
+function drawFire(c: MapContext, m: MapMarks, t: TerrainData, mx: (x: number) => number, my: (y: number) => number): void {
+  c.lineWidth = 1;
+  c.font = '10px monospace';
+  c.textAlign = 'start';
+  m.missions.forEach((ms, i) => {
+    if (ms.location?.method === 'grid') {
+      const p = fromGrid(ms.location.easting, ms.location.northing, t.grid);
+      const x = mx(p.x);
+      const y = my(p.y);
+      c.strokeStyle = 'rgba(255,255,255,.85)';
+      c.strokeRect(x - 4, y - 4, 8, 8);
+      c.fillStyle = 'rgba(255,255,255,.9)';
+      c.fillText(ms.mto ? `AB${String(ms.mto.targetNumber).padStart(4, '0')}` : `#${i + 1}`, x + 6, y - 5);
+    }
+    c.strokeStyle = 'rgba(255,140,40,.9)';
+    for (const im of ms.impacts) {
+      if (m.tick - im.tick > IMPACT_TICKS) continue;
+      const x = mx(im.x);
+      const y = my(im.y);
+      c.beginPath();
+      c.moveTo(x - 2, y - 2);
+      c.lineTo(x + 2, y + 2);
+      c.moveTo(x + 2, y - 2);
+      c.lineTo(x - 2, y + 2);
+      c.stroke();
+    }
+  });
 }
 
 /** The briefing (demo drawIntelOverlay, 1235–1243) and the post (demo 1281–1293). */

@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
-import { drawOverlay } from '@render/overlay';
+import { drawOverlay, splashOf } from '@render/overlay';
 import { angleAt, DEFAULT_QUALITY, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
 import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
@@ -85,7 +85,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
           since = now;
         }
       }
-      drawOverlay(c, geom.focal, W / buf.w, a, on, dpr, fps);
+      drawOverlay(c, geom.focal, W / buf.w, a, on, dpr, fps, splashOf(state));
     });
   }, [quality, terrain, colours, weather, state, aim, onFrame, showFps]);
 

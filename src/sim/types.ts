@@ -1,4 +1,4 @@
-import type { Activity, DescriptionSlots, LocationSlots, MtoSlots, RadioEvent, Unit, Warning } from './radio';
+import type { Activity, CorrectionSlots, DescriptionSlots, LocationSlots, MtoSlots, RadioEvent, Unit, Warning } from './radio';
 import type { Scheduled } from './queue';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
@@ -93,7 +93,7 @@ export interface Intel {
 
 /** 먼지 (a moving vehicle) or 사격 섬광·연기 (APC: `small`, mortar), seen like members. */
 export interface FieldEffect {
-  kind: 'dust' | 'muzzle';
+  kind: 'dust' | 'muzzle' | 'burst'; // burst: our own round's 탄착 (pid −1)
   x: number;
   y: number;
   gz: number; // height it starts from, m
@@ -135,8 +135,16 @@ export interface Input {
   v?: readonly (number | string)[]; // integers, and enum identifiers as their ASCII strings
 }
 
+/** 탄착: where a round landed. */
+export interface ImpactEvent {
+  type: 'impact';
+  tick: number; // the simulation's tick when the step that saw it land ends
+  x: number;
+  y: number;
+}
+
 /** 사건. */
-export type SimEvent = RadioEvent;
+export type SimEvent = RadioEvent | ImpactEvent;
 
 export interface StepResult {
   events: readonly SimEvent[];
@@ -144,8 +152,9 @@ export interface StepResult {
 }
 
 /** 교신 단계: off until 감명 양호 has gone out · idle takes a call · wait for 기러기 · loc · desc take those
- * transmissions · ready once 사격준비 끝 has come. */
-export type RadioStage = 'off' | 'idle' | 'wait' | 'loc' | 'desc' | 'ready';
+ * transmissions · ready once 사격준비 끝 has come (지명사: takes 준비 쏴) · flight while the round flies · adjust takes a
+ * correction. */
+export type RadioStage = 'off' | 'idle' | 'wait' | 'loc' | 'desc' | 'ready' | 'flight' | 'adjust';
 
 /** 사격 임무: what the observer sent and what 기러기 decided, filled in as the procedure goes. */
 export interface Mission {
@@ -153,6 +162,12 @@ export interface Mission {
   location: LocationSlots | null;
   description: DescriptionSlots | null;
   mto: MtoSlots | null;
+  bias: Point; // 비표준 조건 오차, m: drawn when the call is accepted
+  aim: Point | null; // 조준점: the sent grid, then moved by each correction
+  direction: number | null; // 방향 the observer sent with the first correction, mils: the corrections' 기준선
+  correction: CorrectionSlots | null; // the last correction as sent (snapped), for 기러기's readback
+  flight: { x: number; y: number; at: number } | null; // the round in the air: where and at which tick it lands
+  impacts: { x: number; y: number; tick: number }[];
 }
 
 export interface SimState {

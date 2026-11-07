@@ -1,5 +1,6 @@
-// 먼지와 사격 연기 (demo lines 1162–1176, disc 392): drawn into the low-resolution view before the dot look, only when
-// the simulation has decided they are seen. They drift downwind and fade with age and distance.
+// 먼지와 사격 연기 and our own 탄착 (demo lines 1162–1182, disc 392): drawn into the low-resolution view before the dot
+// look, only when the simulation has decided they are seen. Dust and smoke drift downwind and fade with age and
+// distance; a burst's smoke does not drift yet (smoke flow comes with the weather slice, M1-15).
 import { signalAt, type ReadonlySimState, type Weather } from '@sim';
 import { project, type ViewGeometry } from './projection';
 import { atmosphere, hash } from './shade';
@@ -28,6 +29,8 @@ function disc(buf: ViewBuffers, cx: number, cy: number, r: number, rgb: readonly
 const DUST = [156, 138, 100];
 const FLASH = [255, 230, 160];
 const SMOKE = [128, 126, 118];
+const BURST_FLASH = [255, 238, 170];
+const EARTH = [104, 94, 78]; // 연기·흙먼지 of a burst
 
 export function drawEffects(buf: ViewBuffers, v: ViewGeometry, s: ReadonlySimState, w: Weather): void {
   const { sigma } = atmosphere(w);
@@ -36,6 +39,13 @@ export function drawEffects(buf: ViewBuffers, v: ViewGeometry, s: ReadonlySimSta
     const age = (s.tick - e.tick) * 0.05;
     const t = age / (e.life * 0.05);
     const tr = Math.exp(-sigma * Math.hypot(e.x - v.eye.x, e.y - v.eye.y));
+    if (e.kind === 'burst') {
+      const f = age < 0.3 && project(v, { x: e.x, y: e.y, z: e.gz });
+      if (f) disc(buf, f.sx, f.sy, Math.max(1.6, 8 * (v.focal / f.fwd)), BURST_FLASH, Math.sqrt(tr), 0);
+      const p = age > 0.05 && project(v, { x: e.x, y: e.y, z: e.gz + 4 + age * 2.4 });
+      if (p) disc(buf, p.sx, p.sy, Math.max(1.2, (6 + age * 2.2) * (v.focal / p.fwd)), EARTH, 0.78 * (1 - t) * tr, 3);
+      continue;
+    }
     const c = signalAt(e, s.tick, w); // the same place the simulation sees, picks and watches
     const p = project(v, c);
     if (e.kind === 'dust') {

@@ -268,9 +268,10 @@ describe('F-09: 신관 판단', () => {
     const before = structuredClone(sim.state.rng);
     openRadio(sim);
     toReady(sim, desc(3, 'none', 'ready', 0, 'infantry', 'attacking', 'platoon'));
-    const { fdc, ...others } = sim.state.rng;
-    const { fdc: fdc0, ...others0 } = before;
+    const { fdc, bal, ...others } = sim.state.rng;
+    const { fdc: fdc0, bal: bal0, ...others0 } = before;
     expect(fdc.count).toBeGreaterThan(fdc0.count);
+    expect(bal.count - bal0.count).toBe(2); // the mission's 비표준 조건 오차, drawn at the call (F-10)
     expect(others).toEqual(others0);
   });
 });

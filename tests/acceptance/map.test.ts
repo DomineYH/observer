@@ -7,6 +7,7 @@ import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain } from './terrain';
 import { angleTo, idAt, oneUnit, started } from './enemy';
+import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, untilImpact } from './mission';
 
 type Path = [number, number][];
 
@@ -152,7 +153,7 @@ describe('F-06', () => {
 
   test('F-06: 관측 시야 부채꼴과 아군 진지', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m on the whole map
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard' };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0 };
     const { strokes, texts, rects } = draw(t, FULL_VIEW, marks);
     // The line of sight, due north 7 km from the post at (256, 422), inside the wedge.
     expect(strokes).toContainEqual([[256, 422], [256, 72]]);
@@ -186,6 +187,8 @@ describe('F-06', () => {
       pin: null,
       platoons: sim.state.platoons,
       mode: sim.state.mode,
+      missions: [],
+      tick: sim.state.tick,
     });
 
     // 표준: where it is stays unknown; only the bearing it was last seen on, 7.5 km out from the post, dashed.
@@ -213,5 +216,39 @@ describe('F-06', () => {
     expect(r.arcs).toContainEqual([at[0], at[1]]);
     expect(r.texts).toEqual(expect.arrayContaining([{ text: '?', x: at[0] - 3, y: at[1] + 3 }, { text: 'T1', x: at[0] + 9, y: at[1] + 3 }]));
     expect(r.dashes.filter(fromPost)).toEqual([]);
+  });
+
+  test('F-10: 지도에 탄착과 요구 좌표', () => {
+    // The flat test terrain at 0.8 px/m: the grid sent, (505, 505), is drawn at (404, 108).
+    const sim = emptyField();
+    openRadio(sim);
+    toReady(sim, DESC_UNKNOWN, CALL_ADJUST, LOC_NEAR);
+    const { impact } = untilImpact(sim);
+    const marks = (): MapMarks => ({
+      scenario: BASE_SCENARIO,
+      op: sim.state.op,
+      az: 0,
+      fovMil: 1066,
+      pin: null,
+      platoons: [],
+      mode: 'standard',
+      missions: sim.state.missions,
+      tick: sim.state.tick,
+    });
+    const t = flatTerrain();
+    const crossAt = (r: ReturnType<typeof draw>, x: number, y: number) =>
+      r.strokes.some((p) => p.length === 4 && Math.abs(p[0]![0] - (x - 2)) < 1e-9 && Math.abs(p[0]![1] - (y - 2)) < 1e-9);
+    const ix = impact.x * 0.8;
+    const iy = 512 - impact.y * 0.8;
+    const now = draw(t, FULL_VIEW, marks());
+    // The requested grid as a square labelled with its 표적번호, the impact as an orange ×.
+    expect(now.rects).toContainEqual([400, 104, 8, 8]);
+    expect(now.texts).toContainEqual({ text: 'AB1001', x: 410, y: 103 });
+    expect(crossAt(now, ix, iy)).toBe(true);
+    // The × stays 150 s.
+    radioEvents(sim, 2999);
+    expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(true);
+    radioEvents(sim, 2);
+    expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(false);
   });
 });

@@ -56,7 +56,8 @@ const step = () => {
     started = true;
     log = [...log, { type: 'system', tick: sim.state.tick, text: '작전 개시.' }];
   }
-  if (events.length) log = [...log, ...events];
+  const said = events.filter((e) => e.type === 'radio');
+  if (said.length) log = [...log, ...said];
 };
 let lastPublish = 0;
 startLoop(step, (now) => {
