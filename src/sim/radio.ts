@@ -119,6 +119,7 @@ export type LocationSlots = SlotsOfKind<'location'>;
 export type DescriptionSlots = SlotsOfKind<'description'>;
 export type MtoSlots = SlotsOfKind<'mto'>;
 export type CorrectionSlots = SlotsOfKind<'correction'>;
+export type ShiftSlots = SlotsOfKind<'shift'>;
 
 export interface RadioEvent {
   type: 'radio';

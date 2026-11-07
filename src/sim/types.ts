@@ -1,4 +1,4 @@
-import type { Activity, CorrectionSlots, DescriptionSlots, Effect, Fuze, LocationSlots, MtoSlots, Next, RadioEvent, Unit, Warning } from './radio';
+import type { Activity, CorrectionSlots, DescriptionSlots, Effect, Fuze, LocationSlots, MtoSlots, Next, RadioEvent, ShiftSlots, Unit, Warning } from './radio';
 import type { Scheduled } from './queue';
 import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
@@ -195,6 +195,7 @@ export interface Mission {
   score: number; // this mission's 전과 보고 points (also in the game's score)
   dangerClose: boolean; // 위험근접 rules apply: declared, or applied by 기러기
   dangerMissed: boolean; // near and not declared (−30)
+  shift: ShiftSlots | null; // the 전이 as sent (snapped); null for a mission opened by a call
 }
 
 /** One 레이저 press: the angles it went out on and what came back. */

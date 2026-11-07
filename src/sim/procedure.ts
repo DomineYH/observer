@@ -3,16 +3,17 @@
 // 기러기's delays are drawn from the fdc stream when the observer sends, in the order the replies are queued (재효력사:
 // one draw, only for 접근신관), and each 효력사 round's firing jitter at the shot; the bal stream
 // gives each mission its bias at the call (2 draws) and each round its 공산오차 at the shot (2 gaussians), the 효력사
-// rounds gun by gun and round by round within a gun. Both draw orders are part of the golden records.
+// rounds gun by gun and round by round within a gun; a 전이 keeps the last mission's bias (no draw). Both draw orders
+// are part of the golden records.
 import { drawBias, fall, SHEAF, shifted, snap, tofSec } from './ballistics';
 import { announceDanger, markDanger, overCap } from './danger';
 import { fromGrid } from './grid';
 import { strike } from './lethality';
 import { schedule, type Act } from './queue';
 import { noteDirection, noteImpact, noteTarget, report } from './report';
-import { EFFECTS, type CorrectionSlots, type DescriptionSlots, type Effect, type Fuze, type MtoSlots, type RadioUtterance, type Warning } from './radio';
+import { EFFECTS, type Corrections, type CorrectionSlots, type DescriptionSlots, type Effect, type Flag, type Fuze, type LateralDir, type MtoSlots, type RadioUtterance, type RangeDir, type ShiftSlots, type Warning } from './radio';
 import { next, type Stream } from './rng';
-import { corrSlots, descSlots } from './slots';
+import { corrections, corrSlots, descSlots, targetSlots } from './slots';
 import { heightAt, type Point, type TerrainData } from './terrain';
 import type { Flight, Mission, SimState } from './types';
 
@@ -52,18 +53,31 @@ function decideMto(s: SimState, d: DescriptionSlots, fdc: Stream): MtoSlots {
   return { fuze, rounds, control: d.control, targetNumber: ++s.radio.lastTn };
 }
 
+/** The aim moved by a 수정량 along the 방향 (기준선): right and add positive. */
+function moved(aim: Point, direction: number, c: Corrections): Point {
+  const lateral = c.lateral ?? 0;
+  const range = c.range ?? 0;
+  return shifted(aim, direction, c.lateralDir === 'right' ? lateral : -lateral, c.rangeDir === 'add' ? range : -range);
+}
+
 /** 수정 taken: keeps the first 방향 as the 기준선 and moves the aim along it. */
 function correct(m: Mission, c: CorrectionSlots): CorrectionSlots {
   if (c.direction !== undefined) m.direction = c.direction;
-  const lateral = c.lateral ?? 0;
-  const range = c.range ?? 0;
   m.corrections++;
-  if (range > 0) m.rangeCorrections.push(range);
-  m.aim = shifted(m.aim!, m.direction!, c.lateralDir === 'right' ? lateral : -lateral, c.rangeDir === 'add' ? range : -range);
+  if (c.range !== undefined) m.rangeCorrections.push(c.range);
+  m.aim = moved(m.aim!, m.direction!, c);
   return c;
 }
 
-/** Applies `call`, `loc`, `desc`, `fire`, `corr`, `repeat` or `eom` if the stage takes it; false means ignored and nothing changed. `v` is valid for
+/** A new mission as the call or the 전이 opens it. */
+const newMission = (s: SimState, warning: Warning, bias: Point): Mission => ({
+  warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null,
+  flights: [], impacts: [], kills: s.platoons.map(() => null), target: -1, firstError: null, directionError: null,
+  rangeCorrections: [], corrections: 0, report: null, truth: null, truthPct: -1, score: 0, dangerClose: false,
+  dangerMissed: false, shift: null,
+});
+
+/** Applies `call`, `loc`, `desc`, `fire`, `corr`, `repeat`, `eom` or `shift` if the stage takes it; false means ignored and nothing changed. `v` is valid for
  * its kind. */
 export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number | string)[] | undefined): boolean {
   const { fdc, say } = ctx;
@@ -72,7 +86,7 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const bias = drawBias(ctx.bal);
-    s.missions.push({ warning, phase: warning, location: null, description: null, mto: null, bias, aim: null, direction: null, correction: null, flights: [], impacts: [], kills: s.platoons.map(() => null), target: -1, firstError: null, directionError: null, rangeCorrections: [], corrections: 0, report: null, truth: null, truthPct: -1, score: 0, dangerClose: false, dangerMissed: false });
+    s.missions.push(newMission(s, warning, bias));
     say({ speaker: 'observer', ending: 'over', kind: 'call', slots: { warning } });
     after(s, 2.5 + next(fdc) * 1.5, 'call_ack');
   } else if (a === 'loc' && stage === 'loc') {
@@ -150,6 +164,27 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
     say({ speaker: 'observer', ending: 'none', kind: 'end_of_mission', slots: { ...report(s, m!, effect), effect } });
     s.radio.stage = 'idle'; // 기러기 does not answer 임무끝 (demo); the next call starts a new mission
     return true;
+  } else if (a === 'shift' && stage === 'idle' && m) {
+    // 전이사격 (demo sendShift, lines 834–848): idle with a mission only after its 임무끝. The new mission fires for
+    // effect from the last aim moved along the sent 방향, with the last bias (no draw); 기러기 picks fuze and rounds
+    // as for a 표적성질 with no fuze asked, 준비되는 대로 (demo reqFuze '', amc false).
+    const [direction, lateralDir, rawLat, rangeDir, rawRng, rounds, dangerClose] = v as [number, LateralDir, number, RangeDir, number, number, Flag];
+    const target = targetSlots(v!.slice(7));
+    const c = corrections(lateralDir, rawLat, rangeDir, rawRng);
+    const n = newMission(s, 'ffe', { ...m.bias });
+    n.shift = { targetNumber: m.mto!.targetNumber, direction, ...c, ...target, rounds, dangerClose } as ShiftSlots;
+    n.description = { rounds, fuzeRequest: 'none', control: 'ready', dangerClose, ...target } as DescriptionSlots;
+    n.aim = moved(m.aim!, direction, c);
+    n.direction = direction;
+    s.missions.push(n);
+    noteTarget(s, n);
+    noteDirection(s, n);
+    markDanger(s, n, ctx.friends);
+    say({ speaker: 'observer', ending: 'over', kind: 'shift', slots: { ...n.shift } });
+    // Two draws, in this order: 사격지휘통보, 사격준비 끝 (the readback comes at a fixed 3 s).
+    after(s, 3, 'shift_readback');
+    after(s, 9 + next(fdc) * 3, 'mto');
+    after(s, 20 + next(fdc) * 8, 'ready');
   } else return false;
   s.radio.stage = 'wait';
   return true;
@@ -178,6 +213,10 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       break;
     case 'desc_readback':
       say({ speaker: 'fdc', ending: 'wait', kind: 'description', slots: { ...m.description! } });
+      announceDanger(s, m, say);
+      break;
+    case 'shift_readback': // then the 위험근접 notices, as for a 표적성질 (B4)
+      say({ speaker: 'fdc', ending: 'wait', kind: 'shift', slots: { ...m.shift! } });
       announceDanger(s, m, say);
       break;
     case 'mto':

@@ -2,7 +2,7 @@
   "terrainHash": "069cd970fa0564a1",
   "replay": {
     "format": 1,
-    "simVersion": 10,
+    "simVersion": 11,
     "seed": 20261106,
     "seedKind": "daily",
     "scenario": {

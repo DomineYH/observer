@@ -2,7 +2,7 @@
 import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
-import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, LOCATION_METHODS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, LOCATION_METHODS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS, type Target } from './radio';
 import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, RadioStage, RouteKey, SimState, UnitType } from './types';
 
 const MODES: readonly Mode[] = ['training', 'standard'];
@@ -17,6 +17,14 @@ const RADIO_STAGES: readonly RadioStage[] = ['off', 'idle', 'wait', 'loc', 'desc
 const bit = (b: boolean) => (b ? 1 : 0);
 /** Index + 1 of an optional enum value, 0 when absent. */
 const opt = <T>(list: readonly T[], x: T | undefined) => (x === undefined ? 0 : list.indexOf(x) + 1);
+
+/** A 표적성질's target slots, absent ones as 0. */
+function target(h: Hasher, t: Target): void {
+  h.u32(TARGET_TYPES.indexOf(t.targetType));
+  h.u32(opt(ACTIVITIES, 'activity' in t ? t.activity : undefined));
+  h.u32(opt(UNITS, 'unit' in t ? t.unit : undefined));
+  h.u32('count' in t ? t.count : 0);
+}
 
 export function hashState(state: SimState): string {
   const h = new Hasher();
@@ -112,10 +120,7 @@ export function hashState(state: SimState): string {
       h.u32(FUZE_REQUESTS.indexOf(d.fuzeRequest));
       h.u32(CONTROLS.indexOf(d.control));
       h.u32(d.dangerClose);
-      h.u32(TARGET_TYPES.indexOf(d.targetType));
-      h.u32(opt(ACTIVITIES, 'activity' in d ? d.activity : undefined));
-      h.u32(opt(UNITS, 'unit' in d ? d.unit : undefined));
-      h.u32('count' in d ? d.count : 0);
+      target(h, d);
     }
     const t = m.mto;
     h.u32(t ? 1 : 0);
@@ -171,6 +176,19 @@ export function hashState(state: SimState): string {
     h.i32(m.score);
     h.u32(bit(m.dangerClose));
     h.u32(bit(m.dangerMissed));
+    const sh = m.shift;
+    h.u32(sh ? 1 : 0);
+    if (sh) {
+      h.u32(sh.targetNumber);
+      h.u32(sh.direction);
+      h.u32(opt(LATERAL_DIRS, sh.lateralDir));
+      h.u32(sh.lateral ?? 0);
+      h.u32(opt(RANGE_DIRS, sh.rangeDir));
+      h.u32(sh.range ?? 0);
+      h.u32(sh.rounds);
+      h.u32(sh.dangerClose);
+      target(h, sh);
+    }
   }
   h.u32(state.queue.length);
   for (const q of state.queue) {

@@ -16,6 +16,14 @@ const KNOWN: readonly Field[] = [TARGET_TYPES.filter((t) => t !== 'unknown'), AC
 const CORR: readonly Field[] = [LATERAL_DIRS, [0, SLOT_RANGES.lateral.max], RANGE_DIRS, [0, SLOT_RANGES.range.max], NEXTS];
 /** 수정 후 효력사, sent after 효력사: the same, 다음 효력사 only, and the 효과 seen. */
 const CORR_EFFECT: readonly Field[] = [...CORR.slice(0, 4), ['ffe'], EFFECTS];
+/** 전이사격: 방향, 좌우·거리, 사거리·거리 (raw), 발수, 위험근접, then the target as in `desc`. */
+const SHIFT_HEAD: readonly Field[] = [range('direction'), ...CORR.slice(0, 4), range('rounds'), [0, 1]];
+/** A target after a head: 미상, a unit without a count, or one with it. */
+const targeted = (head: readonly Field[]): Format => [
+  [...head, ['unknown']],
+  [...head, ...KNOWN, ['platoon', 'platoon_minus', 'squad', 'none']],
+  [...head, ...KNOWN, ['men', 'vehicles', 'tubes'], range('count')],
+];
 
 // A Map, so no kind name can reach an inherited object key.
 const FORMATS = new Map<string, Format>([
@@ -28,16 +36,13 @@ const FORMATS = new Map<string, Format>([
   ['call', [[WARNINGS]]], // 호출: 경고명령
   // 표적위치: 좌표법 동 · 북 4자리, or 극좌표법 방위각 mils · 거리 m (raw; the simulation snaps it to 10 m)
   ['loc', [[['grid'], range('easting'), range('northing')], [['polar'], range('azimuth'), range('distance')]]],
-  ['desc', [
-    [...DESC_HEAD, ['unknown']], // 미상 표적: no activity or size
-    [...DESC_HEAD, ...KNOWN, ['platoon', 'platoon_minus', 'squad', 'none']],
-    [...DESC_HEAD, ...KNOWN, ['men', 'vehicles', 'tubes'], range('count')],
-  ]],
+  ['desc', targeted(DESC_HEAD)],
   ['fire', [[]]], // 발사 (준비 쏴): no values
   // 수정: 방향 only with the mission's first correction
   ['corr', [CORR, [range('direction'), ...CORR], CORR_EFFECT, [range('direction'), ...CORR_EFFECT]]],
   ['repeat', [[EFFECTS, range('rounds')]]], // 재효력사: 효과, 발수
   ['eom', [[EFFECTS]]], // 임무끝: 효과
+  ['shift', targeted(SHIFT_HEAD)], // 전이사격
 ]);
 
 function fits(f: Field, x: unknown): boolean {

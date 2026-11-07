@@ -105,3 +105,13 @@ export function untilTaken(sim: Sim, input: Input, limit = 6000): SimEvent[] {
 /** 임무끝 and 재효력사 with their 전과 보고. */
 export const EOM = (effect: string): Input => ({ a: 'eom', v: [effect] });
 export const REPEAT = (effect: string, rounds: number): Input => ({ a: 'repeat', v: [effect, rounds] });
+
+/** 전이사격: 방향, 좌우·m, 사거리·m (raw), 발수, 위험근접, then the target as in `desc`. */
+export const SHIFT = (...v: (number | string)[]): Input => ({ a: 'shift', v });
+
+/** From an open radio, a mission through its 효력사 to an accepted 임무끝 (효과 미흡): from the next step 기러기 takes a
+ * call or a 전이. */
+export function ended(sim: Sim, call: Input = CALL_FFE, loc: Input = LOC, d: Input = DESC_UNKNOWN): void {
+  toReady(sim, d, call, loc);
+  untilTaken(sim, EOM('ineffective'));
+}
