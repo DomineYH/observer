@@ -1,7 +1,7 @@
-// 수정 입력 (demo lines 778–792, 799–818, 909–916, 985–991): the correction form's sentence and input, and the
+// 수정 입력 (demo lines 778–792, 799–818, 909–916, 985–991, 1026–1030): the correction and 전이사격 forms' sentence and input, and the
 // training-mode help (탄착 편의, 수정값 제안, 미리 채운 방향). Pure.
-import type { Corrections, CorrectionSlots, Effect, LateralDir, Mode, Next, Point, RangeDir } from '@sim';
-import type { Draft } from './radio/drafts';
+import type { Corrections, CorrectionSlots, Effect, Flag, LateralDir, Mode, Next, Point, RangeDir, Target } from '@sim';
+import { targetValues, type Draft } from './radio/drafts';
 
 /** 좌우·사거리 as typed: numbers stay strings until sent. */
 export interface Amount {
@@ -98,5 +98,25 @@ export function corrDraft(f: CorrForm, mission: { direction: number | null }, ef
   return {
     input: { a: 'corr', v: [...(direction !== null ? [direction] : []), f.lateralDir, a.lateral, f.rangeDir, a.range, f.next, ...(effect ? [effect] : [])] },
     utterance: { speaker: 'observer', ending: 'over', kind: 'correction', slots },
+  };
+}
+
+/** The 전이사격 form's fields: 방향 and the meters as typed, the target, rounds and 위험근접 as chosen. */
+export interface ShiftForm extends Amount {
+  direction: string;
+  target: Target;
+  rounds: number;
+  dangerClose: Flag;
+}
+
+/** The 전이 to send from the last 표적번호, or null while 방향 or a meter field is not valid. */
+export function shiftDraft(f: ShiftForm, targetNumber: number): Draft | null {
+  const direction = directionOf(f.direction);
+  const a = amounts(f);
+  if (direction === null || a === null) return null;
+  const { target, rounds, dangerClose } = f;
+  return {
+    input: { a: 'shift', v: [direction, f.lateralDir, a.lateral, f.rangeDir, a.range, rounds, dangerClose, ...targetValues(target)] },
+    utterance: { speaker: 'observer', ending: 'over', kind: 'shift', slots: { targetNumber, direction, ...a.slots, ...target, rounds, dangerClose } },
   };
 }

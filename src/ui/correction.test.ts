@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import type { RadioEvent } from '@sim';
 import { CALL_ADJUST, DESC_UNKNOWN, openRadio, send, started, toAdjust, toReady, untilSaid } from '../../tests/acceptance/mission';
 import { radioSentence, spoken } from './radio/sentence';
-import { corrDraft, deviation, prefillDirection, suggestion, type CorrForm } from './correction';
+import { corrDraft, deviation, prefillDirection, shiftDraft, suggestion, type CorrForm } from './correction';
 
 const OP = { x: 0, y: 0 };
 const platoon = (x: number, y: number, state = 'approach' as const) => ({ x, y, state });
@@ -80,4 +80,11 @@ test('F-07: 수정 뒤 효력사 — 입력기', () => {
   expect(r.ok).toBe(true);
   expect(observer(r.events)).toEqual(d.utterance);
   expect(untilSaid(sim, 'fdc', 'ready').at(-1)!.utterance).toMatchObject({ kind: 'ready', slots: { fuze: 'quick' } });
+});
+
+test('F-07: 전이사격 — 입력기: 방향이나 거리 칸이 맞지 않으면 보낼 수 없다', () => {
+  const f = { direction: '0800', lateralDir: 'right', lateral: '0', rangeDir: 'add', range: '0', target: { targetType: 'unknown' }, rounds: 3, dangerClose: 0 } as const;
+  expect(shiftDraft(f, 1001)!.input).toEqual({ a: 'shift', v: [800, 'right', 0, 'add', 0, 3, 0, 'unknown'] });
+  for (const bad of [{ direction: '' }, { direction: '6400' }, { direction: '8x' }, { lateral: '801' }, { range: '1501' }, { range: '-50' }])
+    expect(shiftDraft({ ...f, ...bad }, 1001)).toBeNull();
 });

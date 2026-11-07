@@ -295,4 +295,27 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
   await expect(log.locator('li').last()).toContainText(said!);
   await expect(composer.getByLabel('경고명령')).toBeVisible();
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.'); // the form keeps the last mission's values
+
+  await test.step('F-07: 전이사격 — 입력기', async () => {
+    // From the mission just ended (AB1001): one transmission, previewed as the log will show it; 기러기 reads it back
+    // and gives the next 표적번호.
+    const shift = page.getByRole('region', { name: '전이사격' });
+    await expect(shift).toContainText('기준: AB1001');
+    const shiftPreview = shift.getByLabel('보낼 문장');
+    const shiftSend = shift.getByRole('button', { name: '송신' });
+    await expect(shiftSend).toBeDisabled(); // standard mode: 방향 starts empty
+    await shift.getByLabel('방향').fill('0800');
+    await shift.getByLabel('좌우', { exact: true }).selectOption('right');
+    await shift.getByLabel('좌우 거리').fill('104');
+    await shift.getByLabel('사거리', { exact: true }).selectOption('add');
+    await shift.getByLabel('사거리 거리').fill('130');
+    await shift.getByLabel('발수').selectOption('2');
+    await shift.getByLabel('위험근접').check();
+    await expect(shiftPreview).toHaveText(/^전이, 표적번호 알파브라보 하나공공하나, 방향 공팔공공, 우로 하나백, .+, 포대 둘발, 위험근접, 효력사, 이상\.$/);
+    const line = (await shiftPreview.textContent())!;
+    await shiftSend.click();
+    await expect(log.locator('li', { hasText: `갈매기 ${line}` })).toHaveCount(1);
+    await expect(log.locator('li', { hasText: `기러기 ${line.replace(/이상\.$/, '잠깐대기.')}` })).toHaveCount(1, { timeout: 10_000 }); // 3 s
+    await expect(log).toContainText('표적번호 알파브라보 하나공공둘', { timeout: 20_000 }); // 사격지휘통보 9–12 s
+  });
 });
