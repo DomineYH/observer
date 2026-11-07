@@ -112,4 +112,16 @@ describe('린트', () => {
     ];
     for (const [file, code] of allowed) expect(await rulesFor(file, code), `${file}: ${code}`).toEqual([]);
   });
+
+  test('F-31: 저장된 문자열은 글자로 보인다 — 화면에 HTML을 직접 넣지 않는다', async () => {
+    const raw = [
+      'export const X = () => <div dangerouslySetInnerHTML={{ __html: "x" }} />;',
+      'export const f = (el: HTMLElement) => { el.innerHTML = "x"; };',
+      'export const f = (el: HTMLElement) => { el.outerHTML = "x"; };',
+      'export const f = (el: HTMLElement) => el.insertAdjacentHTML("beforeend", "x");',
+    ];
+    for (const code of raw)
+      for (const file of ['src/ui/__probe__.tsx', 'src/app/__probe__.tsx']) expect(await rulesFor(file, code), `${file}: ${code}`).toContain('no-restricted-syntax');
+    expect(await rulesFor('src/ui/__probe__.tsx', 'export const X = ({ s }: { s: string }) => <b>{s}</b>;')).toEqual([]);
+  });
 });

@@ -1,5 +1,6 @@
 // 사후강평 (demo lines 1354–1366, 1531–1550): drawn once the game has ended, from its state and its 판 기록.
-import type { GameRecord, GridRef, ReadonlySimState } from '@sim';
+import type { GameRecord, GridRef, ReadonlySimState, ReplayData } from '@sim';
+import type { StoredRun } from '@adapters/index';
 import { BRIEFING } from '@content/scenario';
 import { gridOf } from '@render/mapView';
 import { clock } from './clock';
@@ -25,7 +26,24 @@ function Table({ head, rows }: { head: string[]; rows: string[][] }) {
   );
 }
 
-export function Debrief({ state: s, record: r, grid }: { state: ReadonlySimState; record: GameRecord; grid: GridRef }) {
+/** What 기록 보관소 made of the submission (demo recordHTML's note). */
+function savedNote(saved: StoredRun | 'pending' | 'failed'): string {
+  if (saved === 'pending') return '저장 중…';
+  if (saved === 'failed') return '이 브라우저에 기록을 저장하지 못했습니다.';
+  if (saved.ranked) return '저장했습니다 · 표준 모드 · 일일 시드: 랭킹 집계';
+  return saved.record.mode === 'training' ? '저장했습니다 · 훈련 모드를 썼으므로 랭킹에서는 제외' : '저장했습니다 · 연습 시드: 랭킹에서는 제외';
+}
+
+interface Props {
+  state: ReadonlySimState;
+  record: GameRecord;
+  grid: GridRef;
+  callsign: string;
+  saved: StoredRun | 'pending' | 'failed';
+  replay: ReplayData;
+}
+
+export function Debrief({ state: s, record: r, grid, callsign, saved, replay }: Props) {
   const fired = s.missions.filter((m) => m.impacts.length + m.flights.length > 0);
   const where = s.platoons
     .map((p, pid) => `${unitName(s.platoons, pid)} ${p.route ? BRIEFING.routes[p.route] : gridLabel(grid.letters, gridOf(grid, p))}`)
@@ -59,8 +77,14 @@ export function Debrief({ state: s, record: r, grid }: { state: ReadonlySimState
         {positions.length ? `${positions.join(' · ')} (손실 ${r.friendlyLosses}명)` : '아군 진지 없음'} · 관측소 이동 {r.postMoves}회 · 위험근접 미선언{' '}
         {r.dangerCloseMissed}회 · 아군 근접 탄착 {r.friendlyHits}회
       </p>
-      <h3>기록</h3>
+      <h3>기록 — {callsign}</h3>
+      <p>{savedNote(saved)}</p>
       <Table head={['항목', '값']} rows={metrics} />
+      <details>
+        <summary>전송 데이터 미리보기</summary>
+        {/* The 재생 자료 as it is: 사람 검수 takes it out as a golden record. */}
+        <pre aria-label="전송 데이터">{JSON.stringify(replay, null, 2)}</pre>
+      </details>
     </section>
   );
 }
