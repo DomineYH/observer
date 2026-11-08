@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { linesFrom, mapPixels, settledMap, speedTo, toReady } from './helpers';
+import { everyControlNamed, linesFrom, mapPixels, settledMap, speedTo, tabTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
@@ -12,6 +12,7 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(tick).toHaveText('0');
   // 무전 기록 is empty until the operation starts.
   await expect(page.getByRole('region', { name: '무전 기록' })).toHaveText('');
+  await everyControlNamed(page);
 
   // 호출부호를 정하고 랭킹 창을 연다: the mock board's fake rows are marked, and 닫기 closes it.
   await page.getByLabel('호출부호', { exact: true }).fill('참새12');
@@ -21,6 +22,7 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   const ranking = page.getByRole('dialog', { name: '랭킹' });
   await expect(ranking).toBeVisible();
   await expect(ranking.getByRole('row').filter({ hasText: '목업' })).toHaveCount(12);
+  await everyControlNamed(page);
   await ranking.getByRole('button', { name: '닫기' }).click();
   await expect(ranking).toBeHidden();
 
@@ -54,6 +56,7 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(first);
   // Not the planned post: 위치 보고 is required.
   await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3256 점령. 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.');
+  await everyControlNamed(page); // 위치 보고
 
   // 관측 화면: 화살표가 조준을, B가 쌍안경을 바꾼다
   const view = page.getByRole('img', { name: '관측 화면' });
@@ -97,6 +100,22 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(tick).toHaveText(paused!);
   await page.getByRole('button', { name: '재개' }).click();
   await expect.poll(async () => tick.textContent()).not.toBe(paused);
+
+  // 키보드 걸음 (arrows and B above): 랭킹 by Tab and Enter; the focus is kept in the dialog, and Esc brings it back.
+  const opener = page.getByRole('button', { name: '랭킹' });
+  await tabTo(page, opener);
+  await page.keyboard.press('Enter');
+  await expect(ranking).toBeVisible();
+  const inDialog = () => ranking.evaluate((d) => d.contains(document.activeElement));
+  expect(await inDialog()).toBe(true);
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Shift+Tab');
+    // A modal dialog makes the page under it inert: the focus stays inside or leaves the page, never lands under it.
+    expect(await page.evaluate(() => !document.activeElement || document.activeElement === document.body || !!document.activeElement.closest('dialog'))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(ranking).toBeHidden();
+  await expect(opener).toBeFocused();
 });
 
 test('스모크: 좁은 화면 390 px — 탭 넷과 머리띠 메뉴', async ({ page }) => {
@@ -339,6 +358,7 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   const direction = composer.getByLabel('방향');
   await expect(direction).toBeVisible({ timeout: 40_000 });
   await expect(direction).toHaveValue('');
+  await everyControlNamed(page); // 수정
   await expect(send).toBeDisabled();
   await direction.fill('0800');
   await composer.getByLabel('좌우', { exact: true }).selectOption('right');
@@ -364,6 +384,7 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
   await expect(log).toContainText('기러기 마감탄 떳다, 이상.', { timeout: 40_000 });
   await expect(log).toContainText('갈매기 마감탄 떳다, 잠깐대기.', { timeout: 5_000 });
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 40_000 });
+  await everyControlNamed(page); // 효과
 
   // 재효력사: the line the log shows is the one previewed, target name included, then 기러기's readback.
   await composer.getByLabel('효과').selectOption('neutralized');
@@ -442,6 +463,7 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
     // and gives the next 표적번호.
     const shift = page.getByRole('region', { name: '전이사격' });
     await expect(shift).toContainText('기준: AB1001');
+    await everyControlNamed(page);
     const shiftPreview = shift.getByLabel('보낼 문장');
     const shiftSend = shift.getByRole('button', { name: '송신' });
     await expect(shiftSend).toBeDisabled(); // standard mode: 방향 starts empty

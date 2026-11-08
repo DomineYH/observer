@@ -32,11 +32,13 @@ export async function toReady(page: Page, control: 'ready' | 'amc', warning: 'ad
   }
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 }); // 2.5–4 s after the call
+  await everyControlNamed(page);
   await composer.getByLabel('동', { exact: true }).fill('4720');
   await composer.getByLabel('북', { exact: true }).fill('3150');
   await expect(preview).toContainText('찰리호텔 넷칠둘공 삼하나오공');
   await send.click();
   await expect(composer.getByLabel('표적성질')).toHaveValue('{"targetType":"unknown"}');
+  await everyControlNamed(page);
   await composer.getByLabel('통제').selectOption(control);
   await expect(preview).toHaveText(control === 'amc' ? '미상 표적, 포대 삼발, 지명사, 이상.' : '미상 표적, 포대 삼발, 이상.');
   await send.click();
@@ -109,6 +111,7 @@ export async function fireOnOwnPost(page: Page) {
   const debrief = page.getByRole('region', { name: '사후강평' });
   await expect(debrief).toBeVisible({ timeout: 150_000 });
   await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
+  await everyControlNamed(page);
   return debrief;
 }
 
@@ -135,4 +138,12 @@ export async function narrowStart(page: Page) {
 export async function tabTo(page: Page, target: Locator) {
   for (let i = 0; i < 80 && !(await target.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press('Tab');
   await expect(target).toBeFocused();
+}
+
+/** Every shown button, input, select and textarea on the page has an accessible name (its role is the native one), so a
+ * test can find it by role and name. */
+export async function everyControlNamed(page: Page) {
+  const controls = page.locator('button, input, select, textarea');
+  expect(await controls.count()).toBeGreaterThan(0);
+  for (const c of await controls.all()) if (await c.isVisible()) await expect(c).toHaveAccessibleName(/\S/);
 }
