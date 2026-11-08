@@ -34,7 +34,7 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
     <div className="band">
       <header>
         <span className="brand">
-          OBSERVER <small>포병 관측 · 목업 데이터</small>
+          OBSERVER <small>포병 관측·목업</small>
         </span>
         <span className="stat">
           <span className="hb-label">경과 </span>

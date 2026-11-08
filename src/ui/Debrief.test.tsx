@@ -92,9 +92,9 @@ test('F-13: 머리띠의 경과·점수·사용 탄', () => {
       <HeadBand tick={sim.state.tick} score={sim.state.score} rounds={sim.record().roundsTotal} mode="standard" speed={1} paused={false} phase={sim.state.phase} onSpeed={() => {}} onPause={() => {}} />,
     );
   const sim = aimedAt(INF_RECON, 2, 0, CALL_ADJUST, FFE5, { x: 100, y: 0 });
-  expect(band(sim)).toEqual([`OBSERVER 포병 관측 · 목업 데이터경과 ${clock(sim.state.tick)}점수 0사용 탄 0발일시정지표준×1메뉴`]);
+  expect(band(sim)).toEqual([`OBSERVER 포병 관측·목업경과 ${clock(sim.state.tick)}점수 0사용 탄 0발일시정지표준×1메뉴`]);
   untilLanded(sim);
-  expect(band(sim)).toEqual([`OBSERVER 포병 관측 · 목업 데이터경과 ${clock(sim.state.tick)}점수 ${sim.state.score}사용 탄 1발일시정지표준×1메뉴`]);
+  expect(band(sim)).toEqual([`OBSERVER 포병 관측·목업경과 ${clock(sim.state.tick)}점수 ${sim.state.score}사용 탄 1발일시정지표준×1메뉴`]);
 });
 
 test('F-13: 사후강평 화면 — 협차 준수', () => {

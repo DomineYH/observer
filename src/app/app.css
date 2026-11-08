@@ -63,12 +63,12 @@ input {
   white-space: nowrap;
 }
 
-/* 머리띠: one row of items that never shrink or break. */
+/* 머리띠: one row of items that never shrink or break, compact enough to fit 1280 px. */
 .band > header,
 .hb-menu {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
 }
 .band > header > *,
@@ -78,7 +78,7 @@ input {
   white-space: nowrap;
 }
 .band button {
-  padding: 3px 6px;
+  padding: 3px 2px;
 }
 .band input {
   width: 9ch;
@@ -86,7 +86,7 @@ input {
 }
 .brand {
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   color: var(--amber);
 }
 .brand small {
@@ -104,12 +104,12 @@ input {
 .tag {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 1px 6px;
+  padding: 1px 4px;
   color: var(--dim);
 }
 .hb-menu form {
   display: inline-flex;
-  gap: 4px;
+  gap: 2px;
   align-items: center;
 }
 .aim-pad button {
@@ -136,12 +136,12 @@ input {
   grid-area: top;
   display: flex;
   flex-wrap: nowrap;
-  gap: 12px;
+  gap: 4px;
   align-items: center;
   font-size: 12px;
   border-bottom: 1px solid var(--line);
   padding-bottom: 6px;
-  /* Spec: the wide 머리띠 is one row. The full row is about 1470 px; on a narrower wide screen it scrolls sideways
+  /* Spec: the wide 머리띠 is one row. It fits from about 1280 px; on a narrower wide screen it scrolls sideways
      inside the band instead of wrapping. */
   min-width: 0;
   overflow-x: auto;
@@ -261,6 +261,7 @@ input {
     align-items: flex-start;
     padding: 10px;
     font-size: 14px; /* the sheet has room: the one-row sizes are for the band */
+    gap: 8px;
   }
   .hb-menu button {
     padding: 5px 10px;
