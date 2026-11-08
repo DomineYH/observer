@@ -8,7 +8,7 @@ const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTML
 const tickAtLeast = (page: Page, t: number, timeout: number) => expect.poll(() => ticks(page), { timeout }).toBeGreaterThanOrEqual(t);
 
 test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
-  // 40 simulated minutes at ×8 are 300 s; the pick runs ~20 s at ×1.
+  // 40 simulated minutes at ×8 are 300 s; the pick runs ~25 s at ×1 (~50 s more if it needs the second volley).
   test.setTimeout(480_000);
   await page.goto('/?seed=20261106');
   const prep = page.getByRole('region', { name: '작전 준비' });
@@ -44,7 +44,7 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
   await test.step('탐지: 박격포반의 첫 사격 연기', async () => {
     // The enemy mortar section digs in at about (5676, 7520), 5.8 km north, and fires its first volley at 210 s (tick
     // 4200); its smoke rises past ridges. Through the binoculars from 20.4 mils: 4 × 20 right is 100.4, 5 × 5 up is
-    // +3 mils; a press there picks the smoke from tick 4260 to 4340 (found with a Node run of the simulation).
+    // +3 mils (found with a Node run of the simulation).
     await blur(page);
     await page.keyboard.press('b');
     await expect(page.getByRole('button', { name: '쌍안경' })).toHaveAttribute('aria-pressed', 'true');
@@ -54,14 +54,50 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
     await expect(page.getByRole('region', { name: '관측' }).getByRole('group', { name: '레이저 측정' }).locator('p')).toContainText(
       '레이저: 방위각 0100 밀',
     );
-    // ×1 for the pick window: a poll at ×8 can overshoot by 160 ticks.
-    await tickAtLeast(page, 3900, 40_000);
-    await speedTo(page, 1);
-    await tickAtLeast(page, 4275, 30_000);
+    // The pick is tied to what the clock and the view show, not to timing: on this seed the mortar's volleys start at
+    // ticks 4200, 5219, 6557 (its own stream: the same in every game), and from this aim a press picks the smoke 10–220
+    // ticks after a volley starts. For each volley: ×1 near it, 일시정지 before it for a clear look at the aim, again
+    // inside the window; while paused the smoke must be in the view, then the press (applied on 재개). A volley whose
+    // window the clock has already passed is skipped for the next one: 표적 1 within two volleys.
     const view = page.getByRole('img', { name: '관측 화면' });
-    const v = (await view.boundingBox())!;
-    await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
-    await expect(page.getByRole('region', { name: '표적 목록' })).toContainText('표적 1');
+    const pause = page.getByRole('button', { name: '일시정지' });
+    const resume = page.getByRole('button', { name: '재개' });
+    const targets = page.getByRole('region', { name: '표적 목록' });
+    /** The view's pixels around its centre, where the aim is. */
+    const atAim = () =>
+      view.evaluate((c: HTMLCanvasElement) => {
+        const d = c.getContext('2d')!.getImageData((c.width / 2 - 24) | 0, (c.height / 2 - 24) | 0, 48, 48).data;
+        return Array.from(d).join();
+      });
+    const tryVolley = async (at: number) => {
+      await speedTo(page, 8);
+      await tickAtLeast(page, at - 400, 90_000);
+      await speedTo(page, 1);
+      await tickAtLeast(page, at - 100, 30_000);
+      await pause.click();
+      if ((await ticks(page)) >= at) {
+        await resume.click();
+        return false; // no clear look left before this volley
+      }
+      const clear = await atAim();
+      await resume.click();
+      await tickAtLeast(page, at + 30, 30_000);
+      await pause.click();
+      if ((await ticks(page)) > at + 200) {
+        await resume.click();
+        return false; // past this volley's window
+      }
+      await expect.poll(atAim).not.toBe(clear); // the smoke is in the view
+      const v = (await view.boundingBox())!;
+      await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
+      await resume.click();
+      return targets.getByText(/^표적 1/).waitFor({ timeout: 10_000 }).then(
+        () => true,
+        () => false,
+      );
+    };
+    expect((await tryVolley(4200)) || (await tryVolley(5219))).toBe(true);
+    await expect(targets).toContainText('표적 1');
     await speedTo(page, 8);
   });
 
@@ -105,7 +141,7 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
   await test.step('종료 → 사후강평', async () => {
     // The armour halts 1.3 km out and never falls, so the game runs to the 40분 한도.
     const debrief = page.getByRole('region', { name: '사후강평' });
-    await expect(debrief).toBeVisible({ timeout: 330_000 });
+    await expect(debrief).toBeVisible({ timeout: 0 }); // no own limit: the test's 480 s bound the wait
     await expect(debrief).toContainText('경과 40:00');
     await expect(debrief).toContainText('저장했습니다 · 훈련 모드를 썼으므로 랭킹에서는 제외');
     await expect(debrief.getByRole('row').filter({ hasText: 'AB1001' })).toContainText('일치');
