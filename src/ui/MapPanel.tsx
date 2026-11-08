@@ -11,6 +11,7 @@ import { gridLabel } from './radio/readings';
 
 const REDRAW_MS = 120; // the demo's map rate
 const DRAG_PX = 5; // a press that moves farther is a drag, not a click
+const PINCH_PX = 10; // fingers closer than this give no zoom (demo)
 const VS_CELLS = 192; // 가시권 cells across the map (demo); one sweep is ~37k 가시선, a few hundred ms
 
 /** The 가시권 pixels as an image for the map to draw. */
@@ -82,6 +83,18 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
   }, [terrain]);
 
   const press = useRef<{ x: number; y: number; sx: number; sy: number; dragged: boolean } | null>(null);
+  // Two fingers (demo 1393–1399): the pointers down and the last distance between them. A pinch ends the press, so it
+  // neither clicks nor pans, also when one finger stays.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<number | null>(null);
+  const spread = () => {
+    const [a, b] = [...pointers.current.values()];
+    return { d: Math.hypot(a!.x - b!.x, a!.y - b!.y), mx: (a!.x + b!.x) / 2, my: (a!.y + b!.y) / 2 };
+  };
+  const lift = (id: number) => {
+    pointers.current.delete(id);
+    if (pointers.current.size < 2) pinch.current = null;
+  };
   const zoom = (f: number) => setView((v) => zoomAt(terrain, v, f, 0.5, 0.5));
 
   return (
@@ -92,12 +105,29 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
         height={MAP_PX}
         role="img"
         aria-label="지도"
-        style={{ display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+        style={{ display: 'block', width: '100%', aspectRatio: '1', touchAction: 'none', cursor: 'crosshair' }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
-          press.current = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, dragged: false };
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pointers.current.size === 1) press.current = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, dragged: false };
+          else if (pointers.current.size === 2) {
+            press.current = null;
+            pinch.current = spread().d;
+          }
         }}
         onPointerMove={(e) => {
+          if (!pointers.current.has(e.pointerId)) return;
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pinch.current !== null && pointers.current.size === 2) {
+            const { d, mx, my } = spread();
+            if (d > PINCH_PX) {
+              const r = e.currentTarget.getBoundingClientRect();
+              const f = d / pinch.current;
+              setView((v) => zoomAt(terrain, v, f, (mx - r.left) / r.width, (my - r.top) / r.height));
+              pinch.current = d;
+            }
+            return;
+          }
           const p = press.current;
           if (!p) return;
           if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > DRAG_PX) p.dragged = true;
@@ -111,6 +141,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
           p.y = e.clientY;
         }}
         onPointerUp={(e) => {
+          lift(e.pointerId);
           const p = press.current;
           press.current = null;
           if (!p || p.dragged) return;
@@ -119,7 +150,10 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
           if (state.phase === 'prep') send({ a: 'pick', v: [at.x, at.y] });
           else setPin(at);
         }}
-        onPointerCancel={() => (press.current = null)}
+        onPointerCancel={(e) => {
+          lift(e.pointerId);
+          press.current = null;
+        }}
       />
       <div>
         <button type="button" onClick={() => zoom(1.5)}>
