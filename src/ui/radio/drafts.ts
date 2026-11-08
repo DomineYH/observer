@@ -1,7 +1,7 @@
 // 입력기 초안: one form's values as the input to send and the observer's 교신 한 마디 the simulation will say for it, so
 // the preview is made from the same utterance as the log line (F-07). Pure.
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
-import type { Activity, Control, Effect, Flag, FuzeRequest, Input, RadioUtterance, Target, TargetNameSlots, TargetType, Unit, UnitType, Warning } from '@sim';
+import type { Activity, Control, Effect, Flag, FuzeRequest, Input, Point, RadioUtterance, Target, TargetNameSlots, TargetType, Unit, UnitType, Warning } from '@sim';
 
 const W = RADIO_GRAMMAR.tables;
 
@@ -76,20 +76,35 @@ interface Seen {
   intel: { stage: number; size: { unit: Unit; n: number } | null };
 }
 
-/** 표적성질 choices: only what has been observed (병종 from stage 2, 규모 from stage 3); 미상 표적 is always last. */
+/** What has been observed of a unit (병종 from stage 2, 규모 from stage 3) as a 표적성질. */
+function seenTarget({ type, activity, intel: { size } }: Seen): Target {
+  if (!size) return { targetType: TYPE[type], activity, unit: 'none' };
+  return COUNTED.includes(size.unit) ? { targetType: TYPE[type], activity, unit: size.unit as 'men', count: size.n } : { targetType: TYPE[type], activity, unit: size.unit as 'platoon' };
+}
+
+/** 표적성질 choices: only what has been observed; 미상 표적 is always last. */
 export function targetOptions(platoons: readonly Seen[]): Target[] {
   const out = new Map<string, Target>();
-  for (const { type, activity, intel } of platoons) {
-    if (intel.stage < 2) continue;
-    const size = intel.size;
-    const t: Target = !size
-      ? { targetType: TYPE[type], activity, unit: 'none' }
-      : COUNTED.includes(size.unit)
-        ? { targetType: TYPE[type], activity, unit: size.unit as 'men', count: size.n }
-        : { targetType: TYPE[type], activity, unit: size.unit as 'platoon' };
+  for (const p of platoons) {
+    if (p.intel.stage < 2) continue;
+    const t = seenTarget(p);
     out.set(JSON.stringify(t), t);
   }
   return [...out.values(), { targetType: 'unknown' }];
+}
+
+const DEFAULT_NEAR_M = 600;
+/** The 표적성질 a form starts on (demo 967–972, nearestPlatoon 708): the nearest unit on the field within 600 m of the
+ * mission's location, if it has been identified; else 미상 표적. */
+export function defaultTarget(platoons: readonly (Seen & Point & { state: string })[], at: Point | null): Target {
+  let nearest = null;
+  let best = DEFAULT_NEAR_M;
+  if (at)
+    for (const p of platoons) {
+      const d = Math.hypot(p.x - at.x, p.y - at.y);
+      if (p.state !== 'wait' && d < best) [nearest, best] = [p, d];
+    }
+  return nearest && nearest.intel.stage >= 2 ? seenTarget(nearest) : { targetType: 'unknown' };
 }
 
 const GRID4 = /^\d{4}$/;

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Warning } from '@sim';
 import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, polarDraft, targetLabel, targetOptions, type Draft } from './radio/drafts';
+import { callDraft, defaultTarget, descDraft, FIRE, fireKey, locDraft, polarDraft, targetLabel, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
@@ -63,7 +63,8 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     setLastTransfer(transfer);
     if (transfer && stage === 'loc') setGrid({ e: four(transfer.e), n: four(transfer.n) });
   }
-  const [target, setTarget] = useState(''); // an option's JSON
+  const proposed = () => defaultTarget(state.platoons, state.missions.at(-1)?.aim ?? null);
+  const [target, setTarget] = useState(() => JSON.stringify(proposed())); // an option's JSON
   const [rounds, setRounds] = useState(3);
   const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
   const [control, setControl] = useState<Control>('ready');
@@ -83,7 +84,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   }, [amc, send]);
 
   const options = targetOptions(platoons);
-  const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
+  const chosen = options.find((t) => JSON.stringify(t) === target) ?? proposed(); // the unit's activity changed under it
   // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
   const ready = state.post.state === 'ready';
   const reporting = reportOpen(stage, state);

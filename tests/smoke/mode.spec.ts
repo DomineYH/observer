@@ -825,3 +825,61 @@ test('F-07: 위험근접 수정 제안은 100 m까지 — 화면', async ({ page
   await expect(range).toHaveValue('100');
 });
 
+/** The mortar section identified from an open post about 820 m from it (as in `스모크: 보이는 적을…`), past the 위치 보고,
+ * and the call sent, up to the location step. */
+async function identifiedMortar(page: Page) {
+  dialogs(page);
+  await page.goto('/?seed=20261106');
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: (box.width * 6450) / 10240, y: box.height * (1 - 7250 / 10240) } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보');
+  await start(page);
+  const view = page.getByRole('img', { name: '관측 화면' });
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.waitForTimeout(300); // a frame drawn with the new aim
+  const v = (await view.boundingBox())!;
+  await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
+  const targets = page.getByRole('region', { name: '표적 목록' });
+  await expect(targets).toContainText('표적 1 미상');
+  await page.keyboard.press('b');
+  await expect(targets).toContainText('적정 확인', { timeout: 30_000 });
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  const send = composer.getByRole('button', { name: '송신' });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await expect(log).toContainText('위치 보고 생략');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  return { composer, log, send, kind: composer.getByRole('combobox', { name: '표적성질' }) };
+}
+
+/** 표적위치 at a grid, and on to the 표적성질 step. */
+async function toDescription(page: Page, e: string, n: string) {
+  const composer = page.getByRole('region', { name: '입력기' });
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill(e);
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill(n);
+  await composer.getByRole('button', { name: '송신' }).click();
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
+}
+
+const UNKNOWN = '{"targetType":"unknown"}';
+
+test('F-07: 표적성질 기본값은 가까운 소대 — 화면: 600 m 안의 식별된 소대', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { kind } = await identifiedMortar(page);
+  await toDescription(page, '4567', '3752'); // the mortar section's own grid
+  await expect(kind).toHaveValue(/"targetType":"mortar"/);
+  await expect(kind.locator('option')).toHaveCount(2);
+});
+
+test('F-07: 표적성질 기본값은 가까운 소대 — 화면: 600 m 안에 없으면 미상 표적', async ({ page }) => {
+  test.setTimeout(90_000);
+  const { kind } = await identifiedMortar(page);
+  await toDescription(page, '4720', '3150'); // about 6.3 km from it
+  await expect(kind).toHaveValue(UNKNOWN);
+  await expect(kind.locator('option')).toHaveCount(2); // the identified mortar is on offer, not the default
+});
+

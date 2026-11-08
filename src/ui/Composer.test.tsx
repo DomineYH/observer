@@ -8,7 +8,7 @@ import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer } from './Composer';
 import { Preview } from './CorrectionForm';
 import { RadioLog } from './RadioLog';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm, type Draft } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, defaultTarget, type DescForm, type Draft } from './radio/drafts';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 /** A set-up post 기러기 knows: the composer offers a call at idle. */
@@ -97,6 +97,24 @@ test('표적성질 선택지: 관측된 적정만', () => {
     { targetType: 'infantry', activity: 'moving', unit: 'platoon' },
     { targetType: 'unknown' },
   ]);
+});
+
+test('F-07: 표적성질 기본값 — 경계', () => {
+  // Demo 967–972, nearestPlatoon 708: the nearest platoon on the field strictly within 600 m, if identified.
+  const at = (x: number, type: UnitType, stage: number, state = 'approach') => ({ ...seen(type, 'moving', stage, null), x, y: 0, state });
+  const UNKNOWN = { targetType: 'unknown' };
+  const MORTAR = { targetType: 'mortar', activity: 'moving', unit: 'none' };
+  const APC = { targetType: 'apc', activity: 'moving', unit: 'none' };
+  expect(defaultTarget([], { x: 0, y: 0 })).toEqual(UNKNOWN);
+  expect(defaultTarget([at(599, 'mortar', 2)], { x: 0, y: 0 })).toEqual(MORTAR);
+  expect(defaultTarget([at(600, 'mortar', 2)], { x: 0, y: 0 })).toEqual(UNKNOWN);
+  // The nearest counts, identified or not: an identified one farther off does not stand in for it.
+  expect(defaultTarget([at(500, 'mortar', 2), at(100, 'apc', 2)], { x: 0, y: 0 })).toEqual(APC);
+  expect(defaultTarget([at(500, 'mortar', 2), at(100, 'apc', 1)], { x: 0, y: 0 })).toEqual(UNKNOWN);
+  // Not yet on the field: passed over.
+  expect(defaultTarget([at(100, 'apc', 2, 'wait'), at(500, 'mortar', 2)], { x: 0, y: 0 })).toEqual(MORTAR);
+  // No mission's location: 미상 표적.
+  expect(defaultTarget([at(1, 'mortar', 2)], null)).toEqual(UNKNOWN);
 });
 
 test('F-07: F 키', () => {
