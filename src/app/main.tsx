@@ -265,7 +265,8 @@ function App() {
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
+            // A mode change rebuilds every form from its start, as the demo re-renders them (demo 1408–1409).
+            <Composer key={mode} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>

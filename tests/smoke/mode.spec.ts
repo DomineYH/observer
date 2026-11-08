@@ -5,7 +5,7 @@ import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap, speedTo } from './helpers';
+import { mapPixels, settledMap, speedTo, toReady } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -132,6 +132,10 @@ test('F-14: 훈련 숫자 병기', async ({ page }) => {
   // Standard: words only.
   await expect(preview).toHaveText('좌표 찰리호텔 넷칠둘공 삼하나오공, 이상.');
   await button(page, '훈련').click();
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  // The switch rebuilt the form (demo 1408–1409), so the grid goes in again.
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
   // Training: the arabic numerals beside them, dimmed.
   await expect(preview).toHaveText('좌표 찰리호텔 넷칠둘공(4720) 삼하나오공(3150), 이상.');
   const gloss = preview.getByText('(4720)');
@@ -454,4 +458,221 @@ test('F-21: 좌표자를 위치 보고에 넣는다 — 화면', async ({ page }
   await report.getByRole('button', { name: '송신' }).click();
   await expect(log).toContainText(line);
   await expect(toReport(page)).toHaveCount(0);
+});
+
+// 모드 전환 rebuilds the whole 입력기 from each field's start (demo 1408–1409 call renderComposer, which ends in
+// comp.innerHTML): a typed value, a choice and a transferred point are all replaced.
+
+/** From a fresh page on the picked post, past the 위치 보고, to the call form; `lase` first with the view's aim. */
+async function toCall(page: Page, lase = false) {
+  dialogs(page);
+  await picked(page);
+  await start(page);
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await expect(log).toContainText('위치 보고 생략');
+  if (lase) {
+    const view = page.getByRole('region', { name: '관측' });
+    await view.getByRole('button', { name: '레이저' }).click();
+    await expect(view.getByRole('group', { name: '레이저 측정' }).locator('p')).toContainText('· 거리 ');
+  }
+  return { composer, log, send: composer.getByRole('button', { name: '송신' }) };
+}
+
+/** 표준 · 훈련 back and forth. */
+const switchTo = async (page: Page, name: '훈련' | '표준') => {
+  await button(page, name).click();
+  await expect(button(page, name)).toHaveAttribute('aria-pressed', 'true');
+};
+
+test('F-21: 위치 보고 미리 채움은 모드를 따른다 — 화면', async ({ page }) => {
+  test.setTimeout(60_000);
+  dialogs(page);
+  await picked(page);
+  await start(page);
+  const report = page.getByRole('region', { name: '입력기' }).getByRole('region', { name: '위치 보고' });
+  const east = report.getByRole('textbox', { name: '동', exact: true });
+  const north = report.getByRole('textbox', { name: '북', exact: true });
+  const shows = async (e: string, n: string) => {
+    await expect(east).toHaveValue(e);
+    await expect(north).toHaveValue(n);
+  };
+  await expect(east).toHaveValue('4512', { timeout: 15_000 });
+
+  // A point away from the post, put in: 훈련 replaces it with the post's own grid, 표준 goes back to the point.
+  const read = await pressMap(page, 0.6, 0.4);
+  await toReport(page).click();
+  await shows(read.e, read.n);
+  await switchTo(page, '훈련');
+  await shows('4512', '3256');
+  await switchTo(page, '표준');
+  await shows(read.e, read.n);
+
+  // A typed value does not survive the switch, in either direction.
+  await east.fill('1234');
+  await switchTo(page, '훈련');
+  await shows('4512', '3256');
+  await east.fill('1234');
+  await switchTo(page, '표준');
+  await shows(read.e, read.n);
+
+  // Nor does a transfer come back: the next point is on the map only, and 표준 opens on it.
+  const next = await pressMap(page, 0.3, 0.7);
+  await switchTo(page, '훈련');
+  await shows('4512', '3256');
+  await switchTo(page, '표준');
+  await shows(next.e, next.n);
+});
+
+test('F-07: 호출은 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { composer } = await toCall(page);
+  const warning = composer.getByRole('combobox', { name: '경고명령' });
+  await warning.selectOption('ffe');
+  await switchTo(page, '훈련');
+  await expect(warning).toHaveValue('adjust');
+  await warning.selectOption('ffe');
+  await switchTo(page, '표준');
+  await expect(warning).toHaveValue('adjust');
+});
+
+test('F-07: 표적위치는 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { composer, log, send } = await toCall(page, true);
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  const east = composer.getByRole('textbox', { name: '동', exact: true });
+  const north = composer.getByRole('textbox', { name: '북', exact: true });
+  const polar = composer.getByRole('radio', { name: '극좌표' });
+  const grid = composer.getByRole('radio', { name: '좌표', exact: true });
+
+  // 표준 opens on the map's last point (here the 후보), 훈련 on the lase (demo 958–959).
+  await expect(east).toHaveValue('4512');
+  await east.fill('1111');
+  await switchTo(page, '훈련');
+  await expect(east).toHaveValue(/^\d{4}$/);
+  await expect(east).not.toHaveValue('1111');
+  await expect(east).not.toHaveValue('4512');
+  const lased = { e: await east.inputValue(), n: await north.inputValue() };
+
+  // 극좌표 chosen and typed over: back to 좌표, with 방위각 from the lase again.
+  await polar.check();
+  const azimuth = composer.getByRole('textbox', { name: '방위각' });
+  const measured = await azimuth.inputValue();
+  await azimuth.fill('0800');
+  await switchTo(page, '표준');
+  await expect(grid).toBeChecked();
+  await expect(east).toHaveValue('4512');
+  await expect(north).toHaveValue('3256');
+  await polar.check();
+  await expect(azimuth).toHaveValue(measured);
+  await switchTo(page, '훈련');
+  await expect(grid).toBeChecked();
+  await expect(east).toHaveValue(lased.e);
+  await expect(north).toHaveValue(lased.n);
+});
+
+test('F-07: 표적성질은 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { composer, log, send } = await toCall(page);
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
+  await send.click();
+  const rounds = composer.getByRole('combobox', { name: '발수' });
+  await expect(rounds).toBeVisible({ timeout: 15_000 });
+  await rounds.selectOption('1');
+  await composer.getByRole('combobox', { name: '신관' }).selectOption('vt');
+  await composer.getByRole('combobox', { name: '통제' }).selectOption('amc');
+  await composer.getByRole('checkbox', { name: '위험근접' }).check();
+  await switchTo(page, '훈련');
+  await expect(rounds).toHaveValue('3');
+  await expect(composer.getByRole('combobox', { name: '신관' })).toHaveValue('none');
+  await expect(composer.getByRole('combobox', { name: '통제' })).toHaveValue('ready');
+  await expect(composer.getByRole('checkbox', { name: '위험근접' })).not.toBeChecked();
+});
+
+test('F-07: 수정은 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(180_000);
+  dialogs(page);
+  const { composer } = await toReady(page, 'ready');
+  await speedTo(page, 8);
+  const direction = composer.getByRole('textbox', { name: '방향' });
+  await expect(direction).toBeVisible({ timeout: 60_000 });
+  await speedTo(page, 1);
+  const lateral = composer.getByRole('textbox', { name: '좌우 거리' });
+  const next = composer.getByRole('combobox', { name: '다음' });
+  await expect(direction).toHaveValue('');
+  await direction.fill('0800');
+  await lateral.fill('50');
+  await next.selectOption('ffe');
+
+  // 훈련: 방향 from the view's aim and the 탄착 편의 line; what was typed and chosen is gone.
+  await switchTo(page, '훈련');
+  await expect(composer.getByText(/탄착 (편의|부근)/)).toBeVisible();
+  await expect(direction).toHaveValue(/^\d{1,4}$/);
+  await expect(direction).not.toHaveValue('0800');
+  await expect(next).toHaveValue('adjust');
+  await next.selectOption('ffe');
+
+  // 표준: empty again, no help, nothing suggested.
+  await switchTo(page, '표준');
+  await expect(direction).toHaveValue('');
+  await expect(lateral).toHaveValue('0');
+  await expect(next).toHaveValue('adjust');
+  await expect(composer.getByText(/탄착 (편의|부근)/)).toHaveCount(0);
+});
+
+/** 바로 효력사 on the fixed seed, at ×8, until its 효과 form opens. */
+async function toEffect(page: Page) {
+  dialogs(page);
+  const { composer, log, send } = await toReady(page, 'ready', 'ffe');
+  await speedTo(page, 8);
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+  await speedTo(page, 1);
+  return { composer, log, send };
+}
+
+test('F-07: 효과 보고는 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(180_000);
+  const { composer } = await toEffect(page);
+  const effect = composer.getByRole('combobox', { name: '효과' });
+  const action = composer.getByRole('combobox', { name: '다음 조치' });
+  await effect.selectOption('ineffective');
+  await action.selectOption('corr');
+  const direction = composer.getByRole('textbox', { name: '방향' });
+  await direction.fill('0800');
+  await switchTo(page, '훈련');
+  await expect(effect).toHaveValue('neutralized');
+  await expect(action).toHaveValue('eom');
+  await expect(direction).toHaveCount(0);
+});
+
+test('F-07: 전이사격은 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
+  test.setTimeout(180_000);
+  const { composer, log, send } = await toEffect(page);
+  await send.click(); // 임무끝
+  await expect(log).toContainText('임무끝', { timeout: 10_000 });
+  const shift = page.getByRole('region', { name: '전이사격' });
+  const direction = shift.getByRole('textbox', { name: '방향' });
+  await expect(direction).toBeVisible({ timeout: 15_000 });
+  await expect(direction).toHaveValue('');
+  await direction.fill('0800');
+  await shift.getByRole('textbox', { name: '좌우 거리' }).fill('104');
+  await shift.getByRole('combobox', { name: '발수' }).selectOption('2');
+  await shift.getByRole('checkbox', { name: '위험근접' }).check();
+
+  await switchTo(page, '훈련');
+  await expect(direction).toHaveValue(/^\d{1,4}$/);
+  await expect(direction).not.toHaveValue('0800');
+  await expect(shift.getByRole('textbox', { name: '좌우 거리' })).toHaveValue('0');
+  await expect(shift.getByRole('combobox', { name: '발수' })).toHaveValue('3');
+  await expect(shift.getByRole('checkbox', { name: '위험근접' })).not.toBeChecked();
+
+  await direction.fill('0800');
+  await switchTo(page, '표준');
+  await expect(direction).toHaveValue('');
+  await expect(composer.getByRole('combobox', { name: '경고명령' })).toHaveValue('adjust');
 });
