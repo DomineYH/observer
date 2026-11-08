@@ -78,15 +78,14 @@ input {
   white-space: nowrap;
 }
 .band button {
-  padding: 3px 2px;
+  padding: 3px 1px;
 }
 .band input {
-  width: 9ch;
-  padding: 2px 4px;
+  width: 6ch;
+  padding: 2px 2px;
 }
 .brand {
   font-weight: 700;
-  letter-spacing: 0.06em;
   color: var(--amber);
 }
 .brand small {
@@ -104,9 +103,10 @@ input {
 .tag {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 1px 4px;
+  padding: 1px 2px;
   color: var(--dim);
 }
+.hb-menu > div:not([role]),
 .hb-menu form {
   display: inline-flex;
   gap: 2px;
@@ -139,6 +139,7 @@ input {
   gap: 4px;
   align-items: center;
   font-size: 12px;
+  word-spacing: -2px; /* a monospace space is a full cell; 5 px still parts words */
   border-bottom: 1px solid var(--line);
   padding-bottom: 6px;
   /* Spec: the wide 머리띠 is one row. It fits from about 1280 px; on a narrower wide screen it scrolls sideways
@@ -190,6 +191,7 @@ input {
   }
   .band {
     display: contents;
+    word-spacing: normal;
   }
   .band > header {
     grid-area: head;
