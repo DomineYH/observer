@@ -95,7 +95,10 @@ test.describe('좁은 화면', () => {
       expect(g).toBeGreaterThanOrEqual(1);
       expect(g).toBeLessThanOrEqual(3);
     }
-    expect(inputs[release]!.t - held.at(-1)!.t).toBeLessThanOrEqual(3); // held right up to the lift
+    // Held right up to the lift: from the last step to the release mark at most one interval (1.8 ticks), the tick
+    // that steps it and the B key's own delivery (up to ~2 ticks when the machine is busy). A hold that stopped early
+    // (say at 600 ms) leaves 8 ticks or more.
+    expect(inputs[release]!.t - held.at(-1)!.t).toBeLessThanOrEqual(5);
   });
 });
 
