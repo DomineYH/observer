@@ -36,6 +36,15 @@ test('F-14: 배속과 일시정지는 기록되지 않는다 — 프레임당 �
   expect([frameSteps(acc, 1000, 0), frameSteps(acc, 16, 0), acc.ms]).toEqual([0, 0, 20]);
 });
 
+test('수치표: 빠진 행 — 프레임당 최대 40스텝', () => {
+  // ×8 never reaches the cap (a 0.1 s frame is 16 ticks): a 배속 of 40 does, 80 ticks owed. 40 run and the rest is
+  // dropped, not owed to the next frame.
+  const acc = { ms: 0 };
+  expect(frameSteps(acc, 100, 40)).toBe(40);
+  expect(acc.ms).toBe(0);
+  expect(frameSteps(acc, 50, 1)).toBe(1);
+});
+
 test('F-14: 배속과 일시정지는 기록되지 않는다', () => {
   // The same inputs at the same ticks: one game stepped tick by tick, the other by frames whose pace keeps changing
   // (×1 ×2 ×4 ×8 and paused stretches). Pace is not an input: the state hash and the 입력 기록 come out the same.
