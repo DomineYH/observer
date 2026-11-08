@@ -946,3 +946,38 @@ test('F-07: 표적성질 목록은 입력기를 다시 그릴 때 바뀐다 — 
   await expect(kind).toHaveValue(UNKNOWN);
 });
 
+test('F-07: 수정 제안은 다시 그려도 같다 — 화면', async ({ page }) => {
+  // The suggestion is worked out once, for the round that landed (demo 786–790), so a rebuild brings back the same one
+  // while the unit walks on. The adjusting round goes about 500 m from the recon team, which on this seed walks south
+  // near 찰리호텔 4332 3677 then: near enough to suggest (800 m), too far to pin it.
+  test.setTimeout(180_000);
+  const { composer, log, send } = await toCall(page);
+  await switchTo(page, '훈련');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4382');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3680');
+  await send.click();
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
+  await send.click();
+  await speedTo(page, 8);
+  const lateral = composer.getByRole('textbox', { name: '좌우 거리' });
+  const range = composer.getByRole('textbox', { name: '사거리 거리' });
+  await expect(lateral).toBeVisible({ timeout: 60_000 });
+  const help = composer.getByText(/^탄착 편의/);
+  const shown = (await help.textContent())!;
+  const values = [await lateral.inputValue(), await range.inputValue()];
+
+  // Some walking at ×8, then a rebuild each way: the same text, the same fields.
+  await page.waitForTimeout(1500);
+  await speedTo(page, 1);
+  await lateral.fill('990');
+  await button(page, '일시정지').click();
+  await expect(lateral).toHaveValue(values[0]!);
+  await lateral.fill('990');
+  await button(page, '재개').click();
+  await expect(lateral).toHaveValue(values[0]!);
+  await expect(range).toHaveValue(values[1]!);
+  await expect(help).toHaveText(shown);
+});
+

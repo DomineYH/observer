@@ -6,7 +6,7 @@ import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { callDraft, defaultTarget, descDraft, FIRE, fireKey, locDraft, polarDraft, shiftOptions, targetLabel, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
-import { deviation, prefillDirection, suggestion } from './correction';
+import { prefillDirection, type suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
 import { EffectForm } from './EffectForm';
@@ -40,16 +40,18 @@ interface Props {
   grid: GridRef;
   mode: Mode;
   send: (input: Input) => void;
-  /** The simulation's state, read for the current mission (and in training for the correction help). */
+  /** The simulation's state, read for the current mission. */
   state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
   /** The map's last point (좌표자 or 관측소 후보): what the location grid and the 위치 보고 start from (demo 942, 958–959). */
   pin?: { e: number; n: number } | null;
+  /** 탄착 편의 and the 수정값 제안 for the round that landed: held above this component, so a rebuild brings them back. */
+  help?: ReturnType<typeof suggestion> | null;
   /** 사격요구에 입력 · 위치 보고에 입력: a new object each press fills the form open at that moment (demo 1420–1421). */
   transfer?: { e: number; n: number } | null;
 }
 
 /** Holds each form's fields from their start: `composerKey` remounts it whenever the demo rebuilds the form. */
-export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, transfer }: Props) {
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, help, transfer }: Props) {
   const [warning, setWarning] = useState<Warning>('adjust');
   // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966).
   const hit = state.lases.find((l): l is Hit => l.range !== null);
@@ -126,7 +128,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
           <CorrectionForm
             sent={mission.direction}
             dangerClose={mission.dangerClose}
-            help={mode === 'training' ? suggestion(deviation(state)) : null}
+            help={mode === 'training' ? (help ?? null) : null}
             prefill={prefillDirection({ mode, aim: state.aim })}
             names={names}
             mode={mode}

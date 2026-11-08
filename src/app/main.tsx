@@ -14,6 +14,7 @@ import { gridOf, type Pin } from '@render/mapView';
 import { DEFAULT_QUALITY, type Quality } from '@render/projection';
 import { terrainColours } from '@render/shade';
 import { Composer } from '@ui/Composer';
+import { deviation, suggestion } from '@ui/correction';
 import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
@@ -194,6 +195,10 @@ function App() {
   // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
+  // 탄착 편의 and the 수정값 제안: worked out once for each round landed, as the demo keeps R.suggest (786–790).
+  const impact = sim.state.missions.at(-1)?.impacts.at(-1);
+  const [held, setHeld] = useState<{ impact: typeof impact; help: ReturnType<typeof suggestion> } | null>(null);
+  if (impact && impact !== held?.impact) setHeld({ impact, help: suggestion(deviation(sim.state)) });
   // Every form starts again whenever the demo calls renderComposer for it: a mode change, a 교신 단계 change, the post
   // setting off, arriving or set up, each pause toggle, and a lase hit at 표적위치. Never on a tick: typing stands.
   const composerKey = [mode, stage, sim.state.post.state, paused, stage === 'loc' ? sim.state.lases.find((l) => l.range)?.tick : ''].join();
@@ -269,7 +274,7 @@ function App() {
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
+            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} help={held?.help} transfer={transfer} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>

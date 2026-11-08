@@ -6,6 +6,7 @@ import { oneUnit } from '../../tests/acceptance/enemy';
 import { aimedAt, isImpact, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer } from './Composer';
+import { deviation, suggestion } from './correction';
 import { Preview } from './CorrectionForm';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, defaultTarget, type DescForm, type Draft } from './radio/drafts';
@@ -147,7 +148,7 @@ test('F-07: 훈련 편의와 제안 — 입력기', () => {
   toReady(sim, DESC_UNKNOWN, CALL_ADJUST);
   toAdjust(sim);
   const form = (mode: 'training' | 'standard') =>
-    renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={sim.state} />);
+    renderToStaticMarkup(<Composer stage="adjust" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={sim.state} help={suggestion(deviation(sim.state))} />);
   const az = String(Math.round(sim.state.aim.az / 10) % 6400);
   // Training: the help line and 방향 filled in from the view; the preview already reads that 방향 (동제원 until changed).
   expect(text(form('training'))).toContain('탄착 부근에 표적 없음');
