@@ -141,6 +141,34 @@ describe('F-10: 탄착 분포 수치', () => {
     expect(Math.abs(median(defl) / ((0.5 * gd) / 1000 + 1) - 1)).toBeLessThan(0.2);
   });
 
+  test('수정탄은 포대 중앙의 조준점에 떨어진다', () => {
+    // Where the one adjusting round falls from the aim + 비표준 조건 오차, in the battery's frame (range along the line of
+    // fire, deflection across it), over 200 games: centred on 0 as the centre gun lays it. Every gun of the W sheaf
+    // stands 12–60 m across and 22 m along from the centre, far outside these means (deflection PE ≈ 4.4 m, range ≈ 12 m
+    // at 6.8 km: the mean of 200 is within about ±1.5 m and ±4 m; measured 0.6 m and 1.3 m).
+    const calm = { ...CLEAR_WEATHER, windSpeedTenthMs: 0, tempTenthC: 150 };
+    let range = 0;
+    let defl = 0;
+    const N = 200;
+    for (let seed = 1; seed <= N; seed++) {
+      const sim = started(seed, NO_TROOPS, calm);
+      openRadio(sim);
+      toReady(sim);
+      const { impact } = untilImpact(sim);
+      const m = sim.state.missions[0]!;
+      const aim = m.aim!;
+      const gd = Math.hypot(aim.x - BASE_SCENARIO.battery.x, aim.y - BASE_SCENARIO.battery.y);
+      const ux = (aim.x - BASE_SCENARIO.battery.x) / gd;
+      const uy = (aim.y - BASE_SCENARIO.battery.y) / gd;
+      const ex = impact.x - aim.x - m.bias.x;
+      const ey = impact.y - aim.y - m.bias.y;
+      range += (ex * ux + ey * uy) / N;
+      defl += (ex * uy - ey * ux) / N; // to the right of the line of fire
+    }
+    expect(Math.abs(defl)).toBeLessThan(4);
+    expect(Math.abs(range)).toBeLessThan(6);
+  });
+
   test('수정탄은 중앙 포 한 발만 떨어진다', () => {
     const sim = opened();
     toReady(sim);

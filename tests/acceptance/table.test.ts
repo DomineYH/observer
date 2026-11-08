@@ -126,6 +126,7 @@ const ROWS: [string, string, string][] = [
   ['탄도 · 비표준 조건 오차 (기상 잔차)', 'tests/acceptance/weather.test.ts', 'F-17: 탄도 잔차'],
   ['탄도 · 포대 방렬', 'tests/acceptance/lethality.test.ts', '포대 방렬: 6문 W자, 횡 120 m × 종 44 m'],
   ['탄도 · 수정탄', 'tests/acceptance/fire.test.ts', '수정탄은 중앙 포 한 발만 떨어진다'],
+  ['탄도 · 수정탄 (중앙 포)', 'tests/acceptance/fire.test.ts', '수정탄은 포대 중앙의 조준점에 떨어진다'],
   ['탄도 · 수정탄 (순발신관)', 'tests/acceptance/ffe.test.ts', '접근신관 효력사는 공중 파열로 알려지고 수정탄은 순발이다'],
   ['탄도 · 효력사 간격', 'tests/acceptance/ffe.test.ts', 'F-07: 바로 효력사'],
   ['수정 · 단위·기준선 (단위)', 'tests/acceptance/fire.test.ts', '좌우는 10 m, 사거리는 50 m로 맞추고 0이 된 축은 뺀다'],
