@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createSim, type Input } from '../../src/sim/index';
+import { createSim, heightAt, type Input } from '../../src/sim/index';
+import { DEFAULT_QUALITY, eyeAt, focalOf, MIL, project, QUALITIES } from '../../src/render/projection';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
@@ -168,6 +169,69 @@ test('F-24: 가시권은 훈련 전용', async ({ page }) => {
   await button(page, '훈련').click();
   await expect(vs).not.toBeChecked();
   await expect.poll(() => settledMap(page, map)).toBe(plain);
+});
+
+test('F-14: 훈련 아군 표시 — 화면', async ({ page }) => {
+  // #34: training names our positions in the view, "▼ 아군 n소대" 12 m above each one's ground (demo 1217). From the
+  // planned post, looking where a game starts (20.4 mils, 22 mils down), the places come from the view's projection;
+  // the canvas there must hold that text, drawn as the view draws it, and not another platoon's number.
+  await page.goto('/?seed=20261106');
+  await button(page, '훈련').click();
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await expect.poll(async () => Number(await page.getByRole('status', { name: '틱' }).textContent())).toBeGreaterThan(0);
+
+  const terrain = await mockTerrain.load(20261106);
+  const w = QUALITIES[DEFAULT_QUALITY];
+  const h = Math.round((w * 9) / 16);
+  const aim = { h: 20.4, p: -22 };
+  const focal = focalOf(w, false);
+  const geom = { eye: eyeAt(terrain, BASE_SCENARIO.plannedOp), h: aim.h, focal, cx: w / 2, hor: h / 2 + Math.tan(aim.p / MIL) * focal };
+  const places = BASE_SCENARIO.friends.flatMap((f, i) => {
+    const p = project(geom, { x: f.x, y: f.y, z: heightAt(terrain, f.x, f.y) + 12 });
+    return p && p.sx > 0 && p.sx < w ? [{ n: i + 1, sx: p.sx, sy: p.sy }] : [];
+  });
+  expect(places.map((p) => p.n)).toEqual([1, 2, 3]); // all three in the opening view
+
+  const view = page.getByRole('img', { name: '관측 화면' });
+  /** How well the label-blue pixels around `at` match `text` drawn there in the view's font (intersection over union). */
+  const match = (at: { sx: number; sy: number }, text: string) =>
+    view.evaluate(
+      (c: HTMLCanvasElement, { at, text, w }) => {
+        const dpr = window.devicePixelRatio || 1;
+        const k = c.width / w;
+        const [x, y] = [at.sx * k, at.sy * k];
+        const [bw, bh] = [Math.round(160 * dpr), Math.round(24 * dpr)];
+        const [x0, y0] = [Math.round(x - bw / 2), Math.round(y - 18 * dpr)];
+        const seen = c.getContext('2d')!.getImageData(x0, y0, bw, bh).data;
+        const ref = new OffscreenCanvas(bw, bh).getContext('2d')!;
+        ref.font = `${Math.round(12 * dpr)}px monospace`;
+        ref.textAlign = 'center';
+        ref.fillText(text, x - x0, y - y0);
+        const ink = ref.getImageData(0, 0, bw, bh).data;
+        const near = (v: number, c0: number) => Math.abs(v - c0) <= 30;
+        let both = 0;
+        let either = 0;
+        for (let i = 0; i < bw * bh; i++) {
+          const a = ink[i * 4 + 3]! > 200;
+          const b = near(seen[i * 4]!, 98) && near(seen[i * 4 + 1]!, 174) && near(seen[i * 4 + 2]!, 230);
+          if (a && b) both++;
+          if (a || b) either++;
+        }
+        return either ? both / either : 0;
+      },
+      { at, text, w },
+    );
+  const label = (n: number) => `▼ 아군 ${n}소대`;
+  for (const p of places) {
+    await expect.poll(() => match(p, label(p.n))).toBeGreaterThan(0.5);
+    for (const other of [1, 2, 3, 4].filter((n) => n !== p.n)) expect(await match(p, label(other))).toBeLessThan(await match(p, label(p.n)));
+  }
+
+  // Standard, the same view: no label anywhere.
+  await button(page, '표준').click();
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'true');
+  for (const p of places) await expect.poll(() => match(p, label(p.n))).toBeLessThan(0.05);
 });
 
 test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
