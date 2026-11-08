@@ -1,5 +1,5 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
-import { StrictMode, useState, useSyncExternalStore } from 'react';
+import { StrictMode, useMemo, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
@@ -195,7 +195,8 @@ function App() {
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
-  const point = pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null);
+  // Memoized: the map redraws when its identity changes.
+  const point = useMemo(() => pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null), [pin, picked, op]);
   // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
