@@ -5,22 +5,26 @@ import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_AMC, DESC_UNKNOWN, openRadi
 import { oneUnit } from '../../tests/acceptance/enemy';
 import { aimedAt, isImpact, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
 import { flatTerrain } from '../../tests/acceptance/terrain';
-import { Composer, type ComposerForm } from './Composer';
+import { Composer } from './Composer';
+import { Preview } from './CorrectionForm';
 import { RadioLog } from './RadioLog';
-import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm } from './radio/drafts';
+import { callDraft, descDraft, FIRE, fireKey, locDraft, targetOptions, type DescForm, type Draft } from './radio/drafts';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 /** A set-up post 기러기 knows: the composer offers a call at idle. */
 const POST = { post: { state: 'ready', move: null, departed: 0, until: 0, moves: 0 }, reportDue: false, tick: 0, knownOp: { x: 0, y: 0 } } as const;
 const GRID = flatTerrain().grid;
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
-/** The sentence the composer shows at `stage`, starting from `initial`. */
-function shown(stage: 'idle' | 'loc' | 'desc', platoons: Parameters<typeof targetOptions>[0], initial: Partial<ComposerForm>) {
-  const html = renderToStaticMarkup(
-    <Composer stage={stage} live platoons={platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [], ...POST }} initial={initial} />,
+const previewOf = (html: string) => text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+/** The sentence the composer's preview shows for `draft` (the composer previews its draft with `Preview`). */
+const shown = (draft: Draft) => previewOf(renderToStaticMarkup(<Preview draft={draft} empty="" names={NAMES} mode="standard" send={() => {}} />));
+/** The sentence a fresh composer shows at `stage`, from its own starting values. */
+const fresh = (stage: 'idle' | 'desc') =>
+  previewOf(
+    renderToStaticMarkup(
+      <Composer stage={stage} live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [], ...POST }} />,
+    ),
   );
-  return text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
-}
 /** The sentence of a log line, without its time and speaker. */
 const logged = (e: RadioEvent) =>
   text(renderToStaticMarkup(<RadioLog lines={[e]} callsign={NAMES.callsign} gridLetters={NAMES.gridLetters} mode="standard" />)).replace(
@@ -63,12 +67,14 @@ test('F-07: 미리보기는 송신 문장과 같다', () => {
     const key = JSON.stringify(m.target);
     expect(targetOptions(m.platoons).map((t) => JSON.stringify(t))).toContain(key);
     const steps = [
-      ['idle', m.defaults ? {} : { warning: m.warning }, callDraft(m.warning), 'call'],
-      ['loc', { grid: m.grid }, locDraft(Number(m.grid.e), Number(m.grid.n)), 'loc'],
-      ['desc', m.defaults ? {} : { ...m.head, target: key }, descDraft({ ...m.head, target: m.target }), 'desc'],
+      ['idle', callDraft(m.warning), 'call'],
+      ['loc', locDraft(Number(m.grid.e), Number(m.grid.n)), 'loc'],
+      ['desc', descDraft({ ...m.head, target: m.target }), 'desc'],
     ] as const;
-    for (const [stage, initial, draft, a] of steps) {
-      const preview = shown(stage, m.platoons, initial);
+    for (const [stage, draft, a] of steps) {
+      const preview = shown(draft);
+      // A fresh composer starts on the defaults: 조정, then 미상 표적 포대 삼발. Filling the form in is the smokes' part.
+      if (m.defaults && stage !== 'loc') expect(fresh(stage)).toBe(preview);
       const r = send(sim, draft.input);
       expect(r.ok).toBe(true);
       const said = r.events.find((e) => e.utterance.speaker === 'observer')!;

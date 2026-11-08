@@ -32,17 +32,6 @@ const filled = (l: Hit, g: GridRef) => {
   return { polar: { az: four(Math.round(l.az / 10) % 6400), dist: String(l.range.dist) }, grid: { e: four(at.e), n: four(at.n) } };
 };
 
-/** The form's starting values (a sent form keeps its values for the next mission). `target` is an option's JSON. */
-export interface ComposerForm {
-  warning: Warning;
-  grid: { e: string; n: string };
-  target: string;
-  rounds: number;
-  fuzeRequest: FuzeRequest;
-  control: Control;
-  dangerClose: Flag;
-}
-
 interface Props {
   stage: RadioStage;
   live: boolean;
@@ -53,17 +42,16 @@ interface Props {
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission (and in training for the correction help). */
   state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
-  initial?: Partial<ComposerForm>;
 }
 
-export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, initial = {} }: Props) {
-  const [warning, setWarning] = useState<Warning>(initial.warning ?? 'adjust');
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state }: Props) {
+  const [warning, setWarning] = useState<Warning>('adjust');
   // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966); typing keeps
   // its values until the next such lase.
   const hit = state.lases.find((l): l is Hit => l.range !== null);
   const fill = hit && filled(hit, gridRef);
   const [method, setMethod] = useState<'grid' | 'polar'>('grid');
-  const [grid, setGrid] = useState(initial.grid ?? (fill && mode === 'training' ? fill.grid : { e: '', n: '' }));
+  const [grid, setGrid] = useState(fill && mode === 'training' ? fill.grid : { e: '', n: '' });
   const [polar, setPolar] = useState(fill?.polar ?? { az: '', dist: '' });
   const [lastHit, setLastHit] = useState(hit);
   if (hit !== lastHit) {
@@ -73,11 +61,11 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
       if (mode === 'training') setGrid(fill.grid);
     }
   }
-  const [target, setTarget] = useState(initial.target ?? '');
-  const [rounds, setRounds] = useState(initial.rounds ?? 3);
-  const [fuzeRequest, setFuze] = useState<FuzeRequest>(initial.fuzeRequest ?? 'none');
-  const [control, setControl] = useState<Control>(initial.control ?? 'ready');
-  const [dangerClose, setDangerClose] = useState<Flag>(initial.dangerClose ?? 0);
+  const [target, setTarget] = useState('') // an option's JSON; a sent form keeps its values for the next mission;
+  const [rounds, setRounds] = useState(3);
+  const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
+  const [control, setControl] = useState<Control>('ready');
+  const [dangerClose, setDangerClose] = useState<Flag>(0);
 
   const mission = state.missions.at(-1);
   // 지명사: 기러기 waits for 준비 쏴, for the adjusting round and for 효력사 alike (the simulation's own rule).
