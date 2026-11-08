@@ -16,7 +16,9 @@ export interface MapView {
 export const FULL_VIEW: MapView = { z: 1, x0: 0, y0: 0 };
 
 /** The point under a press at fractions (fx, fy) of the panel, in whole meters, with its 방안좌표 (좌표자, demo 1264). */
-export function pointAt(t: TerrainData, v: MapView, fx: number, fy: number): Point & { e: number; n: number } {
+export type Pin = Point & { e: number; n: number };
+
+export function pointAt(t: TerrainData, v: MapView, fx: number, fy: number): Pin {
   const span = t.n / v.z;
   const x = Math.round((v.x0 + fx * span) * t.cell);
   const y = Math.round((t.n - (v.y0 + fy * span)) * t.cell);

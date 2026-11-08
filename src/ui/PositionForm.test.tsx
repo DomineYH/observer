@@ -10,7 +10,8 @@ import { posDraft } from './radio/drafts';
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const GRID = flatTerrain().grid;
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
-const form = (mode: Mode) => renderToStaticMarkup(<PositionForm op={{ x: 400, y: 320 }} grid={GRID} names={NAMES} mode={mode} send={() => {}} />);
+const form = (mode: Mode, pin?: { e: number; n: number }) =>
+  renderToStaticMarkup(<PositionForm op={{ x: 400, y: 320 }} grid={GRID} names={NAMES} mode={mode} send={() => {}} pin={pin} />);
 
 test('B3: 위치 보고 훈련 힌트', () => {
   // The hint says what 기러기 really does: only 극좌표 is converted from the reported post (the old one when skipped);
@@ -31,6 +32,11 @@ test('F-21: 위치 보고 — 입력기', () => {
   expect(form('training')).toContain('value="3032"');
   expect(form('standard')).not.toContain('value="4040"');
   expect(text(form('standard'))).toContain('보고하지 않고 계속');
+  // 표준 with a 좌표자 point on the map starts from it (demo 942); 훈련 still starts from the post.
+  expect(form('standard', { e: 12, n: 3456 })).toContain('value="0012"');
+  expect(form('standard', { e: 12, n: 3456 })).toContain('value="3456"');
+  expect(form('training', { e: 12, n: 3456 })).toContain('value="4040"');
+  expect(form('training', { e: 12, n: 3456 })).not.toContain('value="0012"');
   // The preview is the sentence the simulation says for the input it sends.
   const sim: Sim = started();
   openRadio(sim);

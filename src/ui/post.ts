@@ -1,6 +1,6 @@
 // 관측소 이동·위치 보고·발각 (demo lines 849–904, 609–637, 1416–1420): the ui's words for the simulation's post state and
 // notes. Pure.
-import type { MoveBlock, MovePlan, Mode, Point, PostNote, ReadonlySimState, UnitType } from '@sim';
+import type { MoveBlock, MovePlan, Mode, Point, PostNote, RadioStage, ReadonlySimState, UnitType } from '@sim';
 import { clock } from './clock';
 import { unitName } from './debrief';
 
@@ -10,6 +10,9 @@ export const POSITION_HINT: Record<Mode, string> = {
     '훈련: 기러기는 극좌표로 보낸 표적 위치를 보고한 관측소 위치에서 환산합니다. 보고하지 않으면 옛 위치에서 환산합니다. 좌표법 + 방향으로 보낸 임무에는 영향이 없습니다.',
   standard: '지도를 눌러 자기 위치를 좌표자로 읽어 넣으십시오.',
 };
+
+/** The 위치 보고 is due and its form open: at idle, once the walk and the setup are over. */
+export const reportOpen = (stage: RadioStage, s: Pick<ReadonlySimState, 'post' | 'reportDue'>) => stage === 'idle' && s.post.state === 'ready' && s.reportDue;
 
 /** Why the map's 좌표자 point cannot be moved to. */
 export const BLOCKED: Record<MoveBlock, string> = {

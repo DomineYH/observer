@@ -177,6 +177,45 @@ test('레이아웃: 넓은 머리띠 — 가장 긴 호출부호', async ({ page
 test.describe('좁은 화면 탭', () => {
   test.use(PHONE);
 
+  test('F-06: 좌표자 입력은 입력 탭으로 넘어간다 — 휴대폰', async ({ page }) => {
+    test.setTimeout(90_000);
+    await narrowStart(page);
+    const composer = region(page, '입력기');
+    const panel = region(page, '지도 패널');
+    const log = region(page, '무전 기록');
+    const send = composer.getByRole('button', { name: '송신' });
+    const readPoint = async () => {
+      await tab(page, '지도').click();
+      const map = panel.getByRole('img', { name: '지도' });
+      const box = (await map.boundingBox())!;
+      await map.tap({ position: { x: box.width * 0.6, y: box.height * 0.4 } });
+      const [, e, n] = (await panel.getByText(/^좌표자:/).textContent())!.match(/(\d{4}) (\d{4})/)!;
+      return { e: e!, n: n! };
+    };
+    const landed = async (at: { e: string; n: string }, within = composer) => {
+      await expect(tab(page, '입력')).toHaveAttribute('aria-pressed', 'true');
+      expect(await rendered(panel)).toBe(false);
+      await expect(within.getByRole('textbox', { name: '동', exact: true })).toHaveValue(at.e);
+      await expect(within.getByRole('textbox', { name: '북', exact: true })).toHaveValue(at.n);
+    };
+
+    await expect(composer.getByRole('button', { name: '보고하지 않고 계속' })).toBeVisible({ timeout: 15_000 });
+    const read = await readPoint();
+    await panel.getByRole('button', { name: '위치 보고에 입력' }).click();
+    await landed(read, composer.getByRole('region', { name: '위치 보고' }));
+    await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+    await send.click();
+    await tab(page, '무전').click();
+    await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+
+    // The point stays on the map from the report on; the form opens with it, so edit it to see the button's effect.
+    await tab(page, '입력').click();
+    await composer.getByRole('textbox', { name: '동', exact: true }).fill('1111');
+    await tab(page, '지도').click();
+    await panel.getByRole('button', { name: '사격요구에 입력' }).click();
+    await landed(read);
+  });
+
   test('레이아웃: 관측 화면 고정', async ({ page }) => {
     await narrowStart(page);
     const view = page.getByRole('img', { name: '관측 화면' });

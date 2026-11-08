@@ -10,6 +10,7 @@ import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
+import { gridOf, type Pin } from '@render/mapView';
 import { DEFAULT_QUALITY, type Quality } from '@render/projection';
 import { terrainColours } from '@render/shade';
 import { Composer } from '@ui/Composer';
@@ -174,6 +175,8 @@ function App() {
   const { sim, init } = useSyncExternalStore(subscribe, () => game);
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY); // outlives the per-game view
   const [tab, setTab] = useState<Tab>('input'); // 아래 탭 on a narrow screen
+  const [pin, setPin] = useState<Pin | null>(null); // the 좌표자
+  const [transfer, setTransfer] = useState<{ e: number; n: number } | null>(null); // the 좌표자 sent to the open form
   const tick = useSyncExternalStore(subscribe, () => game.sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
   const phase = useSyncExternalStore(subscribe, () => game.sim.state.phase);
@@ -191,6 +194,8 @@ function App() {
   // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
+  // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
+  const point = pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null);
   // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
@@ -260,11 +265,25 @@ function App() {
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} />
+            <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>
-          <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
+          <MapPanel
+            terrain={terrain}
+            scenario={BASE_SCENARIO}
+            state={sim.state}
+            send={send}
+            onFrame={onFrame}
+            weather={init.weather}
+            pin={pin}
+            onPin={setPin}
+            mark={point}
+            onTransfer={(g) => {
+              setTransfer(g);
+              setTab('input'); // the form and its 송신 are there on a phone; the demo has no tabs
+            }}
+          />
         </div>
         <div data-panel="targets">
           <TargetList platoons={sim.state.platoons} mode={mode} /* re-rendered with the tick above */ />

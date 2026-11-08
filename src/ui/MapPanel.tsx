@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Input, Point, ReadonlySimState, Scenario, TerrainData, Weather } from '@sim';
 import { drawMap, MAP_PX, mapBase } from '@render/map';
-import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView } from '@render/mapView';
+import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView, type Pin } from '@render/mapView';
 import { fovOf } from '@render/projection';
 import { viewshed } from '@render/viewshed';
-import { BLOCKED, moveLabel } from './post';
+import { BLOCKED, moveLabel, reportOpen } from './post';
 import { gridLabel } from './radio/readings';
 
 const REDRAW_MS = 120; // the demo's map rate
@@ -29,12 +29,18 @@ export interface MapPanelProps {
   send: (input: Input) => void;
   onFrame: (draw: (now: number) => void) => () => void;
   weather: Weather;
+  /** The 좌표자: the point last pressed once started. */
+  pin: Pin | null;
+  onPin: (pin: Pin) => void;
+  /** Where the map's cross stands: the 좌표자, or before any press the 관측소 후보 (demo 1427, 1306). */
+  mark: Point | null;
+  /** 사격요구에 입력 · 위치 보고에 입력: a new object each press (demo 1420–1421). */
+  onTransfer: (grid: { e: number; n: number }) => void;
 }
 
-export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: MapPanelProps) {
+export function MapPanel({ terrain, scenario, state, send, onFrame, weather, pin, onPin, mark, onTransfer }: MapPanelProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<MapView>(FULL_VIEW);
-  const [pin, setPin] = useState<(Point & { e: number; n: number }) | null>(null);
   const [base, setBase] = useState<HTMLCanvasElement | null>(null);
   // 가시권 표시, training only (demo 1405: off again in standard). It is worked out from where the post stands, not
   // while it walks.
@@ -57,8 +63,8 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs });
-  }, [terrain, base, view, scenario, state, pin, weather, vs]);
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin: mark, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs });
+  }, [terrain, base, view, scenario, state, mark, weather, vs]);
 
   useEffect(() => {
     draw();
@@ -148,7 +154,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
           const r = e.currentTarget.getBoundingClientRect();
           const at = pointAt(terrain, view, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
           if (state.phase === 'prep') send({ a: 'pick', v: [at.x, at.y] });
-          else setPin(at);
+          else onPin(at);
         }}
         onPointerCancel={(e) => {
           lift(e.pointerId);
@@ -178,7 +184,17 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
       )}
       {pin && (
         <p>
-          좌표자: {gridLabel(terrain.grid.letters, pin)}
+          좌표자: {gridLabel(terrain.grid.letters, pin)}{' '}
+          {state.phase === 'live' && state.radio.stage === 'loc' && (
+            <button type="button" onClick={() => onTransfer({ e: pin.e, n: pin.n })}>
+              사격요구에 입력
+            </button>
+          )}
+          {state.phase === 'live' && reportOpen(state.radio.stage, state) && (
+            <button type="button" onClick={() => onTransfer({ e: pin.e, n: pin.n })}>
+              위치 보고에 입력
+            </button>
+          )}
         </p>
       )}
       {pin && state.phase === 'live' && <MoveTo terrain={terrain} state={state} to={{ x: Math.round(pin.x), y: Math.round(pin.y) }} send={send} />}

@@ -348,3 +348,110 @@ test('F-30: 기상 변경은 고른 모드를 남긴다 — 화면', async ({ pa
   expect(seen).toEqual([]);
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
 });
+
+/** Presses the map at a share of its width and height; returns the 좌표자's digits. */
+async function pressMap(page: Page, fx: number, fy: number) {
+  const panel = page.getByRole('region', { name: '지도 패널' });
+  const map = panel.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width * fx, y: box.height * fy } });
+  const read = panel.getByText(/^좌표자:/);
+  await expect(read).toBeVisible();
+  const [, e, n] = (await read.textContent())!.match(/(\d{4}) (\d{4})/)!;
+  return { e: e!, n: n! };
+}
+
+const toFire = (page: Page) => page.getByRole('region', { name: '지도 패널' }).getByRole('button', { name: '사격요구에 입력' });
+const toReport = (page: Page) => page.getByRole('region', { name: '지도 패널' }).getByRole('button', { name: '위치 보고에 입력' });
+
+test('F-06: 좌표자를 사격요구에 넣는다 — 화면', async ({ page }) => {
+  test.setTimeout(90_000);
+  await picked(page);
+  await start(page);
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  const east = composer.getByRole('textbox', { name: '동', exact: true });
+  const north = composer.getByRole('textbox', { name: '북', exact: true });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await expect(log).toContainText('위치 보고 생략');
+  // Read at the call: nothing to put it in yet.
+  const first = await pressMap(page, 0.6, 0.4);
+  await expect(toFire(page)).toHaveCount(0);
+  await expect(toReport(page)).toHaveCount(0);
+  await composer.getByRole('button', { name: '송신' }).click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  // At 표적위치 the form opens with that point (demo 958–959), and the button is there.
+  await expect(east).toHaveValue(first.e);
+  await expect(north).toHaveValue(first.n);
+  await expect(toFire(page)).toBeVisible();
+  await expect(toReport(page)).toHaveCount(0);
+
+  // A new point stays on the map until the button puts it in; pressed again it replaces a hand edit.
+  const second = await pressMap(page, 0.3, 0.7);
+  await expect(east).toHaveValue(first.e);
+  await toFire(page).click();
+  await expect(east).toHaveValue(second.e);
+  await expect(north).toHaveValue(second.n);
+  await east.fill('1111');
+  await toFire(page).click();
+  await expect(east).toHaveValue(second.e);
+
+  // On 극좌표 it fills the grid behind it and stays there (demo 1420).
+  const third = await pressMap(page, 0.4, 0.6);
+  await composer.getByRole('radio', { name: '극좌표' }).check();
+  await toFire(page).click();
+  await expect(composer.getByRole('radio', { name: '극좌표' })).toBeChecked();
+  await composer.getByRole('radio', { name: '좌표', exact: true }).check();
+  await expect(east).toHaveValue(third.e);
+  await expect(north).toHaveValue(third.n);
+
+  // What goes out is that point; the step over, the button goes.
+  const line = (await composer.getByRole('status', { name: '보낼 문장' }).textContent())!;
+  await composer.getByRole('button', { name: '송신' }).click();
+  await expect(log).toContainText(line);
+  await expect(toFire(page)).toHaveCount(0);
+});
+
+test('F-06: 관측소 후보가 표적위치에 미리 들어간다 — 화면', async ({ page }) => {
+  // The pick is the map's last point until the map is pressed again (demo 1427, 958–959); no button without a press.
+  test.setTimeout(90_000);
+  await picked(page);
+  await start(page);
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await expect(log).toContainText('위치 보고 생략');
+  await composer.getByRole('button', { name: '송신' }).click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await expect(composer.getByRole('textbox', { name: '동', exact: true })).toHaveValue('4512');
+  await expect(composer.getByRole('textbox', { name: '북', exact: true })).toHaveValue('3256');
+  await expect(toFire(page)).toHaveCount(0);
+});
+
+test('F-21: 좌표자를 위치 보고에 넣는다 — 화면', async ({ page }) => {
+  test.setTimeout(60_000);
+  await picked(page);
+  await start(page);
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  const report = composer.getByRole('region', { name: '위치 보고' });
+  const east = report.getByRole('textbox', { name: '동', exact: true });
+  const north = report.getByRole('textbox', { name: '북', exact: true });
+  // Standard opens the report on the map's last point, here the pick (demo 942, 1427).
+  await expect(east).toHaveValue('4512', { timeout: 15_000 });
+  await expect(north).toHaveValue('3256');
+  await expect(toReport(page)).toHaveCount(0);
+
+  const read = await pressMap(page, 0.6, 0.4);
+  await expect(toReport(page)).toBeVisible();
+  await expect(toFire(page)).toHaveCount(0);
+  await expect(east).toHaveValue('4512');
+  await toReport(page).click();
+  await expect(east).toHaveValue(read.e);
+  await expect(north).toHaveValue(read.n);
+
+  const line = (await report.getByRole('status', { name: '보낼 문장' }).textContent())!;
+  await report.getByRole('button', { name: '송신' }).click();
+  await expect(log).toContainText(line);
+  await expect(toReport(page)).toHaveCount(0);
+});

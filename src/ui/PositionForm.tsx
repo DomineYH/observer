@@ -1,5 +1,5 @@
-// 관측소 위치 보고 (demo lines 941–946, 1015): after the move and the setup, the post's grid — prefilled in 훈련 — with
-// its preview and 송신, or going on without reporting it.
+// 관측소 위치 보고 (demo lines 941–946, 1015): after the move and the setup, the post's grid — prefilled in 훈련, in 표준
+// from the map's last point — with its preview and 송신, or going on without reporting it.
 import { useState } from 'react';
 import type { GridRef, Input, Mode, Point } from '@sim';
 import { gridOf } from '@render/mapView';
@@ -16,13 +16,22 @@ interface Props {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  /** The map's last point: 표준 starts from it (demo 942). */
+  pin?: { e: number; n: number } | null;
+  /** 위치 보고에 입력: a new object each press fills the fields. */
+  transfer?: { e: number; n: number } | null;
 }
 
-export function PositionForm({ op, grid, names, mode, send }: Props) {
+export function PositionForm({ op, grid, names, mode, send, pin, transfer }: Props) {
   const [at, setAt] = useState(() => {
-    const g = gridOf(grid, op);
-    return mode === 'training' ? { e: four(g.e), n: four(g.n) } : { e: '', n: '' };
+    const g = mode === 'training' ? gridOf(grid, op) : pin;
+    return g ? { e: four(g.e), n: four(g.n) } : { e: '', n: '' };
   });
+  const [lastTransfer, setLastTransfer] = useState(transfer);
+  if (transfer !== lastTransfer) {
+    setLastTransfer(transfer);
+    if (transfer) setAt({ e: four(transfer.e), n: four(transfer.n) });
+  }
   return (
     <section aria-label="위치 보고">
       <p>관측소 위치 보고</p>

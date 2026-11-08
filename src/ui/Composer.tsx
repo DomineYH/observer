@@ -11,7 +11,7 @@ import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
 import { EffectForm } from './EffectForm';
 import { PositionForm } from './PositionForm';
-import { postStatus, staleKnown } from './post';
+import { postStatus, reportOpen, staleKnown } from './post';
 import { ShiftForm } from './ShiftForm';
 import { ignoreShortcut } from './shortcut';
 
@@ -42,16 +42,22 @@ interface Props {
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission (and in training for the correction help). */
   state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
+  /** The map's last point (좌표자 or 관측소 후보): what the location grid and the 위치 보고 start from (demo 942, 958–959). */
+  pin?: { e: number; n: number } | null;
+  /** 사격요구에 입력 · 위치 보고에 입력: a new object each press fills the form open at that moment (demo 1420–1421). */
+  transfer?: { e: number; n: number } | null;
 }
 
-export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state }: Props) {
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, transfer }: Props) {
   const [warning, setWarning] = useState<Warning>('adjust');
   // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966); typing keeps
   // its values until the next such lase.
   const hit = state.lases.find((l): l is Hit => l.range !== null);
   const fill = hit && filled(hit, gridRef);
   const [method, setMethod] = useState<'grid' | 'polar'>('grid');
-  const [grid, setGrid] = useState(fill && mode === 'training' ? fill.grid : { e: '', n: '' });
+  // 표적위치 opens on the lase in training, else on the map's last point (demo 958–959).
+  const openGrid = () => (fill && mode === 'training' ? fill.grid : pin ? { e: four(pin.e), n: four(pin.n) } : { e: '', n: '' });
+  const [grid, setGrid] = useState(openGrid);
   const [polar, setPolar] = useState(fill?.polar ?? { az: '', dist: '' });
   const [lastHit, setLastHit] = useState(hit);
   if (hit !== lastHit) {
@@ -60,6 +66,16 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
       setPolar(fill.polar);
       if (mode === 'training') setGrid(fill.grid);
     }
+  }
+  const [lastStage, setLastStage] = useState(stage);
+  if (stage !== lastStage) {
+    setLastStage(stage);
+    if (stage === 'loc') setGrid(openGrid());
+  }
+  const [lastTransfer, setLastTransfer] = useState(transfer);
+  if (transfer !== lastTransfer) {
+    setLastTransfer(transfer);
+    if (transfer && stage === 'loc') setGrid({ e: four(transfer.e), n: four(transfer.n) });
   }
   const [target, setTarget] = useState('') // an option's JSON; a sent form keeps its values for the next mission;
   const [rounds, setRounds] = useState(3);
@@ -84,7 +100,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
   // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
   const ready = state.post.state === 'ready';
-  const reporting = stage === 'idle' && ready && state.reportDue;
+  const reporting = reportOpen(stage, state);
   const callable = stage === 'idle' && ready && !state.reportDue;
   let draft: Draft | null = null;
   if (callable) draft = callDraft(warning);
@@ -105,7 +121,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             {postStatus(state)}. {state.post.state === 'moving' ? '이동 중에는 쌍안경·레이저·사격요구를 쓸 수 없습니다.' : '설치가 끝나야 레이저와 사격요구를 씁니다.'}
           </p>
         )}
-        {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} />}
+        {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} pin={pin} transfer={transfer} />}
         {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
         {amc && (
           <button type="button" onClick={() => send(FIRE)}>
