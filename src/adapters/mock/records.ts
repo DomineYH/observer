@@ -51,7 +51,8 @@ const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'obj
 const count = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
 const countOrNull = (x: unknown) => x === null || count(x);
 const flag = (x: unknown) => typeof x === 'boolean';
-const oneOf = (...xs: string[]) => (x: unknown) => xs.includes(x as string);
+// Stored values are checked as strings before any lookup: a key lookup would coerce, and `{ toString: null }` throws.
+const oneOf = (...xs: string[]) => (x: unknown) => typeof x === 'string' && xs.includes(x);
 // Every field a stored 판 기록 must have, and its type; a missing key fails its check.
 const RECORD: Record<keyof RunRecord, (x: unknown) => boolean> = {
   ticks: count, seed: count, seedKind: oneOf('daily', 'practice'), cleared: flag, clearTick: countOrNull,
@@ -66,7 +67,7 @@ const EFFECTS: Record<Effect, true> = { destroyed: true, neutralized: true, inef
 const MISSION: Record<keyof MissionSummary, (x: unknown) => boolean> = {
   targetNumber: countOrNull, corrections: count, rounds: count, firstError: countOrNull, directionError: countOrNull,
   rangeCorrections: (x) => Array.isArray(x) && x.every(count),
-  report: (x) => x === null || Object.hasOwn(EFFECTS, x as string),
+  report: (x) => x === null || (typeof x === 'string' && Object.hasOwn(EFFECTS, x)),
 };
 const MISSION_KEYS = Object.keys(MISSION) as (keyof MissionSummary)[];
 const fits = <K extends string>(x: unknown, keys: readonly K[], check: Record<K, (v: unknown) => boolean>) =>
@@ -88,11 +89,19 @@ const rankable = (r: RunRecord) => r.mode === 'standard' && r.seedKind === 'dail
 const byTime = (a: RankRow, z: RankRow) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0);
 
 export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isReplay: (x: unknown) => boolean): RecordArchive {
+  // Each run alone: one that fails or throws while checked is dropped without emptying the archive.
+  const valid = (r: unknown): r is StoredRun => {
+    try {
+      return isRun(r, isReplay);
+    } catch {
+      return false;
+    }
+  };
   // Oldest first, valid runs only.
   const load = (): StoredRun[] => {
     try {
       const v: unknown = JSON.parse(storage.getItem(KEY) ?? '[]');
-      return Array.isArray(v) ? v.filter((r) => isRun(r, isReplay)) : [];
+      return Array.isArray(v) ? v.filter(valid) : [];
     } catch {
       return [];
     }

@@ -231,3 +231,32 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 시뮬레이션에서 �
   await mockArchive(storage, isReplay).submit(run('참새34'));
   expect((await mockArchive(storage, isReplay).mine())[1]).toEqual(kept);
 });
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 문자열이 아닌 보고는 버리고 이웃 기록은 남긴다', async () => {
+  const good = { ...stored('참새56', {}, '2026-11-01T09:00:00.000Z'), missions: [MISSION] };
+  // `["destroyed"]` passes as "destroyed" if coerced to a key; `{ toString: null }` throws if coerced.
+  for (const report of [['destroyed'], { toString: null }]) {
+    const storage = memoryStorage();
+    const bad = { ...stored('참새78', {}, '2026-11-02T09:00:00.000Z'), missions: [{ ...MISSION, report }] };
+    storage.setItem('observer.runs', JSON.stringify([good, bad]));
+    const archive = mockArchive(storage, isReplay);
+    expect(await archive.mine()).toEqual([good]);
+    await archive.submit(run('참새12'));
+    expect((JSON.parse(storage.getItem('observer.runs')!) as { callsign: string }[]).map((r) => r.callsign)).toEqual(['참새56', '참새12']);
+  }
+});
+
+test('F-31: 제출한 기록이 랭킹에 보인다 — 검사 중에 던지는 기록은 그것만 버린다', async () => {
+  const good = stored('참새56', {}, '2026-11-01T09:00:00.000Z');
+  const odd = { ...stored('참새78', {}, '2026-11-02T09:00:00.000Z'), replay: replayData([], 10, 1) };
+  const storage = memoryStorage();
+  storage.setItem('observer.runs', JSON.stringify([good, odd]));
+  const throwsOnOdd = (x: unknown) => {
+    if ((x as { seed: unknown }).seed === 1) throw new TypeError('hostile entry');
+    return isReplay(x);
+  };
+  const archive = mockArchive(storage, throwsOnOdd);
+  expect(await archive.mine()).toEqual([good]);
+  await archive.submit(run('참새12'));
+  expect((JSON.parse(storage.getItem('observer.runs')!) as { callsign: string }[]).map((r) => r.callsign)).toEqual(['참새56', '참새12']);
+});
