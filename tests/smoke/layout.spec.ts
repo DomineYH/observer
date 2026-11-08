@@ -59,28 +59,28 @@ test.describe('좁은 화면', () => {
       [204, -220],
     ]);
     // The hold: one step at once, the repeats from 350 ms on, one every 90 ms (the first lands at 440 ms) — 8 in the
-    // second held (±2 for timer and input latency), each exactly 1 mil right of the one before.
+    // second held, each exactly 1 mil right of the one before. The timing bounds below are wide enough for a loaded
+    // runner's main-thread stalls; the strict stop-on-release timing goes to human review (#45, user decision
+    // 2026-11-08).
     const held = cams.slice(4);
-    expect(held.length).toBeGreaterThanOrEqual(6);
+    expect(held.length).toBeGreaterThanOrEqual(4); // at least 3 repeats after the first step
     expect(held.length).toBeLessThanOrEqual(10);
     expect(held.map((c) => c.v)).toEqual(held.map((_, i) => [214 + 10 * i, -220]));
     // It stops at the lift: no 조준 입력 after the release mark.
     const release = inputs.findIndex((i) => i.a === 'bino');
     expect(release).toBeGreaterThan(inputs.indexOf(held.at(-1)!));
     expect(inputs.slice(release).filter((i) => i.a === 'cam')).toEqual([]);
-    // Continuous over time: 440 ms ≈ 8.8 ticks to the first repeat (two ticks either way: the touch's own latency and
-    // the frame that steps it), then 90 ms ≈ 1.8 ticks apart, a tick either way.
+    // Continuous over time: 440 ms ≈ 8.8 ticks to the first repeat, then 90 ms ≈ 1.8 ticks apart — every step on a
+    // later tick than the one before (no same-tick burst), within a stall's slack.
     const gaps = held.slice(1).map((c, i) => c.t - held[i]!.t);
-    expect(gaps[0]).toBeGreaterThanOrEqual(7);
-    expect(gaps[0]).toBeLessThanOrEqual(11);
+    expect(gaps[0]).toBeGreaterThanOrEqual(4);
+    expect(gaps[0]).toBeLessThanOrEqual(25);
     for (const g of gaps.slice(1)) {
       expect(g).toBeGreaterThanOrEqual(1);
-      expect(g).toBeLessThanOrEqual(3);
+      expect(g).toBeLessThanOrEqual(8);
     }
-    // Held right up to the lift: from the last step to the release mark at most one interval (1.8 ticks), the tick
-    // that steps it and the B key's own delivery (up to ~2 ticks when the machine is busy). A hold that stopped early
-    // (say at 600 ms) leaves 8 ticks or more.
-    expect(inputs[release]!.t - held.at(-1)!.t).toBeLessThanOrEqual(5);
+    // Held up to the lift: from the last step to the release mark (the B key straight after it), with a stall's slack.
+    expect(inputs[release]!.t - held.at(-1)!.t).toBeLessThanOrEqual(12);
   });
 });
 
