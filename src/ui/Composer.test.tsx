@@ -153,7 +153,7 @@ test('F-07: 효력사 — 입력기', () => {
   expect(send(ffe, FIRE).ok).toBe(true);
 });
 
-// Static render: the app has no training mode until the mode switch (#38), which adds the end-to-end check.
+// Static render; through the real UI: e2e `F-12: 훈련 모드의 실제 사상 — 화면`.
 test('F-12: 훈련 모드의 실제 사상', () => {
   // A 효력사 on one platoon, run until 효과 관측: training shows the real casualties of the unit it hit most.
   const sim = aimedAt(oneUnit({ type: 'inf', route: 'B', t0: 0 }), 2, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
@@ -206,7 +206,7 @@ test('F-07: 임무끝 — 입력기', () => {
   expect(logged(r.events[0]!)).toBe(preview);
 });
 
-// Static render: training has no switch in the app until #38; the polar path itself is the e2e `F-07: 극좌표 위치법 — 입력기`.
+// Static render of the training fill; the polar path itself is the e2e `F-07: 극좌표 위치법 — 입력기`.
 test('F-05: 훈련 모드는 레이저 측정점의 좌표를 넣어 둔다', () => {
   // At 표적위치 the newest lase that met something fills the grid in training (demo lines 958–966), not in standard.
   const hit: Lase = { tick: 9, az: 8003, el: -20, range: { dist: 1004, vm: -2, x: 805, y: 805, target: true } };

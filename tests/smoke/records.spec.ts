@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_SCENARIO } from '../../src/content/scenario';
+import { mapPixels, settledMap } from './helpers';
 
 // A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).
 const REPLAY = {"format":1,"simVersion":15,"seed":20261106,"seedKind":"daily","scenario":{"id":"base","version":1},"guns":{"id":"base","version":1},"weather":{"visibilityM":24000,"cloudPct":15,"windFromDeg":285,"windSpeedTenthMs":26,"tempTenthC":94,"precipTenthMmH":0,"pressureHpa":1023,"humidityPct":48},"mode":"standard","stepMs":50,"inputs":[{"t":0,"a":"start","v":[320,320]},{"t":1,"a":"pos_skip"},{"t":110,"a":"call","v":["ffe"]},{"t":186,"a":"loc","v":["grid",4080,3080]},{"t":241,"a":"desc","v":[3,"none","ready",0,"unknown"]},{"t":1861,"a":"eom","v":["ineffective"]}],"totalTicks":1862};
@@ -205,9 +206,16 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 전송 데이터', asyn
   // In 작전 준비: the sight turned and the binoculars on (cam and bino inputs of that game), then 안개.
   test.setTimeout(300_000);
   const debrief = await endOnOwnPost(page, async () => {
+    // Each must reach the old game's simulation first: the map draws its sight wedge from the sim's aim and its width
+    // from the sim's binoculars, so the map changing is the input taken.
+    const map = page.getByRole('img', { name: '지도' });
+    const still = await settledMap(page, map);
     for (let k = 0; k < 4; k++) await page.keyboard.press('Shift+ArrowRight');
+    await expect.poll(() => mapPixels(map)).not.toBe(still);
+    const turned = await settledMap(page, map);
     await page.keyboard.press('b');
     await expect(page.getByRole('button', { name: '쌍안경' })).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => mapPixels(map)).not.toBe(turned);
     await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
     await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('기상 시정 2.5 km');
   });

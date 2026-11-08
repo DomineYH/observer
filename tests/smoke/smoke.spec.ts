@@ -45,6 +45,9 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await expect(tick).toHaveText('0');
+  // Start in 훈련 모드 (in 작전 준비 it is free: no warning).
+  await page.getByRole('button', { name: '훈련', exact: true }).click();
+  await expect(page.getByRole('button', { name: '훈련', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
   await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
   const first = Number(await tick.textContent());
@@ -83,6 +86,18 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect.poll(pixels).not.toBe(eye);
   await page.keyboard.press('b');
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
+
+  // 배속 up, then one 일시정지: the clock stands still, and runs again on 재개.
+  await page.getByRole('button', { name: '×8' }).click();
+  await expect(page.getByRole('button', { name: '×8' })).toHaveAttribute('aria-pressed', 'true');
+  const fast = Number(await tick.textContent());
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(fast + 100);
+  await page.getByRole('button', { name: '일시정지' }).click();
+  const paused = await tick.textContent();
+  await page.waitForTimeout(500);
+  await expect(tick).toHaveText(paused!);
+  await page.getByRole('button', { name: '재개' }).click();
+  await expect.poll(async () => tick.textContent()).not.toBe(paused);
 });
 
 /** Whether the lower view is drawn in 2-pixel blocks: 보통 renders 480 internal pixels, stretched to a 960-wide canvas. */
