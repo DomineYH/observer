@@ -154,7 +154,7 @@ describe('F-06', () => {
 
   test('F-06: 관측 시야 부채꼴과 아군 진지', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m on the whole map
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
     const { strokes, texts, rects } = draw(t, FULL_VIEW, marks);
     // The line of sight, due north 7 km from the post at (256, 422), inside the wedge.
     expect(strokes).toContainEqual([[256, 422], [256, 72]]);
@@ -170,7 +170,7 @@ describe('F-06', () => {
   test('F-17: 바람 화살표', () => {
     // Bottom right of the panel, pointing downwind, 8 px + 1.4 px per m/s long, with the speed under it (demo 1311–1316).
     const t = flatTerrain({ n: 1024 });
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: { ...CLEAR_WEATHER, windFromDeg: 270, windSpeedTenthMs: 100 } };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: { ...CLEAR_WEATHER, windFromDeg: 270, windSpeedTenthMs: 100 }, viewshed: null };
     const shaft = (m: MapMarks) => draw(t, FULL_VIEW, m).strokes.at(-1)!.map(([x, y]) => [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]);
     expect(shaft(marks)).toEqual([[467, 478], [489, 478]]); // from the west: blowing east
     expect(draw(t, FULL_VIEW, marks).texts).toContainEqual({ text: '10m/s', x: 478, y: 498 });
@@ -179,7 +179,7 @@ describe('F-06', () => {
 
   test('B3: 훈련 지도의 기러기가 아는 위치', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m: the post (5120, 1800) at (256, 422)
-    const base: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5000, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'training', missions: [], tick: 0, weather: CLEAR_WEATHER };
+    const base: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5000, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'training', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
     const label = (m: MapMarks) => draw(t, FULL_VIEW, m).texts.find((x) => x.text === '기러기가 아는 위치');
     // 훈련: 120 m off, the post 기러기 knows is marked where it is; within 30 m, or in 표준, it is not.
     expect(label(base)).toMatchObject({ x: 258, y: 426 });
@@ -215,6 +215,7 @@ describe('F-06', () => {
       missions: [],
       tick: sim.state.tick,
       weather: CLEAR_WEATHER,
+      viewshed: null,
     });
 
     // 표준: where it is stays unknown; only the bearing it was last seen on, 7.5 km out from the post, dashed.
@@ -263,6 +264,7 @@ describe('F-06', () => {
       missions: sim.state.missions,
       tick: sim.state.tick,
       weather: CLEAR_WEATHER,
+      viewshed: null,
     });
     const t = flatTerrain();
     const crossAt = (r: ReturnType<typeof draw>, x: number, y: number) =>

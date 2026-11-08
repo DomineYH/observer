@@ -1,7 +1,7 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { underCanopy, validateReplay, type ReplayData } from '@sim';
+import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
 import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
@@ -22,7 +22,7 @@ import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
-import { HeadBand } from '@ui/HeadBand';
+import { HeadBand, type Speed } from '@ui/HeadBand';
 import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
@@ -124,13 +124,32 @@ const step = () => {
   if (due && !s.reportDue && !readBack) say([SKIPPED]);
   if (lines.length) log = [...log, ...lines];
 };
-let lastPublish = 0;
-startLoop(step, (now) => {
-  frameListeners.forEach((draw) => draw(now));
-  if (now - lastPublish < PUBLISH_MS) return;
-  lastPublish = now;
+// 배속 and 일시정지: how fast the loop steps, never an input (spec: not recorded). A new object on each change.
+let pace: { speed: Speed; paused: boolean } = { speed: 1, paused: false };
+const setPace = (p: Partial<typeof pace>) => {
+  pace = { ...pace, ...p };
   listeners.forEach((l) => l());
-});
+};
+let lastPublish = 0;
+startLoop(
+  step,
+  (now) => {
+    frameListeners.forEach((draw) => draw(now));
+    if (now - lastPublish < PUBLISH_MS) return;
+    lastPublish = now;
+    listeners.forEach((l) => l());
+  },
+  () => (pace.paused ? 0 : pace.speed),
+);
+
+const TRAINING_WARNING = '표준 모드 작전 중에 훈련 모드를 켜면 이 판은 저장만 되고 랭킹에서 제외됩니다. 계속할까요?';
+/** 모드 전환 (F-14): an input. Turning training on in a standard operation asks first, the first time (demo 1407). */
+function switchMode(m: Mode): void {
+  const s = game.sim.state;
+  if (m === s.mode || pace.paused) return;
+  if (m === 'training' && s.phase === 'live' && !s.trainingUsed && !confirm(TRAINING_WARNING)) return;
+  game.session.send({ a: 'mode', v: [m] });
+}
 
 let colours = terrainColours(terrain, game.init.weather);
 
@@ -164,12 +183,27 @@ function App() {
   const lines = useSyncExternalStore(subscribe, () => log);
   const callsign = useSyncExternalStore(subscribe, () => NAMES.callsign);
   const ended = useSyncExternalStore(subscribe, () => result);
+  const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
+  const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
+  // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
+  const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
   return (
     <>
       {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} />}
       <TickCounter tick={tick} />
-      <HeadBand tick={tick} score={score} rounds={rounds} />
+      <HeadBand
+        tick={tick}
+        score={score}
+        rounds={rounds}
+        mode={mode}
+        speed={speed}
+        paused={paused}
+        phase={phase}
+        onMode={switchMode}
+        onSpeed={(s) => setPace({ speed: s })}
+        onPause={() => setPace({ paused: !paused })}
+      />
       <SoundToggles sound={sound} />
       <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} />
       <RankingDialog archive={archive} callsign={callsign} />
@@ -184,6 +218,8 @@ function App() {
         send={send}
         onFrame={onFrame}
         showFps={showFps}
+        covered={covered}
+        friends={BASE_SCENARIO.friends}
       />
       <PrepPanel
         state={{ phase, op, picked, reportDue }}
@@ -198,10 +234,18 @@ function App() {
         preset={preset}
         onPreset={(p) => void changeWeather(p)}
       />
-      <TargetList platoons={sim.state.platoons} /* re-rendered with the tick above */ />
-      <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
-      <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={sim.state.mode} send={send} state={sim.state} />
-      <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
+      <TargetList platoons={sim.state.platoons} mode={mode} /* re-rendered with the tick above */ />
+      <div hidden={covered}>
+        <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
+      </div>
+      {covered ? (
+        <section aria-label="입력기">
+          <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
+        </section>
+      ) : (
+        <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} />
+      )}
+      <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
     </>
   );
 }

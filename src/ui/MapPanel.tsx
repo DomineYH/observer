@@ -1,15 +1,25 @@
 // 지도 패널 (F-06, demo lines 1258–1320, 1390–1420): the map with the briefing and the post, zoomed by wheel or buttons
 // and dragged. Pressing it picks the 관측소 후보 in prep; once started it reads the 좌표자.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Input, Point, ReadonlySimState, Scenario, TerrainData, Weather } from '@sim';
 import { drawMap, MAP_PX, mapBase } from '@render/map';
 import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView } from '@render/mapView';
 import { fovOf } from '@render/projection';
+import { viewshed } from '@render/viewshed';
 import { BLOCKED, moveLabel } from './post';
 import { gridLabel } from './radio/readings';
 
 const REDRAW_MS = 120; // the demo's map rate
 const DRAG_PX = 5; // a press that moves farther is a drag, not a click
+const VS_CELLS = 192; // 가시권 cells across the map (demo); one sweep is ~37k 가시선, a few hundred ms
+
+/** The 가시권 pixels as an image for the map to draw. */
+function viewshedImage(t: TerrainData, op: Point) {
+  const image = document.createElement('canvas');
+  image.width = image.height = VS_CELLS;
+  image.getContext('2d')!.putImageData(new ImageData(viewshed(t, op, VS_CELLS) as Uint8ClampedArray<ArrayBuffer>, VS_CELLS), 0, 0);
+  return { image, g: VS_CELLS };
+}
 
 export interface MapPanelProps {
   terrain: TerrainData;
@@ -25,6 +35,15 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
   const [view, setView] = useState<MapView>(FULL_VIEW);
   const [pin, setPin] = useState<(Point & { e: number; n: number }) | null>(null);
   const [base, setBase] = useState<HTMLCanvasElement | null>(null);
+  // 가시권 표시, training only (demo 1405: off again in standard). It is worked out from where the post stands, not
+  // while it walks.
+  const training = state.mode === 'training';
+  const [vsOn, setVsOn] = useState(false);
+  if (!training && vsOn) setVsOn(false);
+  const [from, setFrom] = useState(state.op);
+  if (state.post.state !== 'moving' && from !== state.op) setFrom(state.op);
+  const shownVs = training && vsOn;
+  const vs = useMemo(() => (shownVs ? viewshedImage(terrain, from) : null), [shownVs, terrain, from]);
 
   useEffect(() => {
     const { n } = terrain;
@@ -37,8 +56,8 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather });
-  }, [terrain, base, view, scenario, state, pin, weather]);
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs });
+  }, [terrain, base, view, scenario, state, pin, weather, vs]);
 
   useEffect(() => {
     draw();
@@ -117,6 +136,12 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
         </button>
         <output aria-label="지도 배율">×{Math.round(view.z * 10) / 10}</output>
       </div>
+      {training && (
+        <label>
+          <input type="checkbox" checked={vsOn} onChange={(e) => setVsOn(e.target.checked)} /> 가시권 표시{' '}
+          <small>(훈련 전용 · 관측소에서 보이지 않는 땅을 어둡게)</small>
+        </label>
+      )}
       {pin && (
         <p>
           좌표자: {gridLabel(terrain.grid.letters, pin)}

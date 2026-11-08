@@ -2,9 +2,9 @@
 // the 화질 buttons, and a tap that names a target by its angles (demo lines 1185–1234, 1336–1342, 1370–1389).
 // Panels never step the simulation.
 import { useEffect, useRef, useState } from 'react';
-import type { Input, ReadonlySimState, TerrainData, Weather } from '@sim';
+import type { Input, Point, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
-import { drawOverlay, drawRain, rainStreaks, splashOf } from '@render/overlay';
+import { drawOverlay, drawRain, friendLabels, rainStreaks, splashOf } from '@render/overlay';
 import { angleAt, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
 import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
@@ -29,10 +29,16 @@ export interface ObservationViewProps {
   /** 화질, the player's choice: held above the view so a new game (which remounts it) keeps it. */
   quality: Quality;
   onQuality: (q: Quality) => void;
+  /** 표준 모드 일시정지: the view is hidden and neither draws nor takes keys. */
+  covered: boolean;
+  /** 아군 진지, labelled in training. */
+  friends: readonly Point[];
 }
 
-export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, onQuality }: ObservationViewProps) {
+export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, onQuality, covered, friends }: ObservationViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const hidden = useRef(covered); // read by the frame and key listeners, which outlive a render
+  hidden.current = covered;
   const [bino, setBino] = useState(state.bino);
   // Made once: it starts from the simulation's aim and remembers the value it sent last.
   const [aim] = useState(() => createAimControl(state, send));
@@ -64,8 +70,9 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       }
       const on = aim.bino();
       setBino(on);
-      if (state.phase === 'prep') {
-        // Before the post is occupied the view stays dark (demo 1194); the candidate preview is a later slice.
+      if (hidden.current) return;
+      // Before the post is occupied the view stays dark (demo 1194); training previews the 관측소 후보 (demo 939).
+      if (state.phase === 'prep' && !(state.mode === 'training' && state.picked)) {
         c.fillStyle = '#0b0e0a';
         c.fillRect(0, 0, W, H);
         c.fillStyle = '#8b947c';
@@ -82,6 +89,15 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       c.drawImage(low, 0, 0, W, H);
       drawSprites(c, spritesOf(state, geom, terrain, weather), W / buf.w, on, dpr, fog); // only what the simulation sees
       drawRain(c, rainStreaks(weather, a.h, W, H, dpr, now / 1000), dpr);
+      if (state.mode === 'training') {
+        // 훈련: our positions named where they stand (demo 1217)
+        const k = W / buf.w;
+        c.fillStyle = 'rgba(98,174,230,.95)';
+        c.textAlign = 'center';
+        c.font = `${Math.round(12 * dpr)}px monospace`;
+        for (const l of friendLabels(friends, geom, terrain)) c.fillText(`▼ 아군 ${l.n}소대`, l.sx * k, l.sy * k);
+        c.textAlign = 'left';
+      }
       if (fps !== null) {
         frames++;
         if (now - since >= 1000) {
@@ -103,10 +119,11 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         c.textAlign = 'left';
       }
     });
-  }, [quality, terrain, colours, weather, state, aim, onFrame, showFps]);
+  }, [quality, terrain, colours, weather, state, aim, onFrame, showFps, friends]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (hidden.current) return;
       if (aim.key(e.key, e.shiftKey)) e.preventDefault();
       else if (e.key === 'b' || e.key === 'B') aim.toggleBino();
       else if ((e.key === 'r' || e.key === 'R') && !e.repeat && state.phase === 'live') aim.lase();
@@ -118,7 +135,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
   // `travel`: how far the pointer has gone from where it went down, CSS pixels. Under 5 it is a tap, not a drag.
   const drag = useRef<{ x0: number; y0: number; x: number; y: number; travel: number } | null>(null);
   return (
-    <section aria-label="관측">
+    <section aria-label="관측" hidden={covered}>
       <canvas
         ref={ref}
         role="img"

@@ -279,6 +279,7 @@ describe('F-13: 종료', () => {
       postMoves: 0,
       compromised: false,
       score: sim.state.score,
+      mode: 'standard',
     });
   });
 });

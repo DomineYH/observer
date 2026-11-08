@@ -1,8 +1,18 @@
 // 겹쳐 그리는 표시 of the observation view (demo lines 1197–1229): the binocular mil reticle, the azimuth tape and the
 // time to impact. Positions come from milToPx, the renderer's own projection.
-import type { ReadonlySimState, Weather } from '@sim';
-import { MIL, milToPx } from './projection';
+import { heightAt, type Point, type ReadonlySimState, type TerrainData, type Weather } from '@sim';
+import { MIL, milToPx, project, type ViewGeometry } from './projection';
 import { hash } from './shade';
+
+const FRIEND_LABEL_M = 12; // above the ground (demo 1217)
+
+/** 훈련: where each 아군 진지 (numbered from 1) shows in the view, for its "▼ 아군 n소대" label; off-view ones are left out. */
+export function friendLabels(friends: readonly Point[], v: ViewGeometry, t: TerrainData): { n: number; sx: number; sy: number }[] {
+  return friends.flatMap((f, i) => {
+    const p = project(v, { x: f.x, y: f.y, z: heightAt(t, f.x, f.y) + FRIEND_LABEL_M });
+    return p && p.sx > 0 && p.sx < 2 * v.cx ? [{ n: i + 1, sx: p.sx, sy: p.sy }] : [];
+  });
+}
 
 /** 탄착까지 남은 초 (F-11, demo line 1229), rounded up; `urgent` from 5 s down (SPLASH 대용). */
 export interface Splash {

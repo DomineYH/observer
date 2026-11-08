@@ -16,7 +16,7 @@ const RECORD: GameRecord = {
   ticks: 30000, seed: 20261106, seedKind: 'daily', cleared: true, clearTick: 20000, roundsTotal: 30, missions: 3,
   adjustRounds: 4, firstErrorAvg: 20, directionErrorAvg: 5, reportAccuracyPct: 100, roundsPerUnit: 7.5, neutralized: 4,
   combatUnits: 4, earlyDefeats: 1, friendlyHits: 0, friendlyLosses: 0, dangerCloseMissed: 0, observerLost: false,
-  postMoves: 0, compromised: false, score: 2000,
+  postMoves: 0, compromised: false, score: 2000, mode: 'standard',
 };
 const run = (callsign: string, record: Partial<GameRecord> = {}): Submission => ({
   callsign,

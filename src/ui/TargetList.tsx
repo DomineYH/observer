@@ -1,5 +1,5 @@
 // 표적 탭 (demo lines 1088–1099): the units found, in the order found, described only as far as they have been watched.
-import type { Activity, ReadonlySimState, Unit, UnitType } from '@sim';
+import type { Activity, Mode, ReadonlySimState, Unit, UnitType } from '@sim';
 import { clock } from './clock';
 
 const STAGE = ['', '탐지', '병종 식별', '적정 확인'] as const;
@@ -15,7 +15,10 @@ const SIZE: Record<Unit, (n: number) => string> = {
   none: () => '(문수 미상)',
 };
 
-export function TargetList({ platoons }: { platoons: ReadonlySimState['platoons'] }) {
+/** 훈련: the share of the unit still alive (demo `strength`, 1095), %. */
+const strength = (ms: readonly { alive: boolean }[]) => Math.round((100 * ms.filter((m) => m.alive).length) / ms.length);
+
+export function TargetList({ platoons, mode }: { platoons: ReadonlySimState['platoons']; mode: Mode }) {
   const found = platoons.filter((p) => p.intel.stage > 0).sort((a, b) => a.intel.tnum - b.intel.tnum);
   return (
     <section aria-label="표적 목록">
@@ -28,6 +31,7 @@ export function TargetList({ platoons }: { platoons: ReadonlySimState['platoons'
               <b>표적 {I.tnum}</b> {desc}
               <br />
               {STAGE[I.stage]} · 최초 탐지 {clock(I.firstTick)} · 마지막 관측 {clock(I.seenTick)}
+              {mode === 'training' && I.stage >= 2 && ` · (훈련: 전투력 ${strength(p.members)}%)`}
             </li>
           );
         })}

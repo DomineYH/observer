@@ -84,6 +84,8 @@ export interface MapMarks {
   missions: ReadonlySimState['missions'];
   tick: number;
   weather: Weather; // its wind is drawn as an arrow
+  /** 훈련 가시권 표시: `viewshed()` pixels as an image `g` cells across, or null. */
+  viewshed: { image: CanvasImageSource; g: number } | null;
 }
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
@@ -144,6 +146,11 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     const y = my(v.y + v.r) - 4;
     c.strokeText(v.name, x, y);
     c.fillText(v.name, x, y);
+  }
+  if (marks?.viewshed) {
+    const q = marks.viewshed.g / t.n;
+    c.imageSmoothingEnabled = true;
+    c.drawImage(marks.viewshed.image, view.x0 * q, view.y0 * q, span * q, span * q, 0, 0, W, W);
   }
   if (marks) {
     drawMarks(c, marks, k, mx, my);

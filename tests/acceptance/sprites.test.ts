@@ -131,7 +131,7 @@ function mapBoxes(sim: Sim, scenario: MapMarks['scenario'], t: TerrainData) {
     set: () => true,
   }) as unknown as MapContext;
   const s = sim.state;
-  const marks: MapMarks = { scenario, op: s.op, knownOp: s.knownOp, dest: null, az: s.aim.az, fovMil: 1066, pin: null, platoons: s.platoons, mode: s.mode, missions: s.missions, tick: s.tick, weather: CLEAR_WEATHER };
+  const marks: MapMarks = { scenario, op: s.op, knownOp: s.knownOp, dest: null, az: s.aim.az, fovMil: 1066, pin: null, platoons: s.platoons, mode: s.mode, missions: s.missions, tick: s.tick, weather: CLEAR_WEATHER, viewshed: null };
   drawMap(ctx, t, {} as CanvasImageSource, FULL_VIEW, marks);
   return rects.filter((r) => r[2] === 14 && r[3] === 8);
 }
