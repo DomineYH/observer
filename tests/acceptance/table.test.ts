@@ -8,6 +8,7 @@ import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { dist, mortarAt, oneUnit, run, started, until } from './enemy';
 import { init, START } from './init';
 import { flatTerrain } from './terrain';
+import { declaredNames } from '../lint/testNames';
 
 // A straight approach from the north onto the observer's position, 3 km long (as the F-12 tests).
 const NORTH = [
@@ -160,8 +161,13 @@ const ROWS: [string, string, string][] = [
 // "155mm 견인포" has no model value (the simulation has no calibre); the PRD's "시드 4242" run is not reproduced (spec).
 
 test('수치표: 모든 행에 테스트', () => {
+  // A name counts only as a test the file declares: the ROWS literal itself, comments and other strings do not.
+  const rowsOnly = "const ROWS = [['적 · 편제', 'x.test.ts', '수치표: 빠진 행 — 적 편제']]; // test('수치표: 빠진 행 — 적 편제')";
+  expect(declaredNames(rowsOnly)).not.toContain('수치표: 빠진 행 — 적 편제');
   const root = new URL('../..', import.meta.url).pathname;
-  const missing = ROWS.filter(([, file, name]) => !readFileSync(root + file, 'utf8').includes(`'${name}'`));
+  const declared = new Map<string, string[]>();
+  const namesIn = (file: string) => declared.get(file) ?? declared.set(file, declaredNames(readFileSync(root + file, 'utf8'), file)).get(file)!;
+  const missing = ROWS.filter(([, file, name]) => !namesIn(file).includes(name));
   expect(missing).toEqual([]);
   // All 32 rows of the table and the 몬테카를로 paragraph are listed (a row may need several tests).
   expect(new Set(ROWS.map(([row]) => row.replace(/ \(.*\)$/, ''))).size).toBe(33);
