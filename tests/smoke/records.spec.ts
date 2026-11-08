@@ -77,15 +77,16 @@ test('F-08: 호출부호 반영', async ({ page }) => {
   await expect(page.getByLabel('호출부호', { exact: true })).toHaveValue('참새12');
 });
 
-test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', async ({ page }) => {
-  // The shortest end the app allows: 효력사 on our own post. 기러기 applies 위험근접 and adjusts first; one correction
-  // with 효력사 brings the volley onto the post and our rounds take out the 관측반 (about 2 min of game time).
-  test.setTimeout(300_000);
+/** The shortest end the app allows: 효력사 on our own post. 기러기 applies 위험근접 and adjusts first; one correction
+ * with 효력사 brings the volley onto the post and our rounds take out the 관측반 (about 2 min of game time). `prep`
+ * runs once the 관측소 후보 is picked, before 작전 개시. Returns the 사후강평. */
+const endOnOwnPost = async (page: Page, prep: () => Promise<void> = async () => {}) => {
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await prep();
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
   const log = page.getByRole('region', { name: '무전 기록' });
   await expect(log).toContainText('감명 양호', { timeout: 15_000 });
@@ -113,6 +114,12 @@ test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', a
   const debrief = page.getByRole('region', { name: '사후강평' });
   await expect(debrief).toBeVisible({ timeout: 150_000 });
   await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
+  return debrief;
+};
+
+test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', async ({ page }) => {
+  test.setTimeout(300_000);
+  const debrief = await endOnOwnPost(page);
   await expect(debrief).toContainText('저장했습니다 · 연습 시드: 랭킹에서는 제외');
   const [, rounds, score] = (await debrief.textContent())!.match(/사용 탄 (\d+)발 · 점수 (-?\d+) · 시드 연습 20261106/)!;
   await debrief.getByText('전송 데이터 미리보기').click();
@@ -192,4 +199,36 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 문자열은 �
   await expect(rows.filter({ hasText: '<b>x</b>' })).toHaveCount(2); // on the board and in 내 기록, as characters
   await expect(rows.filter({ hasText: '<b>x</b>' }).first()).toContainText('1<b>x</b>5000점');
   await expect(dialog.locator('b')).toHaveCount(0);
+});
+
+test('F-30: 기상 변경은 판을 새로 만든다 — 전송 데이터', async ({ page }) => {
+  // In 작전 준비: the sight turned and the binoculars on (cam and bino inputs of that game), then 안개.
+  test.setTimeout(300_000);
+  const debrief = await endOnOwnPost(page, async () => {
+    for (let k = 0; k < 4; k++) await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('b');
+    await expect(page.getByRole('button', { name: '쌍안경' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
+    await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('기상 시정 2.5 km');
+  });
+  await debrief.getByText('전송 데이터 미리보기').click();
+  const preview = debrief.getByLabel('전송 데이터');
+  await expect(preview).toBeVisible();
+  const checked = validateReplay(JSON.parse((await preview.textContent())!));
+  expect(checked.ok).toBe(true);
+  if (!checked.ok) return;
+  // The header carries 안개 (the preset's values, written out), and the 입력 기록 is the new game's: the candidate put in
+  // again, then 작전 개시; none of the old game's sight or binocular inputs.
+  expect(checked.data.weather).toEqual({
+    visibilityM: 2500, cloudPct: 100, windFromDeg: 180, windSpeedTenthMs: 7, tempTenthC: 40, precipTenthMmH: 0,
+    pressureHpa: 1020, humidityPct: 99,
+  });
+  const acts = checked.data.inputs.map((i) => i.a);
+  expect(acts.slice(0, 2)).toEqual(['pick', 'start']);
+  expect(acts).not.toContain('cam');
+  expect(acts).not.toContain('bino');
+  // And it is this game: replayed, it ends as the screen says, nothing ignored.
+  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO);
+  expect(again.ignored).toBe(0);
+  expect(again.record.observerLost).toBe(true);
 });
