@@ -5,6 +5,8 @@ import { silentVoice } from '@adapters/mock/voice';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, START } from '../../tests/acceptance/init';
 import { CALL_ADJUST, LOC, openRadio, started, toAdjust, toReady, untilImpact, untilSaid } from '../../tests/acceptance/mission';
+import { oneUnit, started as startedWith } from '../../tests/acceptance/enemy';
+import { flatTerrain } from '../../tests/acceptance/terrain';
 import { RadioLog } from './RadioLog';
 import { createSound } from './sound';
 
@@ -141,3 +143,29 @@ test('F-10: 소리를 끄면 폭음과 스퀠치가 없다', () => {
   expect(impact.tick).toBeGreaterThan(0);
   expect(played.slice(before)).toEqual([]);
 });
+
+test('F-10: 적 포탄 폭음', () => {
+  // The enemy mortar dug in 2.4 km north of the field, shelling our position 1.3 km from the post from 210 s (demo 505:
+  // heard distance ÷ 음속 later, ×1.6 quieter). Our own rounds keep their 폭음 (F-10: 폭음 지연); none fly here.
+  const FRIEND = { x: 1280, y: 1200 };
+  const scenario = { ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }), nais: [{ x: 1280, y: 2400, r: 100, conf: 'low' as const }], friends: [FRIEND] };
+  for (const effects of [true, false]) {
+    const { sim, sound, played } = listening(startedWith(scenario, { seed: 3, terrain: flatTerrain({ n: 256 }) }));
+    sound.set({ effects });
+    const heard = new Map<string, { tick: number; distance: number }>();
+    while (sim.state.tick < 6400) {
+      sim.step([]);
+      for (const e of sim.state.effects) {
+        const key = `${e.tick},${e.x},${e.y}`;
+        if (e.kind !== 'burst' || heard.has(key)) continue;
+        const d = Math.hypot(e.x - sim.state.op.x, e.y - sim.state.op.y);
+        heard.set(key, { tick: e.tick + Math.round((d / 343) * 20), distance: Math.max(60, d * 1.6) });
+      }
+    }
+    // Two volleys of three rounds have landed and been heard by tick 6400.
+    const due = [...heard.values()].filter((b) => b.tick <= 6400);
+    expect(due.length).toBeGreaterThanOrEqual(6);
+    const booms = played.filter((p) => p.kind === 'boom').map(({ tick, distance }) => ({ tick, distance }));
+    expect(booms).toEqual(effects ? due.sort((a, b) => a.tick - b.tick) : []);
+  }
+}, 30000);

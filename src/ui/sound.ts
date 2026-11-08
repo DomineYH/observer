@@ -1,5 +1,5 @@
 // 사건 → 소리: the squelch on every radio line, the 폭음 of a 탄착 heard distance ÷ 음속 later, 기러기's sentences read aloud.
-import type { Point, SimEvent } from '@sim';
+import type { FieldEffect, Point, SimEvent } from '@sim';
 import type { VoiceOutput } from '@adapters/index';
 import { radioSentence, spoken, type RadioNames } from './radio/sentence';
 
@@ -28,7 +28,7 @@ export function createSound(voice: VoiceOutput, effects: Effects, names: RadioNa
       Object.assign(settings, next);
     },
     /** One step's events, read with the state after that step. */
-    hear(events: readonly SimEvent[], state: { tick: number; op: Point }): void {
+    hear(events: readonly SimEvent[], state: { tick: number; op: Point; effects: readonly FieldEffect[] }): void {
       for (const e of events) {
         if (e.type === 'radio') {
           if (settings.effects) effects.squelch();
@@ -39,6 +39,12 @@ export function createSound(voice: VoiceOutput, effects: Effects, names: RadioNa
           booms.push({ due: e.tick + boomDelay(distance), distance });
         }
       }
+      // 적 포탄 (demo 505, 631): its burst is the only sign of it, heard ×1.6 quieter (at least 60 m, as the retaliation's).
+      for (const e of state.effects)
+        if (e.kind === 'burst' && e.small && e.tick === state.tick) {
+          const distance = Math.hypot(e.x - state.op.x, e.y - state.op.y);
+          booms.push({ due: e.tick + boomDelay(distance), distance: Math.max(60, distance * 1.6) });
+        }
       // The delay runs on the simulation's clock: a pause holds the 폭음, 배속 brings it sooner.
       const due = booms.filter((b) => b.due <= state.tick);
       booms = booms.filter((b) => b.due > state.tick);
