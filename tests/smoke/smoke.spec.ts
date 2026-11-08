@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, speedTo, tabTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
+  test.setTimeout(60_000); // 15 s alone, but near the default 30 s under parallel workers
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
   await page.goto('/?seed=20261106');
   const tick = page.getByRole('status', { name: '틱' });
