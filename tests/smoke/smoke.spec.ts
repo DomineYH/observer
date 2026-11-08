@@ -388,6 +388,8 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
   const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 40_000 });
   await expect(direction).toHaveValue('');
+  await expect(composer).toContainText('(10 m 단위)');
+  await expect(composer).toContainText('(50 m 단위)');
   await everyControlNamed(page); // 수정
   await expect(send).toBeDisabled();
   await direction.fill('0800');

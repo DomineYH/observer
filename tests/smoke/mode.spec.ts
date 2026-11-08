@@ -131,8 +131,10 @@ test('F-14: 훈련 숫자 병기', async ({ page }) => {
   await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
   // Standard: words only.
   await expect(preview).toHaveText('좌표 찰리호텔 넷칠둘공 삼하나오공, 이상.');
+  await expect(composer).toContainText('표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.');
   await button(page, '훈련').click();
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toContainText('훈련: 마지막 레이저 측정점의 좌표가 자동으로 들어갑니다. 극좌표는 레이저의 방위각·거리를 그대로 씁니다.');
   // The switch rebuilt the form (demo 1408–1409), so the grid goes in again.
   await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
   await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');

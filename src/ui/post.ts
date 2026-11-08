@@ -11,6 +11,12 @@ export const POSITION_HINT: Record<Mode, string> = {
   standard: '지도를 눌러 자기 위치를 좌표자로 읽어 넣으십시오.',
 };
 
+/** The 표적위치 hint (demo 966): where each field's value comes from. */
+export const LOCATION_HINT: Record<Mode, string> = {
+  training: '훈련: 마지막 레이저 측정점의 좌표가 자동으로 들어갑니다. 극좌표는 레이저의 방위각·거리를 그대로 씁니다.',
+  standard: '표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.',
+};
+
 /** The 위치 보고 is due and its form open: at idle, once the walk and the setup are over. */
 export const reportOpen = (stage: RadioStage, s: Pick<ReadonlySimState, 'post' | 'reportDue'>) => stage === 'idle' && s.post.state === 'ready' && s.reportDue;
 

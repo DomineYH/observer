@@ -34,7 +34,7 @@ const RANGE_LABEL = { drop: W.rangeDir.drop.text, add: W.rangeDir.add.text };
 const NEXT_LABEL = { adjust: W.warning.adjust.text, ffe: W.warning.ffe.text }; // 조정 · 효력사
 
 /** 좌우·사거리 and their meters, as typed: the correction and the 전이 forms share them. */
-export function Amounts({ form, set }: { form: Amount; set: (patch: Partial<Amount>) => void }) {
+export function Amounts({ form, set, dangerClose }: { form: Amount; set: (patch: Partial<Amount>) => void; dangerClose?: boolean }) {
   return (
     <>
       <select aria-label="좌우" value={form.lateralDir} onChange={(e) => set({ lateralDir: e.target.value as Amount['lateralDir'] })}>
@@ -44,7 +44,7 @@ export function Amounts({ form, set }: { form: Amount; set: (patch: Partial<Amou
           </option>
         ))}
       </select>
-      <input aria-label="좌우 거리" inputMode="numeric" size={4} value={form.lateral} onChange={(e) => set({ lateral: e.target.value })} /> m{' '}
+      <input aria-label="좌우 거리" inputMode="numeric" size={4} value={form.lateral} onChange={(e) => set({ lateral: e.target.value })} /> m <small>(10 m 단위)</small>{' '}
       <select aria-label="사거리" value={form.rangeDir} onChange={(e) => set({ rangeDir: e.target.value as Amount['rangeDir'] })}>
         {keys(RANGE_LABEL).map((k) => (
           <option key={k} value={k}>
@@ -52,7 +52,7 @@ export function Amounts({ form, set }: { form: Amount; set: (patch: Partial<Amou
           </option>
         ))}
       </select>
-      <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m{' '}
+      <input aria-label="사거리 거리" inputMode="numeric" size={4} value={form.range} onChange={(e) => set({ range: e.target.value })} /> m <small>(50 m 단위{dangerClose && ' · 위험근접: 100 m까지'})</small>{' '}
     </>
   );
 }
@@ -63,10 +63,11 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
   prefill: string;
   /** 수정 후 효력사: the 효과 seen, sent with the correction; 다음 is then 효력사. */
   effect?: Effect;
+  dangerClose?: boolean; // the mission's 위험근접 rules apply
 }
 
 /** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
-export function CorrectionForm({ sent, help, prefill, effect, names, mode, send }: CorrectionProps) {
+export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send }: CorrectionProps) {
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
     next: effect ? 'ffe' : 'adjust',
@@ -84,7 +85,7 @@ export function CorrectionForm({ sent, help, prefill, effect, names, mode, send 
       ) : (
         <p>방향 {String(sent).padStart(4, '0')} 밀 (송신함)</p>
       )}
-      <Amounts form={form} set={set} />
+      <Amounts form={form} set={set} dangerClose={dangerClose} />
       {!effect && (
               <select aria-label="다음" value={form.next} onChange={(e) => set({ next: e.target.value as CorrForm['next'] })}>
         {keys(NEXT_LABEL).map((k) => (

@@ -114,6 +114,7 @@ export async function fireOnOwnPost(page: Page, { at, fire }: { at?: (stage: Own
   }
   const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
+  await expect(composer).toContainText('(50 m 단위 · 위험근접: 100 m까지)'); // 기러기 applied 위험근접 (demo corrInputs)
   await direction.fill('1600');
   await composer.getByRole('combobox', { name: '좌우', exact: true }).selectOption('right');
   await composer.getByRole('textbox', { name: '좌우 거리' }).fill('40');

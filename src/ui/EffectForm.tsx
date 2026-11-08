@@ -16,7 +16,7 @@ const ROUNDS = [1, 2, 3]; // 재효력사 포대 1–3발 (demo)
 
 interface Props {
   state: Pick<ReadonlySimState, 'missions' | 'platoons'>;
-  mission: Pick<Mission, 'direction'>;
+  mission: Pick<Mission, 'direction' | 'dangerClose'>;
   prefill: string; // 방향 field's start, for a mission that has not sent one
   names: RadioNames;
   mode: Mode;
@@ -58,7 +58,7 @@ export function EffectForm({ state, mission, prefill, names, mode, send }: Props
       )}
       {action === 'corr' ? (
         // B1: a mission that never sent 방향 (바로 효력사) gets the 방향 field here.
-        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} names={names} mode={mode} send={send} />
+        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} />
       ) : (
         <Preview
           draft={action === 'eom' ? eomDraft(effect, name) : repeatDraft(effect, rounds, name)}

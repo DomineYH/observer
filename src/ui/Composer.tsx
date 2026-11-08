@@ -11,7 +11,7 @@ import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
 import { EffectForm } from './EffectForm';
 import { PositionForm } from './PositionForm';
-import { postStatus, reportOpen, staleKnown } from './post';
+import { LOCATION_HINT, postStatus, reportOpen, staleKnown } from './post';
 import { ShiftForm } from './ShiftForm';
 import { ignoreShortcut } from './shortcut';
 
@@ -137,6 +137,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {stage === 'adjust' && mission && (
           <CorrectionForm
             sent={mission.direction}
+            dangerClose={mission.dangerClose}
             help={mode === 'training' ? suggestion(deviation(state)) : null}
             prefill={prefillDirection({ mode, aim: state.aim })}
             names={names}
@@ -232,6 +233,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             </label>
           </>
         )}
+        {stage === 'loc' && <p>{LOCATION_HINT[mode]}</p>}
         {stage === 'loc' && method === 'polar' && staleKnown(state) && (
           <p>기러기는 관측소 위치를 다른 지점으로 알고 있습니다. 극좌표로 보낸 표적 위치가 어긋납니다.</p>
         )}
