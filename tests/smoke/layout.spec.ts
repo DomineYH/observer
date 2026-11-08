@@ -55,34 +55,53 @@ test.describe('좁은 화면', () => {
     await press('위 1밀');
     await press('아래 1밀');
     await gesture(page, [[await centre(pad.getByRole('button', { name: '오른쪽 1밀' }))]], 1000);
-    await page.waitForTimeout(400); // lifted: nothing more may come
+    // B straight after the lift: its 쌍안경 input marks the release in the record (its tick is the release's or later).
+    await page.keyboard.press('b');
+    await page.waitForTimeout(400);
 
-    // The exact aims come from the game's 재생 자료, which the 사후강평 shows once the game ends: every accepted 조준
-    // 입력 [az, el] in 0.1 mils. End it the shortest way, on the wide layout (the same page, nothing remounts).
+    // The exact aims come from the game's 재생 자료, which the 사후강평 shows once the game ends: every accepted input
+    // with its tick `t` (20 a second), 조준 입력 [az, el] in 0.1 mils. End it the shortest way, on the wide layout (the
+    // same page, nothing remounts).
     await page.setViewportSize({ width: 1280, height: 800 });
     const debrief = await fireOnOwnPost(page);
     await debrief.getByText('전송 데이터 미리보기').click();
-    const data = JSON.parse((await debrief.getByLabel('전송 데이터').textContent())!) as { inputs: { a: string; v: number[] }[] };
-    const cams = data.inputs.filter((i) => i.a === 'cam').map((i) => i.v);
+    type Rec = { t: number; a: string; v: number[] };
+    const inputs = (JSON.parse((await debrief.getByLabel('전송 데이터').textContent())!) as { inputs: Rec[] }).inputs;
+    const cams = inputs.filter((i) => i.a === 'cam');
 
     // From the opening aim 20.4 / −22 mils: each tap is exactly 1 mil on its own axis, in its direction.
-    expect(cams.slice(0, 4)).toEqual([
+    expect(cams.slice(0, 4).map((c) => c.v)).toEqual([
       [214, -220],
       [204, -220],
       [204, -210],
       [204, -220],
     ]);
-    // The hold: one step at once and one every 90 ms after 350 ms — 8 in a second (±2 for timer and input latency),
-    // each exactly 1 mil right of the one before; nothing after the lift.
+    // The hold: one step at once, the repeats from 350 ms on, one every 90 ms (the first lands at 440 ms) — 8 in the
+    // second held (±2 for timer and input latency), each exactly 1 mil right of the one before.
     const held = cams.slice(4);
     expect(held.length).toBeGreaterThanOrEqual(6);
     expect(held.length).toBeLessThanOrEqual(10);
-    expect(held).toEqual(held.map((_, i) => [214 + 10 * i, -220]));
+    expect(held.map((c) => c.v)).toEqual(held.map((_, i) => [214 + 10 * i, -220]));
+    // It stops at the lift: no 조준 입력 after the release mark.
+    const release = inputs.findIndex((i) => i.a === 'bino');
+    expect(release).toBeGreaterThan(inputs.indexOf(held.at(-1)!));
+    expect(inputs.slice(release).filter((i) => i.a === 'cam')).toEqual([]);
+    // Continuous over time: 440 ms ≈ 8.8 ticks to the first repeat (two ticks either way: the touch's own latency and
+    // the frame that steps it), then 90 ms ≈ 1.8 ticks apart, a tick either way.
+    const gaps = held.slice(1).map((c, i) => c.t - held[i]!.t);
+    expect(gaps[0]).toBeGreaterThanOrEqual(7);
+    expect(gaps[0]).toBeLessThanOrEqual(11);
+    for (const g of gaps.slice(1)) {
+      expect(g).toBeGreaterThanOrEqual(1);
+      expect(g).toBeLessThanOrEqual(3);
+    }
+    expect(inputs[release]!.t - held.at(-1)!.t).toBeLessThanOrEqual(3); // held right up to the lift
   });
 });
 
-/** The wide 머리띠 is one row (spec): every item's top within 3 px of the first, and the band one row high. */
-async function oneRow(page: Page) {
+/** The wide 머리띠 is one row (spec): every item's centre within 3 px of the first, and the band one row high. Where it
+ * `fits` (1280 px and up) the band does not scroll and every item lies inside the band's visible box. */
+async function oneRow(page: Page, fits: boolean) {
   const items = [page.getByRole('banner').getByText('OBSERVER'), ...alwaysShown(page).slice(0, 6), ...menuItems(page)];
   const boxes = [];
   for (const item of items) {
@@ -93,8 +112,18 @@ async function oneRow(page: Page) {
   const row = Math.max(...boxes.map((b) => b.height));
   // The band: the 머리띠's banner and its menu side by side; its inner height (no border, no scroll bar) is one row and
   // its padding.
-  const band = await page.getByRole('banner').evaluate((h) => h.parentElement!.clientHeight);
-  expect(band).toBeLessThanOrEqual(row + 8);
+  const band = await page.getByRole('banner').evaluate((h) => {
+    const b = h.parentElement!;
+    const r = b.getBoundingClientRect();
+    return { inner: b.clientHeight, scroll: b.scrollWidth, client: b.clientWidth, left: r.left, right: r.right };
+  });
+  expect(band.inner).toBeLessThanOrEqual(row + 8);
+  if (!fits) return;
+  expect(band.scroll).toBeLessThanOrEqual(band.client);
+  for (const b of boxes) {
+    expect(b.x).toBeGreaterThanOrEqual(band.left);
+    expect(b.x + b.width).toBeLessThanOrEqual(band.right);
+  }
 }
 
 test('레이아웃: 좁은 화면 경계', async ({ page }) => {
@@ -129,9 +158,11 @@ test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   await expect(subtitle).toBeVisible();
   for (const name of ['지도 패널', '작전 준비', '입력기', '표적 목록', '무전 기록']) await expect.poll(() => rendered(region(page, name))).toBe(true);
   await expect(page.getByRole('banner')).toContainText('포병 관측'); // the wide 머리띠, spread out
-  await oneRow(page);
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await oneRow(page);
+  await oneRow(page, false); // 768 px holds about two thirds of the row: it scrolls inside the band (report, for M1-H2)
+  for (const width of [1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await oneRow(page, true);
+  }
   // and back.
   await page.setViewportSize({ width: 767, height: 900 });
   await expect(tabs).toBeVisible();
@@ -254,7 +285,7 @@ test.describe('좁은 화면 머리띠', () => {
     for (const item of items) await expect(item).toBeVisible();
     await expect(items[5]!).toHaveText('오프라인');
     await expect(items[6]!).toHaveText('연습 20261106');
-    await expect(items[7]!).toHaveText('시정 24.0 km · 바람 285° 2.6 m/s');
+    await expect(items[7]!).toHaveText('시정 24.0km·바람 285° 2.6m/s');
     const handles = await Promise.all(items.map((i) => i.elementHandle()));
     const ordered = await page.evaluate((els) => els.every((e, i) => i === 0 || !!(els[i - 1]!.compareDocumentPosition(e!) & Node.DOCUMENT_POSITION_FOLLOWING)), handles);
     expect(ordered).toBe(true);
