@@ -56,9 +56,10 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
     );
     // The pick is tied to what the clock and the view show, not to timing: on this seed the mortar's volleys start at
     // ticks 4200, 5219, 6557 (its own stream: the same in every game), and from this aim a press picks the smoke 10–220
-    // ticks after a volley starts. For each volley: ×1 near it, 일시정지 before it for a clear look at the aim, again
-    // inside the window; while paused the smoke must be in the view, then the press (applied on 재개). A volley whose
-    // window the clock has already passed is skipped for the next one: 표적 1 within two volleys.
+    // ticks after a volley starts. For each volley: ×1 near it, 일시정지 before it for a clear look at the aim; then, in
+    // its window, again and again: 일시정지, and if the view at the aim differs from the clear look (the smoke), the press;
+    // 재개 for a few ticks (the press applies on the next step), and 표적 1 or the next look. Nothing in an attempt
+    // throws: a volley that gives no target leaves the game running for the next one. 표적 1 within two volleys.
     const view = page.getByRole('img', { name: '관측 화면' });
     const pause = page.getByRole('button', { name: '일시정지' });
     const resume = page.getByRole('button', { name: '재개' });
@@ -69,32 +70,39 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
         const d = c.getContext('2d')!.getImageData((c.width / 2 - 24) | 0, (c.height / 2 - 24) | 0, 48, 48).data;
         return Array.from(d).join();
       });
+    /** Whether the clock reaches `t` within `timeout` ms; never throws. */
+    const reaches = (t: number, timeout = 30_000) => tickAtLeast(page, t, timeout).then(() => true, () => false);
+    const found = () => targets.getByText(/^표적 1/).waitFor({ timeout: 1_000 }).then(() => true, () => false);
+    const running = async () => {
+      if (await resume.isVisible()) await resume.click();
+    };
     const tryVolley = async (at: number) => {
+      await running();
       await speedTo(page, 8);
-      await tickAtLeast(page, at - 400, 90_000);
+      if (!(await reaches(at - 400, 90_000))) return false;
       await speedTo(page, 1);
-      await tickAtLeast(page, at - 100, 30_000);
+      if (!(await reaches(at - 100))) return false;
       await pause.click();
-      if ((await ticks(page)) >= at) {
-        await resume.click();
-        return false; // no clear look left before this volley
-      }
+      const before = await ticks(page);
       const clear = await atAim();
       await resume.click();
-      await tickAtLeast(page, at + 30, 30_000);
-      await pause.click();
-      if ((await ticks(page)) > at + 200) {
+      if (before >= at) return false; // no clear look left before this volley
+      if (!(await reaches(at + 10))) return false;
+      for (;;) {
+        await pause.click();
+        const t = await ticks(page);
+        if (t > at + 215) break; // the window is over
+        if ((await atAim()) !== clear) {
+          // The smoke is in the view: press it.
+          const v = (await view.boundingBox())!;
+          await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
+        }
         await resume.click();
-        return false; // past this volley's window
+        await reaches(t + 15, 10_000);
+        if (await found()) return true;
       }
-      await expect.poll(atAim).not.toBe(clear); // the smoke is in the view
-      const v = (await view.boundingBox())!;
-      await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
-      await resume.click();
-      return targets.getByText(/^표적 1/).waitFor({ timeout: 10_000 }).then(
-        () => true,
-        () => false,
-      );
+      await running();
+      return false;
     };
     expect((await tryVolley(4200)) || (await tryVolley(5219))).toBe(true);
     await expect(targets).toContainText('표적 1');
