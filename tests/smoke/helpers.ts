@@ -81,23 +81,37 @@ export async function speedTo(page: Page, n: 1 | 2 | 4 | 8) {
   await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
 }
 
+/** Where `fireOnOwnPost` stops for the caller's own steps: before the 위치 보고 is skipped, before the call goes, before
+ * the grid is typed. */
+export type OwnPostStage = 'report' | 'call' | 'loc';
+
 /** The shortest end the app allows, from a started game at 찰리호텔 4512 3256 just after 작전 개시: 효력사 on our own post.
  * 기러기 applies 위험근접 and adjusts first; one correction with 효력사 brings the volley onto the post and our rounds take
- * out the 관측반 (about 2 min of game time). Returns the 사후강평. */
-export async function fireOnOwnPost(page: Page) {
+ * out the 관측반 (about 2 min of game time). Returns the 사후강평. `at` runs at each stage; with `fire` the mission goes
+ * 지명사 and `fire` sends 준비 쏴 each time 기러기 waits for it (the adjusting round, then the 효력사). */
+export async function fireOnOwnPost(page: Page, { at, fire }: { at?: (stage: OwnPostStage) => Promise<void>; fire?: () => Promise<void> } = {}) {
   const log = page.getByRole('region', { name: '무전 기록' });
   await expect(log).toContainText('감명 양호', { timeout: 15_000 });
   const composer = page.getByRole('region', { name: '입력기' });
   const send = composer.getByRole('button', { name: '송신' });
+  await at?.('report');
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+  await at?.('call');
   await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await at?.('loc');
   await composer.getByRole('textbox', { name: '동', exact: true }).fill('4512');
   await composer.getByRole('textbox', { name: '북', exact: true }).fill('3256');
   await send.click();
   await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
+  if (fire) await composer.getByRole('combobox', { name: '통제' }).selectOption('amc');
   await send.click();
+  const ready = composer.getByRole('button', { name: '준비 쏴' });
+  if (fire) {
+    await expect(ready).toBeVisible({ timeout: 60_000 });
+    await fire();
+  }
   const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
   await direction.fill('1600');
@@ -107,6 +121,10 @@ export async function fireOnOwnPost(page: Page) {
   await composer.getByRole('textbox', { name: '사거리 거리' }).fill('60');
   await composer.getByRole('combobox', { name: '다음' }).selectOption('ffe');
   await send.click();
+  if (fire) {
+    await expect(ready).toBeVisible({ timeout: 60_000 });
+    await fire();
+  }
 
   const debrief = page.getByRole('region', { name: '사후강평' });
   await expect(debrief).toBeVisible({ timeout: 150_000 });
@@ -157,4 +175,12 @@ export async function everyControlNamed(page: Page) {
     await expect(c).toHaveRole(native as Parameters<Page['getByRole']>[0]);
     await expect(c).toHaveAccessibleName(/\S/);
   }
+}
+
+/** One accepted input of the 재생 자료: its tick `t`, kind `a` and values `v` (aims in 0.1 mil). */
+export type Recorded = { t: number; a: string; v?: number[] };
+/** Every accepted input of the game, from the 사후강평's 전송 데이터 (the 재생 자료 as it would be sent). */
+export async function recordedInputs(debrief: Locator): Promise<Recorded[]> {
+  await debrief.getByText('전송 데이터 미리보기').click();
+  return (JSON.parse((await debrief.getByRole('group', { name: '전송 데이터' }).textContent())!) as { inputs: Recorded[] }).inputs;
 }
