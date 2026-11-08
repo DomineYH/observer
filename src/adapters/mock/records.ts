@@ -1,6 +1,6 @@
 // 기록 보관소 mock (demo lines 1457–1460, 1495–1503; PRD 10.2): this browser's runs plus fake rows, ranked by board.
-import type { Effect } from '@sim';
-import type { Board, MissionSummary, RankRow, RecordArchive, RunRecord, StoredRun } from '../index';
+import type { Effect, GameRecord } from '@sim';
+import type { Board, MissionSummary, RankRow, RecordArchive, StoredRun } from '../index';
 
 const fake = (
   callsign: string,
@@ -54,14 +54,14 @@ const flag = (x: unknown) => typeof x === 'boolean';
 // Stored values are checked as strings before any lookup: a key lookup would coerce, and `{ toString: null }` throws.
 const oneOf = (...xs: string[]) => (x: unknown) => typeof x === 'string' && xs.includes(x);
 // Every field a stored 판 기록 must have, and its type; a missing key fails its check.
-const RECORD: Record<keyof RunRecord, (x: unknown) => boolean> = {
+const RECORD: Record<keyof GameRecord, (x: unknown) => boolean> = {
   ticks: count, seed: count, seedKind: oneOf('daily', 'practice'), cleared: flag, clearTick: countOrNull,
   roundsTotal: count, missions: count, adjustRounds: count, firstErrorAvg: countOrNull, directionErrorAvg: countOrNull,
   reportAccuracyPct: countOrNull, roundsPerUnit: countOrNull, neutralized: count, combatUnits: count, earlyDefeats: count,
   friendlyHits: count, friendlyLosses: count, dangerCloseMissed: count, observerLost: flag, postMoves: count,
   compromised: flag, score: count, mode: oneOf('training', 'standard'),
 };
-const RECORD_KEYS = Object.keys(RECORD) as (keyof RunRecord)[];
+const RECORD_KEYS = Object.keys(RECORD) as (keyof GameRecord)[];
 const EFFECTS: Record<Effect, true> = { destroyed: true, neutralized: true, ineffective: true }; // the compiler keeps it whole
 // 임무 요약, field by field as RECORD.
 const MISSION: Record<keyof MissionSummary, (x: unknown) => boolean> = {
@@ -85,7 +85,7 @@ const isRun = (r: unknown, isReplay: (x: unknown) => boolean): r is StoredRun =>
   isReplay(r.replay) &&
   fits(r.record, RECORD_KEYS, RECORD);
 /** 랭킹 자격 (PRD 10.2): 표준 모드 and 일일 시드, read off the record itself. */
-const rankable = (r: RunRecord) => r.mode === 'standard' && r.seedKind === 'daily';
+const rankable = (r: GameRecord) => r.mode === 'standard' && r.seedKind === 'daily';
 const byTime = (a: RankRow, z: RankRow) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0);
 
 export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isReplay: (x: unknown) => boolean): RecordArchive {

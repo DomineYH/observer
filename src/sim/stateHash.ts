@@ -3,9 +3,8 @@ import { Hasher } from './hash';
 import { STREAMS } from './rng';
 import { ACTS } from './queue';
 import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, LOCATION_METHODS, NEXTS, RANGE_DIRS, TARGET_TYPES, UNITS, WARNINGS, type Target } from './radio';
-import type { Cue, FieldEffect, Member, Mode, Phase, PlatoonState, PostState, RadioStage, RouteKey, Shooter, SimState, UnitType } from './types';
+import { MODES, type Cue, type FieldEffect, type Member, type Phase, type PlatoonState, type PostState, type RadioStage, type RouteKey, type Shooter, type SimState, type UnitType } from './types';
 
-const MODES: readonly Mode[] = ['training', 'standard'];
 const PHASES: readonly Phase[] = ['prep', 'live', 'ended'];
 const POST_STATES: readonly PostState[] = ['ready', 'moving', 'setup'];
 const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
@@ -280,6 +279,7 @@ export function hashState(state: SimState): string {
     h.u32(ACTS.indexOf(q.act));
   }
   h.u32(MODES.indexOf(state.mode));
+  h.u32(bit(state.trainingUsed));
   h.i32(state.aim.az);
   h.i32(state.aim.el);
   h.u32(bit(state.bino));

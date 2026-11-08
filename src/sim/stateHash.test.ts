@@ -202,3 +202,13 @@ test('상태 해시: 섬멸 시각·종료 예정 틱·진지 돌파가 해시�
   ];
   for (const [k, change] of changes) expect(differs(change), k).not.toBe(base);
 });
+
+test('상태 해시: 모드와 훈련 사용이 해시에 든다', () => {
+  const state = structuredClone(started().state) as SimState;
+  const base = hashState(state);
+  const used = structuredClone(state);
+  used.trainingUsed = true;
+  const training = structuredClone(state);
+  training.mode = 'training';
+  expect(new Set([base, hashState(used), hashState(training)]).size).toBe(3);
+});

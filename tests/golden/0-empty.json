@@ -2,7 +2,7 @@
   "terrainHash": "069cd970fa0564a1",
   "replay": {
     "format": 1,
-    "simVersion": 16,
+    "simVersion": 17,
     "seed": 20261106,
     "seedKind": "daily",
     "scenario": {
@@ -59,18 +59,19 @@
     "observerLost": false,
     "postMoves": 0,
     "compromised": false,
-    "score": 0
+    "score": 0,
+    "mode": "standard"
   },
   "ignored": 0,
-  "chain": "8f2deb0a83a57193",
+  "chain": "07dbf862da18e91b",
   "checkpoints": [
     {
       "tick": 200,
-      "hash": "d20c190fae54ba7a"
+      "hash": "6cadc13fc936ad1a"
     },
     {
       "tick": 400,
-      "hash": "e3a4cb22e4fbf4b3"
+      "hash": "520e9fe2d996da83"
     }
   ]
 }

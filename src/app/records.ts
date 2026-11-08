@@ -34,12 +34,11 @@ export const missionsOf = (missions: ReadonlySimState['missions']): MissionSumma
       report: m.report,
     }));
 
-/** What goes to 기록 보관소 once a game ends. The 모드 is the game's own until #38 puts it in the 판 기록 (there is no
- * `mode` input before then). */
+/** What goes to 기록 보관소 once a game ends. The 판 기록 carries the 모드 (training once used after 작전 개시). */
 export function submissionOf(callsign: string, sim: Sim, init: Omit<SimInit, 'terrain'>, log: readonly RecordedInput[]): Submission {
   return {
     callsign,
-    record: { ...sim.record(), mode: init.mode },
+    record: sim.record(),
     missions: missionsOf(sim.state.missions),
     replay: replayOf(init, log, sim.state.tick),
   };

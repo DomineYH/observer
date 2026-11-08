@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { validateReplay, type GameRecord } from '@sim';
 import { submissionOf } from '@app/records';
-import type { Board, RunRecord, Submission } from '../index';
+import type { Board, Submission } from '../index';
 import { replayData } from '../../../tests/acceptance/init';
 import { memoryStorage } from '../../../tests/acceptance/storage';
 import { NO_ENEMY, oneMission } from '../../../tests/acceptance/session';
@@ -18,14 +18,14 @@ const RECORD: GameRecord = {
   combatUnits: 4, earlyDefeats: 1, friendlyHits: 0, friendlyLosses: 0, dangerCloseMissed: 0, observerLost: false,
   postMoves: 0, compromised: false, score: 2000,
 };
-const run = (callsign: string, record: Partial<RunRecord> = {}): Submission => ({
+const run = (callsign: string, record: Partial<GameRecord> = {}): Submission => ({
   callsign,
   record: { ...RECORD, mode: 'standard', ...record },
   missions: [],
   replay: replayData([]),
 });
 /** A run as the archive keeps it, with its own time. */
-const stored = (callsign: string, record: Partial<RunRecord>, createdAt: string, ranked = true) => ({ ...run(callsign, record), createdAt, ranked });
+const stored = (callsign: string, record: Partial<GameRecord>, createdAt: string, ranked = true) => ({ ...run(callsign, record), createdAt, ranked });
 const seeded = (runs: unknown[]) => {
   const storage = memoryStorage();
   storage.setItem('observer.runs', JSON.stringify(runs));

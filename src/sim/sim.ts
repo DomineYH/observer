@@ -17,7 +17,7 @@ import { createStreams } from './rng';
 import { hashState } from './stateHash';
 import { updateVisibility } from './visibility';
 import type { RadioEvent } from './radio';
-import type { ImpactEvent, PostNote, Sim, SimInit, SimState, StepResult } from './types';
+import type { ImpactEvent, Mode, PostNote, Sim, SimInit, SimState, StepResult } from './types';
 
 export const STEP_MS = 50;
 const VIS_TICKS = 6;
@@ -48,6 +48,7 @@ export function createSim(init: SimInit): Sim {
     effects: [],
     targets: 0,
     mode: init.mode,
+    trainingUsed: false, // set by the step once live
     score: 0,
     aim: { ...INITIAL_AIM },
     bino: false,
@@ -84,6 +85,12 @@ export function createSim(init: SimInit): Sim {
       const accepted = inputs.map((input) => {
         if (!isValid(input) || state.phase === 'ended') return false; // unknown kind or malformed value, or over: ignored
         const a = input.a;
+        if (a === 'mode') {
+          const m = input.v![0] as Mode;
+          if (m === state.mode) return false; // already in it
+          state.mode = m;
+          return true;
+        }
         if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom' || a === 'shift') return applyRadio(state, ctx, a, input.v);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'move') return applyMove(state, ctx, v);
@@ -101,6 +108,7 @@ export function createSim(init: SimInit): Sim {
         }
         return true;
       });
+      if (state.phase !== 'prep' && state.mode === 'training') state.trainingUsed = true;
       if (state.phase === 'live') {
         state.tick++; // 작전 준비: the clock stands still
         updatePost(state, ctx); // the post walks first: this tick's sight is from where it now stands

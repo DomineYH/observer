@@ -4,6 +4,7 @@ export { createSim, STEP_MS } from './sim';
 export { signalAt } from './visibility';
 export type { StreamName } from './rng';
 export type * from './types';
+export { MODES } from './types';
 export { replay, validateReplay, CHECKPOINT_TICKS } from './replay';
 export { COVER, EYE_HEIGHT, heightAt, surfaceAt, lineOfSight, terrainHash, underCanopy } from './terrain';
 export { moveCheck, planMove, type MoveBlock } from './post';

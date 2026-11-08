@@ -4,7 +4,8 @@ import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
 
 export type SeedKind = 'daily' | 'practice';
-export type Mode = 'training' | 'standard';
+export const MODES = ['training', 'standard'] as const;
+export type Mode = (typeof MODES)[number];
 
 export interface Ref {
   id: string;
@@ -316,6 +317,8 @@ export interface SimState {
   effects: FieldEffect[]; // oldest first
   targets: number; // units found so far: the last 표적 번호 given
   mode: Mode;
+  /** In training at some tick from 작전 개시 on: the 판 기록 is a training one (switching in 작전 준비 is free). */
+  trainingUsed: boolean;
   score: number;
   /** 조준 last accepted: azimuth 0–63999 and elevation −2000–2000, in 0.1 mils. */
   aim: { az: number; el: number };
@@ -354,6 +357,7 @@ export interface GameRecord {
   postMoves: number; // 관측소 이동
   compromised: boolean; // 발각된 적이 있음
   score: number;
+  mode: Mode; // training once the game was in training mode after 작전 개시 (demo trainUsed || trainMode)
 }
 
 export interface Sim {

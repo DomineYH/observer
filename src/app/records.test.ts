@@ -3,7 +3,7 @@ import { replay, validateReplay, type SimInit } from '@sim';
 import { mockArchive } from '@adapters/mock/records';
 import { init, START } from '../../tests/acceptance/init';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, POS_SKIP } from '../../tests/acceptance/mission';
-import { NO_ENEMY, oneMission, play } from '../../tests/acceptance/session';
+import { MISSION, NO_ENEMY, oneMission, play } from '../../tests/acceptance/session';
 import { memoryStorage } from '../../tests/acceptance/storage';
 import { replayOf, submissionOf } from './records';
 
@@ -36,7 +36,8 @@ test('F-30: 랭킹 자격 — 시뮬레이션에서 온 기록', async () => {
   practice.take(START);
   for (let k = 0; k < 10; k++) practice.step();
   const sub = submissionOf('참새12', daily.sim, { ...init(20261106), scenario: NO_ENEMY }, daily.session.log);
-  expect(sub.record).toEqual({ ...daily.sim.record(), mode: 'standard' });
+  expect(sub.record).toEqual(daily.sim.record());
+  expect(sub.record.mode).toBe('standard');
   expect(sub.replay.inputs).toEqual(daily.session.log);
   // 임무 요약: the one mission, its 18 rounds as the events showed them.
   expect(sub.missions).toEqual([
@@ -51,4 +52,31 @@ test('F-30: 랭킹 자격 — 시뮬레이션에서 온 기록', async () => {
     ['참새34', 'practice'],
     ['참새12', 'daily'],
   ]);
+});
+
+test('F-30: 랭킹 자격 — 작전 개시 뒤 훈련으로 바꾼 판은 저장만 된다', async () => {
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
+  const at = { ...init(20261106), scenario: NO_ENEMY };
+  const TRAINING = { a: 'mode', v: ['training'] };
+  const STANDARD = { a: 'mode', v: ['standard'] };
+  // Standard daily, switched to training after 작전 개시 and back: stored, not ranked.
+  const switched = play(at);
+  switched.take(START);
+  switched.take(TRAINING);
+  switched.take(STANDARD);
+  for (const input of MISSION) switched.take(input);
+  // Switched in 작전 준비 only, and back before 작전 개시: still a standard game.
+  const free = play(at);
+  free.take(TRAINING);
+  free.take(STANDARD);
+  free.take(START);
+  for (const input of MISSION) free.take(input);
+
+  const a = await archive.submit(submissionOf('참새12', switched.sim, at, switched.session.log));
+  const b = await archive.submit(submissionOf('참새34', free.sim, at, free.session.log));
+  expect([a.record.mode, a.ranked]).toEqual(['training', false]);
+  expect([b.record.mode, b.ranked]).toEqual(['standard', true]);
+  expect((await archive.board('total')).map((r) => r.callsign)).toContain('참새34');
+  expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새12');
+  expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새34', '참새12']);
 });

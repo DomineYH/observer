@@ -1,5 +1,5 @@
 // 다섯 이음매(지형 원천·기상 원천·계정·기록 보관소·음성 출력)의 인터페이스와 mock 구현 자리. 각 슬라이스가 더한다.
-import type { Effect, GameRecord, Mode, ReplayData, SeedKind, Speaker, TerrainData, Weather } from '@sim';
+import type { Effect, GameRecord, ReplayData, SeedKind, Speaker, TerrainData, Weather } from '@sim';
 
 /** 지형 원천: one 지형 자료 per seed, finished. */
 export interface TerrainSource {
@@ -30,11 +30,6 @@ export interface Account {
   claim(callsign: string): Promise<{ ok: true; callsign: string } | { ok: false; reason: CallsignRejection }>;
 }
 
-/** 판 기록 with the game's 모드. #38 adds `mode` to GameRecord (training once used); then this is GameRecord. */
-export interface RunRecord extends GameRecord {
-  mode: Mode;
-}
-
 /** 임무 요약 (PRD 10.2): one per mission that fired. */
 export interface MissionSummary {
   targetNumber: number | null;
@@ -49,7 +44,7 @@ export interface MissionSummary {
 /** What 기록 보관소 receives for an ended game. */
 export interface Submission {
   callsign: string;
-  record: RunRecord;
+  record: GameRecord;
   missions: MissionSummary[];
   replay: ReplayData;
 }

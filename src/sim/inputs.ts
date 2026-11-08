@@ -1,7 +1,7 @@
 // 입력 종류 and their value formats (재생 자료 format 1, spec 입력 기록). The one kind table: the replay format check
 // and the simulation's step both use it. Kinds are added by the slices that use them.
 import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, LATERAL_DIRS, NEXTS, RANGE_DIRS, SLOT_RANGES, TARGET_TYPES, WARNINGS } from './radio';
-import type { Input } from './types';
+import { MODES, type Input } from './types';
 
 /** An integer in range, or one of the enum identifiers (ASCII strings, spec 열거형 식별자). */
 type Field = readonly [min: number, max: number] | readonly string[];
@@ -46,6 +46,7 @@ const FORMATS = new Map<string, Format>([
   ['move', [[[0, 99999], [0, 99999]]]], // 관측소 이동: 동 · 북 m
   ['pos', [[range('easting'), range('northing')]]], // 위치 보고: 동 · 북 4자리
   ['pos_skip', [[]]], // 위치 보고 생략: no values
+  ['mode', [[MODES]]], // 모드: training · standard
 ]);
 
 function fits(f: Field, x: unknown): boolean {
