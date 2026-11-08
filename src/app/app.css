@@ -140,6 +140,7 @@ input {
   align-items: center;
   font-size: 12px;
   word-spacing: -2px; /* a monospace space is a full cell; 5 px still parts words */
+  letter-spacing: -0.5px; /* the longest callsign fits 1280 px also on CI's wider fonts (about 65 px wider than local) */
   border-bottom: 1px solid var(--line);
   padding-bottom: 6px;
   /* Spec: the wide 머리띠 is one row. It fits from about 1280 px; on a narrower wide screen it scrolls sideways
@@ -192,6 +193,7 @@ input {
   .band {
     display: contents;
     word-spacing: normal;
+    letter-spacing: normal;
   }
   .band > header {
     grid-area: head;
