@@ -246,6 +246,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
 });
 
 test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {
+  test.setTimeout(90_000); // 통신 점검, 15.5 s of watching and three transmissions with 기러기's answers
   await page.goto('/?seed=20261106');
   // On this seed the enemy mortar section digs in at about (5676, 7520) from the start. From an open post about
   // 820 m south-east of it, (6450, 7250), six of its crew are seen by eye (found with a Node run of the simulation).
@@ -270,6 +271,35 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   await view.click({ position: { x: v.width / 2, y: v.height / 2 } });
   await expect(targets).toContainText('표적 1 미상');
   await expect(targets).toContainText('탐지 · 최초 탐지');
+
+  // Watched through the binoculars it is identified (type after 5.5 s, size after 15.5 s), and the 사격요구 goes on
+  // the identified target with the composer's non-default values: 바로 효력사, then the 박격포반 as 표적성질. The log
+  // holds each observer line exactly as the preview showed it.
+  await page.keyboard.press('b');
+  await expect(page.getByRole('button', { name: '쌍안경' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(targets).toContainText('적정 확인', { timeout: 30_000 });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  const composer = page.getByRole('region', { name: '입력기' });
+  const preview = composer.getByRole('status', { name: '보낼 문장' });
+  const transmit = async () => {
+    const said = (await preview.textContent())!;
+    await composer.getByRole('button', { name: '송신' }).click();
+    await expect(log.locator('li', { hasText: `갈매기 ${said}` })).toHaveCount(1);
+    return said;
+  };
+  await expect(log).toContainText('감명 양호', { timeout: 15_000 });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click(); // not the planned post (F-21)
+  await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
+  expect(await transmit()).toBe('기러기, 여기는 갈매기, 효력사, 이상.');
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4567');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3752');
+  expect(await transmit()).toBe('좌표 찰리호텔 넷오여섯칠 삼칠오둘, 이상.');
+  const kind = composer.getByRole('combobox', { name: '표적성질' });
+  const mortar = (await kind.locator('option', { hasText: '박격포' }).getAttribute('value'))!;
+  await kind.selectOption(mortar);
+  expect(await transmit()).toMatch(/박격포/);
+  await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 });
 });
 
 test('F-07: F 키', async ({ page, context }) => {
