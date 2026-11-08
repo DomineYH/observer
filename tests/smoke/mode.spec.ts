@@ -678,3 +678,115 @@ test('F-07: 전이사격은 모드 전환에 다시 채워진다 — 화면', as
   await expect(direction).toHaveValue('');
   await expect(composer.getByRole('combobox', { name: '경고명령' })).toHaveValue('adjust');
 });
+
+test('F-07: 훈련 일시정지는 입력기를 다시 채운다 — 화면', async ({ page }) => {
+  // The pause button re-renders the form each way (demo 1410). Training only: a standard pause hides the form.
+  test.setTimeout(60_000);
+  const { composer, log, send } = await toCall(page);
+  await switchTo(page, '훈련');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  const east = composer.getByRole('textbox', { name: '동', exact: true });
+  const north = composer.getByRole('textbox', { name: '북', exact: true });
+  await east.fill('1111');
+  await north.fill('2222');
+  // The clock alone rebuilds nothing: many ticks and publishes later the typed values stand.
+  await page.waitForTimeout(1000);
+  await expect(east).toHaveValue('1111');
+  await expect(north).toHaveValue('2222');
+
+  await button(page, '일시정지').click();
+  await expect(east).toHaveValue('4512');
+  await expect(north).toHaveValue('3256');
+  await east.fill('1111');
+  await button(page, '재개').click();
+  await expect(east).toHaveValue('4512');
+});
+
+test('F-07: 표적위치의 레이저는 입력기를 다시 채운다 — 화면', async ({ page }) => {
+  // A hit at the location step re-renders the form (demo 1067–1073, 957–963); a lase with no reflection returns first.
+  test.setTimeout(60_000);
+  const { composer, log, send } = await toCall(page);
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  const east = composer.getByRole('textbox', { name: '동', exact: true });
+  const north = composer.getByRole('textbox', { name: '북', exact: true });
+  const grid = composer.getByRole('radio', { name: '좌표', exact: true });
+  const polar = composer.getByRole('radio', { name: '극좌표' });
+  const azimuth = composer.getByRole('textbox', { name: '방위각' });
+  const distance = composer.getByRole('textbox', { name: '거리' });
+  await east.fill('1111');
+  await polar.check();
+  await azimuth.fill('0800');
+
+  const panel = page.getByRole('region', { name: '관측' });
+  const laser = panel.getByRole('button', { name: '레이저' });
+  const reading = panel.getByRole('group', { name: '레이저 측정' }).locator('p');
+  // Out of the fields: an arrow key in one is the field's.
+  const blur = () => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+  // At the sky: no reflection, and the form as it was.
+  await blur();
+  for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+ArrowUp');
+  await page.waitForTimeout(200);
+  await laser.click();
+  await expect(reading).toContainText('반사 없음');
+  await page.waitForTimeout(300);
+  await expect(polar).toBeChecked();
+  await expect(azimuth).toHaveValue('0800');
+
+  // At the ground: a hit. Back to 좌표 on the map's last point, with 극좌표 holding the new lase.
+  await blur();
+  for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+ArrowDown');
+  await page.waitForTimeout(200);
+  await laser.click();
+  await expect(reading).toContainText('· 거리 ');
+  await expect(grid).toBeChecked();
+  await expect(east).toHaveValue('4512');
+  await expect(north).toHaveValue('3256');
+  const [, az, dist] = (await reading.textContent())!.match(/방위각 (\d{4}) 밀 · 거리 ([\d,]+) m/)!;
+  await polar.check();
+  await expect(azimuth).toHaveValue(az!);
+  await expect(distance).toHaveValue(dist!.replace(/,/g, ''));
+});
+
+test('F-07: 새 임무는 입력기를 처음부터 채운다 — 화면', async ({ page }) => {
+  // Each 교신 단계 change re-renders the form (demo 703), so nothing of a finished mission is offered for the next.
+  test.setTimeout(180_000);
+  const { composer, log, send } = await toCall(page);
+  const warning = composer.getByRole('combobox', { name: '경고명령' });
+  await warning.selectOption('ffe');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByRole('radio', { name: '극좌표' }).check();
+  await composer.getByRole('textbox', { name: '방위각' }).fill('0800');
+  await composer.getByRole('textbox', { name: '거리' }).fill('6000');
+  await send.click();
+  const rounds = composer.getByRole('combobox', { name: '발수' });
+  await expect(rounds).toBeVisible({ timeout: 15_000 });
+  await rounds.selectOption('1');
+  await composer.getByRole('combobox', { name: '신관' }).selectOption('quick');
+  await send.click();
+  await speedTo(page, 8);
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+  await speedTo(page, 1);
+  await composer.getByRole('combobox', { name: '효과' }).selectOption('ineffective');
+  await send.click(); // 임무끝
+
+  // The next mission, from the top: 조정; 좌표 on the map's last point, 극좌표 empty; 포대 3발, no 신관 asked.
+  await expect(warning).toBeVisible({ timeout: 15_000 });
+  await expect(warning).toHaveValue('adjust');
+  await send.click();
+  await expect(log.getByText('좌표 송신바람')).toHaveCount(2, { timeout: 15_000 });
+  await expect(composer.getByRole('radio', { name: '좌표', exact: true })).toBeChecked();
+  await expect(composer.getByRole('textbox', { name: '동', exact: true })).toHaveValue('4512');
+  await composer.getByRole('radio', { name: '극좌표' }).check();
+  await expect(composer.getByRole('textbox', { name: '방위각' })).toHaveValue('');
+  await expect(composer.getByRole('textbox', { name: '거리' })).toHaveValue('');
+  await composer.getByRole('radio', { name: '좌표', exact: true }).check();
+  await send.click();
+  await expect(rounds).toBeVisible({ timeout: 15_000 });
+  await expect(rounds).toHaveValue('3');
+  await expect(composer.getByRole('combobox', { name: '신관' })).toHaveValue('none');
+});
+

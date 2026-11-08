@@ -459,7 +459,9 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
   await send.click();
   await expect(log.locator('li').last()).toContainText(said!);
   await expect(composer.getByRole('combobox', { name: '경고명령' })).toBeVisible();
-  await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.'); // the form keeps the last mission's values
+  // A new mission's form starts on 조정 (demo 703, 947–950), so 효력사 is chosen again.
+  await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
+  await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.');
 
   await test.step('F-21: 관측소 이동과 위치 보고', async () => {
     // After 임무끝 the post may move: press the map 1 px east of it (a few metres: the shortest walk the map gives; B2

@@ -194,6 +194,9 @@ function App() {
   // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
+  // Every form starts again whenever the demo calls renderComposer for it: a mode change, a 교신 단계 change, the post
+  // setting off, arriving or set up, each pause toggle, and a lase hit at 표적위치. Never on a tick: typing stands.
+  const composerKey = [mode, stage, sim.state.post.state, paused, stage === 'loc' ? sim.state.lases.find((l) => l.range)?.tick : ''].join();
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
   const point = useMemo(() => pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null), [pin, picked, op]);
@@ -266,8 +269,7 @@ function App() {
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            // A mode change rebuilds every form from its start, as the demo re-renders them (demo 1408–1409).
-            <Composer key={mode} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
+            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} transfer={transfer} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>

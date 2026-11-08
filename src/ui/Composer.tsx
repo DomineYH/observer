@@ -48,36 +48,22 @@ interface Props {
   transfer?: { e: number; n: number } | null;
 }
 
+/** Holds each form's fields from their start: `composerKey` remounts it whenever the demo rebuilds the form. */
 export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, transfer }: Props) {
   const [warning, setWarning] = useState<Warning>('adjust');
-  // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966); typing keeps
-  // its values until the next such lase.
+  // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966).
   const hit = state.lases.find((l): l is Hit => l.range !== null);
   const fill = hit && filled(hit, gridRef);
   const [method, setMethod] = useState<'grid' | 'polar'>('grid');
   // 표적위치 opens on the lase in training, else on the map's last point (demo 958–959).
-  const openGrid = () => (fill && mode === 'training' ? fill.grid : pin ? { e: four(pin.e), n: four(pin.n) } : { e: '', n: '' });
-  const [grid, setGrid] = useState(openGrid);
+  const [grid, setGrid] = useState(() => (fill && mode === 'training' ? fill.grid : pin ? { e: four(pin.e), n: four(pin.n) } : { e: '', n: '' }));
   const [polar, setPolar] = useState(fill?.polar ?? { az: '', dist: '' });
-  const [lastHit, setLastHit] = useState(hit);
-  if (hit !== lastHit) {
-    setLastHit(hit);
-    if (fill) {
-      setPolar(fill.polar);
-      if (mode === 'training') setGrid(fill.grid);
-    }
-  }
-  const [lastStage, setLastStage] = useState(stage);
-  if (stage !== lastStage) {
-    setLastStage(stage);
-    if (stage === 'loc') setGrid(openGrid());
-  }
   const [lastTransfer, setLastTransfer] = useState(transfer);
   if (transfer !== lastTransfer) {
     setLastTransfer(transfer);
     if (transfer && stage === 'loc') setGrid({ e: four(transfer.e), n: four(transfer.n) });
   }
-  const [target, setTarget] = useState('') // an option's JSON; a sent form keeps its values for the next mission;
+  const [target, setTarget] = useState(''); // an option's JSON
   const [rounds, setRounds] = useState(3);
   const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
   const [control, setControl] = useState<Control>('ready');
