@@ -19,7 +19,7 @@ function shown(stage: 'idle' | 'loc' | 'desc', platoons: Parameters<typeof targe
   const html = renderToStaticMarkup(
     <Composer stage={stage} live platoons={platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [], ...POST }} initial={initial} />,
   );
-  return text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  return text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
 }
 /** The sentence of a log line, without its time and speaker. */
 const logged = (e: RadioEvent) =>
@@ -199,7 +199,7 @@ test('F-07: 임무끝 — 입력기', () => {
   const html = renderToStaticMarkup(<Composer stage="effect" live platoons={sim.state.platoons} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={sim.state} />);
   expect(html).toMatch(/<select aria-label="효과">.*<option value="neutralized" selected="">무력화<\/option>/);
   expect(html).toMatch(/<select aria-label="다음 조치">.*<option value="eom" selected="">임무끝<\/option><option value="repeat">재효력사<\/option><option value="corr">수정 후 효력사<\/option><\/select>/);
-  const preview = text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  const preview = text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
   expect(preview).toBe('임무끝, 적 보병소대 무력화.');
   const r = send(sim, { a: 'eom', v: ['neutralized'] });
   expect(r.ok).toBe(true);
@@ -215,7 +215,7 @@ test('F-05: 훈련 모드는 레이저 측정점의 좌표를 넣어 둔다', ()
     renderToStaticMarkup(
       <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit], ...POST }} />,
     );
-  const preview = (html: string) => text(html.match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  const preview = (html: string) => text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
   expect(preview(at('training'))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.'); // training adds the numerals
   expect(preview(at('standard'))).toBe('동·북 네 자리씩');
 });

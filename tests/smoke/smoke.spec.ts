@@ -15,9 +15,9 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await everyControlNamed(page);
 
   // 호출부호를 정하고 랭킹 창을 연다: the mock board's fake rows are marked, and 닫기 closes it.
-  await page.getByLabel('호출부호', { exact: true }).fill('참새12');
+  await page.getByRole('textbox', { name: '호출부호', exact: true }).fill('참새12');
   await page.getByRole('button', { name: '정하기' }).click();
-  await expect(page.getByLabel('현재 호출부호')).toHaveText('참새12');
+  await expect(page.getByRole('status', { name: '현재 호출부호' })).toHaveText('참새12');
   await page.getByRole('button', { name: '랭킹' }).click();
   const ranking = page.getByRole('dialog', { name: '랭킹' });
   await expect(ranking).toBeVisible();
@@ -314,7 +314,7 @@ test('F-05: R 키', async ({ page, context }) => {
   await other.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await other.keyboard.press('r');
   // The opening line of sight, 22 mils down, meets the ground: 방위각 0020, a range, no target.
-  const line = (view: typeof button) => view.getByLabel('레이저 측정').locator('p');
+  const line = (view: typeof button) => view.getByRole('group', { name: '레이저 측정' }).locator('p');
   await expect(line(button)).toContainText('레이저: 방위각 0020 밀 · 거리 ');
   await expect(line(key)).toContainText('레이저: 방위각 0020 밀 · 거리 ');
   expect(await line(key).textContent()).toBe(await line(button).textContent());
@@ -328,18 +328,18 @@ test('F-07: 극좌표 위치법 — 입력기', async ({ page }) => {
   await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.', { timeout: 10_000 }); // 5.5 s in
   const composer = page.getByRole('region', { name: '입력기' });
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click(); // not the planned post (F-21)
-  const preview = composer.getByLabel('보낼 문장');
+  const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 }); // 2.5–4 s after the call
 
   // A lase fills 극좌표; then the observer types their own 방위각 and 거리 (거리 goes out to the nearest 10 m).
   await view.getByRole('button', { name: '레이저' }).click();
-  await expect(view.getByLabel('레이저 측정').locator('p')).toContainText('레이저: 방위각 0020 밀');
-  await composer.getByLabel('극좌표').check();
-  await expect(composer.getByLabel('방위각')).toHaveValue('0020');
-  await composer.getByLabel('방위각').fill('0800');
-  await composer.getByLabel('거리').fill('1004');
+  await expect(view.getByRole('group', { name: '레이저 측정' }).locator('p')).toContainText('레이저: 방위각 0020 밀');
+  await composer.getByRole('radio', { name: '극좌표' }).check();
+  await expect(composer.getByRole('textbox', { name: '방위각' })).toHaveValue('0020');
+  await composer.getByRole('textbox', { name: '방위각' }).fill('0800');
+  await composer.getByRole('textbox', { name: '거리' }).fill('1004');
   await expect(preview).toHaveText('극좌표, 방위각 공팔공공, 거리 하나공공공, 이상.');
   const said = (await preview.textContent())!;
   await send.click();
@@ -355,14 +355,14 @@ test('스모크: 통신 점검 뒤 사격요구 세 송신에 사격준비 끝�
 
   // 준비되는 대로: the adjusting round goes by itself. Once it lands the correction form opens (standard mode: 방향 empty).
   await expect(log).toContainText('하나발 떳다', { timeout: 10_000 });
-  const direction = composer.getByLabel('방향');
+  const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 40_000 });
   await expect(direction).toHaveValue('');
   await everyControlNamed(page); // 수정
   await expect(send).toBeDisabled();
   await direction.fill('0800');
-  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
-  await composer.getByLabel('좌우 거리').fill('50');
+  await composer.getByRole('combobox', { name: '좌우', exact: true }).selectOption('right');
+  await composer.getByRole('textbox', { name: '좌우 거리' }).fill('50');
   await expect(preview).toHaveText('방향 공팔공공, 우로 오십, 이상.');
   await send.click();
   await expect(log).toContainText('방향 공팔공공, 우로 오십, 이상.');
@@ -373,10 +373,10 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
   // 사격준비 끝 24–38 s, the adjusting round about 20 s, 신관 사격준비 끝 14–22 s after the correction, 마감탄 떳다 ~25 s later.
   test.setTimeout(180_000);
   const { log, composer, preview, send } = await toReady(page, 'ready');
-  const direction = composer.getByLabel('방향');
+  const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 50_000 });
   await direction.fill('0800');
-  await composer.getByLabel('다음').selectOption('ffe');
+  await composer.getByRole('combobox', { name: '다음' }).selectOption('ffe');
   await expect(preview).toHaveText('방향 공팔공공, 동제원, 효력사, 이상.');
   await send.click();
   await expect(log).toContainText('방향 공팔공공, 동제원, 효력사, 잠깐대기.', { timeout: 10_000 });
@@ -387,9 +387,9 @@ test('스모크: 수정에 효력사를 붙여 효력사를 걸면 마감탄 떳
   await everyControlNamed(page); // 효과
 
   // 재효력사: the line the log shows is the one previewed, target name included, then 기러기's readback.
-  await composer.getByLabel('효과').selectOption('neutralized');
-  await composer.getByLabel('다음 조치').selectOption('repeat');
-  await composer.getByLabel('발수').selectOption('1');
+  await composer.getByRole('combobox', { name: '효과' }).selectOption('neutralized');
+  await composer.getByRole('combobox', { name: '다음 조치' }).selectOption('repeat');
+  await composer.getByRole('combobox', { name: '발수' }).selectOption('1');
   const said = (await preview.textContent())!;
   expect(said).toMatch(/^(표적|적 \S+) 무력화, 재효력사, 동제원, 포대 하나발, 이상\.$/);
   await send.click();
@@ -405,14 +405,14 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
 
   // B1: this mission never sent 방향, so 수정 후 효력사 asks for it and cannot go without it.
-  await composer.getByLabel('효과').selectOption('ineffective');
-  await composer.getByLabel('다음 조치').selectOption('corr');
-  const direction = composer.getByLabel('방향');
+  await composer.getByRole('combobox', { name: '효과' }).selectOption('ineffective');
+  await composer.getByRole('combobox', { name: '다음 조치' }).selectOption('corr');
+  const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toHaveValue('');
   await expect(send).toBeDisabled();
   await direction.fill('0800');
-  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
-  await composer.getByLabel('좌우 거리').fill('50');
+  await composer.getByRole('combobox', { name: '좌우', exact: true }).selectOption('right');
+  await composer.getByRole('textbox', { name: '좌우 거리' }).fill('50');
   await expect(preview).toHaveText('방향 공팔공공, 우로 오십, 효력사, 이상.');
   await send.click();
   await expect(log).toContainText('방향 공팔공공, 우로 오십, 효력사, 이상.');
@@ -420,13 +420,13 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
   await expect(log.locator('li', { hasText: '마감탄 떳다, 잠깐대기.' })).toHaveCount(2, { timeout: 90_000 }); // fired again
 
   // 임무끝: the preview is the line the log shows, and the composer is back to a new call.
-  await expect(composer.getByLabel('다음 조치')).toHaveValue('eom', { timeout: 60_000 });
-  await composer.getByLabel('효과').selectOption('destroyed');
+  await expect(composer.getByRole('combobox', { name: '다음 조치' })).toHaveValue('eom', { timeout: 60_000 });
+  await composer.getByRole('combobox', { name: '효과' }).selectOption('destroyed');
   const said = await preview.textContent();
   expect(said).toMatch(/^임무끝, .+ 파괴\.$/);
   await send.click();
   await expect(log.locator('li').last()).toContainText(said!);
-  await expect(composer.getByLabel('경고명령')).toBeVisible();
+  await expect(composer.getByRole('combobox', { name: '경고명령' })).toBeVisible();
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.'); // the form keeps the last mission's values
 
   await test.step('F-21: 관측소 이동과 위치 보고', async () => {
@@ -445,17 +445,17 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
     await expect(log).toContainText('갈매기, 여기는 기러기, 관측소 이동, 이상.', { timeout: 10_000 });
     await expect(log).toContainText('관측소 도착.', { timeout: 30_000 });
     await expect(composer).toContainText('관측 장비 설치 중');
-    await expect(composer.getByLabel('경고명령')).toHaveCount(0);
+    await expect(composer.getByRole('combobox', { name: '경고명령' })).toHaveCount(0);
     await expect(log).toContainText('관측소 설치 끝.', { timeout: 40_000 });
     const report = composer.getByRole('region', { name: '위치 보고' });
-    await report.getByLabel('동', { exact: true }).fill(e!);
-    await report.getByLabel('북', { exact: true }).fill(n!);
-    const said = (await report.getByLabel('보낼 문장').textContent())!;
+    await report.getByRole('textbox', { name: '동', exact: true }).fill(e!);
+    await report.getByRole('textbox', { name: '북', exact: true }).fill(n!);
+    const said = (await report.getByRole('status', { name: '보낼 문장' }).textContent())!;
     expect(said).toMatch(/^기러기, 여기는 갈매기, 관측소 이동 끝, 현 위치 좌표 찰리호텔 .+, 이상\.$/);
     await report.getByRole('button', { name: '송신' }).click();
     await expect(log.locator('li', { hasText: said })).toHaveCount(1);
     await expect(log).toContainText(said.replace('기러기, 여기는 갈매기', '갈매기, 여기는 기러기'), { timeout: 10_000 }); // 3–4 s
-    await expect(composer.getByLabel('경고명령')).toBeVisible();
+    await expect(composer.getByRole('combobox', { name: '경고명령' })).toBeVisible();
   });
 
   await test.step('F-07: 전이사격 — 입력기', async () => {
@@ -464,16 +464,16 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
     const shift = page.getByRole('region', { name: '전이사격' });
     await expect(shift).toContainText('기준: AB1001');
     await everyControlNamed(page);
-    const shiftPreview = shift.getByLabel('보낼 문장');
+    const shiftPreview = shift.getByRole('status', { name: '보낼 문장' });
     const shiftSend = shift.getByRole('button', { name: '송신' });
     await expect(shiftSend).toBeDisabled(); // standard mode: 방향 starts empty
-    await shift.getByLabel('방향').fill('0800');
-    await shift.getByLabel('좌우', { exact: true }).selectOption('right');
-    await shift.getByLabel('좌우 거리').fill('104');
-    await shift.getByLabel('사거리', { exact: true }).selectOption('add');
-    await shift.getByLabel('사거리 거리').fill('130');
-    await shift.getByLabel('발수').selectOption('2');
-    await shift.getByLabel('위험근접').check();
+    await shift.getByRole('textbox', { name: '방향' }).fill('0800');
+    await shift.getByRole('combobox', { name: '좌우', exact: true }).selectOption('right');
+    await shift.getByRole('textbox', { name: '좌우 거리' }).fill('104');
+    await shift.getByRole('combobox', { name: '사거리', exact: true }).selectOption('add');
+    await shift.getByRole('textbox', { name: '사거리 거리' }).fill('130');
+    await shift.getByRole('combobox', { name: '발수' }).selectOption('2');
+    await shift.getByRole('checkbox', { name: '위험근접' }).check();
     await expect(shiftPreview).toHaveText(/^전이, 표적번호 알파브라보 하나공공하나, 방향 공팔공공, 우로 하나백, .+, 포대 둘발, 위험근접, 효력사, 이상\.$/);
     const line = (await shiftPreview.textContent())!;
     await shiftSend.click();

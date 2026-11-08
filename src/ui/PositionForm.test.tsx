@@ -41,7 +41,7 @@ test('F-21: 위치 보고 — 입력기', () => {
   expect(r.accepted).toEqual([true]);
   const said = r.events.find((e): e is RadioEvent => e.type === 'radio')!;
   expect(said.utterance).toEqual(draft.utterance);
-  const preview = text(form('training').match(/<p aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
+  const preview = text(form('training').match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
   const logged = text(renderToStaticMarkup(<RadioLog lines={[said]} callsign="갈매기" gridLetters="CH" mode="training" />)).replace(/^\d\d:\d\d 갈매기 /, '');
   expect(logged).toBe(preview);
   expect(posDraft('404', '3032')).toBeNull();

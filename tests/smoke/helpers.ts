@@ -20,26 +20,26 @@ export async function toReady(page: Page, control: 'ready' | 'amc', warning: 'ad
   const composer = page.getByRole('region', { name: '입력기' });
   // Not the planned post: the 위치 보고 comes first and no call can go; going on without it keeps the planned post for
   // 극좌표 (F-21).
-  await expect(composer.getByLabel('경고명령')).toHaveCount(0);
+  await expect(composer.getByRole('combobox', { name: '경고명령' })).toHaveCount(0);
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
   await expect(log).toContainText('위치 보고 생략');
-  const preview = composer.getByLabel('보낼 문장');
+  const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
   await expect(preview).toHaveText('기러기, 여기는 갈매기, 조정, 이상.');
   if (warning === 'ffe') {
-    await composer.getByLabel('경고명령').selectOption('ffe');
+    await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
     await expect(preview).toHaveText('기러기, 여기는 갈매기, 효력사, 이상.');
   }
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 }); // 2.5–4 s after the call
   await everyControlNamed(page);
-  await composer.getByLabel('동', { exact: true }).fill('4720');
-  await composer.getByLabel('북', { exact: true }).fill('3150');
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
   await expect(preview).toContainText('찰리호텔 넷칠둘공 삼하나오공');
   await send.click();
-  await expect(composer.getByLabel('표적성질')).toHaveValue('{"targetType":"unknown"}');
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toHaveValue('{"targetType":"unknown"}');
   await everyControlNamed(page);
-  await composer.getByLabel('통제').selectOption(control);
+  await composer.getByRole('combobox', { name: '통제' }).selectOption(control);
   await expect(preview).toHaveText(control === 'amc' ? '미상 표적, 포대 삼발, 지명사, 이상.' : '미상 표적, 포대 삼발, 이상.');
   await send.click();
   await expect(log).toContainText('표적번호 알파브라보 하나공공하나', { timeout: 20_000 }); // 9–12 s
@@ -90,22 +90,22 @@ export async function fireOnOwnPost(page: Page) {
   const composer = page.getByRole('region', { name: '입력기' });
   const send = composer.getByRole('button', { name: '송신' });
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
-  await composer.getByLabel('경고명령').selectOption('ffe');
+  await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
-  await composer.getByLabel('동', { exact: true }).fill('4512');
-  await composer.getByLabel('북', { exact: true }).fill('3256');
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4512');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3256');
   await send.click();
-  await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
   await send.click();
-  const direction = composer.getByLabel('방향');
+  const direction = composer.getByRole('textbox', { name: '방향' });
   await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
   await direction.fill('1600');
-  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
-  await composer.getByLabel('좌우 거리').fill('40');
-  await composer.getByLabel('사거리', { exact: true }).selectOption('add');
-  await composer.getByLabel('사거리 거리').fill('60');
-  await composer.getByLabel('다음').selectOption('ffe');
+  await composer.getByRole('combobox', { name: '좌우', exact: true }).selectOption('right');
+  await composer.getByRole('textbox', { name: '좌우 거리' }).fill('40');
+  await composer.getByRole('combobox', { name: '사거리', exact: true }).selectOption('add');
+  await composer.getByRole('textbox', { name: '사거리 거리' }).fill('60');
+  await composer.getByRole('combobox', { name: '다음' }).selectOption('ffe');
   await send.click();
 
   const debrief = page.getByRole('region', { name: '사후강평' });
@@ -140,10 +140,21 @@ export async function tabTo(page: Page, target: Locator) {
   await expect(target).toBeFocused();
 }
 
-/** Every shown button, input, select and textarea on the page has an accessible name (its role is the native one), so a
- * test can find it by role and name. */
+/** Every shown button, input, select and textarea on the page has its native role (no explicit role that contradicts the
+ * tag) and an accessible name, so a test can find it by role and name. */
 export async function everyControlNamed(page: Page) {
   const controls = page.locator('button, input, select, textarea');
   expect(await controls.count()).toBeGreaterThan(0);
-  for (const c of await controls.all()) if (await c.isVisible()) await expect(c).toHaveAccessibleName(/\S/);
+  for (const c of await controls.all()) {
+    if (!(await c.isVisible())) continue;
+    const { native, explicit } = await c.evaluate((e) => {
+      const type = e instanceof HTMLInputElement ? e.type : '';
+      const INPUT: Record<string, string> = { checkbox: 'checkbox', radio: 'radio', number: 'spinbutton', range: 'slider', search: 'searchbox', button: 'button', submit: 'button', reset: 'button' };
+      const native = e.tagName === 'BUTTON' ? 'button' : e.tagName === 'SELECT' ? 'combobox' : e.tagName === 'TEXTAREA' ? 'textbox' : (INPUT[type] ?? 'textbox');
+      return { native, explicit: e.getAttribute('role') };
+    });
+    expect([null, native]).toContain(explicit);
+    await expect(c).toHaveRole(native as Parameters<Page['getByRole']>[0]);
+    await expect(c).toHaveAccessibleName(/\S/);
+  }
 }

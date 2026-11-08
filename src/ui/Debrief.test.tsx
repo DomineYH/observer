@@ -114,8 +114,8 @@ test('F-31: 미리보기는 재생 자료 형식 그대로', () => {
   while (g.sim.state.phase === 'live') g.step();
   const data = replayOf(at, g.session.log, g.sim.state.tick);
   const html = renderToStaticMarkup(view(g.sim, 'pending', data));
-  expect(html).toMatch(/<details><summary>전송 데이터 미리보기<\/summary><pre aria-label="전송 데이터">/);
-  const shown = html.match(/<pre aria-label="전송 데이터">([^<]*)<\/pre>/)![1]!.replace(/&(quot|#x27|lt|gt|amp);/g, (e) => ENTITIES[e]!);
+  expect(html).toMatch(/<details><summary>전송 데이터 미리보기<\/summary><pre role="group" aria-label="전송 데이터">/);
+  const shown = html.match(/<pre role="group" aria-label="전송 데이터">([^<]*)<\/pre>/)![1]!.replace(/&(quot|#x27|lt|gt|amp);/g, (e) => ENTITIES[e]!);
   const parsed: unknown = JSON.parse(shown);
   const checked = validateReplay(parsed);
   expect(checked.ok).toBe(true);

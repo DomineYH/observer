@@ -14,7 +14,7 @@ test('B7: 조합 키에서는 단축키 무시', async ({ page }) => {
   test.setTimeout(120_000);
   const { log } = await toReady(page, 'amc'); // 지명사: F would send 준비 쏴
   const view = page.getByRole('region', { name: '관측' });
-  const readout = view.getByLabel('레이저 측정');
+  const readout = view.getByRole('group', { name: '레이저 측정' });
   await blur(page);
   for (const mod of ['Control', 'Alt', 'Meta'])
     for (const k of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Shift+ArrowRight', 'b', 'r', 'f']) await page.keyboard.press(`${mod}+${k}`);
@@ -38,7 +38,7 @@ test('B7: 단축키는 단추와 같은 입력', async ({ page, context }) => {
   const [keys, buttons] = await Promise.all([toReady(page, 'amc'), toReady(other, 'amc')]);
   const kView = page.getByRole('region', { name: '관측' });
   const bView = other.getByRole('region', { name: '관측' });
-  const line = (view: typeof kView) => view.getByLabel('레이저 측정').locator('p');
+  const line = (view: typeof kView) => view.getByRole('group', { name: '레이저 측정' }).locator('p');
   const pad = (name: string) => bView.getByRole('group', { name: '1밀 조준' }).getByRole('button', { name });
   let before = '';
   /** `key` on one page, `n` presses of the 1밀 `button` on the other (Enter: one step each), then R and 레이저. */
@@ -94,7 +94,7 @@ test('B7: 초점에 따른 무시 조건', async ({ page }) => {
   test.setTimeout(60_000);
   const { log, composer, view } = await occupy(page);
   const bino = view.getByRole('button', { name: '쌍안경' });
-  const readout = view.getByLabel('레이저 측정');
+  const readout = view.getByRole('group', { name: '레이저 측정' });
   const keys = async (...k: string[]) => {
     for (const key of k) await page.keyboard.press(key);
   };
@@ -226,6 +226,6 @@ test.describe('좁은 화면', () => {
     await expect(targets).toBeFocused();
     await expect(targets).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press('r');
-    await expect(page.getByRole('region', { name: '관측' }).getByLabel('레이저 측정').locator('p')).toContainText('레이저: 방위각 0040 밀');
+    await expect(page.getByRole('region', { name: '관측' }).getByRole('group', { name: '레이저 측정' }).locator('p')).toContainText('레이저: 방위각 0040 밀');
   });
 });

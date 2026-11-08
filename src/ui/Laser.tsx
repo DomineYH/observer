@@ -16,7 +16,7 @@ export function LaseReadout({ lases, mode, grid }: { lases: Lases; mode: Mode; g
   if (!last) return null;
   const r = last.range;
   return (
-    <div aria-label="레이저 측정">
+    <div role="group" aria-label="레이저 측정">
       <p>
         {r
           ? `레이저: 방위각 ${az4(last.az)} 밀 · 거리 ${r.dist.toLocaleString()} m · 고저 ${r.vm} 밀${r.target ? ' · 표적 반사' : ''}${at(r)}`

@@ -83,7 +83,7 @@ export function Debrief({ state: s, record: r, grid, callsign, saved, replay }: 
       <details>
         <summary>전송 데이터 미리보기</summary>
         {/* The 재생 자료 as it is: 사람 검수 takes it out as a golden record. */}
-        <pre aria-label="전송 데이터">{JSON.stringify(replay, null, 2)}</pre>
+        <pre role="group" aria-label="전송 데이터">{JSON.stringify(replay, null, 2)}</pre>
       </details>
     </section>
   );

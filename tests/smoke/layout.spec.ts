@@ -48,7 +48,7 @@ test.describe('좁은 화면', () => {
     const debrief = await fireOnOwnPost(page);
     await debrief.getByText('전송 데이터 미리보기').click();
     type Rec = { t: number; a: string; v: number[] };
-    const inputs = (JSON.parse((await debrief.getByLabel('전송 데이터').textContent())!) as { inputs: Rec[] }).inputs;
+    const inputs = (JSON.parse((await debrief.getByRole('group', { name: '전송 데이터' }).textContent())!) as { inputs: Rec[] }).inputs;
     const cams = inputs.filter((i) => i.a === 'cam');
 
     // From the opening aim 20.4 / −22 mils: each tap is exactly 1 mil on its own axis, in its direction.

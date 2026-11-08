@@ -38,9 +38,9 @@ const cells = (row: ReturnType<Page['getByRole']>) => row.getByRole('cell').allT
 
 test('F-08: 호출부호 반영', async ({ page }) => {
   await page.goto('/?seed=20261106');
-  const field = page.getByLabel('호출부호', { exact: true });
+  const field = page.getByRole('textbox', { name: '호출부호', exact: true });
   const set = page.getByRole('button', { name: '정하기' });
-  const current = page.getByLabel('현재 호출부호');
+  const current = page.getByRole('status', { name: '현재 호출부호' });
   await expect(current).toHaveText('갈매기'); // the placeholder until one is set
   // Refused with its reason; the callsign stays.
   await field.fill('기러기');
@@ -70,12 +70,12 @@ test('F-08: 호출부호 반영', async ({ page }) => {
   await expect(log).not.toContainText('갈매기');
   const composer = page.getByRole('region', { name: '입력기' });
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
-  await expect(composer.getByLabel('보낼 문장')).toHaveText('기러기, 여기는 참새12, 조정, 이상.');
+  await expect(composer.getByRole('status', { name: '보낼 문장' })).toHaveText('기러기, 여기는 참새12, 조정, 이상.');
 
   // The same browser is not asked again.
   await page.reload();
-  await expect(page.getByLabel('현재 호출부호')).toHaveText('참새12');
-  await expect(page.getByLabel('호출부호', { exact: true })).toHaveValue('참새12');
+  await expect(page.getByRole('status', { name: '현재 호출부호' })).toHaveText('참새12');
+  await expect(page.getByRole('textbox', { name: '호출부호', exact: true })).toHaveValue('참새12');
 });
 
 /** From a fresh page: pick the 관측소 후보 north of 1번 고지, run `prep`, start, and end the game on our own post. */
@@ -96,7 +96,7 @@ test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', a
   await expect(debrief).toContainText('저장했습니다 · 연습 시드: 랭킹에서는 제외');
   const [, rounds, score] = (await debrief.textContent())!.match(/사용 탄 (\d+)발 · 점수 (-?\d+) · 시드 연습 20261106/)!;
   await debrief.getByText('전송 데이터 미리보기').click();
-  const preview = debrief.getByLabel('전송 데이터');
+  const preview = debrief.getByRole('group', { name: '전송 데이터' });
   await expect(preview).toBeVisible();
 
   // In Node: the text is 재생 자료 as it is, and replaying it gives this game with nothing ignored.
@@ -192,7 +192,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 전송 데이터', asyn
     await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('기상 시정 2.5 km');
   });
   await debrief.getByText('전송 데이터 미리보기').click();
-  const preview = debrief.getByLabel('전송 데이터');
+  const preview = debrief.getByRole('group', { name: '전송 데이터' });
   await expect(preview).toBeVisible();
   const checked = validateReplay(JSON.parse((await preview.textContent())!));
   expect(checked.ok).toBe(true);

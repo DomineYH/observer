@@ -21,7 +21,7 @@ export interface PreviewProps {
 export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
   return (
     <>
-      <p aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
+      <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
       <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
         송신
       </button>

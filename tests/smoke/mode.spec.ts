@@ -122,13 +122,13 @@ test('F-14: 훈련 숫자 병기', async ({ page }) => {
   await start(page);
   const log = page.getByRole('region', { name: '무전 기록' });
   const composer = page.getByRole('region', { name: '입력기' });
-  const preview = composer.getByLabel('보낼 문장');
+  const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
-  await composer.getByLabel('동', { exact: true }).fill('4720');
-  await composer.getByLabel('북', { exact: true }).fill('3150');
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
   // Standard: words only.
   await expect(preview).toHaveText('좌표 찰리호텔 넷칠둘공 삼하나오공, 이상.');
   await button(page, '훈련').click();
@@ -258,18 +258,18 @@ test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
   await button(page, '훈련').click();
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
-  await expect(composer.getByLabel('경고명령')).toBeVisible({ timeout: 15_000 }); // 통신 점검 done, no 위치 보고 owed
+  await expect(composer.getByRole('combobox', { name: '경고명령' })).toBeVisible({ timeout: 15_000 }); // 통신 점검 done, no 위치 보고 owed
   await paused({ a: 'call', v: ['ffe'] }, async () => {
-    await composer.getByLabel('경고명령').selectOption('ffe');
+    await composer.getByRole('combobox', { name: '경고명령' }).selectOption('ffe');
     await send.click();
   });
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
   await paused({ a: 'loc', v: ['grid', 4567, 3752] }, async () => {
-    await composer.getByLabel('동', { exact: true }).fill('4567');
-    await composer.getByLabel('북', { exact: true }).fill('3752');
+    await composer.getByRole('textbox', { name: '동', exact: true }).fill('4567');
+    await composer.getByRole('textbox', { name: '북', exact: true }).fill('3752');
     await send.click();
   });
-  await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
   await paused({ a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] }, () => send.click()); // the form's defaults: 미상 표적, 포대 삼발
   await speedTo(page, 8);
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 60_000 });
@@ -311,8 +311,8 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
   const composer = page.getByRole('region', { name: '입력기' });
   const log = page.getByRole('region', { name: '무전 기록' });
   const report = composer.getByRole('region', { name: '위치 보고' });
-  await expect(report.getByLabel('동', { exact: true })).toHaveValue('4512', { timeout: 15_000 });
-  await expect(report.getByLabel('북', { exact: true })).toHaveValue('3256');
+  await expect(report.getByRole('textbox', { name: '동', exact: true })).toHaveValue('4512', { timeout: 15_000 });
+  await expect(report.getByRole('textbox', { name: '북', exact: true })).toHaveValue('3256');
   await report.getByRole('button', { name: '보고하지 않고 계속' }).click();
   await expect(log).toContainText('위치 보고 생략');
 
@@ -326,6 +326,6 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
   await mapPanel.getByRole('button', { name: /^여기로 관측소 이동 · \d+ m · 약 \d\d:\d\d/ }).click();
   await speedTo(page, 8);
   await expect(log).toContainText('관측소 설치 끝.', { timeout: 60_000 });
-  await expect(report.getByLabel('동', { exact: true })).toHaveValue(e!);
-  await expect(report.getByLabel('북', { exact: true })).toHaveValue(n!);
+  await expect(report.getByRole('textbox', { name: '동', exact: true })).toHaveValue(e!);
+  await expect(report.getByRole('textbox', { name: '북', exact: true })).toHaveValue(n!);
 });
