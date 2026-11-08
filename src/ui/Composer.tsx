@@ -63,8 +63,10 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     setLastTransfer(transfer);
     if (transfer && stage === 'loc') setGrid({ e: four(transfer.e), n: four(transfer.n) });
   }
-  const proposed = () => defaultTarget(state.platoons, state.missions.at(-1)?.aim ?? null);
-  const [target, setTarget] = useState(() => JSON.stringify(proposed())); // an option's JSON
+  // The lists are made when the form is built, as is its start (demo 952, 967–972).
+  const [options] = useState(() => targetOptions(platoons));
+  const [toShift] = useState(() => shiftOptions(state.platoons));
+  const [target, setTarget] = useState(() => JSON.stringify(defaultTarget(state.platoons, state.missions.at(-1)?.aim ?? null))); // an option's JSON
   const [rounds, setRounds] = useState(3);
   const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
   const [control, setControl] = useState<Control>('ready');
@@ -83,8 +85,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     return () => document.removeEventListener('keydown', down);
   }, [amc, send]);
 
-  const options = targetOptions(platoons);
-  const chosen = options.find((t) => JSON.stringify(t) === target) ?? proposed(); // the unit's activity changed under it
+  const chosen = options.find((t) => JSON.stringify(t) === target)!;
   // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
   const ready = state.post.state === 'ready';
   const reporting = reportOpen(stage, state);
@@ -229,7 +230,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         )}
       </section>
       {callable && mission?.mto && (
-        <ShiftForm targetNumber={mission.mto.targetNumber} options={shiftOptions(state.platoons)} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+        <ShiftForm targetNumber={mission.mto.targetNumber} options={toShift} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
       )}
     </>
   );

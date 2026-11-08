@@ -927,3 +927,22 @@ test('F-07: 전이 표적성질은 끝난 소대를 뺀다', async ({ page }) =>
   await expect(kind.locator('option')).toHaveCount(2);
 });
 
+test('F-07: 표적성질 목록은 입력기를 다시 그릴 때 바뀐다 — 화면', async ({ page }) => {
+  // The list is made when the form is built (demo 969, 1004): a unit identified while the form is open joins it only at
+  // the next rebuild, here the pause toggle (demo 1410).
+  test.setTimeout(90_000);
+  await nearMortar(page);
+  const { kind } = await toLocation(page);
+  await toDescription(page, '4720', '3150');
+  await expect(kind.locator('option')).toHaveCount(1);
+
+  await watchMortar(page);
+  await page.waitForTimeout(300); // a publish after 적정 확인: the panels have read it
+  await expect(kind.locator('option')).toHaveCount(1);
+
+  await button(page, '일시정지').click();
+  await button(page, '재개').click();
+  await expect(kind.locator('option')).toHaveCount(2);
+  await expect(kind).toHaveValue(UNKNOWN);
+});
+
