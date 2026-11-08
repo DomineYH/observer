@@ -1,7 +1,10 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { underCanopy } from '@sim';
+import { underCanopy, validateReplay, type ReplayData } from '@sim';
+import type { StoredRun } from '@adapters/index';
+import { mockAccount } from '@adapters/mock/account';
+import { mockArchive } from '@adapters/mock/records';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
@@ -21,12 +24,15 @@ import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { HeadBand } from '@ui/HeadBand';
 import { Debrief } from '@ui/Debrief';
+import { CallsignForm } from '@ui/CallsignForm';
+import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
 import { selectBackend } from './backend';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame } from './game';
 import { startLoop } from './loop';
+import { submissionOf } from './records';
 import { chooseSeed } from './seed';
 
 selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
@@ -61,9 +67,27 @@ const onFrame = (draw: (now: number) => void) => {
   frameListeners.add(draw);
   return () => void frameListeners.delete(draw);
 };
-// Placeholders until the account slice (callsign) and the terrain slice (방안 기준) arrive.
-const CALLSIGN = '갈매기';
-const NAMES = { callsign: CALLSIGN, gridLetters: terrain.grid.letters };
+// 계정 and 기록 보관소 (M1: this browser's storage). Until a callsign is set the radio uses the placeholder 갈매기.
+// NAMES is one object the sound holds too, so a new callsign reaches it in place.
+const account = mockAccount(localStorage);
+const archive = mockArchive(localStorage, (x) => validateReplay(x).ok); // the sim's 재생 자료 format check
+const NAMES = { callsign: (await account.callsign()) ?? '갈매기', gridLetters: terrain.grid.letters };
+const claim: typeof account.claim = async (c) => {
+  const r = await account.claim(c);
+  if (r.ok) NAMES.callsign = r.callsign;
+  listeners.forEach((l) => l());
+  return r;
+};
+// Once the game has ended: its 재생 자료, submitted once with the 판 기록 and 임무 요약; a new object on each change.
+let result: { replay: ReplayData; saved: StoredRun | 'pending' | 'failed' } | null = null;
+const submitOnEnd = () => {
+  if (result || game.sim.state.phase !== 'ended') return;
+  // the current game: after a weather change its sim, init and 입력 기록 are the new ones
+  const submission = submissionOf(NAMES.callsign, game.sim, game.init, game.session.log);
+  const done = (saved: StoredRun | 'failed') => void (result = { replay: submission.replay, saved });
+  result = { replay: submission.replay, saved: 'pending' };
+  archive.submit(submission).then(done, () => done('failed'));
+};
 // 음성 출력 is the user's 음성 setting, not the backend variable; browsers without speech synthesis get the 무음 어댑터.
 const audio = webAudio();
 const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(), audio, NAMES);
@@ -74,6 +98,7 @@ let started = false;
 const step = () => {
   const due = game.sim.state.reportDue;
   const events = game.session.step();
+  submitOnEnd();
   const s = game.sim.state;
   sound.hear(events, s);
   const lines: LogLine[] = [];
@@ -137,13 +162,17 @@ function App() {
   const reportDue = useSyncExternalStore(subscribe, () => game.sim.state.reportDue);
   const stage = useSyncExternalStore(subscribe, () => game.sim.state.radio.stage);
   const lines = useSyncExternalStore(subscribe, () => log);
-  const names = { callsign: CALLSIGN, gridLetters: terrain.grid.letters };
+  const callsign = useSyncExternalStore(subscribe, () => NAMES.callsign);
+  const ended = useSyncExternalStore(subscribe, () => result);
+  const names = { callsign, gridLetters: terrain.grid.letters };
   return (
     <>
-      {phase === 'ended' && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} />}
+      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} />}
       <TickCounter tick={tick} />
       <HeadBand tick={tick} score={score} rounds={rounds} />
       <SoundToggles sound={sound} />
+      <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} />
+      <RankingDialog archive={archive} callsign={callsign} />
       <ObservationView
         key={games}
         quality={quality}
@@ -172,7 +201,7 @@ function App() {
       <TargetList platoons={sim.state.platoons} /* re-rendered with the tick above */ />
       <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
       <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={sim.state.mode} send={send} state={sim.state} />
-      <RadioLog lines={lines} callsign={CALLSIGN} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
+      <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={sim.state.mode} />
     </>
   );
 }

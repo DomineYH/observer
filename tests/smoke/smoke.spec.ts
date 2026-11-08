@@ -12,6 +12,17 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   // 무전 기록 is empty until the operation starts.
   await expect(page.getByRole('region', { name: '무전 기록' })).toHaveText('');
 
+  // 호출부호를 정하고 랭킹 창을 연다: the mock board's fake rows are marked, and 닫기 closes it.
+  await page.getByLabel('호출부호', { exact: true }).fill('참새12');
+  await page.getByRole('button', { name: '정하기' }).click();
+  await expect(page.getByLabel('현재 호출부호')).toHaveText('참새12');
+  await page.getByRole('button', { name: '랭킹' }).click();
+  const ranking = page.getByRole('dialog', { name: '랭킹' });
+  await expect(ranking).toBeVisible();
+  await expect(ranking.getByRole('row').filter({ hasText: '목업' })).toHaveCount(12);
+  await ranking.getByRole('button', { name: '닫기' }).click();
+  await expect(ranking).toBeHidden();
+
   // 지도 패널에 지형이 그려진다
   const map = page.getByRole('img', { name: '지도' });
   await expect(map).toBeVisible();

@@ -1,10 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { expect, test } from 'vitest';
-import type { Sim } from '@sim';
+import { replay, validateReplay, type ReplayData, type Sim } from '@sim';
+import type { StoredRun } from '@adapters/index';
+import { replayOf, submissionOf } from '@app/records';
 import { INF_RECON, FFE5, playOut } from '../../tests/acceptance/end';
 import { CALL_ADJUST, corr, EOM, started, untilTaken } from '../../tests/acceptance/mission';
 import { aimedAt, untilLanded } from '../../tests/acceptance/strike';
+import { NO_ENEMY, oneMission } from '../../tests/acceptance/session';
+import { init } from '../../tests/acceptance/init';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { clock } from './clock';
 import { Debrief } from './Debrief';
@@ -21,7 +25,12 @@ const text = (el: ReactElement) =>
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
-const debrief = (sim: Sim) => text(<Debrief state={sim.state} record={sim.record()} grid={flatTerrain().grid} />);
+/** The debrief as the app draws it: no saved run yet, the 재생 자료 of a game played without the session. */
+const view = (sim: Sim, saved: StoredRun | 'pending' | 'failed' = 'pending', data: ReplayData = replayOf(init(0), [], sim.state.tick)) => (
+  <Debrief state={sim.state} record={sim.record()} grid={flatTerrain().grid} callsign="참새12" saved={saved} replay={data} />
+);
+const debrief = (sim: Sim) => text(view(sim));
+const ENTITIES: Record<string, string> = { '&quot;': '"', '&#x27;': "'", '&lt;': '<', '&gt;': '>', '&amp;': '&' };
 const mils = (p: { x: number; y: number }) => (Math.round((Math.atan2(p.x - 320, p.y - 320) * 3200) / Math.PI) + 6400) % 6400;
 
 test('F-13: 사후강평 화면', () => {
@@ -93,4 +102,38 @@ test('F-13: 사후강평 화면 — 협차 준수', () => {
   expect(bracket([200, 100, 100])).toBe('200→100→100 ✗');
   expect(bracket([200])).toBe('200');
   expect(bracket([])).toBe('—');
+});
+
+test('F-31: 미리보기는 재생 자료 형식 그대로', () => {
+  // A game through the session to the 40분 한도, with one mission and the ignored presses on the way.
+  const at = { ...init(20261106), scenario: NO_ENEMY };
+  const g = oneMission(at);
+  while (g.sim.state.phase === 'live') g.step();
+  const data = replayOf(at, g.session.log, g.sim.state.tick);
+  const html = renderToStaticMarkup(view(g.sim, 'pending', data));
+  expect(html).toMatch(/<details><summary>전송 데이터 미리보기<\/summary><pre aria-label="전송 데이터">/);
+  const shown = html.match(/<pre aria-label="전송 데이터">([^<]*)<\/pre>/)![1]!.replace(/&(quot|#x27|lt|gt|amp);/g, (e) => ENTITIES[e]!);
+  const parsed: unknown = JSON.parse(shown);
+  const checked = validateReplay(parsed);
+  expect(checked.ok).toBe(true);
+  expect(parsed).toEqual(data); // the replay data itself, no wrapper
+  const again = replay(checked.ok ? checked.data : data, at.terrain, at.scenario);
+  expect(again.ignored).toBe(0);
+  expect(again.record).toEqual(g.sim.record());
+  expect(again.record.missions).toBe(1);
+}, 30000);
+
+test('F-30: 랭킹 자격 — 사후강평의 저장 알림', () => {
+  const g = oneMission();
+  const stored = (over: Partial<StoredRun['record']>, ranked: boolean): StoredRun => {
+    const s = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
+    return { ...s, record: { ...s.record, ...over }, createdAt: '2026-11-07T00:00:00.000Z', ranked };
+  };
+  const said = (saved: StoredRun | 'pending' | 'failed') => text(view(g.sim, saved));
+  expect(said('pending')).toContain('기록 — 참새12');
+  expect(said('pending')).toContain('저장 중…');
+  expect(said(stored({}, true))).toContain('저장했습니다 · 표준 모드 · 일일 시드: 랭킹 집계');
+  expect(said(stored({ mode: 'training' }, false))).toContain('저장했습니다 · 훈련 모드를 썼으므로 랭킹에서는 제외');
+  expect(said(stored({ seedKind: 'practice' }, false))).toContain('저장했습니다 · 연습 시드: 랭킹에서는 제외');
+  expect(said('failed')).toContain('이 브라우저에 기록을 저장하지 못했습니다.');
 });

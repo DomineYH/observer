@@ -1,0 +1,54 @@
+import { expect, test } from 'vitest';
+import { replay, validateReplay, type SimInit } from '@sim';
+import { mockArchive } from '@adapters/mock/records';
+import { init, START } from '../../tests/acceptance/init';
+import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, POS_SKIP } from '../../tests/acceptance/mission';
+import { NO_ENEMY, oneMission, play } from '../../tests/acceptance/session';
+import { memoryStorage } from '../../tests/acceptance/storage';
+import { replayOf, submissionOf } from './records';
+
+test('F-31: 받아들인 입력만 기록된다', () => {
+  const at = { ...init(20261106), scenario: NO_ENEMY };
+  const g = play(at);
+  // 작전 준비: 발사 before any mission, an unknown kind, then 작전 개시 twice.
+  for (const input of [{ a: 'fire' }, { a: 'bogus', v: [1] }, START, START]) g.session.send(input);
+  g.step();
+  for (const input of [POS_SKIP, CALL_FFE, LOC_CLEAR, DESC_UNKNOWN]) g.take(input);
+  g.take(EOM('ineffective')); // 효력사 lands first: until then 임무끝 is ignored
+  for (let k = 0; k < 40; k++) g.step();
+  expect(g.events.filter((e) => e.type === 'impact').length).toBe(18); // 포대 3발: six guns
+  expect(g.sent.length).toBeGreaterThan(g.session.log.length + 50); // most presses were ignored
+  // Only what the simulation took is written down, at the tick it took it.
+  expect(g.session.log.map((i) => i.a)).toEqual(['start', 'pos_skip', 'call', 'loc', 'desc', 'eom']);
+  expect(g.session.log[0]).toEqual({ t: 0, ...START });
+  const data = replayOf(at, g.session.log, g.sim.state.tick);
+  const again = replay(data, at.terrain, at.scenario);
+  expect(again.ignored).toBe(0);
+  expect(again.record).toEqual(g.sim.record());
+  expect(again.record.missions).toBe(1);
+});
+
+test('F-30: 랭킹 자격 — 시뮬레이션에서 온 기록', async () => {
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
+  const daily = oneMission();
+  const practiceInit: SimInit = { ...init(42), seedKind: 'practice', scenario: NO_ENEMY };
+  const practice = play(practiceInit);
+  practice.take(START);
+  for (let k = 0; k < 10; k++) practice.step();
+  const sub = submissionOf('참새12', daily.sim, { ...init(20261106), scenario: NO_ENEMY }, daily.session.log);
+  expect(sub.record).toEqual({ ...daily.sim.record(), mode: 'standard' });
+  expect(sub.replay.inputs).toEqual(daily.session.log);
+  // 임무 요약: the one mission, its 18 rounds as the events showed them.
+  expect(sub.missions).toEqual([
+    expect.objectContaining({ rounds: daily.events.filter((e) => e.type === 'impact').length, corrections: 0, report: 'ineffective' }),
+  ]);
+  expect((await archive.submit(sub)).ranked).toBe(true);
+  expect((await archive.submit(submissionOf('참새34', practice.sim, practiceInit, practice.session.log))).ranked).toBe(false);
+  const total = await archive.board('total');
+  expect(total.find((r) => r.callsign === '참새12')?.record.score).toBe(daily.sim.record().score);
+  expect(total.map((r) => r.callsign)).not.toContain('참새34');
+  expect((await archive.mine()).map((r) => [r.callsign, r.record.seedKind])).toEqual([
+    ['참새34', 'practice'],
+    ['참새12', 'daily'],
+  ]);
+});
