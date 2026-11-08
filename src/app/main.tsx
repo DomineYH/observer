@@ -204,8 +204,9 @@ function App() {
   const [lastHit, setLastHit] = useState(newestHit);
   if (newestHit && newestHit !== lastHit) setLastHit(newestHit);
   // Every form starts again whenever the demo calls renderComposer for it: a mode change, a 교신 단계 change, the post
-  // setting off, arriving or set up, each pause toggle, and a lase hit at 표적위치. Never on a tick: typing stands.
-  const composerKey = [mode, stage, sim.state.post.state, paused, stage === 'loc' ? lastHit?.tick : ''].join();
+  // setting off, arriving or set up, 위치 보고 owed or skipped, each pause toggle, and a lase hit at 표적위치. Never on a
+  // tick: typing stands.
+  const composerKey = [mode, stage, sim.state.post.state, sim.state.reportDue, paused, stage === 'loc' ? lastHit?.tick : ''].join();
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
   const point = useMemo(() => pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null), [pin, picked, op]);

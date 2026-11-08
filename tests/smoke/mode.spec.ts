@@ -1050,3 +1050,36 @@ test('F-07: 레이저 빗나감 다섯 번은 입력기를 지우지 않는다 �
   await expect(distance).toHaveValue(dist!.replace(/,/g, ''));
 });
 
+test('F-07: 위치 보고 생략은 입력기를 다시 채운다 — 화면', async ({ page }) => {
+  // 보고하지 않고 계속 re-renders the form (demo 1015), and the 전이 list is made then (952): a unit identified while the
+  // report form is open is on offer. A short mission far from the mortar section, a short walk, then the watching.
+  test.setTimeout(180_000);
+  await nearMortar(page);
+  const { composer, log, send } = await toLocation(page, 'ffe');
+  await toDescription(page, '4720', '3150');
+  await composer.getByRole('combobox', { name: '발수' }).selectOption('1');
+  await send.click();
+  await speedTo(page, 8);
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+  await send.click(); // 임무끝
+  const shift = page.getByRole('region', { name: '전이사격' });
+  await expect(shift).toBeVisible({ timeout: 15_000 });
+  await expect(shift.getByRole('combobox', { name: '표적성질' }).locator('option')).toHaveCount(1);
+
+  const panel = page.getByRole('region', { name: '지도 패널' });
+  await panel.getByRole('button', { name: '관측소로' }).click();
+  const map = panel.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2 + 1, y: box.height / 2 } });
+  await panel.getByRole('button', { name: /^여기로 관측소 이동/ }).click();
+  await expect(log).toContainText('관측소 설치 끝.', { timeout: 60_000 });
+  await speedTo(page, 1);
+  const skip = composer.getByRole('button', { name: '보고하지 않고 계속' });
+  await expect(skip).toBeVisible();
+
+  await watchMortar(page);
+  await skip.click();
+  await expect(shift).toBeVisible();
+  await expect(shift.getByRole('combobox', { name: '표적성질' }).locator('option')).toHaveCount(2);
+  await expect(shift.getByRole('combobox', { name: '표적성질' }).locator('option', { hasText: '박격포' })).toHaveCount(1);
+});
