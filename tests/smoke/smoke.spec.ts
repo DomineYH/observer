@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { everyControlNamed, linesFrom, mapPixels, settledMap, speedTo, tabTo, toReady } from './helpers';
+import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, speedTo, tabTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
@@ -274,7 +274,7 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
 
   // Watched through the binoculars it is identified (type after 5.5 s, size after 15.5 s), and the 사격요구 goes on
   // the identified target with the composer's non-default values: 바로 효력사, then the 박격포반 as 표적성질. The log
-  // holds each observer line exactly as the preview showed it.
+  // holds each observer line exactly as the preview showed it: one line, nothing else in it but its time and 갈매기.
   await page.keyboard.press('b');
   await expect(page.getByRole('button', { name: '쌍안경' })).toHaveAttribute('aria-pressed', 'true');
   await expect(targets).toContainText('적정 확인', { timeout: 30_000 });
@@ -284,7 +284,7 @@ test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', 
   const transmit = async () => {
     const said = (await preview.textContent())!;
     await composer.getByRole('button', { name: '송신' }).click();
-    await expect(log.locator('li', { hasText: `갈매기 ${said}` })).toHaveCount(1);
+    await expect(lineSaid(log, '갈매기', said)).toHaveCount(1); // the whole line: its time, 갈매기 and the sentence
     return said;
   };
   await expect(log).toContainText('감명 양호', { timeout: 15_000 });

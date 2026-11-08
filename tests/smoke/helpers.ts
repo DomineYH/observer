@@ -184,3 +184,7 @@ export async function recordedInputs(debrief: Locator): Promise<Recorded[]> {
   await debrief.getByText('전송 데이터 미리보기').click();
   return (JSON.parse((await debrief.getByRole('group', { name: '전송 데이터' }).textContent())!) as { inputs: Recorded[] }).inputs;
 }
+
+/** The 무전 기록 lines that read exactly `speaker said` after their time (mm:ss): nothing before or after the sentence. */
+export const lineSaid = (log: Locator, speaker: string, said: string) =>
+  log.locator('li', { hasText: new RegExp(`^\\d\\d:\\d\\d ${`${speaker} ${said}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) });

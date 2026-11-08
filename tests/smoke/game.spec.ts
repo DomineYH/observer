@@ -1,7 +1,7 @@
 // 스모크 (spec 테스트하는 이음매 5, repo_checks critical flow): one 훈련 모드 game through the UI of the built app, from
 // 작전 준비 to the 사후강평, at ×8 except for the few seconds the pick needs.
 import { expect, test, type Page } from '@playwright/test';
-import { everyControlNamed, speedTo, ticks } from './helpers';
+import { everyControlNamed, lineSaid, speedTo, ticks } from './helpers';
 
 const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 /** Polls the 틱 until it reaches `t` (at ×8 the clock runs 160 ticks a second). */
@@ -20,7 +20,7 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
   const transmit = async () => {
     const said = (await preview.textContent())!;
     await send.click();
-    await expect(log.locator('li', { hasText: `갈매기 ${said}` })).toHaveCount(1);
+    await expect(lineSaid(log, '갈매기', said)).toHaveCount(1); // the whole line: its time, 갈매기 and the sentence
     return said;
   };
 
