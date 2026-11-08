@@ -111,3 +111,28 @@ export async function fireOnOwnPost(page: Page) {
   await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
   return debrief;
 }
+
+/** A 아래 탭 by its name. */
+export const tab = (page: Page, name: string) => page.getByRole('group', { name: '아래 탭' }).getByRole('button', { name, exact: true });
+/** A panel by role and name, found also while its tab is not chosen. */
+export const region = (page: Page, name: string) => page.getByRole('region', { name, includeHidden: true });
+export const ticks = async (page: Page) => Number(await page.getByRole('status', { name: '틱' }).textContent());
+
+/** On the narrow page: pick the open field north of 1번 고지 on the 지도 tab, start on the 입력 tab, wait for the clock. */
+export async function narrowStart(page: Page) {
+  await page.goto('/?seed=20261106');
+  await tab(page, '지도').click();
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(region(page, '작전 준비')).toContainText('관측소 후보: 찰리호텔 4512 3256'); // on the 입력 tab, hidden now
+  await tab(page, '입력').click();
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await expect.poll(() => ticks(page)).toBeGreaterThan(0);
+}
+
+/** Presses Tab until `target` has the focus, so it is in the tab order; fails after 80 presses. */
+export async function tabTo(page: Page, target: Locator) {
+  for (let i = 0; i < 80 && !(await target.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press('Tab');
+  await expect(target).toBeFocused();
+}

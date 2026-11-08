@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Mode, Phase } from '@sim';
 import { QUALITIES, type Quality } from '@render/projection';
 import { clock } from './clock';
@@ -30,38 +30,52 @@ interface Props {
  */
 export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children }: Props) {
   const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLElement>(null);
+  // Opened, the focus goes in (no trap: the game keeps running); Esc closes it and the focus goes back to 메뉴.
+  useEffect(() => {
+    if (open) menu.current?.querySelector<HTMLElement>('button:enabled, input:enabled, select:enabled')?.focus();
+  }, [open]);
   return (
-    <div className="band">
+    <div
+      className="band"
+      onKeyDown={(e) => {
+        // Esc in the 랭킹 dialog, which lives in the menu, closes only the dialog.
+        if (e.key !== 'Escape' || !open || (e.target as Element).closest('dialog')) return;
+        setOpen(false);
+        toggle.current?.focus();
+      }}
+    >
       <header>
         <span className="brand">
           OBSERVER <small>포병 관측·목업</small>
         </span>
         <span className="stat">
           <span className="hb-label">경과 </span>
-          <output aria-label="경과">{clock(tick)}</output>
+          <output aria-live="off" aria-label="경과">{clock(tick)}</output>
         </span>
         <span className="stat">
           <span className="hb-label">점수 </span>
-          <output aria-label="점수">{score}</output>
+          <output aria-live="off" aria-label="점수">{score}</output>
         </span>
         <span className="stat">
           <span className="hb-label">사용 탄 </span>
-          <output aria-label="사용 탄">{rounds}발</output>
+          <output aria-live="off" aria-label="사용 탄">{rounds}발</output>
         </span>
         <button type="button" aria-pressed={paused} disabled={phase !== 'live'} onClick={onPause}>
           {paused ? '재개' : '일시정지'}
         </button>
-        <output aria-label="모드" className="tag">
+        <output aria-live="off" aria-label="모드" className="tag">
           {MODE_NAMES[mode]}
         </output>
         <button type="button" aria-label={`배속 ×${speed}`} onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>
           ×{speed}
         </button>
-        <button type="button" className="hb-toggle" aria-pressed={open} aria-controls="hb-menu" onClick={() => setOpen(!open)}>
+        <button ref={toggle} type="button" className="hb-toggle" aria-pressed={open} aria-controls="hb-menu" onClick={() => setOpen(!open)}>
           메뉴
         </button>
       </header>
-      <section id="hb-menu" aria-label="머리띠 메뉴" className="hb-menu" data-open={open || undefined}>
+      <section ref={menu} id="hb-menu" aria-label="머리띠 메뉴" className="hb-menu" data-open={open || undefined}>
         {children}
       </section>
     </div>

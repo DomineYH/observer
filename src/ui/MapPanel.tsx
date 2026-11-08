@@ -168,7 +168,7 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather }: M
         <button type="button" onClick={() => setView((v) => centreOn(terrain, v, state.op, Math.max(v.z, 3)))}>
           관측소로
         </button>
-        <output aria-label="지도 배율">×{Math.round(view.z * 10) / 10}</output>
+        <output aria-live="off" aria-label="지도 배율">×{Math.round(view.z * 10) / 10}</output>
       </div>
       {training && (
         <label>

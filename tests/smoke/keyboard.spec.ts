@@ -1,8 +1,7 @@
 // 키보드와 화면 읽기 (#42, spec 384–388): the seven 단축키, when they are ignored, and the focus of the 머리띠 메뉴 and 랭킹.
 import { expect, test, type Page } from '@playwright/test';
-import { toReady } from './helpers';
+import { narrowStart, tabTo, ticks, toReady } from './helpers';
 
-const ticks = async (page: Page) => Number(await page.getByRole('status', { name: '틱' }).textContent());
 /** Lets `n` more ticks pass, so any input sent before has been applied. */
 async function ticksPass(page: Page, n = 3) {
   const from = await ticks(page);
@@ -72,4 +71,55 @@ test('B7: 초점에 따른 무시 조건', async ({ page }) => {
   await expect(readout.locator('p')).toContainText('레이저: 방위각 0040 밀');
   await keys('b');
   await expect(bino).toHaveAttribute('aria-pressed', 'true');
+});
+
+test.describe('좁은 화면', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('머리띠: 메뉴의 초점과 Esc', async ({ page }) => {
+    await page.goto('/?seed=20261106');
+    const toggle = page.getByRole('button', { name: '메뉴', exact: true });
+    const menu = page.getByRole('region', { name: '머리띠 메뉴' });
+    // No read-out is a live region: the clock and the score would be read out every tick.
+    await expect(page.locator('output')).not.toHaveCount(0);
+    await expect(page.locator('output:not([aria-live="off"])')).toHaveCount(0);
+
+    await tabTo(page, toggle);
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('button', { name: '훈련' })).toBeFocused(); // its first item
+    // Not a trap: Tab leaves the sheet while the game keeps running.
+    const inMenu = () => menu.evaluate((m) => m.contains(document.activeElement));
+    for (let i = 0; i < 30 && (await inMenu()); i++) await page.keyboard.press('Tab');
+    expect(await inMenu()).toBe(false);
+    await expect(menu).toBeVisible();
+    await menu.getByRole('button', { name: '음성' }).focus();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(toggle).toBeFocused();
+
+    // While the clock runs: the same, and Esc does not stop the game.
+    await narrowStart(page);
+    await toggle.click();
+    await expect(menu.getByRole('button', { name: '훈련' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(toggle).toBeFocused();
+    const from = await ticks(page);
+    await expect.poll(() => ticks(page)).toBeGreaterThan(from);
+
+    // Esc in the 랭킹 dialog, which opens from the menu, closes only the dialog.
+    await toggle.click();
+    const ranking = menu.getByRole('button', { name: '랭킹' });
+    await ranking.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: '랭킹' });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(menu).toBeVisible();
+    await expect(ranking).toBeFocused();
+  });
 });

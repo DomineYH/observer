@@ -212,13 +212,13 @@ function App() {
           <SoundToggles sound={sound} />
           <div>
             {/* M1 has only the mock backend: callsigns and records stay in this browser. */}
-            <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} /> <output aria-label="연결">오프라인</output>
+            <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} /> <output aria-live="off" aria-label="연결">오프라인</output>
           </div>
           <span>
-            시드 <output aria-label="시드">{seedKind === 'daily' ? '일일' : '연습'} {seed}</output>
+            시드 <output aria-live="off" aria-label="시드">{seedKind === 'daily' ? '일일' : '연습'} {seed}</output>
           </span>
           <span>
-            기상 <output aria-label="기상">{weatherChip(init.weather)}</output>
+            기상 <output aria-live="off" aria-label="기상">{weatherChip(init.weather)}</output>
           </span>
           <RankingDialog archive={archive} callsign={callsign} />
         </HeadBand>

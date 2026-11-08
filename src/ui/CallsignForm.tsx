@@ -29,7 +29,7 @@ export function CallsignForm({ callsign, editable, claim }: Props) {
       <label>
         호출부호 <input value={draft} onChange={(e) => setDraft(e.target.value)} disabled={!editable} />
       </label>
-      <button disabled={!editable}>정하기</button> <output aria-label="현재 호출부호">{callsign}</output>
+      <button disabled={!editable}>정하기</button> <output aria-live="off" aria-label="현재 호출부호">{callsign}</output>
       {refused && <span role="alert">{refused}</span>}
     </form>
   );
