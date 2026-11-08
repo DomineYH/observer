@@ -23,7 +23,7 @@ const shown = (draft: Draft) => previewOf(renderToStaticMarkup(<Preview draft={d
 const fresh = (stage: 'idle' | 'desc') =>
   previewOf(
     renderToStaticMarkup(
-      <Composer stage={stage} live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [], ...POST }} />,
+      <Composer stage={stage} live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, ...POST }} />,
     ),
   );
 /** The sentence of a log line, without its time and speaker. */
@@ -233,12 +233,11 @@ test('F-07: 임무끝 — 입력기', () => {
 
 // Static render of the training fill; the polar path itself is the e2e `F-07: 극좌표 위치법 — 입력기`.
 test('F-05: 훈련 모드는 레이저 측정점의 좌표를 넣어 둔다', () => {
-  // At 표적위치 the newest lase that met something fills the grid in training (demo lines 958–966), not in standard.
+  // At 표적위치 the last lase that met something fills the grid in training (demo lines 958–966), not in standard.
   const hit: Lase = { tick: 9, az: 8003, el: -20, range: { dist: 1004, vm: -2, x: 805, y: 805, target: true } };
-  const miss: Lase = { tick: 10, az: 100, el: 50, range: null };
   const at = (mode: Mode) =>
     renderToStaticMarkup(
-      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, lases: [miss, hit], ...POST }} />,
+      <Composer stage="loc" live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} lastHit={hit} state={{ missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, ...POST }} />,
     );
   const preview = (html: string) => text(html.match(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/)![1]!);
   expect(preview(at('training'))).toBe('좌표 찰리호텔 넷공팔공(4080) 삼공팔공(3080), 이상.'); // training adds the numerals

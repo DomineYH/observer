@@ -1008,3 +1008,45 @@ test('F-04: 표적 목록은 결과와 관측 진행을 보인다 — 화면', a
   await expect(targets.getByRole('listitem')).toContainText(/표적 1 .+ (파괴|무력화)/);
 });
 
+test('F-07: 레이저 빗나감 다섯 번은 입력기를 지우지 않는다 — 화면', async ({ page }) => {
+  // The simulation keeps five lases, misses included; the last hit is the player's until a newer one (demo 1067, 1069).
+  test.setTimeout(60_000);
+  const { composer, log, send } = await toCall(page);
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  const panel = page.getByRole('region', { name: '관측' });
+  const laser = panel.getByRole('button', { name: '레이저' });
+  const reading = panel.getByRole('group', { name: '레이저 측정' }).locator('p');
+  const east = composer.getByRole('textbox', { name: '동', exact: true });
+  const polar = composer.getByRole('radio', { name: '극좌표' });
+  const azimuth = composer.getByRole('textbox', { name: '방위각' });
+  const distance = composer.getByRole('textbox', { name: '거리' });
+
+  await laser.click();
+  await expect(reading).toContainText('· 거리 ');
+  const [, az, dist] = (await reading.textContent())!.match(/방위각 (\d{4}) 밀 · 거리 ([\d,]+) m/)!;
+  await east.fill('1111');
+  await polar.check();
+  await azimuth.fill('0800');
+
+  // Five misses at the sky, each in its own step: the last pushes the hit out of the simulation's list.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+ArrowUp');
+  await page.waitForTimeout(200);
+  for (let i = 0; i < 5; i++) {
+    await laser.click();
+    await expect(reading).toContainText('반사 없음');
+    await page.waitForTimeout(150);
+  }
+  await page.waitForTimeout(300);
+  await expect(polar).toBeChecked();
+  await expect(azimuth).toHaveValue('0800');
+
+  // A rebuild: 극좌표 starts from the hit, which only the ui still holds.
+  await button(page, '일시정지').click();
+  await button(page, '재개').click();
+  await polar.check();
+  await expect(azimuth).toHaveValue(az!);
+  await expect(distance).toHaveValue(dist!.replace(/,/g, ''));
+});
+

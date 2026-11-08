@@ -59,4 +59,3 @@ test('F-04: 표적 목록의 결과 낱말', () => {
   expect(as('overran')).toContain('표적 1 미상 진지 돌파 / ');
   expect(as('emplaced')).toContain('표적 1 미상 / ');
 });
-

@@ -25,11 +25,10 @@ const AZ_FIELD = /^\d{1,4}$/;
 const DIST_FIELD = /^\d{3,5}$/;
 const four = (n: number) => String(n).padStart(4, '0');
 
-type Hit = Lase & { range: NonNullable<Lase['range']> };
 /** What a lase fills in: 방위각 · 거리 for 극좌표, and the measured point's grid (used in training). */
-const filled = (l: Hit, g: GridRef) => {
-  const at = gridOf(g, l.range);
-  return { polar: { az: four(Math.round(l.az / 10) % 6400), dist: String(l.range.dist) }, grid: { e: four(at.e), n: four(at.n) } };
+const filled = (az: number, range: NonNullable<Lase['range']>, g: GridRef) => {
+  const at = gridOf(g, range);
+  return { polar: { az: four(Math.round(az / 10) % 6400), dist: String(range.dist) }, grid: { e: four(at.e), n: four(at.n) } };
 };
 
 interface Props {
@@ -41,9 +40,11 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission. */
-  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'lases' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
   /** The map's last point (좌표자 or 관측소 후보): what the location grid and the 위치 보고 start from (demo 942, 958–959). */
   pin?: { e: number; n: number } | null;
+  /** The last lase that met something: it fills 극좌표, and in training the grid too (demo 958–966). */
+  lastHit?: Lase;
   /** 탄착 편의 and the 수정값 제안 for the round that landed: held above this component, so a rebuild brings them back. */
   help?: ReturnType<typeof suggestion> | null;
   /** 사격요구에 입력 · 위치 보고에 입력: a new object each press fills the form open at that moment (demo 1420–1421). */
@@ -51,11 +52,9 @@ interface Props {
 }
 
 /** Holds each form's fields from their start: `composerKey` remounts it whenever the demo rebuilds the form. */
-export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, help, transfer }: Props) {
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, lastHit, help, transfer }: Props) {
   const [warning, setWarning] = useState<Warning>('adjust');
-  // The newest lase that met something fills 극좌표, and in training the grid too (demo lines 958–966).
-  const hit = state.lases.find((l): l is Hit => l.range !== null);
-  const fill = hit && filled(hit, gridRef);
+  const fill = lastHit?.range ? filled(lastHit.az, lastHit.range, gridRef) : undefined;
   const [method, setMethod] = useState<'grid' | 'polar'>('grid');
   // 표적위치 opens on the lase in training, else on the map's last point (demo 958–959).
   const [grid, setGrid] = useState(() => (fill && mode === 'training' ? fill.grid : pin ? { e: four(pin.e), n: four(pin.n) } : { e: '', n: '' }));
