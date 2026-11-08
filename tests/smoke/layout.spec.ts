@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mapPixels, settledMap } from './helpers';
+import { fireOnOwnPost, mapPixels, settledMap } from './helpers';
 
 // A phone held upright. Touches go through Chromium's own touch input (CDP): Playwright alone can only tap.
 const PHONE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
@@ -45,32 +45,57 @@ test.describe('좁은 화면', () => {
   test.use(PHONE);
 
   test('F-03: 1밀 터치 단추', async ({ page }) => {
+    test.setTimeout(240_000);
     await narrowStart(page);
-    const view = page.getByRole('region', { name: '관측' });
-    const pad = view.getByRole('group', { name: '1밀 조준' });
-    const readout = view.getByLabel('레이저 측정').locator('p');
-    // The view keeps the last 5 lases, newest first: this test lases 5 times, so the n-th lase is the n-th line.
-    let lases = 0;
-    const lase = async () => {
-      await view.getByRole('button', { name: '레이저' }).tap();
-      await expect(view.getByLabel('레이저 측정').locator('li')).toHaveCount(++lases);
-      return Number(/방위각 (\d{4}) 밀/.exec((await readout.textContent())!)![1]);
-    };
-    // The opening aim is 20.4 mils: one tap right is 1 mil, one tap left comes back.
-    expect(await lase()).toBe(20);
-    await pad.getByRole('button', { name: '오른쪽 1밀' }).tap();
-    expect(await lase()).toBe(21);
-    await pad.getByRole('button', { name: '왼쪽 1밀' }).tap();
-    expect(await lase()).toBe(20);
-    // Held for a second: one step at once, then more every 90 ms after 350 ms.
+    const pad = page.getByRole('region', { name: '관측' }).getByRole('group', { name: '1밀 조준' });
+    const press = (name: string) => pad.getByRole('button', { name }).tap();
+    // One tap on each button, then the right one held for a second.
+    await press('오른쪽 1밀');
+    await press('왼쪽 1밀');
+    await press('위 1밀');
+    await press('아래 1밀');
     await gesture(page, [[await centre(pad.getByRole('button', { name: '오른쪽 1밀' }))]], 1000);
-    const held = await lase();
-    expect(held).toBeGreaterThanOrEqual(23);
-    // Lifting the finger stops it.
-    await page.waitForTimeout(400);
-    expect(await lase()).toBe(held);
+    await page.waitForTimeout(400); // lifted: nothing more may come
+
+    // The exact aims come from the game's 재생 자료, which the 사후강평 shows once the game ends: every accepted 조준
+    // 입력 [az, el] in 0.1 mils. End it the shortest way, on the wide layout (the same page, nothing remounts).
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const debrief = await fireOnOwnPost(page);
+    await debrief.getByText('전송 데이터 미리보기').click();
+    const data = JSON.parse((await debrief.getByLabel('전송 데이터').textContent())!) as { inputs: { a: string; v: number[] }[] };
+    const cams = data.inputs.filter((i) => i.a === 'cam').map((i) => i.v);
+
+    // From the opening aim 20.4 / −22 mils: each tap is exactly 1 mil on its own axis, in its direction.
+    expect(cams.slice(0, 4)).toEqual([
+      [214, -220],
+      [204, -220],
+      [204, -210],
+      [204, -220],
+    ]);
+    // The hold: one step at once and one every 90 ms after 350 ms — 8 in a second (±2 for timer and input latency),
+    // each exactly 1 mil right of the one before; nothing after the lift.
+    const held = cams.slice(4);
+    expect(held.length).toBeGreaterThanOrEqual(6);
+    expect(held.length).toBeLessThanOrEqual(10);
+    expect(held).toEqual(held.map((_, i) => [214 + 10 * i, -220]));
   });
 });
+
+/** The wide 머리띠 is one row (spec): every item's top within 3 px of the first, and the band one row high. */
+async function oneRow(page: Page) {
+  const items = [page.getByRole('banner').getByText('OBSERVER'), ...alwaysShown(page).slice(0, 6), ...menuItems(page)];
+  const boxes = [];
+  for (const item of items) {
+    await expect(item).toBeVisible();
+    boxes.push((await item.boundingBox())!);
+  }
+  for (const b of boxes) expect(Math.abs(b.y + b.height / 2 - (boxes[0]!.y + boxes[0]!.height / 2))).toBeLessThanOrEqual(3);
+  const row = Math.max(...boxes.map((b) => b.height));
+  // The band: the 머리띠's banner and its menu side by side; its inner height (no border, no scroll bar) is one row and
+  // its padding.
+  const band = await page.getByRole('banner').evaluate((h) => h.parentElement!.clientHeight);
+  expect(band).toBeLessThanOrEqual(row + 8);
+}
 
 test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   const tabs = page.getByRole('group', { name: '아래 탭' });
@@ -103,6 +128,10 @@ test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   await expect(menu.getByRole('group', { name: '화질' })).toBeVisible();
   await expect(subtitle).toBeVisible();
   for (const name of ['지도 패널', '작전 준비', '입력기', '표적 목록', '무전 기록']) await expect.poll(() => rendered(region(page, name))).toBe(true);
+  await expect(page.getByRole('banner')).toContainText('포병 관측'); // the wide 머리띠, spread out
+  await oneRow(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await oneRow(page);
   // and back.
   await page.setViewportSize({ width: 767, height: 900 });
   await expect(tabs).toBeVisible();
