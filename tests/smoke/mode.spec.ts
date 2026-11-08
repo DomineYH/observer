@@ -826,9 +826,8 @@ test('F-07: 위험근접 수정 제안은 100 m까지 — 화면', async ({ page
   await expect(range).toHaveValue('100');
 });
 
-/** The mortar section identified from an open post about 820 m from it (as in `스모크: 보이는 적을…`), past the 위치 보고,
- * and the call sent, up to the location step. */
-async function identifiedMortar(page: Page) {
+/** Started at an open post about 820 m from the mortar section (as in `스모크: 보이는 적을…`). */
+async function nearMortar(page: Page) {
   dialogs(page);
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
@@ -836,6 +835,11 @@ async function identifiedMortar(page: Page) {
   await map.click({ position: { x: (box.width * 6450) / 10240, y: box.height * (1 - 7250 / 10240) } });
   await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보');
   await start(page);
+}
+
+/** Aims at the mortar section, presses it, and watches it through the binoculars until it is identified. */
+async function watchMortar(page: Page) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const view = page.getByRole('img', { name: '관측 화면' });
   for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft');
@@ -847,14 +851,26 @@ async function identifiedMortar(page: Page) {
   await expect(targets).toContainText('표적 1 미상');
   await page.keyboard.press('b');
   await expect(targets).toContainText('적정 확인', { timeout: 30_000 });
+}
+
+/** Past the 위치 보고, and the call sent (조정 unless asked), up to the location step. */
+async function toLocation(page: Page, warning: 'adjust' | 'ffe' = 'adjust') {
   const composer = page.getByRole('region', { name: '입력기' });
   const log = page.getByRole('region', { name: '무전 기록' });
   const send = composer.getByRole('button', { name: '송신' });
   await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
   await expect(log).toContainText('위치 보고 생략');
+  await composer.getByRole('combobox', { name: '경고명령' }).selectOption(warning);
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
   return { composer, log, send, kind: composer.getByRole('combobox', { name: '표적성질' }) };
+}
+
+/** The mortar section identified, and on to the location step. */
+async function identifiedMortar(page: Page, warning: 'adjust' | 'ffe' = 'adjust') {
+  await nearMortar(page);
+  await watchMortar(page);
+  return toLocation(page, warning);
 }
 
 /** 표적위치 at a grid, and on to the 표적성질 step. */
@@ -882,5 +898,32 @@ test('F-07: 표적성질 기본값은 가까운 소대 — 화면: 600 m 안에 
   await toDescription(page, '4720', '3150'); // about 6.3 km from it
   await expect(kind).toHaveValue(UNKNOWN);
   await expect(kind.locator('option')).toHaveCount(2); // the identified mortar is on offer, not the default
+});
+
+test('F-07: 전이 표적성질은 끝난 소대를 뺀다', async ({ page }) => {
+  // A unit with a fate (파괴, 무력화, 진지 돌파) is no longer on offer for a 전이 (demo 952); the 표적성질 of a new
+  // mission still lists it (demo 969). 바로 효력사 of five rounds on the identified mortar section.
+  test.setTimeout(180_000);
+  const { composer, log, send, kind } = await identifiedMortar(page, 'ffe');
+  await toDescription(page, '4567', '3752');
+  await expect(kind).toHaveValue(/"targetType":"mortar"/);
+  await composer.getByRole('combobox', { name: '발수' }).selectOption('5');
+  await send.click();
+  await speedTo(page, 8);
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+  await speedTo(page, 1);
+  // It has a fate: 무력화 scores 100, 파괴 150, and nothing else has scored yet.
+  await expect.poll(async () => Number(await page.getByRole('status', { name: '점수' }).textContent())).toBeGreaterThanOrEqual(100);
+  await send.click(); // 임무끝
+
+  const shift = page.getByRole('region', { name: '전이사격' });
+  await expect(shift).toBeVisible({ timeout: 15_000 });
+  await expect(shift.getByRole('combobox', { name: '표적성질' }).locator('option')).toHaveCount(1);
+  await expect(shift.getByRole('combobox', { name: '표적성질' })).toHaveValue(UNKNOWN);
+
+  await send.click(); // the call: 조정
+  await expect(log.getByText('좌표 송신바람')).toHaveCount(2, { timeout: 15_000 });
+  await toDescription(page, '4567', '3752');
+  await expect(kind.locator('option')).toHaveCount(2);
 });
 

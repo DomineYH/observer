@@ -93,6 +93,10 @@ export function targetOptions(platoons: readonly Seen[]): Target[] {
   return [...out.values(), { targetType: 'unknown' }];
 }
 
+const FATED = ['destroyed', 'broken', 'overran'];
+/** 전이사격's choices: as `targetOptions`, without a unit that has its fate (demo 952; the 표적성질 step keeps it, 969). */
+export const shiftOptions = (platoons: readonly (Seen & { state: string })[]) => targetOptions(platoons.filter((p) => !FATED.includes(p.state)));
+
 const DEFAULT_NEAR_M = 600;
 /** The 표적성질 a form starts on (demo 967–972, nearestPlatoon 708): the nearest unit on the field within 600 m of the
  * mission's location, if it has been identified; else 미상 표적. */

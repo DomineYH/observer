@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Warning } from '@sim';
 import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
-import { callDraft, defaultTarget, descDraft, FIRE, fireKey, locDraft, polarDraft, targetLabel, targetOptions, type Draft } from './radio/drafts';
+import { callDraft, defaultTarget, descDraft, FIRE, fireKey, locDraft, polarDraft, shiftOptions, targetLabel, targetOptions, type Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
@@ -229,7 +229,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         )}
       </section>
       {callable && mission?.mto && (
-        <ShiftForm targetNumber={mission.mto.targetNumber} options={options} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+        <ShiftForm targetNumber={mission.mto.targetNumber} options={shiftOptions(state.platoons)} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
       )}
     </>
   );
