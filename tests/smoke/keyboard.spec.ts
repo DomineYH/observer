@@ -56,7 +56,7 @@ test('B7: 조합 키에서는 단축키 무시', async ({ page }) => {
   await blur(page);
   const windows: Window[] = [];
   const combos = (keys: string[]) => ['Control', 'Alt', 'Meta'].flatMap((m) => keys.map((k) => `${m}+${k}`));
-  await pressEach(page, 'idle', combos([...ARROWS, 'b', 'r']), windows);
+  await pressEach(page, 'idle', combos([...ARROWS, 'Shift+ArrowRight', 'b', 'r']), windows); // Shift is the step multiplier, not a way round
   // F at 지명사's 준비 쏴: each combination on its own, then F alone (the key still acts).
   const debrief = await fireOnOwnPost(page, {
     fire: async () => {
@@ -66,8 +66,12 @@ test('B7: 조합 키에서는 단축키 무시', async ({ page }) => {
     },
   });
   const inputs = await recordedInputs(debrief);
-  expect(windows).toHaveLength(18 + 6);
+  expect(windows).toHaveLength(21 + 6);
   expect(strays(inputs, windows)).toEqual([]);
+  // Ctrl/Alt/Meta + Shift + → each in its own ticks: no 조준 입력, and the aim never moved (no cam at all below).
+  const shifted = windows.filter((w) => w.what.endsWith('+Shift+ArrowRight'));
+  expect(shifted.map((w) => w.what)).toEqual(['idle Control+Shift+ArrowRight', 'idle Alt+Shift+ArrowRight', 'idle Meta+Shift+ArrowRight']);
+  expect(strays(inputs, shifted)).toEqual([]);
   expect(of(inputs, 'cam')).toEqual([]);
   expect(of(inputs, 'bino')).toEqual([]);
   expect(of(inputs, 'lase')).toEqual([]);
