@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createSim, type Input } from '../../src/sim/index';
+import { mockTerrain } from '../../src/adapters/mock/terrain/index';
+import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
+import { BASE_GUNS } from '../../src/content/guns';
+import { BASE_SCENARIO } from '../../src/content/scenario';
 import { mapPixels, settledMap } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
@@ -167,27 +172,69 @@ test('F-24: 가시권은 훈련 전용', async ({ page }) => {
 
 test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
   // #29: after 효력사 in training, the 입력기 shows the real casualties of the unit hit hardest. 바로 효력사 on the 82 mm
-  // mortar section, dug in at 찰리호텔 4567 3752 on this seed (golden ①), at ×8.
+  // mortar section, dug in at 찰리호텔 4567 3752 on this seed (golden ①), from the planned post. Each input goes in
+  // while paused, so it applies at the tick the counter shows: the same game is then played again in Node through the
+  // simulation's public interface, and its casualties are the ones the page must show.
   test.setTimeout(180_000);
-  await picked(page);
+  const tick = page.getByRole('status', { name: '틱' });
+  const composer = page.getByRole('region', { name: '입력기' });
+  const log = page.getByRole('region', { name: '무전 기록' });
+  const send = composer.getByRole('button', { name: '송신' });
+  const inputs = new Map<number, Input[]>();
+  /** Pauses, does `act` (which sends `input`), notes the tick it will apply at, resumes. */
+  const paused = async (input: Input, act: () => Promise<void>) => {
+    await button(page, '일시정지').click();
+    await page.waitForTimeout(300); // the counter catches up with the stopped clock
+    const t = Number(await tick.textContent());
+    await act();
+    inputs.set(t, [...(inputs.get(t) ?? []), input]);
+    await button(page, '재개').click();
+  };
+  await page.goto('/?seed=20261106');
   await button(page, '훈련').click();
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
-  await start(page);
-  await button(page, '×8').click();
-  const log = page.getByRole('region', { name: '무전 기록' });
-  const composer = page.getByRole('region', { name: '입력기' });
-  const send = composer.getByRole('button', { name: '송신' });
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
-  await composer.getByLabel('경고명령').selectOption('ffe');
-  await send.click();
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await expect(composer.getByLabel('경고명령')).toBeVisible({ timeout: 15_000 }); // 통신 점검 done, no 위치 보고 owed
+  await paused({ a: 'call', v: ['ffe'] }, async () => {
+    await composer.getByLabel('경고명령').selectOption('ffe');
+    await send.click();
+  });
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
-  await composer.getByLabel('동', { exact: true }).fill('4567');
-  await composer.getByLabel('북', { exact: true }).fill('3752');
-  await send.click();
+  await paused({ a: 'loc', v: ['grid', 4567, 3752] }, async () => {
+    await composer.getByLabel('동', { exact: true }).fill('4567');
+    await composer.getByLabel('북', { exact: true }).fill('3752');
+    await send.click();
+  });
   await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
-  await send.click();
+  await paused({ a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] }, () => send.click()); // the form's defaults: 미상 표적, 포대 삼발
+  await button(page, '×8').click();
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 60_000 });
-  await expect(composer).toContainText(/\(훈련\) .+ 실제 사상 \d+\/\d+ \(\d+%\)/);
+  await button(page, '일시정지').click();
+  await page.waitForTimeout(300);
+  const end = Number(await tick.textContent());
+  const shown = (await composer.textContent())!.match(/\(훈련\) (.+?) 실제 사상 (\d+)\/(\d+) \((\d+)%\)/);
+  expect(shown).not.toBeNull();
+  const [, name, dead, size, pct] = shown!;
+
+  // The same game in Node: 연습 시드, clear weather, 훈련 then 작전 개시 at the planned post in 작전 준비.
+  const sim = createSim({ seed: 20261106, seedKind: 'practice', scenario: BASE_SCENARIO, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'standard', terrain: await mockTerrain.load(20261106) });
+  expect(sim.step([{ a: 'mode', v: ['training'] }]).accepted).toEqual([true]);
+  expect(sim.step([{ a: 'start', v: [BASE_SCENARIO.plannedOp.x, BASE_SCENARIO.plannedOp.y] }]).accepted).toEqual([true]);
+  while (sim.state.tick < end) {
+    const batch = inputs.get(sim.state.tick) ?? [];
+    expect(sim.step(batch).accepted, `inputs at tick ${sim.state.tick}`).toEqual(batch.map(() => true));
+  }
+  const unit = sim.state.platoons.find((p) => (p.intel.stage > 0 ? `표적 ${p.intel.tnum}` : null) === name) ?? sim.state.platoons.find((p) => p.type === 'mortar')!;
+  const lost = unit.members.filter((m) => !m.alive).length;
+  expect([Number(dead), Number(size), Number(pct)]).toEqual([lost, unit.members.length, Math.round((100 * lost) / unit.members.length)]);
+  expect(lost).toBeGreaterThan(0); // the volley did hit the section
+
+  // Standard, same situation: no casualty line.
+  await button(page, '재개').click();
+  await button(page, '표준').click();
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'true');
+  await expect(composer).toContainText('효과를 관측하십시오.');
+  await expect(composer).not.toContainText('실제 사상');
 });
 
 test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => {
