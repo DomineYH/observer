@@ -31,6 +31,7 @@ export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
 
 const LATERAL_LABEL = { left: W.lateralDir.left.text, right: W.lateralDir.right.text };
 const RANGE_LABEL = { drop: W.rangeDir.drop.text, add: W.rangeDir.add.text };
+const DANGER_CAP_M = '100'; // 위험근접: what the suggestion may fill in on each axis (demo 909–912); typing is not capped
 const NEXT_LABEL = { adjust: W.warning.adjust.text, ffe: W.warning.ffe.text }; // 조정 · 효력사
 
 /** 좌우·사거리 and their meters, as typed: the correction and the 전이 forms share them. */
@@ -68,10 +69,11 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
 
 /** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
 export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send }: CorrectionProps) {
+  const capped = (metres: string) => (dangerClose && Number(metres) > Number(DANGER_CAP_M) ? DANGER_CAP_M : metres);
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
     next: effect ? 'ffe' : 'adjust',
-    ...(help?.form ?? { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
+    ...(help?.form ? { ...help.form, lateral: capped(help.form.lateral), range: capped(help.form.range) } : { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
   }));
   const set = (patch: Partial<CorrForm>) => setForm({ ...form, ...patch });
   const draft = corrDraft(form, { direction: sent }, effect);

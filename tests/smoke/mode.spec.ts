@@ -790,3 +790,38 @@ test('F-07: 새 임무는 입력기를 처음부터 채운다 — 화면', async
   await expect(composer.getByRole('combobox', { name: '신관' })).toHaveValue('none');
 });
 
+test('F-07: 위험근접 수정 제안은 100 m까지 — 화면', async ({ page }) => {
+  // 훈련, 위험근접 declared, the adjusting round sent about 300 m east and north of the mortar section (찰리호텔 4567 3752
+  // on this seed): 탄착 편의 suggests more than 100 m on both axes, and the fields start at 100 (demo 909–912, 985–990).
+  test.setTimeout(180_000);
+  const { composer, log, send } = await toCall(page);
+  await switchTo(page, '훈련');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4597');
+  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3782');
+  await send.click();
+  await expect(composer.getByRole('combobox', { name: '표적성질' })).toBeVisible({ timeout: 15_000 });
+  await composer.getByRole('checkbox', { name: '위험근접' }).check();
+  await send.click();
+  await speedTo(page, 8);
+  const lateral = composer.getByRole('textbox', { name: '좌우 거리' });
+  const range = composer.getByRole('textbox', { name: '사거리 거리' });
+  await expect(lateral).toBeVisible({ timeout: 60_000 });
+  await speedTo(page, 1);
+  const help = (await composer.getByText(/^탄착 편의/).textContent())!;
+  const [, suggestedLateral, suggestedRange] = help.match(/→ \S+ (\d+), \S+ (\d+)$/)!;
+  expect(Number(suggestedLateral)).toBeGreaterThan(100);
+  expect(Number(suggestedRange)).toBeGreaterThan(100);
+  await expect(lateral).toHaveValue('100');
+  await expect(range).toHaveValue('100');
+
+  // A typed value is not capped: it goes out as typed and 기러기 refuses it (#31). The form comes back from its start.
+  await lateral.fill('150');
+  await expect(lateral).toHaveValue('150');
+  await send.click();
+  await expect(log).toContainText('재송신', { timeout: 15_000 });
+  await expect(lateral).toHaveValue('100', { timeout: 15_000 });
+  await expect(range).toHaveValue('100');
+});
+
