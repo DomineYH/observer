@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { linesFrom, mapPixels, settledMap, toReady } from './helpers';
+import { linesFrom, mapPixels, settledMap, speedTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
@@ -88,8 +88,7 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
 
   // 배속 up, then one 일시정지: the clock stands still, and runs again on 재개.
-  await page.getByRole('button', { name: '×8' }).click();
-  await expect(page.getByRole('button', { name: '×8' })).toHaveAttribute('aria-pressed', 'true');
+  await speedTo(page, 8);
   const fast = Number(await tick.textContent());
   await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(fast + 100);
   await page.getByRole('button', { name: '일시정지' }).click();
@@ -98,6 +97,53 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await expect(tick).toHaveText(paused!);
   await page.getByRole('button', { name: '재개' }).click();
   await expect.poll(async () => tick.textContent()).not.toBe(paused);
+});
+
+test('스모크: 좁은 화면 390 px — 탭 넷과 머리띠 메뉴', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?seed=20261106');
+  // The 7 always-visible 머리띠 items fit one line at 390 px.
+  const band = page.getByRole('banner');
+  const items = [
+    band.getByRole('status', { name: '경과' }),
+    band.getByRole('status', { name: '점수' }),
+    band.getByRole('status', { name: '사용 탄' }),
+    band.getByRole('button', { name: '일시정지' }),
+    band.getByRole('status', { name: '모드', exact: true }),
+    band.getByRole('button', { name: /^배속 ×/ }),
+    band.getByRole('button', { name: '메뉴', exact: true }),
+  ];
+  const boxes = [];
+  for (const item of items) {
+    await expect(item).toBeVisible();
+    boxes.push((await item.boundingBox())!);
+  }
+  const mid = (b: { y: number; height: number }) => b.y + b.height / 2;
+  for (const b of boxes) {
+    expect(Math.abs(mid(b) - mid(boxes[0]!))).toBeLessThan(Math.min(b.height, boxes[0]!.height) / 2);
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+  }
+  // The 4 tabs each open their panel.
+  const tabs = page.getByRole('group', { name: '아래 탭' });
+  for (const [name, region] of [
+    ['입력', '작전 준비'],
+    ['지도', '지도 패널'],
+    ['표적', '표적 목록'],
+    ['무전', '무전 기록'],
+  ] as const) {
+    await tabs.getByRole('button', { name, exact: true }).click();
+    await expect(tabs.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.getByRole('region', { name: region, includeHidden: true }).evaluate((e) => e.checkVisibility())).toBe(true);
+  }
+  // The 머리띠 메뉴 opens and closes.
+  const menuButton = band.getByRole('button', { name: '메뉴', exact: true });
+  const menu = page.getByRole('region', { name: '머리띠 메뉴' });
+  await menuButton.click();
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('button', { name: '랭킹' })).toBeVisible();
+  await menuButton.click();
+  await expect(menu).toBeHidden();
 });
 
 /** Whether the lower view is drawn in 2-pixel blocks: 보통 renders 480 internal pixels, stretched to a 960-wide canvas. */
@@ -132,6 +178,8 @@ test('F-30: 연습 시드의 기상 선택 — 화면', async ({ page }) => {
 });
 
 test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page }) => {
+  // `doubled` reads a 960-px view canvas: at 1280 px the wide layout's view column is narrower.
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?seed=20261106');
   const tick = page.getByRole('status', { name: '틱' });
   const prep = page.getByRole('region', { name: '작전 준비' });

@@ -15,14 +15,15 @@ import { terrainColours } from '@render/shade';
 import { Composer } from '@ui/Composer';
 import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
-import { PrepPanel } from '@ui/PrepPanel';
+import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
-import { HeadBand, type Speed } from '@ui/HeadBand';
+import { HeadBand, ModeSwitch, QualityPicker, type Speed } from '@ui/HeadBand';
+import { LowerTabs, type Tab } from '@ui/LowerTabs';
 import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
@@ -34,6 +35,7 @@ import { newGame } from './game';
 import { startLoop } from './loop';
 import { submissionOf } from './records';
 import { chooseSeed } from './seed';
+import './app.css';
 
 selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
@@ -171,6 +173,7 @@ const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사�
 function App() {
   const { sim, init } = useSyncExternalStore(subscribe, () => game);
   const [quality, setQuality] = useState<Quality>(DEFAULT_QUALITY); // outlives the per-game view
+  const [tab, setTab] = useState<Tab>('input'); // 아래 탭 on a narrow screen
   const tick = useSyncExternalStore(subscribe, () => game.sim.state.tick);
   // The simulation replaces these objects when they change, so their identity is a valid snapshot.
   const phase = useSyncExternalStore(subscribe, () => game.sim.state.phase);
@@ -188,64 +191,88 @@ function App() {
   // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
+  // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
       {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} />}
-      <TickCounter tick={tick} />
-      <HeadBand
-        tick={tick}
-        score={score}
-        rounds={rounds}
-        mode={mode}
-        speed={speed}
-        paused={paused}
-        phase={phase}
-        onMode={switchMode}
-        onSpeed={(s) => setPace({ speed: s })}
-        onPause={() => setPace({ paused: !paused })}
-      />
-      <SoundToggles sound={sound} />
-      <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} />
-      <RankingDialog archive={archive} callsign={callsign} />
-      <ObservationView
-        key={games}
-        quality={quality}
-        onQuality={setQuality}
-        terrain={terrain}
-        colours={colours}
-        weather={init.weather}
-        state={sim.state}
-        send={send}
-        onFrame={onFrame}
-        showFps={showFps}
-        covered={covered}
-        friends={BASE_SCENARIO.friends}
-      />
-      <PrepPanel
-        state={{ phase, op, picked, reportDue }}
-        scenario={BASE_SCENARIO}
-        terrain={terrain}
-        seed={seed}
-        seedKind={seedKind}
-        weather={init.weather}
-        send={send}
-        queued={game.session.queued}
-        live={sim.state}
-        preset={preset}
-        onPreset={(p) => void changeWeather(p)}
-      />
-      <TargetList platoons={sim.state.platoons} mode={mode} /* re-rendered with the tick above */ />
-      <div hidden={covered}>
-        <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
+      <div className="app" data-tab={tab}>
+        <HeadBand
+          tick={tick}
+          score={score}
+          rounds={rounds}
+          mode={mode}
+          speed={speed}
+          paused={paused}
+          phase={phase}
+          onSpeed={(s) => setPace({ speed: s })}
+          onPause={() => setPace({ paused: !paused })}
+        >
+          <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={switchMode} />
+          <QualityPicker quality={quality} onQuality={setQuality} />
+          <SoundToggles sound={sound} />
+          <div>
+            {/* M1 has only the mock backend: callsigns and records stay in this browser. */}
+            <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} /> <output aria-label="연결">오프라인</output>
+          </div>
+          <span>
+            시드 <output aria-label="시드">{seedKind === 'daily' ? '일일' : '연습'} {seed}</output>
+          </span>
+          <span>
+            기상 <output aria-label="기상">{weatherChip(init.weather)}</output>
+          </span>
+          <RankingDialog archive={archive} callsign={callsign} />
+        </HeadBand>
+        <div className="sr-only">
+          <TickCounter tick={tick} />
+        </div>
+        <div className="view">
+          <ObservationView
+            key={games}
+            quality={quality}
+            terrain={terrain}
+            colours={colours}
+            weather={init.weather}
+            state={sim.state}
+            send={send}
+            onFrame={onFrame}
+            showFps={showFps}
+            covered={covered}
+            friends={BASE_SCENARIO.friends}
+          />
+        </div>
+        <LowerTabs tab={tab} onTab={setTab} />
+        <div data-panel="input">
+          <PrepPanel
+            state={{ phase, op, picked, reportDue }}
+            scenario={BASE_SCENARIO}
+            terrain={terrain}
+            seed={seed}
+            seedKind={seedKind}
+            weather={init.weather}
+            send={send}
+            queued={game.session.queued}
+            live={sim.state}
+            preset={preset}
+            onPreset={(p) => void changeWeather(p)}
+          />
+          {covered ? (
+            <section aria-label="입력기">
+              <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
+            </section>
+          ) : (
+            <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} />
+          )}
+        </div>
+        <div data-panel="map" hidden={covered}>
+          <MapPanel terrain={terrain} scenario={BASE_SCENARIO} state={sim.state} send={send} onFrame={onFrame} weather={init.weather} />
+        </div>
+        <div data-panel="targets">
+          <TargetList platoons={sim.state.platoons} mode={mode} /* re-rendered with the tick above */ />
+        </div>
+        <div data-panel="log">
+          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
+        </div>
       </div>
-      {covered ? (
-        <section aria-label="입력기">
-          <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
-        </section>
-      ) : (
-        <Composer stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} />
-      )}
-      <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
     </>
   );
 }

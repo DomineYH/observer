@@ -28,6 +28,11 @@ export interface PrepPanelProps {
 
 const PRESET_NAMES: Record<WeatherPreset, string> = { clear: '맑음', haze: '박무', rain: '비', wind: '강한 북서풍', fog: '안개' };
 
+/** The 머리띠 메뉴's short 기상 (demo 349): visibility and wind. */
+export function weatherChip(w: Weather): string {
+  return `시정 ${(w.visibilityM / 1000).toFixed(1)} km · 바람 ${w.windFromDeg}° ${(w.windSpeedTenthMs / 10).toFixed(1)} m/s`;
+}
+
 function weatherText(w: Weather): string {
   const parts = [
     `시정 ${(w.visibilityM / 1000).toFixed(1)} km`,

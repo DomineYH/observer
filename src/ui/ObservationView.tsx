@@ -11,10 +11,10 @@ import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
 import { postStatus } from './post';
+import { AimPad } from './AimPad';
 import { LaseReadout } from './Laser';
 
 const TAP_PX = 5;
-const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 export interface ObservationViewProps {
   terrain: TerrainData;
@@ -26,16 +26,15 @@ export interface ObservationViewProps {
   /** Calls `draw` once per frame until the returned function is called. */
   onFrame: (draw: (now: number) => void) => () => void;
   showFps: boolean;
-  /** 화질, the player's choice: held above the view so a new game (which remounts it) keeps it. */
+  /** 화질, the player's choice (picked in the 머리띠 메뉴): held above the view so a new game (which remounts it) keeps it. */
   quality: Quality;
-  onQuality: (q: Quality) => void;
   /** 표준 모드 일시정지: the view is hidden and neither draws nor takes keys. */
   covered: boolean;
   /** 아군 진지, labelled in training. */
   friends: readonly Point[];
 }
 
-export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, onQuality, covered, friends }: ObservationViewProps) {
+export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, covered, friends }: ObservationViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const hidden = useRef(covered); // read by the frame and key listeners, which outlive a render
   hidden.current = covered;
@@ -170,14 +169,8 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       <button type="button" disabled={state.phase !== 'live' || state.post.state !== 'ready'} onClick={() => aim.lase()}>
         레이저 <kbd>R</kbd>
       </button>
+      <AimPad aim={aim} />
       <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} />
-      <span role="group" aria-label="화질">
-        {(Object.keys(QUALITIES) as Quality[]).map((q) => (
-          <button key={q} type="button" aria-pressed={q === quality} onClick={() => onQuality(q)}>
-            {QUALITY_NAMES[q]}
-          </button>
-        ))}
-      </span>
     </section>
   );
 }

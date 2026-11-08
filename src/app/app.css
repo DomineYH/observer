@@ -1,0 +1,246 @@
+/* Layout (spec 화면과 조작, ticket #41): one set of panels and one 머리띠, placed by width alone.
+   Palette and controls after the demo (lines 11–23). */
+:root {
+  --bg: #0c100b;
+  --panel: #131911;
+  --line: #2a3525;
+  --txt: #d9ddc9;
+  --dim: #8b947c;
+  --amber: #e8b04a;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 14px;
+}
+button {
+  font: inherit;
+  color: var(--txt);
+  background: #1c2418;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  background: #27321f;
+}
+button[aria-pressed='true'] {
+  background: var(--amber);
+  color: #17130a;
+  font-weight: 700;
+}
+button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+select,
+input {
+  font: inherit;
+  background: #0e130c;
+  color: var(--txt);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+/* No layout rule below may show what a component hid (표준 일시정지 hides the view and the map). */
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 머리띠 */
+.band > header,
+.hb-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+}
+.brand small {
+  color: var(--dim);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.stat,
+.band output {
+  white-space: nowrap;
+}
+.hb-label {
+  color: var(--dim);
+}
+.tag {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1px 6px;
+  color: var(--dim);
+}
+.hb-menu form {
+  display: inline;
+}
+.aim-pad button {
+  min-width: 44px;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Wide: everything at once (demo main grid); the 머리띠 spread out in one band. */
+.app {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  max-width: 1520px;
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(300px, 390px);
+  grid-template-areas:
+    'top top top'
+    'view view input'
+    'map targets log';
+  align-items: start;
+}
+.band {
+  grid-area: top;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.view {
+  grid-area: view;
+}
+[data-panel='input'] {
+  grid-area: input;
+}
+[data-panel='map'] {
+  grid-area: map;
+}
+[data-panel='targets'] {
+  grid-area: targets;
+}
+[data-panel='log'] {
+  grid-area: log;
+}
+.hb-toggle,
+.lower-tabs {
+  display: none;
+}
+@media (768px <= width < 1000px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'top top'
+      'view view'
+      'input log'
+      'map targets';
+  }
+}
+
+/* Narrow (spec: under 768 px): the view fixed on top at full width, 아래 탭 below, the 머리띠 folded into its menu. */
+@media (width < 768px) {
+  .app {
+    height: 100dvh;
+    padding: 0;
+    gap: 0;
+    grid-template-columns: 100%;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: 'head' 'view' 'tabs' 'body';
+    align-items: stretch;
+  }
+  .band {
+    display: contents;
+  }
+  .band > header {
+    grid-area: head;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .band > header button {
+    padding: 3px 6px;
+  }
+  .brand small,
+  .hb-label {
+    display: none;
+  }
+  /* Room for the widest values (99:59 · 9999 · 999발), so the one-line check at load is the worst case. */
+  .band output {
+    display: inline-block;
+    font-variant-numeric: tabular-nums;
+  }
+  output[aria-label='경과'] {
+    min-width: 5ch;
+  }
+  output[aria-label='점수'] {
+    min-width: 4ch;
+  }
+  output[aria-label='사용 탄'] {
+    min-width: 5ch;
+  }
+  .view {
+    grid-area: view;
+  }
+  .view section {
+    padding-bottom: 4px;
+  }
+  .lower-tabs {
+    grid-area: tabs;
+    display: flex;
+  }
+  .lower-tabs button {
+    flex: 1;
+    border-radius: 0;
+    min-height: 40px;
+  }
+  [data-panel] {
+    grid-area: body;
+    overflow: auto;
+    min-height: 0;
+    padding: 6px;
+  }
+  .app[data-tab='input'] [data-panel]:not([data-panel='input']),
+  .app[data-tab='map'] [data-panel]:not([data-panel='map']),
+  .app[data-tab='targets'] [data-panel]:not([data-panel='targets']),
+  .app[data-tab='log'] [data-panel]:not([data-panel='log']) {
+    display: none;
+  }
+  .hb-toggle {
+    display: inline-block;
+  }
+  /* The menu covers the tabs and their panel, never the view. */
+  .hb-menu {
+    grid-row: 3 / 5;
+    grid-column: 1;
+    z-index: 2;
+    overflow: auto;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px;
+  }
+  .hb-menu:not([data-open]) {
+    display: none;
+  }
+}

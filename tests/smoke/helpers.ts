@@ -71,3 +71,10 @@ export async function settledMap(page: Page, map: Locator): Promise<string> {
     last = now;
   }
 }
+
+/** 배속 is one button cycling ×1 → ×2 → ×4 → ×8 → ×1: press it until it reads ×`n`. */
+export async function speedTo(page: Page, n: 1 | 2 | 4 | 8) {
+  const speed = page.getByRole('button', { name: /^배속 ×/ });
+  for (let i = 0; i < 4 && (await speed.getAttribute('aria-label')) !== `배속 ×${n}`; i++) await speed.click();
+  await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
+}

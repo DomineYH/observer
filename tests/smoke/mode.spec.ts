@@ -5,7 +5,7 @@ import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap } from './helpers';
+import { mapPixels, settledMap, speedTo } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -271,7 +271,7 @@ test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
   });
   await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
   await paused({ a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] }, () => send.click()); // the form's defaults: 미상 표적, 포대 삼발
-  await button(page, '×8').click();
+  await speedTo(page, 8);
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 60_000 });
   await button(page, '일시정지').click();
   await page.waitForTimeout(300);
@@ -324,7 +324,7 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
   await map.click({ position: { x: box.width / 2 + 1, y: box.height / 2 } });
   const [, e, n] = (await mapPanel.getByText(/^좌표자:/).textContent())!.match(/(\d{4}) (\d{4})/)!;
   await mapPanel.getByRole('button', { name: /^여기로 관측소 이동 · \d+ m · 약 \d\d:\d\d/ }).click();
-  await button(page, '×8').click();
+  await speedTo(page, 8);
   await expect(log).toContainText('관측소 설치 끝.', { timeout: 60_000 });
   await expect(report.getByLabel('동', { exact: true })).toHaveValue(e!);
   await expect(report.getByLabel('북', { exact: true })).toHaveValue(n!);

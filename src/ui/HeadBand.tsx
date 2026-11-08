@@ -1,8 +1,13 @@
+import { useState, type ReactNode } from 'react';
 import type { Mode, Phase } from '@sim';
+import { QUALITIES, type Quality } from '@render/projection';
 import { clock } from './clock';
 
 export const SPEEDS = [1, 2, 4, 8] as const;
 export type Speed = (typeof SPEEDS)[number];
+
+const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준' };
+const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 interface Props {
   tick: number;
@@ -12,36 +17,80 @@ interface Props {
   speed: Speed;
   paused: boolean;
   phase: Phase;
-  onMode: (m: Mode) => void;
   onSpeed: (s: Speed) => void;
   onPause: () => void;
+  /** The 머리띠 메뉴 items, in the spec's order. */
+  children?: ReactNode;
 }
 
-/** 머리띠 (wide layout): 경과 · 점수 · 사용 탄, then 모드, 배속 and 일시정지. Pause and speed are not inputs. */
-export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onMode, onSpeed, onPause }: Props) {
-  // A mode switch goes in on the next tick, and a paused game has none.
-  const modeOff = paused || phase === 'ended';
+/**
+ * 머리띠, one set for every width: 경과 · 점수 · 사용 탄 · 일시정지 · 모드 딱지 · 배속 · 메뉴, then the 머리띠 메뉴. The page's CSS
+ * spreads the menu inline on a wide screen and makes it a sheet over the lower tabs on a narrow one. Pause and speed
+ * are not inputs, and opening the menu does not pause.
+ */
+export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children }: Props) {
+  const [open, setOpen] = useState(false);
   return (
-    <p>
-      경과 <output aria-label="경과">{clock(tick)}</output> · 점수 <output aria-label="점수">{score}</output> · 사용 탄{' '}
-      <output aria-label="사용 탄">{rounds}발</output>{' '}
-      <span role="group" aria-label="모드">
-        {(['training', 'standard'] as const).map((m) => (
-          <button key={m} type="button" aria-pressed={mode === m} disabled={modeOff} onClick={() => onMode(m)}>
-            {m === 'training' ? '훈련' : '표준'}
-          </button>
-        ))}
-      </span>{' '}
-      <span role="group" aria-label="배속">
-        {SPEEDS.map((s) => (
-          <button key={s} type="button" aria-pressed={speed === s} onClick={() => onSpeed(s)}>
-            ×{s}
-          </button>
-        ))}
-      </span>{' '}
-      <button type="button" aria-pressed={paused} disabled={phase !== 'live'} onClick={onPause}>
-        {paused ? '재개' : '일시정지'}
-      </button>
-    </p>
+    <div className="band">
+      <header>
+        <span className="brand">
+          OBSERVER <small>포병 관측 · 목업 데이터</small>
+        </span>
+        <span className="stat">
+          <span className="hb-label">경과 </span>
+          <output aria-label="경과">{clock(tick)}</output>
+        </span>
+        <span className="stat">
+          <span className="hb-label">점수 </span>
+          <output aria-label="점수">{score}</output>
+        </span>
+        <span className="stat">
+          <span className="hb-label">사용 탄 </span>
+          <output aria-label="사용 탄">{rounds}발</output>
+        </span>
+        <button type="button" aria-pressed={paused} disabled={phase !== 'live'} onClick={onPause}>
+          {paused ? '재개' : '일시정지'}
+        </button>
+        <output aria-label="모드" className="tag">
+          {MODE_NAMES[mode]}
+        </output>
+        <button type="button" aria-label={`배속 ×${speed}`} onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>
+          ×{speed}
+        </button>
+        <button type="button" className="hb-toggle" aria-pressed={open} aria-controls="hb-menu" onClick={() => setOpen(!open)}>
+          메뉴
+        </button>
+      </header>
+      <section id="hb-menu" aria-label="머리띠 메뉴" className="hb-menu" data-open={open || undefined}>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+/** 모드 전환 (F-14): an input, applied on the next tick, so not while paused or after the end. */
+export function ModeSwitch({ mode, paused, phase, onMode }: { mode: Mode; paused: boolean; phase: Phase; onMode: (m: Mode) => void }) {
+  const off = paused || phase === 'ended';
+  return (
+    <span role="group" aria-label="모드 전환">
+      {(['training', 'standard'] as const).map((m) => (
+        <button key={m} type="button" aria-pressed={mode === m} disabled={off} onClick={() => onMode(m)}>
+          {MODE_NAMES[m]}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+/** 화질, the player's choice: it outlives a game. */
+export function QualityPicker({ quality, onQuality }: { quality: Quality; onQuality: (q: Quality) => void }) {
+  return (
+    <span role="group" aria-label="화질">
+      {(Object.keys(QUALITIES) as Quality[]).map((q) => (
+        <button key={q} type="button" aria-pressed={q === quality} onClick={() => onQuality(q)}>
+          {QUALITY_NAMES[q]}
+        </button>
+      ))}
+    </span>
   );
 }
