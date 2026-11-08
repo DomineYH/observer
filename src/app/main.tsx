@@ -155,7 +155,7 @@ function switchMode(m: Mode): void {
 
 let colours = terrainColours(terrain, game.init.weather);
 
-/** 연습 시드의 기상 변경 (F-30): only in 작전 준비; a new simulation and 입력 기록, with the 관측소 후보 put in again. */
+/** 연습 시드의 기상 변경 (F-30): only in 작전 준비; a new simulation and 입력 기록, with the 관측소 후보 and the mode put in again. */
 async function changeWeather(p: WeatherPreset): Promise<void> {
   if (seedKind !== 'practice' || game.sim.state.phase !== 'prep') return;
   const weather = await mockWeather.load(seed, seedKind, p);

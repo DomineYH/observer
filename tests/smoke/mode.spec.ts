@@ -329,3 +329,22 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
   await expect(report.getByRole('textbox', { name: '동', exact: true })).toHaveValue(e!);
   await expect(report.getByRole('textbox', { name: '북', exact: true })).toHaveValue(n!);
 });
+
+test('F-30: 기상 변경은 고른 모드를 남긴다 — 화면', async ({ page }) => {
+  const { seen } = dialogs(page);
+  await picked(page);
+  await button(page, '훈련').click();
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  await expect(prep).toContainText('기상 시정 2.5 km');
+  // Still training: the mode buttons, and a training aid on the map; the 후보 kept too.
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toBeVisible();
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  // Training was chosen before 작전 개시: the warning has nothing to warn about.
+  await start(page);
+  expect(seen).toEqual([]);
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+});
