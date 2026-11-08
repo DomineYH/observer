@@ -576,20 +576,21 @@ test('F-07: 표적위치는 모드 전환에 다시 채워진다 — 화면', as
 });
 
 test('F-07: 표적성질은 모드 전환에 다시 채워진다 — 화면', async ({ page }) => {
-  test.setTimeout(60_000);
-  const { composer, log, send } = await toCall(page);
-  await send.click();
-  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
-  await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
-  await composer.getByRole('textbox', { name: '북', exact: true }).fill('3150');
-  await send.click();
+  test.setTimeout(90_000);
+  // Two choices on offer: the identified mortar section, and 미상 표적, the start at a grid far from it.
+  const { composer, kind } = await identifiedMortar(page);
+  await toDescription(page, '4720', '3150');
+  await expect(kind).toHaveValue(UNKNOWN);
+  const mortar = (await kind.locator('option', { hasText: '박격포' }).getAttribute('value'))!;
+  await kind.selectOption(mortar);
+  await expect(kind).toHaveValue(mortar);
   const rounds = composer.getByRole('combobox', { name: '발수' });
-  await expect(rounds).toBeVisible({ timeout: 15_000 });
   await rounds.selectOption('1');
   await composer.getByRole('combobox', { name: '신관' }).selectOption('vt');
   await composer.getByRole('combobox', { name: '통제' }).selectOption('amc');
   await composer.getByRole('checkbox', { name: '위험근접' }).check();
   await switchTo(page, '훈련');
+  await expect(kind).toHaveValue(UNKNOWN);
   await expect(rounds).toHaveValue('3');
   await expect(composer.getByRole('combobox', { name: '신관' })).toHaveValue('none');
   await expect(composer.getByRole('combobox', { name: '통제' })).toHaveValue('ready');
