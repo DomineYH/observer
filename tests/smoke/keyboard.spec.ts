@@ -172,12 +172,14 @@ test.describe('좁은 화면', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('button', { name: '훈련' })).toBeFocused(); // its first item
-    // Not a trap: Tab leaves the sheet while the game keeps running.
+    // Not a trap: Tab leaves the sheet for the lower panel while the game keeps running, and Esc still closes it.
     const inMenu = () => menu.evaluate((m) => m.contains(document.activeElement));
-    for (let i = 0; i < 30 && (await inMenu()); i++) await page.keyboard.press('Tab');
+    const prep = page.getByRole('region', { name: '작전 준비', includeHidden: true });
+    const inPrep = () => prep.evaluate((m) => m.contains(document.activeElement));
+    for (let i = 0; i < 60 && !(await inPrep()); i++) await page.keyboard.press('Tab');
+    expect(await inPrep()).toBe(true);
     expect(await inMenu()).toBe(false);
     await expect(menu).toBeVisible();
-    await menu.getByRole('button', { name: '음성' }).focus();
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');

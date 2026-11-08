@@ -34,18 +34,19 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
   const menu = useRef<HTMLElement>(null);
   // Opened, the focus goes in (no trap: the game keeps running); Esc closes it and the focus goes back to 메뉴.
   useEffect(() => {
-    if (open) menu.current?.querySelector<HTMLElement>('button:enabled, input:enabled, select:enabled')?.focus();
+    if (!open) return;
+    menu.current?.querySelector<HTMLElement>('button:enabled, input:enabled, select:enabled')?.focus();
+    const down = (e: KeyboardEvent) => {
+      // Wherever the focus is; but the 랭킹 dialog (opened from the menu) takes its own Esc.
+      if (e.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+      setOpen(false);
+      toggle.current?.focus();
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
   }, [open]);
   return (
-    <div
-      className="band"
-      onKeyDown={(e) => {
-        // Esc in the 랭킹 dialog, which lives in the menu, closes only the dialog.
-        if (e.key !== 'Escape' || !open || (e.target as Element).closest('dialog')) return;
-        setOpen(false);
-        toggle.current?.focus();
-      }}
-    >
+    <div className="band">
       <header>
         <span className="brand">
           OBSERVER <small>포병 관측·목업</small>
