@@ -10,6 +10,7 @@ import { atmosphere, type TerrainColours } from '@render/shade';
 import { drawSprites, spritesOf } from '@render/sprites';
 import { createViewBuffers, renderView, type ViewBuffers } from '@render/voxel';
 import { createAimControl } from './aim';
+import { ignoreShortcut } from './shortcut';
 import { postStatus } from './post';
 import { AimPad } from './AimPad';
 import { LaseReadout } from './Laser';
@@ -122,7 +123,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (hidden.current) return;
+      if (hidden.current || ignoreShortcut(e)) return;
       if (aim.key(e.key, e.shiftKey)) e.preventDefault();
       else if (e.key === 'b' || e.key === 'B') aim.toggleBino();
       else if ((e.key === 'r' || e.key === 'R') && !e.repeat && state.phase === 'live') aim.lase();

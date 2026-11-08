@@ -13,6 +13,7 @@ import { EffectForm } from './EffectForm';
 import { PositionForm } from './PositionForm';
 import { postStatus, staleKnown } from './post';
 import { ShiftForm } from './ShiftForm';
+import { ignoreShortcut } from './shortcut';
 
 const W = RADIO_GRAMMAR.tables;
 const FUZE_LABEL: Record<FuzeRequest, string> = { none: '신관 요청 없음', quick: W.fuze.quick.text, vt: W.fuze.vt.text };
@@ -84,7 +85,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   useEffect(() => {
     if (!amc) return;
     const down = (e: KeyboardEvent) => {
-      const input = fireKey(e.key);
+      const input = !ignoreShortcut(e) && fireKey(e.key);
       if (input && !e.repeat) send(input);
     };
     document.addEventListener('keydown', down);
