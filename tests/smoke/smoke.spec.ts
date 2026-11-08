@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { linesFrom, toReady } from './helpers';
+import { linesFrom, mapPixels, settledMap, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
@@ -84,27 +84,6 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   await page.keyboard.press('b');
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
 });
-
-/** The map's pixels on a 16 px grid, less the bottom-right corner where the wind arrow follows the weather. */
-const mapPixels = (map: Locator) =>
-  map.evaluate((c: HTMLCanvasElement) => {
-    const ctx = c.getContext('2d')!;
-    const out: string[] = [];
-    for (let y = 8; y < c.height; y += 16)
-      for (let x = 8; x < c.width; x += 16) if (x < c.width * 0.82 || y < c.height * 0.82) out.push(ctx.getImageData(x, y, 1, 1).data.join());
-    return out.join(';');
-  });
-
-/** The map's pixels once it has settled: the map redraws every 120 ms, so a pick shows up a frame or two after its text. */
-async function settledMap(page: Page, map: Locator): Promise<string> {
-  let last = await mapPixels(map);
-  for (;;) {
-    await page.waitForTimeout(300);
-    const now = await mapPixels(map);
-    if (now === last) return now;
-    last = now;
-  }
-}
 
 /** Whether the lower view is drawn in 2-pixel blocks: 보통 renders 480 internal pixels, stretched to a 960-wide canvas. */
 const doubled = (view: Locator) =>

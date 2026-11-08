@@ -50,3 +50,24 @@ export const linesFrom = async (log: Locator, from: string) => {
   const all = (await log.locator('li').allTextContents()).map((t) => t.replace(/^\d\d:\d\d /, ''));
   return all.slice(all.findIndex((t) => t.includes(from)));
 };
+
+/** The map's pixels on a 16 px grid, less the bottom-right corner where the wind arrow follows the weather. */
+export const mapPixels = (map: Locator) =>
+  map.evaluate((c: HTMLCanvasElement) => {
+    const ctx = c.getContext('2d')!;
+    const out: string[] = [];
+    for (let y = 8; y < c.height; y += 16)
+      for (let x = 8; x < c.width; x += 16) if (x < c.width * 0.82 || y < c.height * 0.82) out.push(ctx.getImageData(x, y, 1, 1).data.join());
+    return out.join(';');
+  });
+
+/** The map's pixels once it has settled: the map redraws every 120 ms, so a pick shows up a frame or two after its text. */
+export async function settledMap(page: Page, map: Locator): Promise<string> {
+  let last = await mapPixels(map);
+  for (;;) {
+    await page.waitForTimeout(300);
+    const now = await mapPixels(map);
+    if (now === last) return now;
+    last = now;
+  }
+}
