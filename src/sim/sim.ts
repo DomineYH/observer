@@ -48,7 +48,7 @@ export function createSim(init: SimInit): Sim {
     effects: [],
     targets: 0,
     mode: init.mode,
-    trainingUsed: false, // set by the step once live
+    trainingUsed: false, // set by a training switch after 작전 개시, or 작전 개시 in training
     score: 0,
     aim: { ...INITIAL_AIM },
     bino: false,
@@ -89,6 +89,7 @@ export function createSim(init: SimInit): Sim {
           const m = input.v![0] as Mode;
           if (m === state.mode) return false; // already in it
           state.mode = m;
+          if (m === 'training' && state.phase !== 'prep') state.trainingUsed = true; // sticky from 작전 개시 on
           return true;
         }
         if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom' || a === 'shift') return applyRadio(state, ctx, a, input.v);
@@ -104,11 +105,13 @@ export function createSim(init: SimInit): Sim {
         else if (a === 'lase') return state.post.state === 'ready' && applyLase(state, init.terrain, rng.las, v); // so does the laser
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
-          if (a === 'start') openProcedure(state);
+          if (a === 'start') {
+            openProcedure(state);
+            if (state.mode === 'training') state.trainingUsed = true; // in training at 작전 개시
+          }
         }
         return true;
       });
-      if (state.phase !== 'prep' && state.mode === 'training') state.trainingUsed = true;
       if (state.phase === 'live') {
         state.tick++; // 작전 준비: the clock stands still
         updatePost(state, ctx); // the post walks first: this tick's sight is from where it now stands

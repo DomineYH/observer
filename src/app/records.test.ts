@@ -80,3 +80,23 @@ test('F-30: 랭킹 자격 — 작전 개시 뒤 훈련으로 바꾼 판은 저�
   expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새12');
   expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새34', '참새12']);
 });
+
+test('F-30: 랭킹 자격 — 한 틱 안에 훈련으로 바꿨다 돌아온 판도 저장만 된다', async () => {
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
+  const at = { ...init(20261106), scenario: NO_ENEMY };
+  const g = play(at);
+  g.take(START);
+  g.session.send({ a: 'mode', v: ['training'] });
+  g.session.send({ a: 'mode', v: ['standard'] });
+  g.step();
+  expect(g.session.log.slice(-2).map((i) => [i.t, i.v![0]])).toEqual([
+    [1, 'training'],
+    [1, 'standard'],
+  ]);
+  for (const input of MISSION) g.take(input);
+  const sub = submissionOf('참새56', g.sim, at, g.session.log);
+  expect(replay(sub.replay, at.terrain, at.scenario).record.mode).toBe('training');
+  const stored = await archive.submit(sub);
+  expect([stored.record.mode, stored.ranked]).toEqual(['training', false]);
+  expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새56');
+});

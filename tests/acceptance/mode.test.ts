@@ -66,4 +66,27 @@ describe('F-14: 모드 전환은 입력이다', () => {
     sim.step([STANDARD]);
     expect(sim.record().mode).toBe('training');
   });
+
+  test('F-14: 모드 전환은 입력이다 — 한 틱 안의 전환도 남는다', () => {
+    // After 작전 개시: training then standard in one step is a training game.
+    const sim = createSim(init(20261106));
+    sim.step([START]);
+    expect(sim.step([TRAINING, STANDARD]).accepted).toEqual([true, true]);
+    expect(sim.state.mode).toBe('standard');
+    expect(sim.record().mode).toBe('training');
+    // In training at 작전 개시, standard in the same step: training too.
+    const started = createSim(init(20261106));
+    started.step([TRAINING]);
+    expect(started.step([START, STANDARD]).accepted).toEqual([true, true]);
+    expect(started.record().mode).toBe('training');
+    // In 작전 준비, training and back in the step before 작전 개시: still free.
+    const free = createSim(init(20261106));
+    free.step([TRAINING, STANDARD, START]);
+    expect(free.record().mode).toBe('standard');
+    // The replay gives the same mode.
+    const r = replay(replayData([{ t: 0, ...START }, { t: 1, ...TRAINING }, { t: 1, ...STANDARD }], sim.state.tick), init(20261106).terrain, BASE_SCENARIO);
+    expect(r.ignored).toBe(0);
+    expect(r.record.mode).toBe('training');
+    expect(r.record).toEqual(sim.record());
+  });
 });
