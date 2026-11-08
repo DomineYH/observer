@@ -837,8 +837,9 @@ async function nearMortar(page: Page) {
   await start(page);
 }
 
-/** Aims at the mortar section, presses it, and watches it through the binoculars until it is identified. */
-async function watchMortar(page: Page) {
+/** Aims at the mortar section, presses it, and watches it through the binoculars until it is identified; `watching`
+ * runs while it is. */
+async function watchMortar(page: Page, watching?: () => Promise<void>) {
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   const view = page.getByRole('img', { name: '관측 화면' });
   for (let i = 0; i < 6; i++) await page.keyboard.press('Shift+ArrowLeft');
@@ -850,6 +851,7 @@ async function watchMortar(page: Page) {
   const targets = page.getByRole('region', { name: '표적 목록' });
   await expect(targets).toContainText('표적 1 미상');
   await page.keyboard.press('b');
+  await watching?.();
   await expect(targets).toContainText('적정 확인', { timeout: 30_000 });
 }
 
@@ -912,8 +914,7 @@ test('F-07: 전이 표적성질은 끝난 소대를 뺀다', async ({ page }) =>
   await speedTo(page, 8);
   await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
   await speedTo(page, 1);
-  // It has a fate: 무력화 scores 100, 파괴 150, and nothing else has scored yet.
-  await expect.poll(async () => Number(await page.getByRole('status', { name: '점수' }).textContent())).toBeGreaterThanOrEqual(100);
+  await expect(page.getByRole('region', { name: '표적 목록' })).toContainText(/파괴|무력화/); // it has a fate
   await send.click(); // 임무끝
 
   const shift = page.getByRole('region', { name: '전이사격' });
@@ -979,5 +980,31 @@ test('F-07: 수정 제안은 다시 그려도 같다 — 화면', async ({ page 
   await expect(lateral).toHaveValue(values[0]!);
   await expect(range).toHaveValue(values[1]!);
   await expect(help).toHaveText(shown);
+});
+
+test('F-04: 표적 목록은 결과와 관측 진행을 보인다 — 화면', async ({ page }) => {
+  // Demo 1093–1097: `· 관측 N%` while a unit is being identified, its fate after its description.
+  test.setTimeout(180_000);
+  await nearMortar(page);
+  const targets = page.getByRole('region', { name: '표적 목록' });
+  await expect(targets).toContainText('아직 식별한 표적이 없습니다.');
+  const watched = async () => Number((await targets.textContent())!.match(/· 관측 (\d+)%/)?.[1] ?? -1);
+  await watchMortar(page, async () => {
+    await expect.poll(watched).toBeGreaterThan(0);
+    const earlier = await watched();
+    expect(earlier).toBeLessThan(100);
+    await expect.poll(watched).toBeGreaterThan(earlier);
+  });
+  await expect(targets).not.toContainText(/· 관측 \d+%/); // 적정 확인: nothing left to watch
+
+  // 바로 효력사 of five rounds on it.
+  const { composer, send } = await toLocation(page, 'ffe');
+  await toDescription(page, '4567', '3752');
+  await composer.getByRole('combobox', { name: '발수' }).selectOption('5');
+  await expect(targets).not.toContainText(/파괴|무력화/);
+  await send.click();
+  await speedTo(page, 8);
+  await expect(composer).toContainText('효과를 관측하십시오.', { timeout: 90_000 });
+  await expect(targets.getByRole('listitem')).toContainText(/표적 1 .+ (파괴|무력화)/);
 });
 

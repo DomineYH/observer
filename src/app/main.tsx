@@ -295,7 +295,7 @@ function App() {
           />
         </div>
         <div data-panel="targets">
-          <TargetList platoons={sim.state.platoons} mode={mode} /* re-rendered with the tick above */ />
+          <TargetList platoons={sim.state.platoons} mode={mode} op={op} /* re-rendered with the tick above */ />
         </div>
         <div data-panel="log">
           <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />

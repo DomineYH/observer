@@ -12,7 +12,7 @@ export function unitName(platoons: Platoons, pid: number): string {
   return { recon: '적 정찰조', apc: '적 장갑차', mortar: '적 박격포반' }[p.type];
 }
 
-const FATE: Partial<Record<Platoons[number]['state'], string>> = { destroyed: '파괴', broken: '무력화', overran: '진지 돌파' };
+export const FATE: Partial<Record<Platoons[number]['state'], string>> = { destroyed: '파괴', broken: '무력화', overran: '진지 돌파' };
 const STAGE = ['', '탐지', '병종 식별', '적정 확인'] as const;
 const EFFECT = RADIO_GRAMMAR.tables.effect;
 
