@@ -78,3 +78,36 @@ export async function speedTo(page: Page, n: 1 | 2 | 4 | 8) {
   for (let i = 0; i < 4 && (await speed.getAttribute('aria-label')) !== `배속 ×${n}`; i++) await speed.click();
   await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
 }
+
+/** The shortest end the app allows, from a started game at 찰리호텔 4512 3256 just after 작전 개시: 효력사 on our own post.
+ * 기러기 applies 위험근접 and adjusts first; one correction with 효력사 brings the volley onto the post and our rounds take
+ * out the 관측반 (about 2 min of game time). Returns the 사후강평. */
+export async function fireOnOwnPost(page: Page) {
+  const log = page.getByRole('region', { name: '무전 기록' });
+  await expect(log).toContainText('감명 양호', { timeout: 15_000 });
+  const composer = page.getByRole('region', { name: '입력기' });
+  const send = composer.getByRole('button', { name: '송신' });
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+  await composer.getByLabel('경고명령').selectOption('ffe');
+  await send.click();
+  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
+  await composer.getByLabel('동', { exact: true }).fill('4512');
+  await composer.getByLabel('북', { exact: true }).fill('3256');
+  await send.click();
+  await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
+  await send.click();
+  const direction = composer.getByLabel('방향');
+  await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
+  await direction.fill('1600');
+  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
+  await composer.getByLabel('좌우 거리').fill('40');
+  await composer.getByLabel('사거리', { exact: true }).selectOption('add');
+  await composer.getByLabel('사거리 거리').fill('60');
+  await composer.getByLabel('다음').selectOption('ffe');
+  await send.click();
+
+  const debrief = page.getByRole('region', { name: '사후강평' });
+  await expect(debrief).toBeVisible({ timeout: 150_000 });
+  await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
+  return debrief;
+}

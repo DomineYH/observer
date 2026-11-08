@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap } from './helpers';
+import { fireOnOwnPost, mapPixels, settledMap } from './helpers';
 
 // A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).
 const REPLAY = {"format":1,"simVersion":15,"seed":20261106,"seedKind":"daily","scenario":{"id":"base","version":1},"guns":{"id":"base","version":1},"weather":{"visibilityM":24000,"cloudPct":15,"windFromDeg":285,"windSpeedTenthMs":26,"tempTenthC":94,"precipTenthMmH":0,"pressureHpa":1023,"humidityPct":48},"mode":"standard","stepMs":50,"inputs":[{"t":0,"a":"start","v":[320,320]},{"t":1,"a":"pos_skip"},{"t":110,"a":"call","v":["ffe"]},{"t":186,"a":"loc","v":["grid",4080,3080]},{"t":241,"a":"desc","v":[3,"none","ready",0,"unknown"]},{"t":1861,"a":"eom","v":["ineffective"]}],"totalTicks":1862};
@@ -78,9 +78,7 @@ test('F-08: 호출부호 반영', async ({ page }) => {
   await expect(page.getByLabel('호출부호', { exact: true })).toHaveValue('참새12');
 });
 
-/** The shortest end the app allows: 효력사 on our own post. 기러기 applies 위험근접 and adjusts first; one correction
- * with 효력사 brings the volley onto the post and our rounds take out the 관측반 (about 2 min of game time). `prep`
- * runs once the 관측소 후보 is picked, before 작전 개시. Returns the 사후강평. */
+/** From a fresh page: pick the 관측소 후보 north of 1번 고지, run `prep`, start, and end the game on our own post. */
 const endOnOwnPost = async (page: Page, prep: () => Promise<void> = async () => {}) => {
   await page.goto('/?seed=20261106');
   const map = page.getByRole('img', { name: '지도' });
@@ -89,33 +87,7 @@ const endOnOwnPost = async (page: Page, prep: () => Promise<void> = async () => 
   await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await prep();
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
-  const log = page.getByRole('region', { name: '무전 기록' });
-  await expect(log).toContainText('감명 양호', { timeout: 15_000 });
-  const composer = page.getByRole('region', { name: '입력기' });
-  const send = composer.getByRole('button', { name: '송신' });
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
-  await composer.getByLabel('경고명령').selectOption('ffe');
-  await send.click();
-  await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
-  await composer.getByLabel('동', { exact: true }).fill('4512');
-  await composer.getByLabel('북', { exact: true }).fill('3256');
-  await send.click();
-  await expect(composer.getByLabel('표적성질')).toBeVisible({ timeout: 15_000 });
-  await send.click();
-  const direction = composer.getByLabel('방향');
-  await expect(direction).toBeVisible({ timeout: 120_000 }); // the adjusting round has landed, 73 m off
-  await direction.fill('1600');
-  await composer.getByLabel('좌우', { exact: true }).selectOption('right');
-  await composer.getByLabel('좌우 거리').fill('40');
-  await composer.getByLabel('사거리', { exact: true }).selectOption('add');
-  await composer.getByLabel('사거리 거리').fill('60');
-  await composer.getByLabel('다음').selectOption('ffe');
-  await send.click();
-
-  const debrief = page.getByRole('region', { name: '사후강평' });
-  await expect(debrief).toBeVisible({ timeout: 150_000 });
-  await expect(debrief).toContainText('관측반 전투 불능으로 임무 종료.');
-  return debrief;
+  return fireOnOwnPost(page);
 };
 
 test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', async ({ page }) => {
