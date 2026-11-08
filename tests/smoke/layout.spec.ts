@@ -154,6 +154,26 @@ test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   await expect(menu).toBeHidden();
 });
 
+test('레이아웃: 넓은 머리띠 — 가장 긴 호출부호', async ({ page }) => {
+  // The longest callsign (8 characters, wide Hangul ones), typed in during 작전 준비 as a player would: at 1280 px the
+  // 머리띠 stays one row without scrolling, and the 현재 호출부호 shows it whole on that row.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/?seed=20261106');
+  const longest = '천둥번개참새열둘';
+  await page.getByRole('textbox', { name: '호출부호', exact: true }).fill(longest);
+  await page.getByRole('button', { name: '정하기' }).click();
+  const current = page.getByRole('status', { name: '현재 호출부호' });
+  await expect(current).toHaveText(longest);
+  await oneRow(page, true);
+  const shown = await current.evaluate((e) => ({ scroll: e.scrollWidth, client: e.clientWidth }));
+  expect(shown.scroll).toBeLessThanOrEqual(shown.client);
+  const c = (await current.boundingBox())!;
+  const first = (await page.getByRole('banner').getByText('OBSERVER').boundingBox())!;
+  expect(Math.abs(c.y + c.height / 2 - (first.y + first.height / 2))).toBeLessThanOrEqual(3);
+  const band = await page.getByRole('banner').evaluate((h) => h.parentElement!.getBoundingClientRect().right);
+  expect(c.x + c.width).toBeLessThanOrEqual(band);
+});
+
 test.describe('좁은 화면 탭', () => {
   test.use(PHONE);
 
