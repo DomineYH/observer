@@ -127,3 +127,37 @@ test('F-05: 레이저 측정 — 입력기', () => {
   expect(az).toBe(Math.round(c.aim().h * 10) % 64000);
   expect(el).toBe(-220);
 });
+
+test('F-03: 1밀 터치 단추 — 조준 입력', () => {
+  // One press = one 조준 입력 exactly 1 mil (10 tenths) from the value sent last, by eye and through binoculars alike.
+  const moves: [0 | 1, 1 | -1, number[]][] = [
+    [0, 1, [10010, 0]],
+    [0, -1, [9990, 0]],
+    [1, 1, [10000, 10]],
+    [1, -1, [10000, -10]],
+  ];
+  for (const bino of [false, true])
+    for (const [axis, dir, v] of moves) {
+      const { sent, c } = control(10000, 0, bino);
+      c.nudge(axis, dir);
+      expect(sent).toEqual([{ a: 'cam', v }]);
+    }
+
+  // A drag remainder under 1 mil was never sent: the press still moves 1 mil from what was sent.
+  const W = fovOf(true) * 10;
+  const a = control(10000, 0, true);
+  a.c.drag(-5, 0, W); // 0.5 mil right, nothing sent
+  expect(a.sent).toEqual([]);
+  a.c.nudge(0, 1);
+  expect(a.sent).toEqual([{ a: 'cam', v: [10010, 0] }]);
+  a.c.nudge(0, 1);
+  expect(a.sent.at(-1)).toEqual({ a: 'cam', v: [10020, 0] });
+
+  // At the +200 mil stop nothing is sent; azimuth wraps through north.
+  const top = control(10000, 2000);
+  top.c.nudge(1, 1);
+  expect(top.sent).toEqual([]);
+  const north = control(0, 0);
+  north.c.nudge(0, -1);
+  expect(north.sent).toEqual([{ a: 'cam', v: [63990, 0] }]);
+});
