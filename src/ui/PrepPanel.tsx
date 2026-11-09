@@ -1,8 +1,9 @@
 // 작전 준비 (F-22, demo lines 922–936): the briefing, the seed and weather, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
-import type { GridRef, Input, Point, ReadonlySimState, Scenario, SeedKind, Weather } from '@sim';
+import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
+import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
 import { BRIEFING } from '@content/scenario';
-import { gridOf } from '@render/mapView';
+import { gridOf, underCanopy } from '@render/mapView';
 import { startInput } from './prep';
 import { gridLabel } from './radio/readings';
 
@@ -11,7 +12,7 @@ export type PrepState = Pick<ReadonlySimState, 'phase' | 'op' | 'picked' | 'repo
 export interface PrepPanelProps {
   state: PrepState;
   scenario: Scenario;
-  grid: GridRef;
+  terrain: TerrainData; // its 방안 기준 labels grids; its forest marks a candidate under the canopy
   seed: number;
   seedKind: SeedKind;
   weather: Weather;
@@ -20,6 +21,16 @@ export interface PrepPanelProps {
   queued: readonly Input[];
   /** The simulation's live state, read when 작전 개시 is pressed. */
   live: Pick<ReadonlySimState, 'op'>;
+  /** The practice seed's preset in use (null for a daily seed), and choosing another one (F-30). */
+  preset: WeatherPreset | null;
+  onPreset: (p: WeatherPreset) => void;
+}
+
+const PRESET_NAMES: Record<WeatherPreset, string> = { clear: '맑음', haze: '박무', rain: '비', wind: '강한 북서풍', fog: '안개' };
+
+/** The 머리띠 메뉴's short 기상 (demo 349): visibility and wind. */
+export function weatherChip(w: Weather): string {
+  return `시정 ${(w.visibilityM / 1000).toFixed(1)}km·바람 ${w.windFromDeg}° ${(w.windSpeedTenthMs / 10).toFixed(1)}m/s`;
 }
 
 function weatherText(w: Weather): string {
@@ -40,7 +51,8 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send, queued, live }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset }: PrepPanelProps) {
+  const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
     return (
@@ -80,12 +92,26 @@ export function PrepPanel({ state, scenario, grid, seed, seedKind, weather, send
         <b>시드</b>{' '}
         {seedKind === 'daily' ? `일일 ${seed} — 오늘은 모두 같은 배치·기상·편차로 경쟁` : `연습 ${seed} — 랭킹 제외`}
       </p>
+      {seedKind === 'practice' && preset && (
+        <p>
+          <label>
+            기상 바꾸기{' '}
+            <select value={preset} onChange={(e) => onPreset(e.target.value as WeatherPreset)}>
+              {WEATHER_PRESETS.map((p) => (
+                <option key={p} value={p}>
+                  {PRESET_NAMES[p]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </p>
+      )}
       <p>
         <b>주의</b> {BRIEFING.caution} 계획된 관측소 1번 고지 {at(scenario.plannedOp)}.
       </p>
       <p>
         {state.picked
-          ? `관측소 후보: ${at(state.op)}`
+          ? `관측소 후보: ${at(state.op)}${underCanopy(terrain, state.op.x, state.op.y) ? ' · 숲 속 — 시야 가림' : ''}`
           : '지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.'}
       </p>
       <button type="button" onClick={() => pressStart({ state, live, queued, send })}>

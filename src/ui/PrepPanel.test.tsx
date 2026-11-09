@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import type { Input, SeedKind } from '@sim';
+import type { Input, SeedKind, TerrainData } from '@sim';
+import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { pressStart, PrepPanel, type PrepState } from './PrepPanel';
 
@@ -15,18 +16,20 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH') =>
+const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } })) =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
       scenario={BASE_SCENARIO}
-      grid={{ letters, e0: 40000, n0: 30000 }}
+      terrain={terrain}
       seed={seed}
       seedKind={seedKind}
       weather={WEATHER}
       send={() => {}}
       queued={[]}
       live={state}
+      preset={seedKind === 'practice' ? 'fog' : null}
+      onPreset={() => {}}
     />,
   ).replace(/<[^>]*>/g, '');
 
@@ -78,5 +81,14 @@ test('F-22: 작전 개시 단추는 패널이 그린 상태가 아니라 지금�
   sent.length = 0;
   pressStart({ state: rendered, live, queued: [{ a: 'pick', v: [3100, 2600] }], send: (i) => void sent.push(i) });
   expect(sent).toEqual([{ a: 'start', v: [3100, 2600] }]);
+});
+
+test('F-22: 숲 속 후보는 시야가 가린다고 알린다', () => {
+  // #25 follow-up (demo 931): a candidate under the canopy (surface 3 m or more above the ground) sees only trees.
+  const picked = { ...PREP, op: { x: 320, y: 320 }, picked: true };
+  const forest = flatTerrain();
+  forest.surface.fill(105);
+  expect(text(20261106, 'daily', picked, 'CH', forest)).toContain('관측소 후보: 찰리호텔 4032 3032 · 숲 속 — 시야 가림');
+  expect(text(20261106, 'daily', picked)).not.toContain('숲 속');
 });
 

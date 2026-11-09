@@ -7,7 +7,6 @@ import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
 const INT32_MAX = 0x7fffffff;
-const INT32_MIN = -0x80000000;
 
 const HEADER_KEYS = ['format', 'simVersion', 'seed', 'seedKind', 'scenario', 'guns', 'weather', 'mode', 'stepMs', 'inputs', 'totalTicks'];
 const WEATHER_RANGES: readonly [key: string, min: number, max: number][] = [
@@ -69,10 +68,7 @@ function check(x: unknown): asserts x is ReplayData {
     int(input.t, last, (x.totalTicks as number) - 1, `${what}: tick (not decreasing, below totalTicks)`);
     last = input.t as number;
     if (typeof input.a !== 'string' || !/^[a-z_]+$/.test(input.a)) fail(`${what}.a: ASCII kind expected`);
-    if ('v' in input) {
-      if (!Array.isArray(input.v)) fail(`${what}.v: integer array expected`);
-      (input.v as unknown[]).forEach((n, j) => int(n, INT32_MIN, INT32_MAX, `${what}.v[${j}]`));
-    }
+    if ('v' in input && !Array.isArray(input.v)) fail(`${what}.v: array expected`); // each value is checked by its kind
     if (!validInput(input.a as string, input.v)) fail(`${what}: unknown kind or bad value`);
   });
 }
@@ -89,7 +85,8 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
 }
 
 /** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller regenerates the terrain from the
- * seed and passes the scenario the header names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit at t 0. */
+ * seed and passes the scenario the header names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit
+ * at t 0, and a game that ends (its clock stops) ends the record at that tick. */
 export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
   if (scenario.id !== d.scenario.id || scenario.version !== d.scenario.version)
@@ -108,6 +105,9 @@ export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario):
     chain.u32(parseInt(hash.slice(0, 8), 16));
     chain.u32(parseInt(hash.slice(8), 16));
     if (sim.state.tick % CHECKPOINT_TICKS === 0) checkpoints.push({ tick: sim.state.tick, hash });
+    // An ended game's clock stops: there is no tick past its terminal one, so the record must end there (총 틱 초과).
+    if (sim.state.phase === 'ended' && t + 1 < d.totalTicks)
+      throw new Error(`replay: the game ended at tick ${t + 1}, before totalTicks ${d.totalTicks}`);
   }
   return { record: sim.record(), ignored, chain: chain.hex(), checkpoints };
 }

@@ -1,6 +1,32 @@
-// 겹쳐 그리는 표시 of the observation view (demo lines 1197–1222): the binocular mil reticle and the azimuth tape.
-// Positions come from milToPx, the renderer's own projection.
-import { milToPx } from './projection';
+// 겹쳐 그리는 표시 of the observation view (demo lines 1197–1229): the binocular mil reticle, the azimuth tape and the
+// time to impact. Positions come from milToPx, the renderer's own projection.
+import { heightAt, type Point, type ReadonlySimState, type TerrainData, type Weather } from '@sim';
+import { MIL, milToPx, project, type ViewGeometry } from './projection';
+import { hash } from './shade';
+
+const FRIEND_LABEL_M = 12; // above the ground (demo 1217)
+
+/** 훈련: where each 아군 진지 (numbered from 1) shows in the view, for its "▼ 아군 n소대" label; off-view ones are left out. */
+export function friendLabels(friends: readonly Point[], v: ViewGeometry, t: TerrainData): { n: number; sx: number; sy: number }[] {
+  return friends.flatMap((f, i) => {
+    const p = project(v, { x: f.x, y: f.y, z: heightAt(t, f.x, f.y) + FRIEND_LABEL_M });
+    return p && p.sx > 0 && p.sx < 2 * v.cx ? [{ n: i + 1, sx: p.sx, sy: p.sy }] : [];
+  });
+}
+
+/** 탄착까지 남은 초 (F-11, demo line 1229), rounded up; `urgent` from 5 s down (SPLASH 대용). */
+export interface Splash {
+  sec: number;
+  urgent: boolean;
+}
+
+/** The countdown to the current mission's next round to land, or null when none flies. */
+export function splashOf(s: ReadonlySimState): Splash | null {
+  const f = s.missions.at(-1)?.flights[0];
+  if (!f) return null;
+  const sec = Math.ceil((f.at - s.tick) / 20);
+  return { sec, urgent: sec <= 5 };
+}
 
 export interface Reticle {
   h: { mil: number; x: number; major: boolean }[]; // ticks on the horizontal scale
@@ -61,6 +87,35 @@ function binoMask(W: number, H: number): HTMLCanvasElement {
   return mask.canvas;
 }
 
+/** 빗줄기 (demo 1191–1193): 90 streaks per mm/h at display resolution, each 16 px long, falling and drifting with
+ * the crosswind seen at heading `h` mils; `tSec` moves them. Segments as [x0, y0, x1, y1]. */
+export function rainStreaks(w: Weather, h: number, W: number, H: number, dpr: number, tSec: number): [number, number, number, number][] {
+  const n = Math.round(9 * w.precipTenthMmH);
+  const to = ((w.windFromDeg + 180) * Math.PI) / 180;
+  const v = w.windSpeedTenthMs / 10;
+  const a = h / MIL;
+  const lean = (Math.sin(to) * v * Math.cos(a) - Math.cos(to) * v * Math.sin(a)) * 2.2 * dpr;
+  const out: [number, number, number, number][] = [];
+  for (let k = 0; k < n; k++) {
+    const x = (((hash(k, 1, 77) * W + tSec * lean * 20) % W) + W) % W;
+    const y = (hash(k, 2, 77) * H + tSec * 900 * dpr * (0.8 + hash(k, 3, 77) * 0.4)) % H;
+    out.push([x, y, x + lean, y + 16 * dpr]);
+  }
+  return out;
+}
+
+export function drawRain(c: CanvasRenderingContext2D, streaks: readonly (readonly number[])[], dpr: number): void {
+  if (!streaks.length) return;
+  c.strokeStyle = 'rgba(210,215,222,.35)';
+  c.lineWidth = dpr;
+  c.beginPath();
+  for (const [x0, y0, x1, y1] of streaks) {
+    c.moveTo(x0!, y0!);
+    c.lineTo(x1!, y1!);
+  }
+  c.stroke();
+}
+
 /** Draws the overlay at display resolution: `scale` display pixels per internal pixel, `aim` in mils. */
 export function drawOverlay(
   c: CanvasRenderingContext2D,
@@ -70,6 +125,7 @@ export function drawOverlay(
   bino: boolean,
   dpr: number,
   fps: number | null,
+  splash: Splash | null = null,
 ): void {
   const { width: W, height: H } = c.canvas;
   const fpx = focal * scale;
@@ -140,9 +196,11 @@ export function drawOverlay(
   c.fillRect(pad - 4 * dpr, top - 10 * dpr, c.measureText(text).width + 8 * dpr, 20 * dpr);
   c.fillStyle = 'rgba(232,176,74,.95)';
   c.fillText(text, pad, top);
-  if (fps !== null) {
-    c.textAlign = 'right';
-    c.fillText(`${fps} fps`, W - pad, top);
+  c.textAlign = 'right';
+  if (fps !== null) c.fillText(`${fps} fps`, W - pad, top);
+  if (splash) {
+    c.fillStyle = splash.urgent ? 'rgba(226,96,74,1)' : 'rgba(232,176,74,.95)';
+    c.fillText(`탄착까지 ${splash.sec}초${splash.urgent ? ' — 관측!' : ''}`, W - pad, top + 20 * dpr);
   }
   c.restore();
 }

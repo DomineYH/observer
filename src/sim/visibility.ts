@@ -10,6 +10,7 @@ const OPAQUE = 0.9; // Koschmieder opacity past which nothing is seen
 const LOS_AT = 0.85; // the sight line must reach this fraction of the target's height
 const HEIGHT: Record<Member['kind'], number> = { man: 1.7, veh: 2.3, tube: 1.0 };
 const PRONE_M = 0.45;
+const TRUCK_M = 2.6;
 
 /** Where a dust cloud or smoke puff is at `tick` (demo drawing, lines 1162–1176): its centre, carried downwind
  * (dust at 80% of the wind) and rising, and its radius, m. It is drawn, pressed and watched there. */
@@ -25,16 +26,17 @@ export function signalAt(e: Pick<FieldEffect, 'kind' | 'x' | 'y' | 'gz' | 'small
   };
 }
 
-/** How a signal is detected (demo effSize/effTop, lines 544–551): its size, m, and the height the sight line must
- * reach, both at where it was made. The demo detects with these, apart from its drawing, so detection keeps them. */
+/** How a signal or a burst is detected (demo effSize/effTop, lines 544–551): its size, m, and the height the sight
+ * line must reach, both at where it was made. The demo detects with these, apart from its drawing, so detection keeps
+ * them. */
 export function signalDetect(e: Pick<FieldEffect, 'kind' | 'gz' | 'small' | 'tick'>, tick: number) {
   const age = (tick - e.tick) * 0.05;
-  return e.kind === 'muzzle'
-    ? { size: (e.small ? 1.5 : 3) + age * 1.6, top: e.gz + 1 + age * (e.small ? 1.2 : 5) }
-    : { size: 3 + age * 1.6, top: e.gz + 3 };
+  if (e.kind === 'muzzle') return { size: (e.small ? 1.5 : 3) + age * 1.6, top: e.gz + 1 + age * (e.small ? 1.2 : 5) };
+  if (e.kind === 'burst') return { size: 6 + age * 2.2, top: e.gz + 6 };
+  return { size: 3 + age * 1.6, top: e.gz + 3 };
 }
 
-/** Recomputes 보임 for every member (`all`) or only for effects made this tick. */
+/** Recomputes 보임 for every member, friendly man and the truck (`all`), or only for effects made this tick. */
 export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: boolean): void {
   const eye = { x: s.op.x, y: s.op.y, z: heightAt(t, s.op.x, s.op.y) + EYE_HEIGHT };
   const sigma = 3.912 / w.visibilityM;
@@ -51,9 +53,17 @@ export function updateVisibility(s: SimState, t: TerrainData, w: Weather, all: b
       if (p.state === 'wait') continue;
       for (const q of p.members) {
         const hh = q.prone ? PRONE_M : HEIGHT[q.kind];
-        q.vis = visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT);
+        q.vis = q.alive && visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT); // the dead are not seen
       }
     }
+  if (all) {
+    for (const q of s.friendlies) {
+      const hh = q.prone ? PRONE_M : HEIGHT.man;
+      q.vis = q.alive && visOf(q.x, q.y, hh, heightAt(t, q.x, q.y) + hh * LOS_AT);
+    }
+    const k = s.truck;
+    if (k) k.vis = visOf(k.x, k.y, TRUCK_M, heightAt(t, k.x, k.y) + TRUCK_M * LOS_AT);
+  }
   for (const e of s.effects) {
     if (!all && e.tick !== s.tick) continue;
     const d = signalDetect(e, s.tick);

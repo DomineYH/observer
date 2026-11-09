@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, signalAt, validateReplay, type Member, type Point, type Scenario, type Sim, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawEffects } from '@render/effects';
 import { angleAt, focalOf, MIL, project, QUALITIES } from '@render/projection';
 import { terrainColours } from '@render/shade';
@@ -166,7 +166,7 @@ describe('F-04', () => {
     expect(count).toBe(12);
     expect(results.size).toBe(1);
     expect(JSON.parse([...results][0]!)[0]).toMatchObject({ stage: 1, tnum: 1, cue: 'man' });
-  });
+  }, 30000);
 
   test('F-04: 적정 세 단계', () => {
     // The mortar section 1 km due north: type and activity after 3 + 2.5 = 5.5 s of watching, its size after

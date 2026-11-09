@@ -1,0 +1,384 @@
+{
+  "terrainHash": "069cd970fa0564a1",
+  "replay": {
+    "format": 1,
+    "simVersion": 17,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "scenario": {
+      "id": "base",
+      "version": 1
+    },
+    "guns": {
+      "id": "base",
+      "version": 1
+    },
+    "weather": {
+      "visibilityM": 24000,
+      "cloudPct": 15,
+      "windFromDeg": 285,
+      "windSpeedTenthMs": 26,
+      "tempTenthC": 94,
+      "precipTenthMmH": 0,
+      "pressureHpa": 1023,
+      "humidityPct": 48
+    },
+    "mode": "standard",
+    "stepMs": 50,
+    "inputs": [
+      {
+        "t": 0,
+        "a": "start",
+        "v": [
+          5120,
+          1800
+        ]
+      },
+      {
+        "t": 150,
+        "a": "lase",
+        "v": [
+          987,
+          -14
+        ]
+      },
+      {
+        "t": 351,
+        "a": "call",
+        "v": [
+          "adjust"
+        ]
+      },
+      {
+        "t": 627,
+        "a": "loc",
+        "v": [
+          "polar",
+          99,
+          5425
+        ]
+      },
+      {
+        "t": 882,
+        "a": "desc",
+        "v": [
+          3,
+          "none",
+          "ready",
+          0,
+          "mortar",
+          "halted",
+          "none"
+        ]
+      },
+      {
+        "t": 2571,
+        "a": "corr",
+        "v": [
+          "left",
+          0,
+          "drop",
+          0,
+          "ffe"
+        ]
+      },
+      {
+        "t": 4339,
+        "a": "eom",
+        "v": [
+          "neutralized"
+        ]
+      },
+      {
+        "t": 4540,
+        "a": "shift",
+        "v": [
+          99,
+          "left",
+          200,
+          "add",
+          300,
+          2,
+          1,
+          "unknown"
+        ]
+      },
+      {
+        "t": 6040,
+        "a": "corr",
+        "v": [
+          "right",
+          100,
+          "drop",
+          100,
+          "ffe"
+        ]
+      },
+      {
+        "t": 7599,
+        "a": "eom",
+        "v": [
+          "ineffective"
+        ]
+      },
+      {
+        "t": 7800,
+        "a": "move",
+        "v": [
+          5200,
+          1800
+        ]
+      },
+      {
+        "t": 10168,
+        "a": "pos",
+        "v": [
+          4520,
+          3180
+        ]
+      }
+    ],
+    "totalTicks": 10631
+  },
+  "record": {
+    "ticks": 10631,
+    "seed": 20261106,
+    "seedKind": "daily",
+    "cleared": false,
+    "clearTick": null,
+    "roundsTotal": 32,
+    "missions": 2,
+    "adjustRounds": 2,
+    "firstErrorAvg": 265,
+    "directionErrorAvg": 0,
+    "reportAccuracyPct": 50,
+    "roundsPerUnit": null,
+    "neutralized": 0,
+    "combatUnits": 4,
+    "earlyDefeats": 0,
+    "friendlyHits": 0,
+    "friendlyLosses": 2,
+    "dangerCloseMissed": 0,
+    "observerLost": false,
+    "postMoves": 1,
+    "compromised": false,
+    "score": -85,
+    "mode": "standard"
+  },
+  "ignored": 0,
+  "chain": "0830e3884822e825",
+  "checkpoints": [
+    {
+      "tick": 200,
+      "hash": "1c1f66ef654008fa"
+    },
+    {
+      "tick": 400,
+      "hash": "ee5d72bc3abaffe5"
+    },
+    {
+      "tick": 600,
+      "hash": "5817a8b881c12289"
+    },
+    {
+      "tick": 800,
+      "hash": "896c9b51428de614"
+    },
+    {
+      "tick": 1000,
+      "hash": "1062e216d4cf097b"
+    },
+    {
+      "tick": 1200,
+      "hash": "7295f7541370e339"
+    },
+    {
+      "tick": 1400,
+      "hash": "261f6c2ad8156baf"
+    },
+    {
+      "tick": 1600,
+      "hash": "44c6c8c866d2f65d"
+    },
+    {
+      "tick": 1800,
+      "hash": "edfcb0f5aa4094a0"
+    },
+    {
+      "tick": 2000,
+      "hash": "f14718507c89b6d9"
+    },
+    {
+      "tick": 2200,
+      "hash": "df292f2e6bbae6bb"
+    },
+    {
+      "tick": 2400,
+      "hash": "62e25e981276524d"
+    },
+    {
+      "tick": 2600,
+      "hash": "f9ae54c53db51c80"
+    },
+    {
+      "tick": 2800,
+      "hash": "78508862e861812f"
+    },
+    {
+      "tick": 3000,
+      "hash": "faa3cf1b0672ffaa"
+    },
+    {
+      "tick": 3200,
+      "hash": "8ea8534c76818f21"
+    },
+    {
+      "tick": 3400,
+      "hash": "28e9e8ca3646881f"
+    },
+    {
+      "tick": 3600,
+      "hash": "1340746cee23d1d1"
+    },
+    {
+      "tick": 3800,
+      "hash": "0b9ce22f355dfcb6"
+    },
+    {
+      "tick": 4000,
+      "hash": "ebc668fc9b990ca5"
+    },
+    {
+      "tick": 4200,
+      "hash": "a691019fe4e746fa"
+    },
+    {
+      "tick": 4400,
+      "hash": "56d04b242d1adac9"
+    },
+    {
+      "tick": 4600,
+      "hash": "71c7c691e3724b84"
+    },
+    {
+      "tick": 4800,
+      "hash": "2fe996ea37f1bca7"
+    },
+    {
+      "tick": 5000,
+      "hash": "5d1ef2f6911207df"
+    },
+    {
+      "tick": 5200,
+      "hash": "2281a79af044aae3"
+    },
+    {
+      "tick": 5400,
+      "hash": "b5e7ef8c900e7ed1"
+    },
+    {
+      "tick": 5600,
+      "hash": "6c1c9533acc2a4fe"
+    },
+    {
+      "tick": 5800,
+      "hash": "9f04294a3de9efe3"
+    },
+    {
+      "tick": 6000,
+      "hash": "09742300d7b62d85"
+    },
+    {
+      "tick": 6200,
+      "hash": "de00da910e51d410"
+    },
+    {
+      "tick": 6400,
+      "hash": "b1b3a1751379ff30"
+    },
+    {
+      "tick": 6600,
+      "hash": "be9ce2804758ba11"
+    },
+    {
+      "tick": 6800,
+      "hash": "3f7f4d663519b623"
+    },
+    {
+      "tick": 7000,
+      "hash": "86ccc3568a592cbf"
+    },
+    {
+      "tick": 7200,
+      "hash": "5a5e2489c7eecafc"
+    },
+    {
+      "tick": 7400,
+      "hash": "5b394d964a517dcf"
+    },
+    {
+      "tick": 7600,
+      "hash": "056acf42f7d2e477"
+    },
+    {
+      "tick": 7800,
+      "hash": "cdeceec5209b423c"
+    },
+    {
+      "tick": 8000,
+      "hash": "dcd0dff8e731f691"
+    },
+    {
+      "tick": 8200,
+      "hash": "64cdf0f16f3be2f8"
+    },
+    {
+      "tick": 8400,
+      "hash": "7e3cd7da672359ff"
+    },
+    {
+      "tick": 8600,
+      "hash": "834fa6194500fc88"
+    },
+    {
+      "tick": 8800,
+      "hash": "d9f8386748a91cc6"
+    },
+    {
+      "tick": 9000,
+      "hash": "4df5174b825a848e"
+    },
+    {
+      "tick": 9200,
+      "hash": "7045947c1b03f431"
+    },
+    {
+      "tick": 9400,
+      "hash": "9c7632080287bf19"
+    },
+    {
+      "tick": 9600,
+      "hash": "312f6025a4792228"
+    },
+    {
+      "tick": 9800,
+      "hash": "6a72d84279a44cd7"
+    },
+    {
+      "tick": 10000,
+      "hash": "5bd044691561f030"
+    },
+    {
+      "tick": 10200,
+      "hash": "5bd0adc20211609b"
+    },
+    {
+      "tick": 10400,
+      "hash": "89f5cdb6d8d2bdff"
+    },
+    {
+      "tick": 10600,
+      "hash": "b271131b799aab4e"
+    }
+  ]
+}

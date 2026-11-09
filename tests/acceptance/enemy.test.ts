@@ -1,7 +1,7 @@
 // 적 움직임과 가시성 (F-12, F-23, F-04): through the simulation's public interface only.
 import { describe, expect, test } from 'vitest';
 import type { Sim } from '@sim';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { dist, mortarAt, oneUnit, run, started, until, wallTerrain } from './enemy';
 import { flatTerrain } from './terrain';
 

@@ -1,5 +1,5 @@
 // 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
-import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType } from '@sim';
+import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType, type Weather } from '@sim';
 import { FULL_VIEW, projector, type MapView } from './mapView';
 
 const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
@@ -74,11 +74,18 @@ export type MapContext = Pick<
 export interface MapMarks {
   scenario: Scenario;
   op: Point;
+  knownOp: Point; // 기러기가 아는 관측소 위치: 훈련 marks it when it is off the post
+  dest: Point | null; // where the post is walking to
   az: number; // line of sight, 0.1 mil
   fovMil: number;
   pin: Point | null; // 좌표자
   platoons: ReadonlySimState['platoons'];
   mode: Mode;
+  missions: ReadonlySimState['missions'];
+  tick: number;
+  weather: Weather; // its wind is drawn as an arrow
+  /** 훈련 가시권 표시: `viewshed()` pixels as an image `g` cells across, or null. */
+  viewshed: { image: CanvasImageSource; g: number } | null;
 }
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
@@ -86,6 +93,8 @@ const BEARING_M = 7500; // a target's bearing line, and where along it its label
 const BEARING_LABEL_M = 1800;
 const TYPE_MARK: Record<UnitType, string> = { inf: '보', recon: '보', apc: '장', mortar: '박' };
 const TAU = Math.PI * 2;
+const IMPACT_TICKS = 3000; // a 탄착 stays on the map 150 s
+const KNOWN_SHOWN_M = 30; // 훈련 marks the post 기러기 knows when it is farther than this off (demo)
 
 /** Draws the map (demo drawMap, lines 1281–1310) at a zoom and scroll: `base` holds mapBase's pixels, then roads,
  * 방안선 and 지명. */
@@ -138,7 +147,76 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     c.strokeText(v.name, x, y);
     c.fillText(v.name, x, y);
   }
-  if (marks) drawMarks(c, marks, k, mx, my);
+  if (marks?.viewshed) {
+    const q = marks.viewshed.g / t.n;
+    c.imageSmoothingEnabled = true;
+    c.drawImage(marks.viewshed.image, view.x0 * q, view.y0 * q, span * q, span * q, 0, 0, W, W);
+  }
+  if (marks) {
+    drawMarks(c, marks, k, mx, my);
+    drawFire(c, marks, t, mx, my);
+    drawWind(c, marks.weather);
+  }
+}
+
+/** 사격 임무 (demo 1302, 1305): each requested grid as a square with its 표적번호, and the recent 탄착 as ×. */
+/** 바람 화살표 (demo 1311–1316): bottom right, pointing downwind, 8 px + 1.4 px per m/s, the speed under it. */
+function drawWind(c: MapContext, w: Weather): void {
+  const x0 = MAP_PX - 34;
+  const y0 = MAP_PX - 34;
+  const a = ((w.windFromDeg + 180) * Math.PI) / 180;
+  const half = (8 + (w.windSpeedTenthMs / 10) * 1.4) / 2;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  c.fillStyle = 'rgba(255,255,255,.75)';
+  c.beginPath();
+  c.arc(x0, y0, 24, 0, TAU);
+  c.fill();
+  c.strokeStyle = c.fillStyle = '#123';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(x0 - dx * half, y0 - dy * half);
+  c.lineTo(x0 + dx * half, y0 + dy * half);
+  c.stroke();
+  const hx = x0 + dx * half;
+  const hy = y0 + dy * half;
+  c.beginPath();
+  c.moveTo(hx, hy);
+  c.lineTo(hx - Math.sin(a - 0.5) * 6, hy + Math.cos(a - 0.5) * 6);
+  c.lineTo(hx - Math.sin(a + 0.5) * 6, hy + Math.cos(a + 0.5) * 6);
+  c.fill();
+  c.font = '9px monospace';
+  c.textAlign = 'center';
+  c.fillText(`${Math.round(w.windSpeedTenthMs / 10)}m/s`, x0, y0 + 20);
+}
+
+function drawFire(c: MapContext, m: MapMarks, t: TerrainData, mx: (x: number) => number, my: (y: number) => number): void {
+  c.lineWidth = 1;
+  c.font = '10px monospace';
+  c.textAlign = 'start';
+  m.missions.forEach((ms, i) => {
+    if (ms.location?.method === 'grid') {
+      const p = fromGrid(ms.location.easting, ms.location.northing, t.grid);
+      const x = mx(p.x);
+      const y = my(p.y);
+      c.strokeStyle = 'rgba(255,255,255,.85)';
+      c.strokeRect(x - 4, y - 4, 8, 8);
+      c.fillStyle = 'rgba(255,255,255,.9)';
+      c.fillText(ms.mto ? `AB${String(ms.mto.targetNumber).padStart(4, '0')}` : `#${i + 1}`, x + 6, y - 5);
+    }
+    c.strokeStyle = 'rgba(255,140,40,.9)';
+    for (const im of ms.impacts) {
+      if (m.tick - im.tick > IMPACT_TICKS) continue;
+      const x = mx(im.x);
+      const y = my(im.y);
+      c.beginPath();
+      c.moveTo(x - 2, y - 2);
+      c.lineTo(x + 2, y + 2);
+      c.moveTo(x + 2, y - 2);
+      c.lineTo(x - 2, y + 2);
+      c.stroke();
+    }
+  });
 }
 
 /** The briefing (demo drawIntelOverlay, 1235–1243) and the post (demo 1281–1293). */
@@ -229,6 +307,30 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
   c.stroke();
   c.fillStyle = '#0c1a2a';
   c.fillText('OP', ox + 8, oy + 4);
+  if (m.dest) {
+    c.strokeStyle = 'rgba(98,174,230,.95)';
+    c.setLineDash([4, 3]);
+    c.beginPath();
+    c.moveTo(ox, oy);
+    c.lineTo(mx(m.dest.x), my(m.dest.y));
+    c.stroke();
+    c.setLineDash([]);
+  }
+  if (m.mode === 'training' && Math.hypot(m.knownOp.x - m.op.x, m.knownOp.y - m.op.y) > KNOWN_SHOWN_M) {
+    const fx = mx(m.knownOp.x);
+    const fy = my(m.knownOp.y);
+    c.strokeStyle = '#62aee6';
+    c.setLineDash([2, 2]);
+    c.beginPath();
+    c.moveTo(fx, fy - 7);
+    c.lineTo(fx - 6, fy + 5);
+    c.lineTo(fx + 6, fy + 5);
+    c.closePath();
+    c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = '#0c1a2a';
+    c.fillText('기러기가 아는 위치', fx + 8, fy + 4);
+  }
   if (m.pin) {
     const x = mx(m.pin.x);
     const y = my(m.pin.y);

@@ -1,5 +1,6 @@
-// Replayer-only page for the engines job: generates each golden record's terrain, replays the record, evaluates the
-// 결정적 수학 bit output table in this browser, and prints the results.
+// Replayer-only page for the engines job: generates each golden record's terrain, evaluates the 결정적 수학 bit output
+// table in this browser, replays the golden record named by `?golden=<file>` (only that one: ③ alone runs 48 000 ticks),
+// and prints the results.
 import { replay, terrainHash, type ReplayData } from '@sim';
 import { atan2, cos, exp, log, sin, tan } from '@sim/math';
 import { generateTerrain } from '@adapters/mock/terrain';
@@ -13,13 +14,17 @@ const terrain = document.createElement('pre');
 math.id = 'math';
 terrain.id = 'terrain';
 try {
+  const only = new URLSearchParams(location.search).get('golden');
   const results: Record<string, unknown> = {};
   const hashes: Record<string, string> = {};
+  const terrains = new Map<number, ReturnType<typeof generateTerrain>>(); // one per seed
   for (const [path, golden] of Object.entries(goldens)) {
     const file = path.split('/').pop()!;
-    const t = generateTerrain(golden.replay.seed);
+    const seed = golden.replay.seed;
+    if (!terrains.has(seed)) terrains.set(seed, generateTerrain(seed));
+    const t = terrains.get(seed)!;
     hashes[file] = terrainHash(t);
-    results[file] = replay(golden.replay, t, BASE_SCENARIO);
+    if (file === only) results[file] = replay(golden.replay, t, BASE_SCENARIO);
   }
   math.textContent = JSON.stringify(evaluate({ exp, log, sin, cos, tan, atan2 }));
   terrain.textContent = JSON.stringify(hashes);

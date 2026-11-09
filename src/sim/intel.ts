@@ -11,7 +11,7 @@ const MIL = 3200 / Math.PI;
 const REACH = { bino: [3, 4.5], eye: [12, 18] } as const;
 /** 쌍안경 안: within 42% of the 7° field either side of the line of sight. */
 const WATCH_MIL = ((7 * 6400) / 360) * 0.42;
-const PICK_Z = { veh: 1.2, prone: 0.25, other: 0.9 }; // where on a member a press lands, m above the ground
+export const PICK_Z = { veh: 1.2, prone: 0.25, other: 0.9 }; // where on a member a press lands, m above the ground
 const HALF_TICKS_PER_S = 40;
 const SCORE = { found: 10, sized: 20 };
 
@@ -61,7 +61,7 @@ export function applyId(s: SimState, t: TerrainData, w: Weather, v: readonly num
       if (q.vis) test(q.x, q.y, heightAt(t, q.x, q.y) + (q.kind === 'veh' ? PICK_Z.veh : q.prone ? PICK_Z.prone : PICK_Z.other), 0, i, q.kind === 'veh' ? 'veh' : 'man');
   });
   for (const e of s.effects) {
-    if (!e.vis) continue;
+    if (!e.vis || e.kind === 'burst' || e.pid < 0) continue; // 탄착, and our troops' dust and flashes, point at no enemy unit (demo 1053)
     const c = signalAt(e, s.tick, w); // where and how large the view draws it
     test(c.x, c.y, c.z, c.r, e.pid, e.kind);
   }
@@ -98,7 +98,7 @@ export function updateIntel(s: SimState, w: Weather): void {
   const inView = (x: number, y: number) => Math.abs(wrap(atan2(x - s.op.x, y - s.op.y) * MIL - aim)) <= WATCH_MIL;
   const signal = new Set<number>();
   for (const e of s.effects) {
-    if (!e.vis) continue;
+    if (!e.vis || e.kind === 'burst') continue;
     const c = signalAt(e, s.tick, w); // where it is seen now, not where it was made
     if (inView(c.x, c.y)) signal.add(e.pid);
   }
@@ -135,7 +135,7 @@ export function updateIntel(s: SimState, w: Weather): void {
 /** 활동 (demo actOf): infantry assaulting attacks; APCs fired within 30 s and the mortar within 70 s are firing. */
 export function activityOf(p: Platoon, tick: number): Activity {
   const fired = (s: number) => p.lastFire >= 0 && tick - p.lastFire < s * 20;
-  if (p.type === 'inf' && p.state === 'assault') return 'attacking';
+  if (p.type === 'inf' && p.state === 'assault' && tick >= p.pinnedUntil) return 'attacking';
   if (p.type === 'apc' && !p.moving && fired(30)) return 'firing';
   if (p.type === 'mortar') return fired(70) ? 'firing' : 'halted';
   return p.moving ? 'moving' : 'halted';

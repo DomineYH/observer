@@ -1,5 +1,5 @@
-// 적 스프라이트 (demo lines 1103–1158): men, vehicles and tubes the simulation has decided are seen, drawn at display
-// resolution over the voxel view. 지각 배율 (binoculars 2.2×, eye 1.4×) changes the drawing size only, never what is seen.
+// 스프라이트 (demo lines 1103–1161): enemy men, vehicles and tubes and our own men and supply truck the simulation has
+// decided are seen, drawn at display resolution over the voxel view. 지각 배율 (binoculars 2.2×, eye 1.4×) changes the drawing size only, never what is seen.
 import { heightAt, type ReadonlySimState, type TerrainData, type Weather } from '@sim';
 import { MIL, project, type ViewGeometry } from './projection';
 import { atmosphere, type RGB } from './shade';
@@ -10,7 +10,8 @@ export interface Sprite {
   fwd: number; // m ahead of the eye
   k: number; // pixels per metre at that distance
   fz: number; // fog mix 0–0.9
-  kind: 'man' | 'veh' | 'tube';
+  kind: 'man' | 'veh' | 'tube' | 'truck';
+  side: 'enemy' | 'friend';
   prone: boolean;
   moving: boolean;
   rel: number; // heading relative to the line of sight, radians
@@ -18,34 +19,27 @@ export interface Sprite {
 }
 
 const MARGIN = 6;
-const PACE = { apc: 5, assault: 2.8, walk: 2 }; // leg-phase speeds
+const PACE = { apc: 5, assault: 2.8, walk: 2, friend: 1.2, truck: 7 }; // leg-phase speeds (friends: walking or running)
 
-/** The sprites to draw, far first: alive and seen members of units that have set off. */
+/** The sprites to draw, far first: alive and seen members of units that have set off, our seen men and the truck. */
 export function spritesOf(s: ReadonlySimState, v: ViewGeometry, t: TerrainData, w: Weather): Sprite[] {
   const { sigma } = atmosphere(w);
   const time = s.tick * 0.05;
   const out: Sprite[] = [];
+  const look = (q: { x: number; y: number; ph: number }, kind: Sprite['kind'], side: Sprite['side'], prone: boolean, moving: boolean, dir: number, speed: number) => {
+    const pr = project(v, { x: q.x, y: q.y, z: heightAt(t, q.x, q.y) });
+    if (!pr || pr.sx < -MARGIN || pr.sx > v.cx * 2 + MARGIN) return;
+    const fz = Math.min(0.9, 1 - Math.exp(-sigma * pr.fwd));
+    out.push({ sx: pr.sx, sy: pr.sy, fwd: pr.fwd, k: v.focal / pr.fwd, fz, kind, side, prone, moving, rel: dir - v.h / MIL, ph: q.ph + time * speed * 3 });
+  };
   for (const p of s.platoons) {
     if (p.state === 'wait') continue;
     const speed = p.moving ? (p.type === 'apc' ? PACE.apc : p.state === 'assault' ? PACE.assault : PACE.walk) : 0;
-    for (const q of p.members) {
-      if (!q.vis) continue;
-      const pr = project(v, { x: q.x, y: q.y, z: heightAt(t, q.x, q.y) });
-      if (!pr || pr.sx < -MARGIN || pr.sx > v.cx * 2 + MARGIN) continue;
-      out.push({
-        sx: pr.sx,
-        sy: pr.sy,
-        fwd: pr.fwd,
-        k: v.focal / pr.fwd,
-        fz: Math.min(0.9, 1 - Math.exp(-sigma * pr.fwd)),
-        kind: q.kind,
-        prone: q.prone,
-        moving: p.moving,
-        rel: p.dir - v.h / MIL,
-        ph: q.ph + time * speed * 3,
-      });
-    }
+    for (const q of p.members) if (q.vis) look(q, q.kind, 'enemy', q.prone, p.moving, p.dir, speed);
   }
+  for (const q of s.friendlies) if (q.vis) look(q, 'man', 'friend', q.prone, q.moving, q.dir, q.moving ? PACE.friend : 0);
+  const k = s.truck;
+  if (k?.vis) look({ x: k.x, y: k.y, ph: 0 }, 'truck', 'friend', false, k.moving, k.dir, k.moving ? PACE.truck : 0);
   return out.sort((a, b) => b.fwd - a.fwd);
 }
 
@@ -54,7 +48,11 @@ export type SpriteContext = Pick<
   'fillStyle' | 'strokeStyle' | 'lineWidth' | 'fillRect' | 'beginPath' | 'moveTo' | 'lineTo' | 'stroke' | 'arc' | 'fill'
 >;
 
-const COLOUR = { man: [52, 54, 38], veh: [62, 64, 48], tube: [84, 84, 76] } as const;
+const COLOUR = {
+  enemy: { man: [52, 54, 38], veh: [62, 64, 48], tube: [84, 84, 76], truck: [62, 64, 48] },
+  friend: { man: [40, 54, 40], veh: [72, 84, 64], tube: [84, 84, 76], truck: [72, 84, 64] },
+} as const;
+const GLASS: RGB = [120, 140, 150];
 const SKIN = [150, 118, 92];
 const BOOT: RGB = [34, 32, 28];
 const BLACK: RGB = [30, 30, 28];
@@ -70,7 +68,7 @@ export function drawSprites(c: SpriteContext, list: readonly Sprite[], scale: nu
   };
   for (const sp of list) {
     const mix = (v: number, i: number) => Math.round(v * (1 - sp.fz) + fog[i]! * sp.fz);
-    const col = COLOUR[sp.kind].map(mix);
+    const col = COLOUR[sp.side][sp.kind].map(mix);
     const dark = col.map((v) => Math.round(v * 0.7));
     const kd = sp.k * scale * G;
     const x = sp.sx * scale;
@@ -106,7 +104,7 @@ export function drawSprites(c: SpriteContext, list: readonly Sprite[], scale: nu
         rect(x - u * 0.45, top + u * 0.85, u * 0.9, u * 0.6, skin);
         rect(x - u * 1.05, top + u * 1.45, u * 2.1, u * 2.9, col);
         rect(x - u * 1.05, top + u * 2.6, u * 2.1, u * 0.3, dark);
-        rect(x - u * 1.45, top + u * 1.6, u * 0.5, u * 2.2, dark);
+        rect(x - u * 1.45, top + u * 1.6, u * 0.5, u * 2.2, sp.side === 'enemy' ? dark : col.map((v) => Math.round(v * 0.85))); // pack
         rect(x - u * 1.35 - as * 0.3, top + u * 1.6, u * 0.45, u * 2.3, col);
         rect(x + u * 0.95 + as * 0.3, top + u * 1.6, u * 0.45, u * 2.1, col);
         c.strokeStyle = 'rgb(28,28,24)';
@@ -147,6 +145,26 @@ export function drawSprites(c: SpriteContext, list: readonly Sprite[], scale: nu
           c.fill();
         }
         rect(x - vw / 2, y - H * 0.55, vw, Math.max(dpr, H * 0.05), BLACK);
+      }
+    } else if (sp.kind === 'truck') {
+      // Cab and cargo body, a black chassis; close up a windscreen at the cab end and, side on, three wheels.
+      const H = 2.7 * kd;
+      const vw = Math.max(2 * dpr, 6.2 * kd * Math.abs(Math.sin(sp.rel)) + 2.4 * kd * Math.abs(Math.cos(sp.rel)));
+      const side = Math.sin(sp.rel) >= 0 ? 1 : -1;
+      rect(x - vw / 2, y - H, vw * 0.68, H * 0.75, col);
+      rect(side > 0 ? x + vw * 0.18 : x - vw / 2, y - H * 0.7, vw * 0.32, H * 0.45, dark);
+      rect(x - vw / 2, y - H * 0.25, vw, H * 0.25, BLACK);
+      if (H >= 12 * dpr) {
+        rect(side > 0 ? x + vw * 0.22 : x - vw * 0.46, y - H * 0.66, vw * 0.2, H * 0.18, GLASS);
+        if (Math.abs(Math.sin(sp.rel)) > 0.5) {
+          const r = H * 0.14;
+          c.fillStyle = rgb(BLACK);
+          for (const fr of [0.18, 0.42, 0.82]) {
+            c.beginPath();
+            c.arc(R(x - vw / 2 + vw * (side > 0 ? fr : 1 - fr)), R(y - r), Math.max(dpr, r), 0, Math.PI * 2);
+            c.fill();
+          }
+        }
       }
     } else {
       const L = 1.3 * kd;

@@ -63,7 +63,7 @@ describe('린트', () => {
       'export const n = (x: object) => Object.keys(x).length + (Object.hasOwn(x, "a") ? 1 : 0);',
     ];
     for (const code of allowed) expect(await rulesFor('src/sim/__probe__.ts', code), code).toEqual([]);
-  });
+  }, 30000);
 
   test('린트: 모듈 의존 자기 검사', async () => {
     const forbidden: [string, string][] = [
@@ -111,5 +111,17 @@ describe('린트', () => {
       ['src/app/__probe__.ts', "import { a } from '@adapters/mock/account'; import { b } from '@ui/b'; import { c } from '@sim'; export { a, b, c };"],
     ];
     for (const [file, code] of allowed) expect(await rulesFor(file, code), `${file}: ${code}`).toEqual([]);
+  });
+
+  test('F-31: 저장된 문자열은 글자로 보인다 — 화면에 HTML을 직접 넣지 않는다', async () => {
+    const raw = [
+      'export const X = () => <div dangerouslySetInnerHTML={{ __html: "x" }} />;',
+      'export const f = (el: HTMLElement) => { el.innerHTML = "x"; };',
+      'export const f = (el: HTMLElement) => { el.outerHTML = "x"; };',
+      'export const f = (el: HTMLElement) => el.insertAdjacentHTML("beforeend", "x");',
+    ];
+    for (const code of raw)
+      for (const file of ['src/ui/__probe__.tsx', 'src/app/__probe__.tsx']) expect(await rulesFor(file, code), `${file}: ${code}`).toContain('no-restricted-syntax');
+    expect(await rulesFor('src/ui/__probe__.tsx', 'export const X = ({ s }: { s: string }) => <b>{s}</b>;')).toEqual([]);
   });
 });

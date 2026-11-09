@@ -23,8 +23,12 @@ export interface AimControl {
   key(key: string, shift: boolean): boolean;
   /** Drag by (dx, dy) CSS pixels on a view `cssWidth` wide: the terrain follows the pointer. */
   drag(dx: number, dy: number, cssWidth: number): void;
+  /** 1밀 단추: exactly 1 mil on one axis from the value sent last, so each press sends one 조준 입력. */
+  nudge(axis: 0 | 1, dir: 1 | -1): void;
   /** Asks for 쌍안경 the other way. */
   toggleBino(): void;
+  /** 레이저 on the live aim (the R key and the button). */
+  lase(): void;
 }
 
 /** `state` is the simulation's live state; nothing is sent until the aim moves from its aim (0.1 mils). */
@@ -60,6 +64,15 @@ export function createAimControl(state: Pick<ReadonlySimState, 'aim' | 'tick' | 
     drag(dx, dy, cssWidth) {
       const k = fovOf(bino()) / cssWidth;
       moved(-dx * k, dy * k);
+    },
+    nudge(axis, dir) {
+      h = last.az / 10; // an unsent sub-mil drag remainder is dropped
+      p = last.el / 10;
+      if (axis === 0) moved(dir, 0);
+      else moved(0, dir);
+    },
+    lase() {
+      send({ a: 'lase', v: [Math.round(h * 10) % 64000, Math.round(p * 10)] });
     },
     toggleBino() {
       sentBino = { on: !bino(), tick: state.tick };

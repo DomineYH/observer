@@ -88,6 +88,17 @@ export default defineConfig(
   ...moduleImports('src/app', []),
   // Determinism bans: the simulation and the mock terrain generator (same rules, ADR 0002).
   { files: ['src/sim/**', 'src/adapters/mock/terrain/**'], rules: determinism },
+  // Stored strings (callsigns, records) reach the screen only as React text, which escapes them.
+  {
+    files: ['src/ui/**', 'src/app/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']", message: '화면에는 React 글자로만 넣는다 (이스케이프)' },
+        { selector: "MemberExpression[property.name=/^(innerHTML|outerHTML|insertAdjacentHTML)$/]", message: '화면에는 React 글자로만 넣는다 (이스케이프)' },
+      ],
+    },
+  },
   // Unit tests next to the source may import the test runner and fixtures; the determinism bans still apply.
   { files: ['src/**/*.test.{ts,tsx}'], rules: imports() },
   { files: ['**/*.js'], languageOptions: { globals: { URL: 'readonly' } } },

@@ -44,7 +44,10 @@ test('F-03: 조준 입력 양자화', () => {
   const W = fovOf(true) * 10; // at this width one dragged pixel is 0.1 mil through binoculars
   const drag = (c: ReturnType<typeof createAimControl>, tenths: number) => c.drag(-tenths, 0, W); // dragging left turns right
   const valid = (sent: Input[]) =>
-    sent.every((i) => i.a === 'cam' && i.v!.every(Number.isInteger) && i.v![0]! >= 0 && i.v![0]! <= 63999 && Math.abs(i.v![1]!) <= 2000);
+    sent.every((i) => {
+      const v = i.v as number[];
+      return i.a === 'cam' && v.every(Number.isInteger) && v[0]! >= 0 && v[0]! <= 63999 && Math.abs(v[1]!) <= 2000;
+    });
 
   // Nothing is sent until the aim is 1 mil away from the last value sent (not from the last value seen).
   const a = control(10000, 0, true);
@@ -108,4 +111,53 @@ test('F-03: 쌍안경은 아직 적용되지 않은 입력을 따른다', () => 
   expect(refused.c.bino()).toBe(false);
   refused.c.toggleBino();
   expect(refused.sent).toEqual([{ a: 'bino', v: [1] }, { a: 'bino', v: [1] }]);
+});
+
+test('F-05: 레이저 측정 — 입력기', () => {
+  // The lase goes out on the live aim, in 0.1 mils, even before the aim has been sent as 조준 (under 1 mil moved).
+  const { sent, c } = control(63990, -220);
+  c.key('ArrowRight', false); // 6399 + 20 mils, through north: 19 mils
+  c.lase();
+  expect(sent.at(-1)).toEqual({ a: 'lase', v: [190, -220] });
+  c.drag(0.02, 0, 960); // a hair: no 조준 sent, the lase still follows it
+  const n = sent.length;
+  c.lase();
+  expect(sent).toHaveLength(n + 1);
+  const [az, el] = sent.at(-1)!.v as number[];
+  expect(az).toBe(Math.round(c.aim().h * 10) % 64000);
+  expect(el).toBe(-220);
+});
+
+test('F-03: 1밀 터치 단추 — 조준 입력', () => {
+  // One press = one 조준 입력 exactly 1 mil (10 tenths) from the value sent last, by eye and through binoculars alike.
+  const moves: [0 | 1, 1 | -1, number[]][] = [
+    [0, 1, [10010, 0]],
+    [0, -1, [9990, 0]],
+    [1, 1, [10000, 10]],
+    [1, -1, [10000, -10]],
+  ];
+  for (const bino of [false, true])
+    for (const [axis, dir, v] of moves) {
+      const { sent, c } = control(10000, 0, bino);
+      c.nudge(axis, dir);
+      expect(sent).toEqual([{ a: 'cam', v }]);
+    }
+
+  // A drag remainder under 1 mil was never sent: the press still moves 1 mil from what was sent.
+  const W = fovOf(true) * 10;
+  const a = control(10000, 0, true);
+  a.c.drag(-5, 0, W); // 0.5 mil right, nothing sent
+  expect(a.sent).toEqual([]);
+  a.c.nudge(0, 1);
+  expect(a.sent).toEqual([{ a: 'cam', v: [10010, 0] }]);
+  a.c.nudge(0, 1);
+  expect(a.sent.at(-1)).toEqual({ a: 'cam', v: [10020, 0] });
+
+  // At the +200 mil stop nothing is sent; azimuth wraps through north.
+  const top = control(10000, 2000);
+  top.c.nudge(1, 1);
+  expect(top.sent).toEqual([]);
+  const north = control(0, 0);
+  north.c.nudge(0, -1);
+  expect(north.sent).toEqual([{ a: 'cam', v: [63990, 0] }]);
 });

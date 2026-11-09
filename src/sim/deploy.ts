@@ -11,7 +11,7 @@ const MORTAR_TRIES = 40;
 const CANOPY_M = 3; // the mortar sits in the open: surface no more than this above the ground
 
 // `x, y` are placed by `layout` and `vis` by the visibility pass.
-const member = (s: Stream, kind: Member['kind'], u: number, v: number, uc = u, vc = v): Member => ({ kind, u, v, uc, vc, ph: next(s) * TAU, x: 0, y: 0, prone: false, vis: false });
+const member = (s: Stream, kind: Member['kind'], u: number, v: number, uc = u, vc = v): Member => ({ kind, u, v, uc, vc, ph: next(s) * TAU, x: 0, y: 0, prone: false, alive: true, vis: false });
 
 function members(s: Stream, type: Platoon['type']): Member[] {
   const out: Member[] = [];
@@ -73,6 +73,7 @@ export function deploy(sc: Scenario, t: TerrainData, s: Stream): Platoon[] {
       nextFire: 0,
       lastFire: -1,
       dustTick: 0,
+      pinnedUntil: 0,
       activity: 'halted',
       intel: { stage: 0, tnum: 0, cue: null, prog: 0, seenMax: 0, tubes: 0, firstTick: -1, seenTick: -1, seenAz: 0, size: null },
     };

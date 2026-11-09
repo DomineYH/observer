@@ -1,7 +1,7 @@
-import { SIM_VERSION, type Input, type ReplayData, type SimInit, type TerrainData } from '@sim';
+import { SIM_VERSION, type Input, type ReplayData, type SimInit, type TerrainData, type Weather } from '@sim';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { flatTerrain } from './terrain';
 
 // The small flat terrain keeps tests that don't look at the terrain fast.
@@ -19,8 +19,8 @@ export const init = (seed: number, terrain: TerrainData = flatTerrain()): SimIni
 export const START: Input = { a: 'start', v: [320, 320] };
 
 /** 재생 자료 for `init(seed)`: the header carries the scenario's identity only, and no terrain. */
-export const replayData = (inputs: ReplayData['inputs'], totalTicks = 10, seed = 20261106): ReplayData => {
-  const { seedKind, scenario, guns, weather, mode } = init(seed);
+export const replayData = (inputs: ReplayData['inputs'], totalTicks = 10, seed = 20261106, weather: Weather = CLEAR_WEATHER): ReplayData => {
+  const { seedKind, scenario, guns, mode } = init(seed);
   return {
     format: 1,
     simVersion: SIM_VERSION,

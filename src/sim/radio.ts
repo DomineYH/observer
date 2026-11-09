@@ -114,7 +114,15 @@ export type RadioUtterance = { speaker: Speaker; ending: Ending } & RadioBody;
 type SlotsOf<B> = B extends { slots: infer S } ? (S extends unknown ? keyof S : never) : never;
 export type SlotName = SlotsOf<RadioBody>;
 
+type SlotsOfKind<K extends RadioKind> = Extract<RadioBody, { kind: K; slots: unknown }>['slots'];
+export type LocationSlots = SlotsOfKind<'location'>;
+export type DescriptionSlots = SlotsOfKind<'description'>;
+export type MtoSlots = SlotsOfKind<'mto'>;
+export type CorrectionSlots = SlotsOfKind<'correction'>;
+export type ShiftSlots = SlotsOfKind<'shift'>;
+
 export interface RadioEvent {
   type: 'radio';
+  tick: number; // the simulation's tick when the step that said it ends
   utterance: RadioUtterance;
 }

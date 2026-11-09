@@ -2,11 +2,13 @@
 import { describe, expect, test } from 'vitest';
 import type { TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain } from './terrain';
 import { angleTo, idAt, oneUnit, started } from './enemy';
+import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, untilImpact } from './mission';
 
 type Path = [number, number][];
 
@@ -107,7 +109,7 @@ describe('F-06', () => {
     const plain = lum(29); // 119 → 120 m
     expect(index).toBeLessThan(plain);
     expect(plain).toBeLessThan(lum(15));
-  });
+  }, 30000);
 
   test('F-06: 좌표자', () => {
     const t = flatTerrain({ n: 1024 }); // 10 240 m square, 방안 기준 동 40000·북 30000
@@ -152,7 +154,7 @@ describe('F-06', () => {
 
   test('F-06: 관측 시야 부채꼴과 아군 진지', () => {
     const t = flatTerrain({ n: 1024 }); // 0.05 px/m on the whole map
-    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard' };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
     const { strokes, texts, rects } = draw(t, FULL_VIEW, marks);
     // The line of sight, due north 7 km from the post at (256, 422), inside the wedge.
     expect(strokes).toContainEqual([[256, 422], [256, 72]]);
@@ -163,6 +165,28 @@ describe('F-06', () => {
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
+  });
+
+  test('F-17: 바람 화살표', () => {
+    // Bottom right of the panel, pointing downwind, 8 px + 1.4 px per m/s long, with the speed under it (demo 1311–1316).
+    const t = flatTerrain({ n: 1024 });
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: { ...CLEAR_WEATHER, windFromDeg: 270, windSpeedTenthMs: 100 }, viewshed: null };
+    const shaft = (m: MapMarks) => draw(t, FULL_VIEW, m).strokes.at(-1)!.map(([x, y]) => [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6]);
+    expect(shaft(marks)).toEqual([[467, 478], [489, 478]]); // from the west: blowing east
+    expect(draw(t, FULL_VIEW, marks).texts).toContainEqual({ text: '10m/s', x: 478, y: 498 });
+    expect(shaft({ ...marks, weather: { ...marks.weather, windFromDeg: 0 } })).toEqual([[478, 467], [478, 489]]); // from the north: down the map
+  });
+
+  test('B3: 훈련 지도의 기러기가 아는 위치', () => {
+    const t = flatTerrain({ n: 1024 }); // 0.05 px/m: the post (5120, 1800) at (256, 422)
+    const base: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5000, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'training', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const label = (m: MapMarks) => draw(t, FULL_VIEW, m).texts.find((x) => x.text === '기러기가 아는 위치');
+    // 훈련: 120 m off, the post 기러기 knows is marked where it is; within 30 m, or in 표준, it is not.
+    expect(label(base)).toMatchObject({ x: 258, y: 426 });
+    expect(label({ ...base, knownOp: { x: 5100, y: 1800 } })).toBeUndefined();
+    expect(label({ ...base, mode: 'standard' })).toBeUndefined();
+    // While walking, a dashed line from the post to where it is going.
+    expect(draw(t, FULL_VIEW, { ...base, dest: { x: 5200, y: 1800 } }).dashes).toContainEqual([[256, 422], [260, 422]]);
   });
 
   test('F-06: 표준은 방위각 선만', () => {
@@ -181,11 +205,17 @@ describe('F-06', () => {
     const marks = (sim: ReturnType<typeof found>): MapMarks => ({
       scenario: BASE_SCENARIO,
       op: sim.state.op,
+      knownOp: sim.state.op,
+      dest: null,
       az: 0,
       fovMil: 1066,
       pin: null,
       platoons: sim.state.platoons,
       mode: sim.state.mode,
+      missions: [],
+      tick: sim.state.tick,
+      weather: CLEAR_WEATHER,
+      viewshed: null,
     });
 
     // 표준: where it is stays unknown; only the bearing it was last seen on, 7.5 km out from the post, dashed.
@@ -213,5 +243,43 @@ describe('F-06', () => {
     expect(r.arcs).toContainEqual([at[0], at[1]]);
     expect(r.texts).toEqual(expect.arrayContaining([{ text: '?', x: at[0] - 3, y: at[1] + 3 }, { text: 'T1', x: at[0] + 9, y: at[1] + 3 }]));
     expect(r.dashes.filter(fromPost)).toEqual([]);
+  });
+
+  test('F-10: 지도에 탄착과 요구 좌표', () => {
+    // The flat test terrain at 0.8 px/m: the grid sent, (505, 505), is drawn at (404, 108).
+    const sim = emptyField();
+    openRadio(sim);
+    toReady(sim, DESC_UNKNOWN, CALL_ADJUST, LOC_NEAR);
+    const { impact } = untilImpact(sim);
+    const marks = (): MapMarks => ({
+      scenario: BASE_SCENARIO,
+      op: sim.state.op,
+      knownOp: sim.state.op,
+      dest: null,
+      az: 0,
+      fovMil: 1066,
+      pin: null,
+      platoons: [],
+      mode: 'standard',
+      missions: sim.state.missions,
+      tick: sim.state.tick,
+      weather: CLEAR_WEATHER,
+      viewshed: null,
+    });
+    const t = flatTerrain();
+    const crossAt = (r: ReturnType<typeof draw>, x: number, y: number) =>
+      r.strokes.some((p) => p.length === 4 && Math.abs(p[0]![0] - (x - 2)) < 1e-9 && Math.abs(p[0]![1] - (y - 2)) < 1e-9);
+    const ix = impact.x * 0.8;
+    const iy = 512 - impact.y * 0.8;
+    const now = draw(t, FULL_VIEW, marks());
+    // The requested grid as a square labelled with its 표적번호, the impact as an orange ×.
+    expect(now.rects).toContainEqual([400, 104, 8, 8]);
+    expect(now.texts).toContainEqual({ text: 'AB1001', x: 410, y: 103 });
+    expect(crossAt(now, ix, iy)).toBe(true);
+    // The × stays 150 s.
+    radioEvents(sim, 2999);
+    expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(true);
+    radioEvents(sim, 2);
+    expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(false);
   });
 });

@@ -1,15 +1,22 @@
 // Fixtures for the enemy tests: one-unit scenarios on the flat test terrain, whose observer stands at (320, 320).
 import { createSim, EYE_HEIGHT, type Mode, type Point, type Scenario, type Sim, type SimInit, type UnitDef, type Weather } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
-import { CLEAR_WEATHER } from '@app/clearWeather';
+import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { init, START } from './init';
 import { flatTerrain } from './terrain';
 
-/** The base scenario with only `unit`; every route is `route` when given. */
+/** A combat unit that never sets off: with it a game goes on after the unit under test falls (all combat units down
+ * ends it, #36). Last in the scenario on a fixed route, so the deploy draws of the unit before it are unchanged. */
+export const RESERVE: UnitDef = { type: 'inf', route: 'A', t0: 1e6 };
+
+/** The base scenario with only `unit` (and the RESERVE); every route is `route` when given. No friendly positions: the
+ * base ones lie kilometres off the flat test terrain, and their troops would only draw from the 행동 stream and cost
+ * sight lines. */
 export const oneUnit = (unit: UnitDef, route?: readonly Point[]): Scenario => ({
   ...BASE_SCENARIO,
   routes: route ? { A: route, B: route, C: route } : BASE_SCENARIO.routes,
-  units: [unit],
+  units: [unit, RESERVE],
+  friends: [],
 });
 
 /** The mortar section dug in exactly at `at` (a zero spread puts it on the NAI's centre). */
