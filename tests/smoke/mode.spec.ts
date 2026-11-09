@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createSim, heightAt, type Input } from '../../src/sim/index';
 import { DEFAULT_QUALITY, eyeAt, focalOf, MIL, project, QUALITIES } from '../../src/render/projection';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
@@ -47,21 +47,61 @@ const shades = (page: Page) =>
     return seen.size;
   });
 
+/** How well the label-blue pixels around (`x`, `y`, canvas pixels) match `text` drawn there in the view's font, in a box
+ * `width` CSS pixels wide (intersection over union). */
+const textMatch = (view: Locator, text: string, x: number, y: number, width: number) =>
+  view.evaluate(
+    (c: HTMLCanvasElement, { text, x, y, width }) => {
+      const dpr = window.devicePixelRatio || 1;
+      const [bw, bh] = [Math.round(width * dpr), Math.round(24 * dpr)];
+      const [x0, y0] = [Math.round(x - bw / 2), Math.round(y - 18 * dpr)];
+      const seen = c.getContext('2d')!.getImageData(x0, y0, bw, bh).data;
+      const ref = new OffscreenCanvas(bw, bh).getContext('2d')!;
+      ref.font = `${Math.round(12 * dpr)}px monospace`;
+      ref.textAlign = 'center';
+      ref.fillText(text, x - x0, y - y0);
+      const ink = ref.getImageData(0, 0, bw, bh).data;
+      const near = (v: number, c0: number) => Math.abs(v - c0) <= 30;
+      let both = 0;
+      let either = 0;
+      for (let i = 0; i < bw * bh; i++) {
+        const a = ink[i * 4 + 3]! > 200;
+        const b = near(seen[i * 4]!, 98) && near(seen[i * 4 + 1]!, 174) && near(seen[i * 4 + 2]!, 230);
+        if (a && b) both++;
+        if (a || b) either++;
+      }
+      return either ? both / either : 0;
+    },
+    { text, x, y, width },
+  );
+
+/** How well the view's foot matches the 미리보기 bar (demo 1195). */
+const previewBar = async (page: Page) => {
+  const view = page.getByRole('img', { name: '관측 화면' });
+  const { W, H, dpr } = await view.evaluate((c: HTMLCanvasElement) => ({ W: c.width, H: c.height, dpr: window.devicePixelRatio || 1 }));
+  return textMatch(view, '미리보기 (훈련) — 관측소 후보 지점에서 본 모습', W / 2, H - 15 * dpr, W / dpr);
+};
+
 test('기본: 훈련 모드로 시작', async ({ page }) => {
-  // A first open touches nothing: 훈련 is on (demo 86, 399), the 관측소 후보 previews, and 작전 개시 asks nothing.
+  // A first open touches nothing: 훈련 is on (demo 86, 399), the view previews from the planned post with its bar before
+  // any pick (demo 1194–1195), then from the 관측소 후보, and 작전 개시 asks nothing and ends the preview.
   const { seen } = dialogs(page);
   await page.goto('/?seed=20261106');
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
   await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toBeVisible();
+  await expect.poll(() => shades(page)).toBeGreaterThan(32);
+  await expect.poll(() => previewBar(page)).toBeGreaterThan(0.5);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await expect.poll(() => shades(page)).toBeGreaterThan(32);
+  await expect.poll(() => previewBar(page)).toBeGreaterThan(0.5);
   await start(page);
   expect(seen).toEqual([]);
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => previewBar(page)).toBeLessThan(0.05);
 });
 
 test('기본: 배속 ×2로 시작', async ({ page }) => {
@@ -229,34 +269,8 @@ test('F-14: 훈련 아군 표시 — 화면', async ({ page }) => {
   expect(places.map((p) => p.n)).toEqual([1, 2, 3]); // all three in the opening view
 
   const view = page.getByRole('img', { name: '관측 화면' });
-  /** How well the label-blue pixels around `at` match `text` drawn there in the view's font (intersection over union). */
-  const match = (at: { sx: number; sy: number }, text: string) =>
-    view.evaluate(
-      (c: HTMLCanvasElement, { at, text, w }) => {
-        const dpr = window.devicePixelRatio || 1;
-        const k = c.width / w;
-        const [x, y] = [at.sx * k, at.sy * k];
-        const [bw, bh] = [Math.round(160 * dpr), Math.round(24 * dpr)];
-        const [x0, y0] = [Math.round(x - bw / 2), Math.round(y - 18 * dpr)];
-        const seen = c.getContext('2d')!.getImageData(x0, y0, bw, bh).data;
-        const ref = new OffscreenCanvas(bw, bh).getContext('2d')!;
-        ref.font = `${Math.round(12 * dpr)}px monospace`;
-        ref.textAlign = 'center';
-        ref.fillText(text, x - x0, y - y0);
-        const ink = ref.getImageData(0, 0, bw, bh).data;
-        const near = (v: number, c0: number) => Math.abs(v - c0) <= 30;
-        let both = 0;
-        let either = 0;
-        for (let i = 0; i < bw * bh; i++) {
-          const a = ink[i * 4 + 3]! > 200;
-          const b = near(seen[i * 4]!, 98) && near(seen[i * 4 + 1]!, 174) && near(seen[i * 4 + 2]!, 230);
-          if (a && b) both++;
-          if (a || b) either++;
-        }
-        return either ? both / either : 0;
-      },
-      { at, text, w },
-    );
+  const k = (await view.evaluate((c: HTMLCanvasElement) => c.width)) / w;
+  const match = (at: { sx: number; sy: number }, text: string) => textMatch(view, text, at.sx * k, at.sy * k, 160);
   const label = (n: number) => `▼ 아군 ${n}소대`;
   for (const p of places) {
     await expect.poll(() => match(p, label(p.n))).toBeGreaterThan(0.5);

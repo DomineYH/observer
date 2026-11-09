@@ -71,8 +71,9 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       const on = aim.bino();
       setBino(on);
       if (hidden.current) return;
-      // Before the post is occupied the view stays dark (demo 1194); training previews the 관측소 후보 (demo 939).
-      if (state.phase === 'prep' && !(state.mode === 'training' && state.picked)) {
+      // Before the post is occupied the view stays dark in 표준 (demo 1194); 훈련 previews from where the post would stand:
+      // the 관측소 후보, or the planned post before any pick.
+      if (state.phase === 'prep' && state.mode !== 'training') {
         c.fillStyle = '#0b0e0a';
         c.fillRect(0, 0, W, H);
         c.fillStyle = '#8b947c';
@@ -96,6 +97,15 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
         c.textAlign = 'center';
         c.font = `${Math.round(12 * dpr)}px monospace`;
         for (const l of friendLabels(friends, geom, terrain)) c.fillText(`▼ 아군 ${l.n}소대`, l.sx * k, l.sy * k);
+        c.textAlign = 'left';
+      }
+      if (state.phase === 'prep') {
+        c.fillStyle = 'rgba(0,0,0,.55)';
+        c.fillRect(0, H - 30 * dpr, W, 30 * dpr);
+        c.fillStyle = '#62aee6';
+        c.textAlign = 'center';
+        c.font = `${Math.round(12 * dpr)}px monospace`;
+        c.fillText('미리보기 (훈련) — 관측소 후보 지점에서 본 모습', W / 2, H - 15 * dpr);
         c.textAlign = 'left';
       }
       if (fps !== null) {
