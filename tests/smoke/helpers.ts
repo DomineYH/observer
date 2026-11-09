@@ -95,6 +95,13 @@ export async function standardGame(page: Page) {
   await speedTo(page, 1);
 }
 
+/** 보고하지 않고 계속, then what a person waits to see before pressing 송신: the call's form. The panels show the skip only at
+ * their next publish; until then 송신 is still the 위치 보고's own, and the simulation refuses a report no longer owed. */
+export async function skipReport(composer: Locator) {
+  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await expect(composer.getByRole('combobox', { name: '경고명령' })).toBeVisible();
+}
+
 /** Where `fireOnOwnPost` stops for the caller's own steps: before the 위치 보고 is skipped, before the call goes, before
  * the grid is typed. */
 export type OwnPostStage = 'report' | 'call' | 'loc';

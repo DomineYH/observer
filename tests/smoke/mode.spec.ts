@@ -5,7 +5,7 @@ import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap, speedTo, standardGame, toReady } from './helpers';
+import { mapPixels, settledMap, skipReport, speedTo, standardGame, toReady } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
@@ -193,7 +193,7 @@ test('F-14: 훈련 숫자 병기', async ({ page }) => {
   const composer = page.getByRole('region', { name: '입력기' });
   const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await skipReport(composer);
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
   await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');

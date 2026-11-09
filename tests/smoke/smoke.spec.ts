@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, speedTo, standardGame, tabTo, toReady } from './helpers';
+import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, skipReport, speedTo, standardGame, tabTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   test.setTimeout(60_000); // 15 s alone, but near the default 30 s under parallel workers
@@ -362,7 +362,7 @@ test('F-07: 극좌표 위치법 — 입력기', async ({ page }) => {
   const log = page.getByRole('region', { name: '무전 기록' });
   await expect(log).toContainText('기러기, 여기는 갈매기, 감명 양호, 이상.', { timeout: 10_000 }); // 5.5 s in
   const composer = page.getByRole('region', { name: '입력기' });
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click(); // not the planned post (F-21)
+  await skipReport(composer); // not the planned post (F-21)
   const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
   await send.click();

@@ -1,5 +1,5 @@
 import { chromium, expect, test, type Locator, type Page } from '@playwright/test';
-import { fireOnOwnPost, mapPixels, narrowStart, region, settledMap, tab, ticks } from './helpers';
+import { fireOnOwnPost, mapPixels, narrowStart, region, settledMap, skipReport, tab, ticks } from './helpers';
 
 // A phone held upright. Touches go through Chromium's own touch input (CDP): Playwright alone can only tap.
 const PHONE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
@@ -228,7 +228,7 @@ test.describe('좁은 화면 탭', () => {
     const read = await readPoint();
     await panel.getByRole('button', { name: '위치 보고에 입력' }).click();
     await landed(read, composer.getByRole('region', { name: '위치 보고' }));
-    await composer.getByRole('button', { name: '보고하지 않고 계속' }).click();
+    await skipReport(composer);
     await send.click();
     await tab(page, '무전').click();
     await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
