@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { chromium, expect, test, type Locator, type Page } from '@playwright/test';
 import { fireOnOwnPost, mapPixels, narrowStart, region, settledMap, tab, ticks } from './helpers';
 
 // A phone held upright. Touches go through Chromium's own touch input (CDP): Playwright alone can only tap.
@@ -154,24 +154,49 @@ test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   await expect(menu).toBeHidden();
 });
 
-test('레이아웃: 넓은 머리띠 — 가장 긴 호출부호', async ({ page }) => {
+test('레이아웃: 넓은 머리띠 — 가장 긴 호출부호', async ({ page, baseURL }) => {
   // The longest callsign (8 characters, wide Hangul ones), typed in during 작전 준비 as a player would: at 1280 px the
-  // 머리띠 stays one row without scrolling, and the 현재 호출부호 shows it whole on that row.
+  // 머리띠 stays one row without scrolling, the 현재 호출부호 shows it whole on that row, with room left at the band's end
+  // and 2 px (the width #45 measured) kept before 오프라인.
+  test.setTimeout(60_000);
+  const longest = async (p: Page, bandWidth: number) => {
+    const name = '천둥번개참새열둘';
+    await p.getByRole('textbox', { name: '호출부호', exact: true }).fill(name);
+    await p.getByRole('button', { name: '정하기' }).click();
+    const current = p.getByRole('status', { name: '현재 호출부호' });
+    await expect(current).toHaveText(name);
+    expect(await p.getByRole('banner').evaluate((h) => h.parentElement!.clientWidth)).toBe(bandWidth);
+    await oneRow(p, true);
+    const shown = await current.evaluate((e) => ({ scroll: e.scrollWidth, client: e.clientWidth }));
+    expect(shown.scroll).toBeLessThanOrEqual(shown.client);
+    const c = (await current.boundingBox())!;
+    const first = (await p.getByRole('banner').getByText('OBSERVER').boundingBox())!;
+    expect(Math.abs(c.y + c.height / 2 - (first.y + first.height / 2))).toBeLessThanOrEqual(3);
+    const band = await p.getByRole('banner').evaluate((h) => h.parentElement!.getBoundingClientRect().right);
+    expect(c.x + c.width).toBeLessThanOrEqual(band);
+    const last = (await p.getByRole('button', { name: '랭킹' }).boundingBox())!;
+    expect(band - (last.x + last.width)).toBeGreaterThanOrEqual(16);
+    const offline = (await p.getByRole('status', { name: '연결' }).boundingBox())!;
+    expect(offline.x - (c.x + c.width)).toBeGreaterThanOrEqual(1.99);
+  };
+
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/?seed=20261106');
-  const longest = '천둥번개참새열둘';
-  await page.getByRole('textbox', { name: '호출부호', exact: true }).fill(longest);
-  await page.getByRole('button', { name: '정하기' }).click();
-  const current = page.getByRole('status', { name: '현재 호출부호' });
-  await expect(current).toHaveText(longest);
-  await oneRow(page, true);
-  const shown = await current.evaluate((e) => ({ scroll: e.scrollWidth, client: e.clientWidth }));
-  expect(shown.scroll).toBeLessThanOrEqual(shown.client);
-  const c = (await current.boundingBox())!;
-  const first = (await page.getByRole('banner').getByText('OBSERVER').boundingBox())!;
-  expect(Math.abs(c.y + c.height / 2 - (first.y + first.height / 2))).toBeLessThanOrEqual(3);
-  const band = await page.getByRole('banner').evaluate((h) => h.parentElement!.getBoundingClientRect().right);
-  expect(c.x + c.width).toBeLessThanOrEqual(band);
+  await longest(page, 1260);
+
+  // With a page scrollbar, as a real window has: the band is 1245 px, as measured in Windows Chrome (#45). Playwright
+  // hides scrollbars by default, and launchOptions cannot be set for one test, so this run has a browser of its own.
+  const browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
+  try {
+    const context = await browser.newContext({ baseURL, viewport: { width: 1280, height: 900 } });
+    const barred = await context.newPage();
+    await barred.goto('/?seed=20261106');
+    await barred.addStyleTag({ content: 'html { overflow-y: scroll }' });
+    expect(await barred.evaluate(() => document.documentElement.clientWidth)).toBe(1265);
+    await longest(barred, 1245);
+  } finally {
+    await browser.close();
+  }
 });
 
 test.describe('좁은 화면 탭', () => {
