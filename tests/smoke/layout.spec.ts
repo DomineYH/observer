@@ -1,5 +1,5 @@
 import { chromium, expect, test, type Locator, type Page } from '@playwright/test';
-import { fireOnOwnPost, mapPixels, narrowStart, region, settledMap, skipReport, tab, ticks } from './helpers';
+import { fireOnOwnPost, mapPixels, narrowStart, region, settledMap, skipReport, standardGame, tab, ticks } from './helpers';
 
 // A phone held upright. Touches go through Chromium's own touch input (CDP): Playwright alone can only tap.
 const PHONE = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
@@ -121,6 +121,7 @@ test('레이아웃: 좁은 화면 경계', async ({ page }) => {
   // 767 px: the upright layout. The view on top at full width, 16:9, above the tabs; the 머리띠 folded.
   await page.setViewportSize({ width: 767, height: 900 });
   await page.goto('/?seed=20261106');
+  await standardGame(page); // the long prep below on the dark view (the preview draws every frame)
   await expect(tabs).toBeVisible();
   await expect(menuButton).toBeVisible();
   await expect(menu).toBeHidden();
