@@ -1,17 +1,18 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createSim, heightAt, type Input } from '../../src/sim/index';
 import { DEFAULT_QUALITY, eyeAt, focalOf, MIL, project, QUALITIES } from '../../src/render/projection';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap, speedTo, toReady } from './helpers';
+import { mapPixels, settledMap, skipReport, speedTo, standardGame, toReady } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
 /** A fresh page on the fixed practice seed with the 관측소 후보 picked (찰리호텔 4512 3256, off the planned post). */
 async function picked(page: Page) {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
@@ -45,6 +46,74 @@ const shades = (page: Page) =>
     for (let i = 0; i < d.length; i += 4) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
     return seen.size;
   });
+
+/** How well the label-blue pixels around (`x`, `y`, canvas pixels) match `text` drawn there in the view's font, in a box
+ * `width` CSS pixels wide (intersection over union). */
+const textMatch = (view: Locator, text: string, x: number, y: number, width: number) =>
+  view.evaluate(
+    (c: HTMLCanvasElement, { text, x, y, width }) => {
+      const dpr = window.devicePixelRatio || 1;
+      const [bw, bh] = [Math.round(width * dpr), Math.round(24 * dpr)];
+      const [x0, y0] = [Math.round(x - bw / 2), Math.round(y - 18 * dpr)];
+      const seen = c.getContext('2d')!.getImageData(x0, y0, bw, bh).data;
+      const ref = new OffscreenCanvas(bw, bh).getContext('2d')!;
+      ref.font = `${Math.round(12 * dpr)}px monospace`;
+      ref.textAlign = 'center';
+      ref.fillText(text, x - x0, y - y0);
+      const ink = ref.getImageData(0, 0, bw, bh).data;
+      const near = (v: number, c0: number) => Math.abs(v - c0) <= 30;
+      let both = 0;
+      let either = 0;
+      for (let i = 0; i < bw * bh; i++) {
+        const a = ink[i * 4 + 3]! > 200;
+        const b = near(seen[i * 4]!, 98) && near(seen[i * 4 + 1]!, 174) && near(seen[i * 4 + 2]!, 230);
+        if (a && b) both++;
+        if (a || b) either++;
+      }
+      return either ? both / either : 0;
+    },
+    { text, x, y, width },
+  );
+
+/** How well the view's foot matches the 미리보기 bar (demo 1195). */
+const previewBar = async (page: Page) => {
+  const view = page.getByRole('img', { name: '관측 화면' });
+  const { W, H, dpr } = await view.evaluate((c: HTMLCanvasElement) => ({ W: c.width, H: c.height, dpr: window.devicePixelRatio || 1 }));
+  return textMatch(view, '미리보기 (훈련) — 관측소 후보 지점에서 본 모습', W / 2, H - 15 * dpr, W / dpr);
+};
+
+test('기본: 훈련 모드로 시작', async ({ page }) => {
+  // A first open touches nothing: 훈련 is on (demo 86, 399), the view previews from the planned post with its bar before
+  // any pick (demo 1194–1195), then from the 관측소 후보, and 작전 개시 asks nothing and ends the preview.
+  const { seen } = dialogs(page);
+  await page.goto('/?seed=20261106');
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toBeVisible();
+  await expect.poll(() => shades(page)).toBeGreaterThan(32);
+  await expect.poll(() => previewBar(page)).toBeGreaterThan(0.5);
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await expect.poll(() => shades(page)).toBeGreaterThan(32);
+  await expect.poll(() => previewBar(page)).toBeGreaterThan(0.5);
+  await start(page);
+  expect(seen).toEqual([]);
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => previewBar(page)).toBeLessThan(0.05);
+});
+
+test('기본: 배속 ×2로 시작', async ({ page }) => {
+  // Demo 90, 399. The cycle goes on from there: ×2 → ×4 → ×8 → ×1 → ×2.
+  await page.goto('/?seed=20261106');
+  const speed = page.getByRole('button', { name: /^배속 ×/ });
+  await expect(speed).toHaveAccessibleName('배속 ×2');
+  for (const n of [4, 8, 1, 2]) {
+    await speed.click();
+    await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
+  }
+});
 
 test('F-14: 훈련 전환 경고', async ({ page }) => {
   const { seen, answer } = dialogs(page);
@@ -124,7 +193,7 @@ test('F-14: 훈련 숫자 병기', async ({ page }) => {
   const composer = page.getByRole('region', { name: '입력기' });
   const preview = composer.getByRole('status', { name: '보낼 문장' });
   const send = composer.getByRole('button', { name: '송신' });
-  await composer.getByRole('button', { name: '보고하지 않고 계속' }).click({ timeout: 15_000 });
+  await skipReport(composer);
   await send.click();
   await expect(log).toContainText('좌표 송신바람', { timeout: 15_000 });
   await composer.getByRole('textbox', { name: '동', exact: true }).fill('4720');
@@ -200,34 +269,8 @@ test('F-14: 훈련 아군 표시 — 화면', async ({ page }) => {
   expect(places.map((p) => p.n)).toEqual([1, 2, 3]); // all three in the opening view
 
   const view = page.getByRole('img', { name: '관측 화면' });
-  /** How well the label-blue pixels around `at` match `text` drawn there in the view's font (intersection over union). */
-  const match = (at: { sx: number; sy: number }, text: string) =>
-    view.evaluate(
-      (c: HTMLCanvasElement, { at, text, w }) => {
-        const dpr = window.devicePixelRatio || 1;
-        const k = c.width / w;
-        const [x, y] = [at.sx * k, at.sy * k];
-        const [bw, bh] = [Math.round(160 * dpr), Math.round(24 * dpr)];
-        const [x0, y0] = [Math.round(x - bw / 2), Math.round(y - 18 * dpr)];
-        const seen = c.getContext('2d')!.getImageData(x0, y0, bw, bh).data;
-        const ref = new OffscreenCanvas(bw, bh).getContext('2d')!;
-        ref.font = `${Math.round(12 * dpr)}px monospace`;
-        ref.textAlign = 'center';
-        ref.fillText(text, x - x0, y - y0);
-        const ink = ref.getImageData(0, 0, bw, bh).data;
-        const near = (v: number, c0: number) => Math.abs(v - c0) <= 30;
-        let both = 0;
-        let either = 0;
-        for (let i = 0; i < bw * bh; i++) {
-          const a = ink[i * 4 + 3]! > 200;
-          const b = near(seen[i * 4]!, 98) && near(seen[i * 4 + 1]!, 174) && near(seen[i * 4 + 2]!, 230);
-          if (a && b) both++;
-          if (a || b) either++;
-        }
-        return either ? both / either : 0;
-      },
-      { at, text, w },
-    );
+  const k = (await view.evaluate((c: HTMLCanvasElement) => c.width)) / w;
+  const match = (at: { sx: number; sy: number }, text: string) => textMatch(view, text, at.sx * k, at.sy * k, 160);
   const label = (n: number) => `▼ 아군 ${n}소대`;
   for (const p of places) {
     await expect.poll(() => match(p, label(p.n))).toBeGreaterThan(0.5);
@@ -286,9 +329,8 @@ test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
   expect(shown).not.toBeNull();
   const [, name, dead, size, pct] = shown!;
 
-  // The same game in Node: 연습 시드, clear weather, 훈련 then 작전 개시 at the planned post in 작전 준비.
-  const sim = createSim({ seed: 20261106, seedKind: 'practice', scenario: BASE_SCENARIO, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'standard', terrain: await mockTerrain.load(20261106) });
-  expect(sim.step([{ a: 'mode', v: ['training'] }]).accepted).toEqual([true]);
+  // The same game in Node: 연습 시드, clear weather, opened in 훈련 (the page's click sent nothing), 작전 개시 at the planned post.
+  const sim = createSim({ seed: 20261106, seedKind: 'practice', scenario: BASE_SCENARIO, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'training', terrain: await mockTerrain.load(20261106) });
   expect(sim.step([{ a: 'start', v: [BASE_SCENARIO.plannedOp.x, BASE_SCENARIO.plannedOp.y] }]).accepted).toEqual([true]);
   while (sim.state.tick < end) {
     const batch = inputs.get(sim.state.tick) ?? [];
@@ -339,10 +381,18 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
 test('F-30: 기상 변경은 고른 모드를 남긴다 — 화면', async ({ page }) => {
   const { seen } = dialogs(page);
   await picked(page);
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  // 표준, which is not the mode a game opens in: the new game has to be told (newGame's carry).
+  await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '박무' });
+  await expect(prep).toContainText('기상 시정 6.5 km');
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'true');
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toHaveCount(0);
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+
   await button(page, '훈련').click();
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
-  const prep = page.getByRole('region', { name: '작전 준비' });
   await expect(prep).toContainText('기상 시정 2.5 km');
   // Still training: the mode buttons, and a training aid on the map; the 후보 kept too.
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
@@ -830,6 +880,7 @@ test('F-07: 위험근접 수정 제안은 100 m까지 — 화면', async ({ page
 async function nearMortar(page: Page) {
   dialogs(page);
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: (box.width * 6450) / 10240, y: box.height * (1 - 7250 / 10240) } });

@@ -138,7 +138,7 @@ input {
   flex-wrap: nowrap;
   gap: 4px;
   align-items: center;
-  font-size: 12px;
+  font-size: 11.5px; /* with a page scrollbar a 1280 px window leaves the band 1245 px: the longest callsign fits on Windows fonts too */
   word-spacing: -2px; /* a monospace space is a full cell; 5 px still parts words */
   letter-spacing: -0.5px; /* the longest callsign fits 1280 px also on CI's wider fonts (about 65 px wider than local) */
   border-bottom: 1px solid var(--line);
