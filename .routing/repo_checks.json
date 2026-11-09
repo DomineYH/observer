@@ -28,7 +28,7 @@
       "engines",
       "e2e"
     ],
-    "source": null
+    "source": "GitHub branch protection rule on main: https://github.com/DomineYH/observer/settings/branches"
   },
   "e2e": {
     "command": "npm run test:e2e",
@@ -38,7 +38,6 @@
   },
   "unknowns": [
     "repo: commands do not exist until the M1 scaffold task creates package.json scripts and the GitHub Actions workflow",
-    "repo: golden regeneration 'npm run golden:update' is a maintenance command, not a check",
-    "repo: branch protection on GitHub is not configured yet"
+    "repo: golden regeneration 'npm run golden:update' is a maintenance command, not a check"
   ]
 }
