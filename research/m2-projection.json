@@ -1,0 +1,110 @@
+[
+  {
+    "question": "(1) 한국(UTM 51S/52S) 위경도 → UTM 미터 변환 규칙",
+    "fact": "WGS84 타원체(a=6378137.0 m, 1/f=298.257223563, e^2≈0.00669438)에서 경도 6° 폭의 UTM 대 번호는 Zone = floor((λ_deg + 180)/6) + 1로 계산된다. 한반도 서해·서부(120°E~126°E)는 51대(중앙자오선 λ0=123°E, EPSG:32651), 126°E 동쪽 육지 대부분(126°E~132°E)은 52대(중앙자오선 λ0=129°E, EPSG:32652)에 속하며, 북반구 가짜 동향값(False Easting) E0=500,000 m, 가짜 북향값(False Northing) N0=0 m, 중앙자오선 축척 계수 k0=0.9996을 적용한 횡메르카토르(Transverse Mercator) 급수로 동향(E)·북향(N) 미터를 구한다.",
+    "source_url": "https://raw.githubusercontent.com/proj4js/mgrs/master/mgrs.js",
+    "source_title": "proj4js/mgrs mgrs.js (LLtoUTM & getZoneNumber implementation)",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "const a = 6378137.0; const eccSquared = 0.00669438; const k0 = 0.9996; ZoneNumber = Math.floor((LongTemp + 180) / 6) + 1;",
+    "version_or_date_of_source": "mgrs v2.2.0",
+    "confidence": "high",
+    "limitations": "NGA 원문 PDF(earth-info.nga.mil)는 직접 다운로드하지 않았으며, 직접 조회한 proj4js/mgrs 소스 코드(mgrs.js)와 호스트의 proj4 2.22.0 + mgrs 2.2.0 교차 검증(철원 38.1467N, 127.3133E → 52SCH52202343)으로 확인하였다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(1) 한국 MGRS 위도대 문자(S/T) 및 100 km 방안 문자(AA 체계)·8자리 좌표 규칙",
+    "fact": "위도 8° 간격 위도대 문자(C~X, I·O 제외)에서 32°N~40°N 구간은 'S'(51S, 52S), 40°N~48°N 구간(북한 북부)은 'T'(51T, 52T)이다. 100 km 방안 문자(WGS84 AA 체계)의 첫 글자(열 문자)는 col = floor(E / 100000)(1~8)과 대 번호의 모드 3 집합(Set = ((Zone - 1) mod 3) + 1)으로 결정되어 51대(Set 3)는 S~Z(서해 백령도·태안 일대는 X, Y), 52대(Set 1)는 A~H(한반도 육지는 B, C, D, E)를 쓴다. 둘째 글자(행 문자)는 row = floor(N / 100000) mod 20을 20글자(A~V, I·O 제외)에 대응시키되 홀수 대(51대)는 A부터, 짝수 대(52대)는 5글자 민 F부터 시작한다(예: 철원·인제 N∈[4,200,000, 4,300,000) m는 52대에서 행 문자 H가 되어 52S CH, 52S DH). 이어지는 8자리 좌표는 100 km 나머지 미터를 반올림이 아닌 버림(truncation)하여 e4 = floor((E mod 100000)/10), n4 = floor((N mod 100000)/10)을 각각 4자리 0-패딩 문자열로 이어 붙인 10 m 해상도 방안좌표이다.",
+    "source_url": "https://raw.githubusercontent.com/proj4js/mgrs/master/mgrs.js",
+    "source_title": "proj4js/mgrs mgrs.js (encode, getLetterDesignator, get100kID, ALPHABET)",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "const seasting = '00000' + Math.floor(utm.Easting % 100000); const snothing = '00000' + Math.floor(utm.Northing % 100000);",
+    "version_or_date_of_source": "mgrs v2.2.0",
+    "confidence": "high",
+    "limitations": "100 km 경계선(E 또는 N이 100,000 m의 배수)을 가로지르는 10 km 전장을 선택하면 단일 두 글자 방안 문자(GridRef.letters) 하나로 전장 전체를 표기할 수 없으므로 전장 원점 선정 시 100 km 경계를 피해야 한다. 호스트가 proj4 2.22.0 + mgrs 2.2.0으로 철원 → 52SCH52202343 변환을 교차 확인하였다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(1) 국지 좌표 원점(e0, n0)을 1 km 배수에 둘 때 데모·M1의 1 km 방안선과 실제 MGRS 선의 일치 여부",
+    "fact": "데모(PRD/OBSERVER_demo_v0.2.html)는 E0=40000, N0=30000에서 국지 좌표 m = 0, 1000, ..., 10000 m마다 1 km 방안선을 긋고 40+m/1000, 30+m/1000으로 번호를 매긴다. M1(src/sim/grid.ts, src/render/map.ts)은 toGrid에서 floor((g.e0 + x)/10), gridLines(t, 1000)에서 10 m 격자 단위의 1 km 배수마다 x = 10*g - g.e0 위치에 선을 그린다. 따라서 지형 원천의 방안 기준 원점(g.e0, g.n0)을 1,000 m(1 km)의 정수 배수로 두면, 국지 좌표 x, y = 0, 1000, ..., 10000 m인 데모/M1의 1 km 방안선과 10 m 격자 칸 경계(cell=10 m), 그리고 실제 UTM/MGRS의 1 km 격자선(E, N ≡ 0 mod 1000 m)이 오차 없이 정확히 일치한다.",
+    "source_url": "https://github.com/DomineYH/observer/blob/acf3651/src/render/map.ts",
+    "source_title": "OBSERVER src/render/map.ts (gridLines) & src/sim/grid.ts (toGrid, fromGrid)",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "export function gridLines(t: TerrainData, step: 1000 | 100): GridLine[] { const eStart = Math.ceil(g.e0 / step) * step;",
+    "version_or_date_of_source": "commit acf3651 (2026-11-09)",
+    "confidence": "high",
+    "limitations": "전장 크기 W = 1024 * 10 m = 10,240 m이므로 x ∈ [0, 10240] 구간에는 0, 1000, ..., 10000 m까지 총 11개의 1 km 방안선이 들어가며 마지막 240 m 여백이 남는다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(2) 10 km 정사각 전장을 UTM 평면으로 펼 때 축척 계수(k)가 거리·방위각에 주는 오차와 밀(mil) 환산",
+    "fact": "횡메르카토르(UTM) 점 축척 계수는 k ≈ k0 * (1 + x'^2 / (2 * R^2)) (k0=0.9996, x'=E-500,000 m, R=sqrt(M*N)≈6,373 km)이다. 한반도 38°N 기준 중앙자오선(129°E, x'=0)에서 k=0.999600(-400 ppm, 10 km당 -4.00 m), 철원 중부전선(127.31°E, x'≈-148.1 km)에서 k=0.999870(-130 ppm, 10 km당 -1.30 m), 52대 서단 경계(126°E, x'≈-263.4 km)에서 k=1.000455(+455 ppm, 10 km당 +4.55 m)이다. 이를 측방 각도로 환산하면 |k-1| * (3200 / π) ≤ 0.46 mil이고, 10 km 전장 내부의 위치별 축척 변화량 Δk ≈ k0 * |x'| * Δx / R^2는 최대 64.8 ppm(10 km당 0.65 m, 0.066 mil)에 불과하다. 또한 UTM은 정각 투영(conformal projection)이므로 등방성 축척 계수 k 자체에 의한 방위각 왜곡은 0 mil이며, 데모·M1의 거리·탄도·삼각측량이 모두 동일한 UTM 평면 미터 위에서 수행되므로 내부 조준 일관성 오차도 0 mil이다.",
+    "source_url": "https://raw.githubusercontent.com/proj4js/mgrs/master/mgrs.js",
+    "source_title": "proj4js/mgrs mgrs.js (UTM Transverse Mercator constants & series)",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "const k0 = 0.9996; N = a / Math.sqrt(1 - eccSquared * Math.sin(LatRad) * Math.sin(LatRad));",
+    "version_or_date_of_source": "mgrs v2.2.0",
+    "confidence": "high",
+    "limitations": "NGA 원문 PDF(earth-info.nga.mil)는 직접 열람하지 않았고, mgrs.js의 WGS84/UTM 상수와 표준 횡메르카토르 급수식을 바탕으로 /tmp/research-54/calc_all.py에서 직접 산술 계산하였다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(2) 자오선 수렴각(도편각 γ) 및 측지선 곡률 보정(Arc-to-Chord |t-T|)의 밀(mil) 단위 크기",
+    "fact": "진북(True North)에 대한 도북(Grid North)의 편차인 자오선 수렴각 γ ≈ (λ - λ0) * sin(φ)는 38°N 기준 철원(127.31°E)에서 -1.044°(-18.56 mil), 서울(126.98°E)에서 -1.233°(-21.92 mil), 126°E 대 경계에서 ±1.848°(±32.85 mil)에 달한다. 따라서 빌드 때 WGS84 위경도 격자(진북 정렬 DEM/벡터)를 UTM 도북 격자로 재투영(warp/리샘플링)하지 않고 단순 축척만 맞춰 넣으면 18~33 mil의 방위각 회전 오차가 발생한다. 반면 빌드 때 UTM 도북 격자로 올바르게 재투영하면, 10 km 정사각 전장 안에서 타원체 측지선(대원/최단경로)과 UTM 평면 직선 시선 사이의 곡률 오차(Arc-to-Chord 보정각 |t - T| ≈ |x' * ΔN| / (2 * R^2))는 남북 10 km 시선에서도 철원 3.76\"(0.019 mil), 126°E 경계 최대 6.69\"(0.033 mil)여서 1 mil 단위 조준에서는 전혀 보이지 않는다. 다만 10 km 동서 양 끝점 사이의 진북 수렴각 차이 Δγ_EW ≈ (ΔE / N_curv) * tan(φ)는 0.0701°(4.21', 1.25 mil)이므로 진북/자북 참조값은 전장 중심 1곳 기준으로 정의해야 한다.",
+    "source_url": "https://registry.npmjs.org/geographiclib-geodesic/latest",
+    "source_title": "geographiclib-geodesic npm registry metadata & Gauss-Krüger convergence/curvature formulas in calc_all.py",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "JavaScript implementation of the geodesic routines in GeographicLib; solves the direct and inverse geodesic problems on an ellipsoid.",
+    "version_or_date_of_source": "geographiclib-geodesic v2.2.0",
+    "confidence": "high",
+    "limitations": "NGA 원문 PDF(earth-info.nga.mil)는 직접 열람하지 않았으며, 가우스-크뤼거/횡메르카토르 미분 기하 수식을 /tmp/research-54/calc_all.py로 계산해 검증하였다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(3) WMM2025 및 IGRF-14 기준 한국 2026년 도북·자북 편차와 연변화율",
+    "fact": "2026.0년 기준 한국 주요 지역의 진북-자북 편각(Magnetic Declination, D, 서편각 음수)은 WMM2025에서 부산 -8.43°(-149.9 mil) ~ 태안 -8.65°(-153.8 mil) ~ 대전 -8.67°(-154.2 mil) ~ 백령도 -8.83°(-157.0 mil) ~ 서울 -8.99°(-159.8 mil) ~ 파주 -9.06°(-161.1 mil) ~ 철원 -9.19°(-163.4 mil) ~ 인제 -9.23°(-164.2 mil)이며, IGRF-14와는 전 지역에서 0.01°(0.2 mil) 이내로 일치한다. 연변화율(Secular Variation, dD/dt)은 WMM2025 기준 -2.31'/yr ~ -2.46'/yr(-0.039°/yr ≈ -0.69 ~ -0.73 mil/yr, 매년 서쪽으로 추가 편향), IGRF-14 기준 -2.04'/yr ~ -2.28'/yr(-0.035°/yr ≈ -0.60 ~ -0.68 mil/yr)이다. 도북(Grid North)을 기준으로 자북이 기운 각도인 도자각(G-M angle = D - γ)은 자오선 수렴각 γ에 따라 달라져, 52대 서부·중부(파주·대전·서울·철원·인제, γ < 0)에서는 -7.68° ~ -8.72°(-136.6 ~ -155.1 mil, 서편 137~155 mil; 철원 52S CH는 -8.15° = -144.8 mil), 51대 동단(백령도·태안, γ > 0)에서는 -9.86° ~ -10.42°(-175.3 ~ -185.2 mil)가 된다.",
+    "source_url": "https://raw.githubusercontent.com/naturalatlas/geomagnetism/master/data/wmm-2025.json",
+    "source_title": "WMM-2025 Coefficient File (naturalatlas/geomagnetism) & lib/model.js & IGRF-14 Coefficients (NOAA/IAGA)",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "epoch: 2025, model: WMM-2025, release_date: 2024-12-17",
+    "version_or_date_of_source": "WMM-2025 (2024-12-17) & IGRF-14 (2024-11)",
+    "confidence": "high",
+    "limitations": "1차 제출(o1) 당시 calc_all.py의 슈미트 준정규화 르장드르 점화식(k2)에 완전 정규화 인자 (2n-1)/(2n-3)가 잘못 포함되어 편각이 약 0.53° 작게 계산되었으나, 호스트가 geomagnetism 0.2.0 및 독립 IGRF-14 프로그램으로 교차 검증하여 발견하였고, 2차 제출(o2)에서 k2를 수정하여 호스트 기준값(철원 -9.19°, 서울 -8.99°, 부산 -8.43°, 대전 -8.67°)과 0.005° 이내로 일치함을 확인하였다.",
+    "conflicts_with_other_sources": "WMM2025의 연변화율(-2.31 ~ -2.46'/yr)과 IGRF-14의 예측 연변화율(-2.04 ~ -2.28'/yr) 사이에 약 0.2'/yr(0.07 mil/yr)의 미세한 모델 차가 있으나 2026.0년 편각 절대값 차이는 0.01°(0.2 mil) 미만이다."
+  },
+  {
+    "question": "(3) 데모·M1이 모두 도북 기준이라는 사실 아래 자북을 보여 줄 UI 선택지",
+    "fact": "데모(PRD/OBSERVER_demo_v0.2.html)와 M1(src/sim/index.ts, src/ui/MapPanel.tsx, src/ui/ObservationView.tsx, src/ui/PrepPanel.tsx)은 관측 방위각·레이저·포병 삼각측량·수정량 계산을 모두 도북(북향 +y=0 mil, 동향 +x=1600 mil)으로 처리한다. 이 도북 체계를 유지한 채 자북 정보를 노출하는 선택지는 (선택지 A) 지도 패널(MapPanel / src/render/map.ts) 여백에 종이 군용지도 방식의 도편각 도표(도북 GN·진북 TN·자북 MN 삼각 화살표와 도자각 예: 철원 기준 '서편 145밀 (8.1°)' 수치) 표시, (선택지 B) 작전 준비(PrepPanel.tsx) 브리핑·기상 줄 옆에 전장 제원 텍스트로 도자각/기준 연도 표시, (선택지 C) 관측 화면(ObservationView.tsx / src/render/overlay.ts) 상단 방위 테이프나 머리띠(HeadBand.tsx)에 도북/자북 전환 토글 또는 자북 보조 눈금 병기, (선택지 D) 현행 데모·M1처럼 자북 표시를 생략하고 TerrainData 메타데이터에만 보관하는 방안의 4가지로 정리된다.",
+    "source_url": "https://github.com/DomineYH/observer/blob/acf3651/src/ui/PrepPanel.tsx",
+    "source_title": "OBSERVER src/ui/PrepPanel.tsx, src/ui/MapPanel.tsx, src/render/map.ts, src/render/overlay.ts",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "바람 {p.windDir.toString().padStart(2, '0')}방향 {p.windSpeed} m/s · 기온 {p.temp}°C",
+    "version_or_date_of_source": "commit acf3651 (2026-11-09)",
+    "confidence": "high",
+    "limitations": "어떤 선택지를 채택할지는 제품 설계 결정 사항이므로 본 조사에서는 각 선택지의 수정 범위와 장단점만 정리하고 승자를 고르지 않는다.",
+    "conflicts_with_other_sources": "none"
+  },
+  {
+    "question": "(4) 빌드 때 쓸 수 있는 좌표·지자기 라이브러리(proj4, mgrs, geomagnetism, geographiclib-geodesic)의 라이선스",
+    "fact": "공식 저장소 및 npm 레지스트리 확인 결과: (a) proj4(proj4js/proj4js, v2.22.0)는 MIT 라이선스이다. (b) mgrs(proj4js/mgrs, v2.2.0)는 package.json과 npm 레지스트리에 'MIT'로 선언되어 있으나, 저장소 readme.md 및 openmap.md에 'BBN OpenMap(자체 구속 조건부 라이선스)에서 Community Mapbuilder(LGPL)를 거쳐 이식된 코드가 일부 포함됨'이라고 명시되어 있어 라이선스 고지문 상충 주의가 필요하다. (c) geomagnetism(naturalatlas/geomagnetism, v0.2.0, WMM-2025 내장)은 Apache-2.0 라이선스이다. (d) 대안인 geographiclib-geodesic(v2.2.0, Karney 측지선·곡률 검증용)은 MIT 라이선스이다.",
+    "source_url": "https://raw.githubusercontent.com/proj4js/mgrs/master/readme.md",
+    "source_title": "proj4js/mgrs readme.md, openmap.md, package.json & proj4js/proj4js LICENSE.md & naturalatlas/geomagnetism LICENSE",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "mostly port of the comments on the source code of the Military Grid Reference System port from Orbit traits by Community Mapbuilder (LGPL),Updated by...",
+    "version_or_date_of_source": "proj4 v2.22.0, mgrs v2.2.0, geomagnetism v0.2.0, geographiclib-geodesic v2.2.0",
+    "confidence": "high",
+    "limitations": "mgrs 패키지를 런타임 번들에 포함하지 않고 빌드 스크립트(devDependencies)에서만 실행하거나, MGRS 변환 수식 약 30~50줄을 직접 빌드 스크립트에 작성하면 배포물 라이선스 고지 의무에서 자유롭다.",
+    "conflicts_with_other_sources": "mgrs 패키지의 package.json은 \"license\": \"MIT\"이나 readme.md는 Community Mapbuilder(LGPL) 및 BBN OpenMap(openmap.md) 유래를 언급하고 있어 문서 간 불일치가 존재한다."
+  },
+  {
+    "question": "(4) 빌드 때만 라이브러리를 사용할 때 결정성 관문(ADR 0005)과의 무관성 확인",
+    "fact": "ADR 0005(결정적 수학은 골든 기록이 지키는 fdlibm 이식이다)와 ADR 0006(방안 기준은 지형 데이터에 딸려 온다), 그리고 src/sim/terrain.ts의 terrainHash(t)를 확인한 결과, 결정성 관문은 런타임 시뮬레이션(src/sim/)이 동일한 초기 씨앗과 정적 TerrainData 입력에 대해 엔진(V8/SpiderMonkey/JavaScriptCore)과 무관하게 비트 단위로 같은 결과와 FNV-1a 해시를 내는지를 검증한다. proj4, mgrs, geomagnetism 등을 런타임 번들(src/sim/)에서 전혀 import하지 않고 빌드/전처리 단계에서만 실행하여 정적 TerrainData(ground: Float32Array, surface: Float32Array, cover: Uint8Array 및 grid: { letters, e0, n0 })로 구워 놓으면, 모든 런타임 환경은 이미 구워진 동일한 바이트 배열과 terrainHash(t)를 읽고 런타임 중에는 src/sim/math.ts(결정적 수학)와 정수 나눗셈(src/sim/grid.ts)만 실행하므로 결정성 관문과 100% 무관하다.",
+    "source_url": "https://github.com/DomineYH/observer/blob/acf3651/docs/adr/0005-deterministic-math-is-an-fdlibm-port-guarded-by-golden-records.md",
+    "source_title": "ADR 0005 (결정적 수학은 골든 기록이 지키는 fdlibm 이식이다) & ADR 0006 & src/sim/terrain.ts",
+    "retrieved_on": "2026-11-09",
+    "section_or_quote": "시뮬레이션 안의 모든 초월함수 호출은 src/sim/math.ts를 거친다. Math.sin, Math.cos, Math.atan2를 직접 부르는 코드는 린트나 코드 검토에서 거른다.",
+    "version_or_date_of_source": "commit acf3651 (2026-11-09)",
+    "confidence": "high",
+    "limitations": "만약 빌드 스크립트를 여러 개발자/CI 머신에서 반복 실행할 때 산출되는 TerrainData 바이너리 자체의 재현성까지 보장하려면, 빌드 산출물을 저장소에 커밋하거나 빌드 출력값을 정수/고정 정밀도로 양자화하는 것이 안전하다.",
+    "conflicts_with_other_sources": "none"
+  }
+]
