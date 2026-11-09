@@ -47,6 +47,34 @@ const shades = (page: Page) =>
     return seen.size;
   });
 
+test('기본: 훈련 모드로 시작', async ({ page }) => {
+  // A first open touches nothing: 훈련 is on (demo 86, 399), the 관측소 후보 previews, and 작전 개시 asks nothing.
+  const { seen } = dialogs(page);
+  await page.goto('/?seed=20261106');
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toBeVisible();
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await expect.poll(() => shades(page)).toBeGreaterThan(32);
+  await start(page);
+  expect(seen).toEqual([]);
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('기본: 배속 ×2로 시작', async ({ page }) => {
+  // Demo 90, 399. The cycle goes on from there: ×2 → ×4 → ×8 → ×1 → ×2.
+  await page.goto('/?seed=20261106');
+  const speed = page.getByRole('button', { name: /^배속 ×/ });
+  await expect(speed).toHaveAccessibleName('배속 ×2');
+  for (const n of [4, 8, 1, 2]) {
+    await speed.click();
+    await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
+  }
+});
+
 test('F-14: 훈련 전환 경고', async ({ page }) => {
   const { seen, answer } = dialogs(page);
   await picked(page);
@@ -287,9 +315,8 @@ test('F-12: 훈련 모드의 실제 사상 — 화면', async ({ page }) => {
   expect(shown).not.toBeNull();
   const [, name, dead, size, pct] = shown!;
 
-  // The same game in Node: 연습 시드, clear weather, 훈련 then 작전 개시 at the planned post in 작전 준비.
-  const sim = createSim({ seed: 20261106, seedKind: 'practice', scenario: BASE_SCENARIO, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'standard', terrain: await mockTerrain.load(20261106) });
-  expect(sim.step([{ a: 'mode', v: ['training'] }]).accepted).toEqual([true]);
+  // The same game in Node: 연습 시드, clear weather, opened in 훈련 (the page's click sent nothing), 작전 개시 at the planned post.
+  const sim = createSim({ seed: 20261106, seedKind: 'practice', scenario: BASE_SCENARIO, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'training', terrain: await mockTerrain.load(20261106) });
   expect(sim.step([{ a: 'start', v: [BASE_SCENARIO.plannedOp.x, BASE_SCENARIO.plannedOp.y] }]).accepted).toEqual([true]);
   while (sim.state.tick < end) {
     const batch = inputs.get(sim.state.tick) ?? [];

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { fireOnOwnPost, mapPixels, settledMap, standardGame } from './helpers';
+import { fireOnOwnPost, mapPixels, settledMap, speedTo, standardGame } from './helpers';
 
 // A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).
 const REPLAY = {"format":1,"simVersion":15,"seed":20261106,"seedKind":"daily","scenario":{"id":"base","version":1},"guns":{"id":"base","version":1},"weather":{"visibilityM":24000,"cloudPct":15,"windFromDeg":285,"windSpeedTenthMs":26,"tempTenthC":94,"precipTenthMmH":0,"pressureHpa":1023,"humidityPct":48},"mode":"standard","stepMs":50,"inputs":[{"t":0,"a":"start","v":[320,320]},{"t":1,"a":"pos_skip"},{"t":110,"a":"call","v":["ffe"]},{"t":186,"a":"loc","v":["grid",4080,3080]},{"t":241,"a":"desc","v":[3,"none","ready",0,"unknown"]},{"t":1861,"a":"eom","v":["ineffective"]}],"totalTicks":1862};
@@ -90,6 +90,51 @@ const endOnOwnPost = async (page: Page, prep: () => Promise<void> = async () => 
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
   return fireOnOwnPost(page);
 };
+
+/** A daily game ended on our own post. The clock is fixed so that today's seed is 20261106: the terrain and post
+ * `fireOnOwnPost` is written for, under the weather that seed draws. `prep` runs after the pick; ×8 once it has started. */
+const endDaily = async (page: Page, prep: () => Promise<void> = async () => {}) => {
+  await page.clock.setFixedTime(new Date('2026-11-06T12:00:00+09:00'));
+  await page.goto('/');
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await prep();
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  await speedTo(page, 8);
+  return fireOnOwnPost(page);
+};
+
+/** The 랭킹 window's first board and 내 기록. */
+const openBoards = async (page: Page) => {
+  await page.getByRole('button', { name: '랭킹' }).click();
+  const dialog = page.getByRole('dialog', { name: '랭킹' });
+  await expect(dialog).toBeVisible();
+  return { board: dialog.getByRole('table').first().getByRole('row').filter({ hasText: '갈매기' }), mine: dialog.getByRole('table').nth(1).getByRole('row').nth(1) };
+};
+
+test('랭킹: 표준을 눌러 시작한 일일 판은 집계된다', async ({ page }) => {
+  test.setTimeout(180_000);
+  const debrief = await endDaily(page, async () => {
+    const standard = page.getByRole('button', { name: '표준', exact: true });
+    await standard.click();
+    await expect(standard).toHaveAttribute('aria-pressed', 'true');
+  });
+  await expect(debrief).toContainText('저장했습니다 · 표준 모드 · 일일 시드: 랭킹 집계');
+  const { board, mine } = await openBoards(page);
+  await expect(board).toHaveCount(1);
+  expect((await cells(mine)).slice(1, 3)).toEqual(['갈매기', '표준']);
+});
+
+test('랭킹: 손대지 않은 일일 판은 훈련 기록이다', async ({ page }) => {
+  test.setTimeout(180_000);
+  const debrief = await endDaily(page);
+  await expect(debrief).toContainText('저장했습니다 · 훈련 모드를 썼으므로 랭킹에서는 제외');
+  const { board, mine } = await openBoards(page);
+  await expect(board).toHaveCount(0);
+  expect((await cells(mine)).slice(1, 3)).toEqual(['갈매기', '훈련']);
+});
 
 test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', async ({ page }) => {
   test.setTimeout(300_000);
@@ -198,14 +243,14 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 전송 데이터', asyn
   const checked = validateReplay(JSON.parse((await preview.textContent())!));
   expect(checked.ok).toBe(true);
   if (!checked.ok) return;
-  // The header carries 안개 (the preset's values, written out), and the 입력 기록 is the new game's: the candidate put in
-  // again, then 작전 개시; none of the old game's sight or binocular inputs.
+  // The header carries 안개 (the preset's values, written out), and the 입력 기록 is the new game's: the candidate and the
+  // chosen 표준 put in again, then 작전 개시; none of the old game's sight or binocular inputs.
   expect(checked.data.weather).toEqual({
     visibilityM: 2500, cloudPct: 100, windFromDeg: 180, windSpeedTenthMs: 7, tempTenthC: 40, precipTenthMmH: 0,
     pressureHpa: 1020, humidityPct: 99,
   });
   const acts = checked.data.inputs.map((i) => i.a);
-  expect(acts.slice(0, 2)).toEqual(['pick', 'start']);
+  expect(acts.slice(0, 3)).toEqual(['pick', 'mode', 'start']);
   expect(acts).not.toContain('cam');
   expect(acts).not.toContain('bino');
   // And it is this game: replayed, it ends as the screen says, nothing ignored.

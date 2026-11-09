@@ -54,7 +54,7 @@ let game = newGame({
   scenario: BASE_SCENARIO,
   guns: BASE_GUNS,
   weather: await mockWeather.load(seed, seedKind, preset ?? undefined),
-  mode: 'standard',
+  mode: 'training', // a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
   terrain,
 });
 
@@ -129,7 +129,7 @@ const step = () => {
   if (lines.length) log = [...log, ...lines];
 };
 // 배속 and 일시정지: how fast the loop steps, never an input (spec: not recorded). A new object on each change.
-let pace: { speed: Speed; paused: boolean } = { speed: 1, paused: false };
+let pace: { speed: Speed; paused: boolean } = { speed: 2, paused: false };
 const setPace = (p: Partial<typeof pace>) => {
   pace = { ...pace, ...p };
   listeners.forEach((l) => l());

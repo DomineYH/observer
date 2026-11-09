@@ -288,11 +288,11 @@ test.describe('좁은 화면 머리띠', () => {
     for (const item of alwaysShown(page)) await expect(item).toBeVisible();
     // The 모드 딱지 shows the mode and cannot be pressed: it is no button, and pressing it changes nothing.
     const tag = alwaysShown(page)[4]!;
-    await expect(tag).toHaveText('표준');
+    await expect(tag).toHaveText('훈련');
     expect(await tag.evaluate((e) => e.tagName)).toBe('OUTPUT');
     await expect(page.getByRole('banner').getByRole('button', { name: /모드|표준|훈련/ })).toHaveCount(0);
     await tag.tap();
-    await expect(tag).toHaveText('표준');
+    await expect(tag).toHaveText('훈련');
     // Everything else waits in the closed menu.
     for (const item of menuItems(page)) {
       await expect(item).toHaveCount(1);
