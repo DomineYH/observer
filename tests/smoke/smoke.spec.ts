@@ -5,6 +5,7 @@ test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른
   test.setTimeout(60_000); // 15 s alone, but near the default 30 s under parallel workers
   // A fixed 연습 seed: the daily seed changes the terrain at KST midnight.
   await page.goto('/?seed=20261106');
+  await standardGame(page); // the long prep below on the dark view (the preview draws every frame); 훈련 is pressed later
   const tick = page.getByRole('status', { name: '틱' });
   await expect(tick).toBeVisible();
   // 작전 준비: the clock stands still.
