@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { fireOnOwnPost, mapPixels, settledMap } from './helpers';
+import { fireOnOwnPost, mapPixels, settledMap, standardGame } from './helpers';
 
 // A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).
 const REPLAY = {"format":1,"simVersion":15,"seed":20261106,"seedKind":"daily","scenario":{"id":"base","version":1},"guns":{"id":"base","version":1},"weather":{"visibilityM":24000,"cloudPct":15,"windFromDeg":285,"windSpeedTenthMs":26,"tempTenthC":94,"precipTenthMmH":0,"pressureHpa":1023,"humidityPct":48},"mode":"standard","stepMs":50,"inputs":[{"t":0,"a":"start","v":[320,320]},{"t":1,"a":"pos_skip"},{"t":110,"a":"call","v":["ffe"]},{"t":186,"a":"loc","v":["grid",4080,3080]},{"t":241,"a":"desc","v":[3,"none","ready",0,"unknown"]},{"t":1861,"a":"eom","v":["ineffective"]}],"totalTicks":1862};
@@ -81,6 +81,7 @@ test('F-08: 호출부호 반영', async ({ page }) => {
 /** From a fresh page: pick the 관측소 후보 north of 1번 고지, run `prep`, start, and end the game on our own post. */
 const endOnOwnPost = async (page: Page, prep: () => Promise<void> = async () => {}) => {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });

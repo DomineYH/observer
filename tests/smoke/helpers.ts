@@ -5,6 +5,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * 포대 삼발 with `control`, until 기러기's 사격준비 끝. */
 export async function toReady(page: Page, control: 'ready' | 'amc', warning: 'adjust' | 'ffe' = 'adjust') {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
@@ -81,6 +82,19 @@ export async function speedTo(page: Page, n: 1 | 2 | 4 | 8) {
   await expect(speed).toHaveAccessibleName(`배속 ×${n}`);
 }
 
+/** 표준 · ×1 on a fresh page in 작전 준비; the game opens in 훈련 · ×2 (demo 399). On a narrow page 표준 is in the menu. */
+export async function standardGame(page: Page) {
+  await expect(page.getByRole('banner')).toBeVisible(); // the app awaits its terrain: isVisible below does not wait
+  const menu = page.getByRole('button', { name: '메뉴', exact: true });
+  const folded = await menu.isVisible();
+  if (folded) await menu.click();
+  const standard = page.getByRole('button', { name: '표준', exact: true });
+  await standard.click();
+  await expect(standard).toHaveAttribute('aria-pressed', 'true');
+  if (folded) await menu.click();
+  await speedTo(page, 1);
+}
+
 /** Where `fireOnOwnPost` stops for the caller's own steps: before the 위치 보고 is skipped, before the call goes, before
  * the grid is typed. */
 export type OwnPostStage = 'report' | 'call' | 'loc';
@@ -143,6 +157,7 @@ export const ticks = async (page: Page) => Number(await page.getByRole('status',
 /** On the narrow page: pick the open field north of 1번 고지 on the 지도 tab, start on the 입력 tab, wait for the clock. */
 export async function narrowStart(page: Page) {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   await tab(page, '지도').click();
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;

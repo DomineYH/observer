@@ -2,7 +2,7 @@
 // The exact inputs come from the game's 재생 자료 (every accepted input, aims in 0.1 mil), which the 사후강평 shows once
 // the game ends: each test ends it the shortest way, on its own post.
 import { expect, test, type Page } from '@playwright/test';
-import { fireOnOwnPost, narrowStart, recordedInputs, tab, tabTo, ticks, type Recorded } from './helpers';
+import { fireOnOwnPost, narrowStart, recordedInputs, standardGame, tab, tabTo, ticks, type Recorded } from './helpers';
 
 /** Lets `n` more ticks pass, so any input sent before has been applied. */
 async function ticksPass(page: Page, n = 3) {
@@ -20,6 +20,7 @@ async function occupy(page: Page, before?: () => Promise<void>) {
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  await standardGame(page); // ×1: pressEach's windows are in ticks
   await before?.();
   await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
   await expect.poll(() => ticks(page)).toBeGreaterThan(0);
@@ -200,6 +201,7 @@ test('B7: 단축키는 단추와 같은 입력', async ({ page, context }) => {
 test('F-07: 키보드만으로 사격요구', async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   // Pressing the map is a pointer-only 조작; everything after it goes by Tab, typing and Enter/Space.
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;

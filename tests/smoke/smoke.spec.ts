@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, speedTo, tabTo, toReady } from './helpers';
+import { everyControlNamed, lineSaid, linesFrom, mapPixels, settledMap, speedTo, standardGame, tabTo, toReady } from './helpers';
 
 test('스모크: 관측소를 고르고 작전을 개시하면 틱 수가 흐른다', async ({ page }) => {
   test.setTimeout(60_000); // 15 s alone, but near the default 30 s under parallel workers
@@ -201,6 +201,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   // `doubled` reads a 960-px view canvas: at 1280 px the wide layout's view column is narrower.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?seed=20261106');
+  await standardGame(page); // training's labels are drawn at full resolution and would break `doubled`
   const tick = page.getByRole('status', { name: '틱' });
   const prep = page.getByRole('region', { name: '작전 준비' });
   const map = page.getByRole('img', { name: '지도' });
@@ -249,6 +250,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
 test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {
   test.setTimeout(90_000); // 통신 점검, 15.5 s of watching and three transmissions with 기러기's answers
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   // On this seed the enemy mortar section digs in at about (5676, 7520) from the start. From an open post about
   // 820 m south-east of it, (6450, 7250), six of its crew are seen by eye (found with a Node run of the simulation).
   const map = page.getByRole('img', { name: '지도' });
@@ -327,6 +329,7 @@ test('F-07: F 키', async ({ page, context }) => {
 /** From a fresh page on a fixed seed: occupy the post north of 1번 고지 and wait for the clock to run. */
 async function occupied(page: Page) {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });

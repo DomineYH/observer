@@ -5,13 +5,14 @@ import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
-import { mapPixels, settledMap, speedTo, toReady } from './helpers';
+import { mapPixels, settledMap, speedTo, standardGame, toReady } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 
 /** A fresh page on the fixed practice seed with the 관측소 후보 picked (찰리호텔 4512 3256, off the planned post). */
 async function picked(page: Page) {
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
@@ -339,10 +340,18 @@ test('F-21: 위치 보고 훈련 미리 채움 — 화면', async ({ page }) => 
 test('F-30: 기상 변경은 고른 모드를 남긴다 — 화면', async ({ page }) => {
   const { seen } = dialogs(page);
   await picked(page);
+  const prep = page.getByRole('region', { name: '작전 준비' });
+  // 표준, which is not the mode a game opens in: the new game has to be told (newGame's carry).
+  await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '박무' });
+  await expect(prep).toContainText('기상 시정 6.5 km');
+  await expect(button(page, '표준')).toHaveAttribute('aria-pressed', 'true');
+  await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('checkbox', { name: /가시권 표시/ })).toHaveCount(0);
+  await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+
   await button(page, '훈련').click();
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
-  const prep = page.getByRole('region', { name: '작전 준비' });
   await expect(prep).toContainText('기상 시정 2.5 km');
   // Still training: the mode buttons, and a training aid on the map; the 후보 kept too.
   await expect(button(page, '훈련')).toHaveAttribute('aria-pressed', 'true');
@@ -830,6 +839,7 @@ test('F-07: 위험근접 수정 제안은 100 m까지 — 화면', async ({ page
 async function nearMortar(page: Page) {
   dialogs(page);
   await page.goto('/?seed=20261106');
+  await standardGame(page);
   const map = page.getByRole('img', { name: '지도' });
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: (box.width * 6450) / 10240, y: box.height * (1 - 7250 / 10240) } });
