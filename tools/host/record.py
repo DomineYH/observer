@@ -37,7 +37,11 @@ def merge(base, new):
 
 
 def validate(rec, task_id):
-    """Run the verifier's own task-record check on the candidate alone. Returns (ok, lines)."""
+    """Run the verifier's own task-record check on the candidate alone. Returns (ok, lines); ok is None without jsonschema."""
+    try:
+        import jsonschema  # noqa: F401  the verifier silently skips schema checks without it
+    except ImportError:
+        return None, ['jsonschema is not installed (pip install jsonschema)']
     spec = importlib.util.spec_from_file_location('verify_routing', ROUTING / 'verify_routing.py')
     vr = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(vr)
@@ -54,6 +58,8 @@ def validate(rec, task_id):
 def write(rec, task_id):
     p = path_of(task_id)
     ok, lines = validate(rec, task_id)
+    if ok is None:
+        return 2, lines
     if not ok:
         return 1, [f'INVALID {task_id}'] + lines
     if p.exists():
@@ -100,6 +106,8 @@ def check(ids=()):
             code, lines = 2, lines + [f'missing record {i}']
             continue
         ok, out = validate(rec, i)
+        if ok is None:
+            return 2, out
         if not ok:
             code, lines = max(code, 1), lines + [f'INVALID {i}'] + out
     return code, lines + ([f'check ok ({len(ids)} record(s))'] if code == 0 else [])
@@ -110,11 +118,6 @@ def read_json(arg):
 
 
 def main(argv):
-    try:
-        import jsonschema  # noqa: F401  the verifier silently skips schema checks without it
-    except ImportError:
-        print('jsonschema is not installed (pip install jsonschema)')
-        return 2
     if argv[:1] == ['put'] and len(argv) >= 2:
         args, jev = argv[2:], None
         if '--jev' in args:
@@ -135,6 +138,9 @@ def main(argv):
 
 def self_test():
     global TASKS
+    if validate({}, 'x')[0] is None:
+        print('self-test needs jsonschema (pip install jsonschema)')
+        return 2
     with tempfile.TemporaryDirectory() as tmp:
         TASKS = Path(tmp)
         t = templates()
@@ -161,6 +167,14 @@ def self_test():
                'provisional_risk': True, 'decision_rule_ids': ['CLS-2b', 'CLS-4:task_type', 'CLS-9']}
         assert put('t3', {'workflow_id': 'standard'}, jev.record_fields(out))[0] == 0 and load('t3')['decision_rule_ids'] == ['CLS-2b', 'CLS-4', 'CLS-9']
         assert check()[0] == 0
+        saved, sys.modules['jsonschema'] = sys.modules.get('jsonschema'), None  # hide the module: import raises
+        try:
+            before = (TASKS / 't1.json').read_bytes()
+            assert put('t4', {'repair_cycles': 'x'})[0] == 2 and not (TASKS / 't4.json').exists()
+            assert set_pane('t1', 'o1', 'w1:p9')[0] == 2 and (TASKS / 't1.json').read_bytes() == before
+            assert check(['t1'])[0] == 2
+        finally:
+            sys.modules['jsonschema'] = saved
     print('self-test ok')
 
 

@@ -12,7 +12,18 @@ import record
 from paths import HOST, NOTES, ROUTING
 
 ORDERS = NOTES / 'orders'  # self-tests point this at a temp folder
-DIALOGS = (('Trust this folder', ['enter']), ('Hooks need review', ['down', 'down', 'enter']))  # codex startup
+# codex startup screens, first match wins. v0.167 shows "⚠ 3 hooks need review ... esc close"; older ones a numbered menu.
+DIALOGS = ((re.compile(r'hooks need review.*esc close', re.I | re.S), ['esc']),
+           (re.compile(r'hooks need review', re.I), ['down', 'down', 'enter']),
+           (re.compile(r'trust this folder', re.I), ['enter']))
+
+
+def dialog_keys(screen):
+    return next((k for pat, k in DIALOGS if pat.search(screen)), None)
+
+
+def screen_of(run, pane):
+    return run(['herdr', 'pane', 'read', pane, '--source', 'visible', '--lines', '15']).stdout
 
 
 def sh(args):
@@ -113,29 +124,34 @@ def dispatch(a, run=sh, sleep=time.sleep):
         return 2, f'REFUSED could not record pane {pane}: ' + ' | '.join(lines[:3])
 
     if not a.no_start:
-        for _ in range(3):
-            if started:
-                break
-            screen = run(['herdr', 'pane', 'read', pane, '--source', 'visible', '--lines', '15']).stdout
-            keys = next((k for text, k in DIALOGS if text in screen), None)
+        screen = screen_of(run, pane)
+        for _ in range(3):  # answer known startup dialogs, even when start reported ready
+            keys = dialog_keys(screen)
             if keys is None:
                 break
             run(['herdr', 'pane', 'send-keys', pane, *keys])
             sleep(3)
-            started = agent(run, a.name).get('interactive_ready') is True
-        if not started:
-            screen = run(['herdr', 'pane', 'read', pane, '--source', 'visible', '--lines', '15']).stdout
+            started = started or agent(run, a.name).get('interactive_ready') is True
+            screen = screen_of(run, pane)
+        if not started or dialog_keys(screen):
             if screen.strip():
                 print(screen.rstrip(), file=sys.stderr)
             return 3, f'MANUAL {a.name} in pane {pane} is not ready (screen above): fix it by hand, then rerun with --no-start'
         if harness == 'opencode':
             return 3, f'MANUAL pick the {model} model in {a.name} with /model as docs/agents/herdr.md says, then rerun with --no-start'
 
-    run(['herdr', 'agent', 'prompt', a.name, prompt])
+    r = run(['herdr', 'agent', 'prompt', a.name, prompt])
+    if r.returncode != 0:
+        return 4, f'NOT_WORKING {a.order_id} pane={pane} prompt failed (exit {r.returncode})'
     status = wait_working(run, sleep, a.name, 15)
     if status != 'working':
         run(['herdr', 'agent', 'send-keys', a.name, 'enter'])  # a prompt can sit unsubmitted in the input box
         status = wait_working(run, sleep, a.name, 10)
+    if status == 'working':  # the prompt arrived: still working 3 s later, and no startup dialog swallowed it
+        sleep(3)
+        status = agent(run, a.name).get('agent_status')
+        if dialog_keys(screen_of(run, pane)):
+            status = 'startup-dialog-on-screen'
     if status != 'working':
         return 4, f'NOT_WORKING {a.order_id} pane={pane} status={status}'
     return 0, f'DISPATCHED {a.order_id} agent={a.name} pane={pane} status=working'
@@ -160,7 +176,7 @@ def parse(argv):
 
 
 def self_test():
-    import tempfile
+    import contextlib, io, tempfile
     from pathlib import Path
     global ORDERS
     assert launch_args('claude', 'fable-5-2', 'high') == ['--model', 'claude-fable-5-2', '--effort', 'high', '--dangerously-skip-permissions']
@@ -179,8 +195,8 @@ def self_test():
         def order(oid, body=None):
             (ORDERS / f'{oid}.md').write_text(body if body is not None else f'# Work order {oid} (revision 1)\n\n## Objective\nx\n\n' + report.replace('@ORDER@', oid))
 
-        def fake(statuses, harness='claude', start_rc=0, screen=''):
-            calls, seen = [], iter(statuses)
+        def fake(statuses, harness='claude', start_rc=0, screens=('',), prompt_rc=0):
+            calls, seen, shown = [], iter(statuses), iter(screens)
 
             def run(args):
                 args = [str(x) for x in args]
@@ -190,17 +206,18 @@ def self_test():
                     out = json.dumps({'roles': {'planner': {'resolved': {'harness': {'value': harness}, 'model': {'value': 'fable-5-2'}, 'effort': {'value': 'high'}}}}})
                 else:
                     verb = args[2]
-                    calls.append(verb)
+                    calls.append(f'pane-keys {" ".join(args[4:])}' if args[1:3] == ['pane', 'send-keys'] else verb)
                     if verb == 'split':
                         out = json.dumps({'result': {'pane': {'pane_id': 'w9:p2'}}})
                     elif verb == 'start':
                         rc = start_rc
                     elif verb == 'prompt':  # the pane id is recorded before the prompt goes out
                         assert record.load('t1')['role_work_items'][a.order_id]['pane_id'] == 'w9:p2'
+                        rc = prompt_rc
                     elif verb == 'get':
                         out = json.dumps({'result': {'agent': {'agent_status': next(seen, statuses[-1]), 'pane_id': 'w9:p2'}}})
                     elif verb == 'read':
-                        out = screen
+                        out = next(shown, screens[-1])
                 return subprocess.CompletedProcess(args, rc, out, '')
             return run, calls
 
@@ -223,7 +240,7 @@ def self_test():
         a = parse(['t1', 'o1', '--name', 'w', '--split', 'w9:p1'])
         run, calls = fake(['working'])
         assert dispatch(a, run, lambda s: None) == (0, 'DISPATCHED o1 agent=w pane=w9:p2 status=working')
-        assert calls == ['resolve', 'split', 'start', 'prompt', 'get'], calls
+        assert calls == ['resolve', 'split', 'start', 'read', 'prompt', 'get', 'get', 'read'], calls
         run, calls = fake(['idle'] * 15 + ['working'])
         assert dispatch(a, run, lambda s: None)[0] == 0 and calls.count('send-keys') == 1
         record.put('t1', {'role_work_items': {'o1': {'pane_id': None}}})
@@ -238,6 +255,34 @@ def self_test():
         assert dispatch(a, run, lambda s: None)[0] == 3 and 'prompt' not in calls
         run, calls = fake(['working'])
         assert dispatch(parse(['t1', 'o1', '--name', 'w', '--no-start']), run, lambda s: None)[0] == 0 and 'start' not in calls
+        # R2: a failed prompt is never a dispatch, even when the agent already reads as working
+        run, calls = fake(['working'], prompt_rc=1)
+        assert dispatch(a, run, lambda s: None) == (4, 'NOT_WORKING o1 pane=w9:p2 prompt failed (exit 1)') and calls.count('send-keys') == 0
+        # L1: codex v0.167 hooks screen is closed with esc; the old menu keeps down down enter
+        hooks_new = ('⚠ 3 hooks need review before they can run.\n\n  .codex/hooks.toml: 3 hooks\n\n'
+                     '  t trust all · enter review · esc close\n')
+        hooks_old = 'Hooks need review\n  1. Trust and run hooks\n  2. Review hooks\n  3. Continue without trusting\n'
+        assert dialog_keys(hooks_new) == ['esc'] and dialog_keys(hooks_old) == ['down', 'down', 'enter']
+        assert dialog_keys('Do you trust this folder?') == ['enter'] and dialog_keys('› Ask Codex to do anything') is None
+        run, calls = fake(['working'], screens=[hooks_new, ''])
+        assert dispatch(a, run, lambda s: None)[0] == 0 and 'pane-keys esc' in calls and calls.index('pane-keys esc') < calls.index('prompt')
+        run, calls = fake(['working'], screens=[hooks_old, ''])
+        assert dispatch(a, run, lambda s: None)[0] == 0 and 'pane-keys down down enter' in calls
+        run, calls = fake(['working'], screens=[hooks_new])  # the screen never closes
+        with contextlib.redirect_stderr(io.StringIO()):
+            assert dispatch(a, run, lambda s: None)[0] == 3 and 'prompt' not in calls and calls.count('pane-keys esc') == 3
+        run, calls = fake(['working'], screens=['', hooks_new])  # a dialog after the prompt: it never arrived
+        assert dispatch(a, run, lambda s: None) == (4, 'NOT_WORKING o1 pane=w9:p2 status=startup-dialog-on-screen')
+        run, calls = fake(['working', 'idle'])  # working once, idle 3 s later
+        assert dispatch(a, run, lambda s: None) == (4, 'NOT_WORKING o1 pane=w9:p2 status=idle')
+        # R3: without jsonschema the record check refuses before any herdr call
+        saved, sys.modules['jsonschema'] = sys.modules.get('jsonschema'), None
+        try:
+            run, calls = fake(['working'])
+            code, last = dispatch(a, run, lambda s: None)
+            assert code == 2 and 'jsonschema' in last and calls == [], (last, calls)
+        finally:
+            sys.modules['jsonschema'] = saved
         a = parse(['t1', 'o3', '--name', 'r', '--pane', 'w9:p2'])  # the committed researcher template
         tpl = (Path(__file__).parent / 'templates' / 'research-order.md').read_text(encoding='utf-8')
         order('o3', tpl)
