@@ -53,3 +53,14 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+  # Not a required status check. verify_routing.py is not run here: it checks the host machine's hook and router key.
+  host-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install jsonschema
+      - run: |
+          for t in record dispatch watch jev; do python3 tools/host/$t.py --self-test; done
