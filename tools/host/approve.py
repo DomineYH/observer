@@ -8,8 +8,9 @@ from paths import NOTES, ROOT
 SAFE_TOOLS = ('curl', 'grep', 'sed', 'head', 'tail', 'gh', 'ls', 'tr', 'cut', 'wc', 'sort', 'uniq', 'jq')
 SAFE_IMPORTS = {'urllib.request', 'urllib.parse', 'urllib.error', 're', 'ssl', 'json', 'html', 'sys', 'time',
                 'struct', 'math', 'io', 'zipfile', 'xml.etree.ElementTree', 'glob'}
-BAD = re.compile(r'[;&`$<>]|\b(sh|bash|zsh|python\d?|node|perl|ruby|tee|xargs|rm|mv|cp|sudo|dd)\b'
-                 r'|\s-(o|O|d|T|F|X)\b|--(data|upload|output|request|form|config)')
+# Second layer, on every token: program names and output/upload options never pass, even inside quotes.
+BAD_TOKEN = re.compile(r'\b(sh|bash|zsh|python\d?|node|perl|ruby|tee|xargs|rm|mv|cp|sudo|dd)\b'
+                       r'|^-(o|O|d|T|F|X)$|^--(data|upload|output|request|form|config)')
 # Options each tool may take; anything else (an output file, a script file, a program to run) goes to the host.
 CURL_FLAG = re.compile(r'-[sSLfIk]+|--(compressed|globoff|fail|silent|location|head)')
 CURL_ARG = re.compile(r'-[AHmr]|--(max-time|retry|user-agent|header)')
@@ -64,34 +65,53 @@ def command_of(out):
     return ' '.join(l.strip() for l in m.group(1).splitlines()).strip() if m else ''
 
 
+def unquoted(c):
+    """The characters of c outside quotes (a backslash escapes only inside double quotes), or None if a quote is open."""
+    out, q, i = [], None, 0
+    while i < len(c):
+        ch = c[i]
+        if q == '"' and ch == '\\':
+            i += 2
+            continue
+        if q:
+            q = None if ch == q else q
+        elif ch in '"\'':
+            q = ch
+        else:
+            out.append(ch)
+        i += 1
+    return None if q else ''.join(out)
+
+
 def pipeline_ok(c):
-    if not c:
+    """One pipeline of allowlisted read-only tools. No expansion, no operator other than |."""
+    if not c or re.search(r'[$`\n]', c):  # raw text, quoted or not: no substitution of any kind
         return False
-    orig = c
-    # A double-quoted plain URL may carry & and ?; $ and backticks stay banned.
-    # Double-quoted strings without $ or backticks (and single-quoted strings) cannot run anything: treat each as one word.
-    c = re.sub(r'"[^"$`]*"', 'Q', c)
-    c = re.sub(r"'[^']*'", 'Q', c)
-    if BAD.search(c.replace('2>/dev/null', '')):
+    bare = unquoted(c)
+    if bare is None or re.search(r'[*?\[\]{}~\\!#]', bare):  # globs, braces, ~, escapes, history, comments
         return False
-    for seg in c.split('|'):
-        words = seg.strip().split()
-        if not words or words[0] not in SAFE_TOOLS:
-            return False
-        if words[0] == 'sed' and re.search(r'\s-i|/[ew]\b', seg):
-            return False
-        if words[0] == 'gh' and not re.fullmatch(r'gh issue view \d+( --json [\w,]+| --comments)?', seg.strip()):
-            return False
     try:
-        lex = shlex.shlex(orig.replace('2>/dev/null', ''), posix=True, punctuation_chars='|')
+        lex = shlex.shlex(c, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
         tokens = list(lex)
     except ValueError:
         return False
     segs = [[]]
     for w in tokens:
-        segs.append([]) if w == '|' else segs[-1].append(w)
-    return all(seg and args_ok(seg) for seg in segs)
+        if re.fullmatch(r'[();<>|&]+', w):  # an operator (or quoted punctuation, refused as well)
+            if w != '|':
+                return False
+            segs.append([])
+        else:
+            segs[-1].append(w)
+    for seg in segs:
+        if not seg or seg[0] not in SAFE_TOOLS or any(BAD_TOKEN.search(w) for w in seg):
+            return False
+        if seg[0] == 'gh' and not re.fullmatch(r'gh issue view \d+( --json [\w,]+| --comments)?', ' '.join(seg)):
+            return False
+        if not args_ok(seg):
+            return False
+    return True
 
 
 def special_ok(c, t):
@@ -300,7 +320,7 @@ def check():
               'curl -sL -D /tmp/x https://a', 'curl -sL -c /tmp/x https://a', 'curl -sL --trace /tmp/x https://a', 'curl -K x https://a'):
         assert not pipeline_ok(c), c
     for c in ("sed -n '5,20p' f", "curl -sL https://a | sed -n '/<td>/,/<\\/td>/p'", "sed 's/<[^>]*>//g' f", "sed -E 's/ +/ /gp' f",
-              'sort -u f', 'sort -t, -k2 -n f', 'uniq -c', 'uniq -f 2 f', "jq -r '.items[] | .name' f", "jq --arg k v '.[$k]' f",
+              'sort -u f', 'sort -t, -k2 -n f', 'uniq -c', 'uniq -f 2 f', "jq -r '.items[] | .name' f", "jq --arg k v '.[]' f",
               'curl -sSL -A x -m 30 https://a'):
         assert pipeline_ok(c), c
     for src in ("open('/tmp/escaped', mode='w')\n", "p='../escaped'\nopen(f'/tmp/research-99/{p}', 'w')\n",
@@ -320,6 +340,13 @@ def check():
              "with open('/tmp/research-99/out.json', 'w') as f:\n    json.dump({'a': 1}, f)\n    f.write('x')\n"
              "g = open('/tmp/research-99/log.txt', 'a')\nprint('done', file=g)\nz = zipfile.ZipFile('/tmp/research-99/a.zip')\n"
              "z.open('n').read()\nu.urlretrieve('https://a.org/f.pdf', '/tmp/research-99/f.pdf')\nprint(open('/tmp/research-99/a').read())\n")
+    # P (o8): no $, backtick or newline anywhere; no globs, braces, ~ or escapes outside quotes; only | as operator
+    for c in ('grep "x\'$(touch /tmp/escaped)\'y" /dev/null', "grep 'a$b' f", 'grep "a`id`b" f', 'grep a\nrm f', 'head f > /tmp/x',
+              'head f 2>/dev/null', 'head f >> x', 'head < /etc/passwd', 'head f && rm x', 'head f || rm x', 'head f; ls', '(head f)',
+              'head /tmp/research-99/{a,b}', 'head /tmp/research-99/*', 'head ~/x', 'head a\\ b', 'grep "|" f', 'head f # x',
+              'grep "unterminated f'):
+        assert not pipeline_ok(c), c
+    assert pipeline_ok('curl -sL "https://a/b?x=1&y=2" | grep -E "a|b" | head -n 5')
     # D1 (o6): allow-list of names; aliases of allowed or denied callables go to the host
     for src in ("import io\ncreate = io.FileIO\ncreate('/tmp/escaped', 'w')\n", "import zipfile\nZ = zipfile.ZipFile\nZ('/tmp/x.zip', 'w')\n",
                 "b = open\nb('/tmp/x', 'w')\n", "list(map(open, ['/tmp/x']))\n", "from io import FileIO\nFileIO('/tmp/x', 'w')\n",
