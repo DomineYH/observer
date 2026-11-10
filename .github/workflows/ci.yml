@@ -63,4 +63,4 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install jsonschema
       - run: |
-          for t in record dispatch watch approve jev; do python3 tools/host/$t.py --self-test; done
+          for t in record dispatch watch jev; do python3 tools/host/$t.py --self-test; done

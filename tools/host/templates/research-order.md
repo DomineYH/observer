@@ -21,7 +21,7 @@ Every claim in the report has one row. Three kinds of row:
 | 2 | a computed number | computed | script path under `/tmp/research-@N@/` | the result of an independent cross-check with an established library (name and version), not a second self-written model; or `cross-check not run: needs <library>` |
 | 3 | a recommendation or design idea | proposal | — | marked as a proposal, never as a fact |
 
-A script that imports a library outside the standard library stops the approval loop; the host reads it and approves it by hand. Anything you could not confirm is a `fact` row with the source column `unconfirmed` and the search you performed.
+The host reads and approves each command by hand, so a script that imports a library outside the standard library is read in full before it is approved. Anything you could not confirm is a `fact` row with the source column `unconfirmed` and the search you performed.
 
 ## Acceptance criteria
 - The claims table covers every claim in the report and every row is complete.

@@ -45,7 +45,7 @@ def launch_args(harness, model, effort):
         return ['--model', model if model.startswith('claude-') else f'claude-{model}', '--effort', effort, '--dangerously-skip-permissions']
     if harness == 'codex':
         return ['-m', model, '-c', f'model_reasoning_effort={effort}', '--dangerously-bypass-approvals-and-sandbox']
-    if harness == 'agy':  # no permission bypass: researchers run under approve.py
+    if harness == 'agy':  # no permission bypass: the host approves each researcher command by hand (issue #89)
         return ['--model', f'{model}-{effort}']
     if harness == 'opencode':  # no model flag: picked by hand with /model
         return ['--auto']

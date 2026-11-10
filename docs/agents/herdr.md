@@ -16,7 +16,6 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
   - `tools/host/watch.py` — wait in the background until a worker changes state or shows a prompt.
   - `tools/host/record.py` — write and check task records in `.routing/tasks/`.
   - `tools/host/jev.py` — call Jev and apply the decision rules.
-  - `tools/host/approve.py` — approval loop for agy researchers.
   - `tools/host/templates/research-order.md` — the researcher order template.
 
 ## 3. Orders
@@ -55,23 +54,14 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
 
 - agy asks permission for every shell command and file write, and a pending prompt reads as `idle`, not `blocked`.
 - One tab per researcher (a small pane cuts off the command being approved). Agent `res-<n>`, order `research-<n>-o<k>`.
-- Run `python3 tools/host/approve.py --check`, then `python3 tools/host/approve.py <n> [<n> ...]` in the background. It approves only what is listed here; scripts and pipelines that need anything else go to the host (`NEEDS_HOST`), and when in doubt the loop asks rather than approves.
-  - **Read roots.** Every file or directory a pipeline, script or file prompt reads must resolve (after following links) inside `/tmp/research-<n>/`, the researcher's own order file, the repository except `.git/`, `.routing/tasks/` and `.routing/hook_log.jsonl`, or be `/dev/null`. Relative paths resolve against the researcher's working directory as herdr reports it, and are refused when it is unknown. `~`, `/proc`, `/sys`, other `/dev` files and everything else are refused. A recursive read (`grep -r`, `ls -R`) of a directory that contains an excluded path is refused.
-  - **Pipelines.** One line of `curl grep sed head tail gh ls tr cut wc sort uniq jq` joined only by `|`:
-    - The raw text may not contain `$`, a backtick or a newline anywhere, quoted or not.
-    - Outside quotes there is no glob, brace, `~`, backslash, `!` or `#`.
-    - No other operator is allowed (`;`, `&`, `&&`, `||`, redirections, parentheses).
-    - Each tool takes only its allowlisted options. `sed` programs are line or range prints (`-n '5,20p'`) or `s/…/…/` with `g`, `i`, `p` flags. `curl` takes only http(s) URLs. `jq` programs may not use `env`, `$ENV`, `input_filename` or modules. `grep -R` is refused.
-    - So output files (`sort -o`, a second `uniq` operand, `curl -D/-c/--trace`), script or config files and programs to run are refused, and every file operand must be inside the read roots (no operand means stdin, which is fine).
-  - `curl -sL <https url> -o /tmp/research-<n>/<file>`, `git show origin/research/...` and the researcher's own report line.
-  - **Scripts.** `python3 /tmp/research-<n>/<name>.py` when:
-    - Every call is to an enumerated module function (for example `urllib.request.urlopen`/`Request`/`urlretrieve`, `urllib.parse.quote`/`urlencode`/`urlparse`, `re.search`/`findall`/`sub`, `json.load(s)`/`dump(s)`, `html.unescape`, `math.sqrt`/`hypot`, `struct.unpack`, `ssl.create_default_context`, `zipfile.ZipFile`, `io.BytesIO`, `glob.glob`, `time.sleep`, `xml.etree.ElementTree.fromstring`), an allowed builtin, one of the script's own `def` functions, or an allowlisted method (`read`, `decode`, `split`, `strip`, `group`, `findall`, `get`, `items`, `append`, `namelist`, `findtext`, …).
-    - Every attribute is an enumerated module value or an allowlisted method or attribute (`status`, `headers`, `text`, `tag`, `attrib`, `code`, `reason`, `check_hostname`, `verify_mode`).
-    - Nothing starts with `_`. No `getattr`, `vars`, `type`, `super`, `eval` or the like, no classes, decorators or async code. No call through a subscript, lambda or call result. `str.format` runs only on a literal without attribute or index lookups.
-    - Write-capable callables (`open`, `print`, `json.dump`, `urlretrieve`, `ZipFile`) are called directly, never aliased or passed around.
-    - Reads (`open`, `ZipFile`, `glob.glob`) use a string literal inside the read roots (a computed path goes to the host). URLs are provably http(s), because urllib also reads `file:` URLs.
-    - Every write goes to a plain string-literal path inside `/tmp/research-<n>/` (no `..`, no f-string or computed path, `.write` only on handles from such an `open`). A deny layer (write sinks, `sys` rebinding) checks again.
-  - **File prompts.** Reads inside the read roots, and creation of `.routing/evidence/research-<n>-o1.{json,md}`.
+- The host approves each prompt by hand. Approve only when all of these hold; when unsure, decline and ask the researcher:
+  - the command is read-only;
+  - it has no `$`, backticks or redirection (`>`, `>>`, `<`);
+  - it reads and writes only inside `/tmp/research-<n>/`, the researcher's order file or the repository (not `.git/` or `.routing/tasks/`);
+  - no option takes a `@file` value (for example `curl -d @file`);
+  - a script is read in full before it is approved.
+- `watch.py` returns as `prompt` when a researcher's screen shows a permission prompt, so the host notices it.
+- Automatic approval waits for the researcher sandbox in issue #89.
 - Researchers put multi-line code in `/tmp/research-<n>/*.py`; folded commands are declined. Inputs from elsewhere are copied into `/tmp/research-<n>/` by the host.
 - Before reading a research report, check that its claims table is complete (every claim has a row; facts quote a primary source; computed numbers name a script and an independent library cross-check or say it was not run). Return incomplete reports.
 
