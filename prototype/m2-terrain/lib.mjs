@@ -112,11 +112,62 @@ export function readTerrain(path) {
 
 /** Writes a terrain in the layout readTerrain and the src/app/main.tsx PROTOTYPE loader read. */
 export function writeTerrain(path, t, label) {
-  const header = Buffer.from(JSON.stringify({ n: t.n, cell: t.cell, grid: t.grid, roads: t.roads, villages: t.villages, label }));
+  const header = Buffer.from(JSON.stringify({ n: t.n, cell: t.cell, grid: t.grid, roads: t.roads, villages: t.villages, clearings: t.clearings, label }));
   const len = Buffer.alloc(4);
   len.writeUInt32LE(header.length);
   const pad = Buffer.alloc((4 - ((4 + header.length) % 4)) % 4, 32);
   const bytes = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
   writeFileSync(path, Buffer.concat([len, header, pad, bytes(t.ground), bytes(t.surface), bytes(t.buildings), bytes(t.cover)]));
   console.log('wrote', path);
+}
+
+/** OSM water as cells: `river` = waterway=river lines stamped every 8 m (as roads); `water` = natural=water areas (ways and
+ * multipolygon relations, outer rings joined end to end; inner rings ignored, so islands count as water). */
+export function osmWater(els, local, n, cell) {
+  const river = new Uint8Array(n * n), water = new Uint8Array(n * n);
+  for (const way of els.filter((x) => x.type === 'way' && x.tags?.waterway === 'river')) {
+    const pts = way.geometry.map(local);
+    for (let a = 1; a < pts.length; a++) {
+      const p = pts[a - 1], q = pts[a], L = Math.hypot(q.x - p.x, q.y - p.y);
+      for (let d = 0; d <= L; d += 8) {
+        const i = Math.round((p.x + ((q.x - p.x) * d) / L) / cell), j = Math.round((p.y + ((q.y - p.y) * d) / L) / cell);
+        if (i >= 0 && i < n && j >= 0 && j < n) river[j * n + i] = 1;
+      }
+    }
+  }
+  // outer rings: closed ways as they are; relation outer members joined end to end
+  const rings = els.filter((x) => x.type === 'way' && x.tags?.natural === 'water').map((x) => x.geometry);
+  for (const rel of els.filter((x) => x.type === 'relation')) {
+    const parts = rel.members.filter((m) => m.type === 'way' && m.role !== 'inner' && m.geometry).map((m) => m.geometry);
+    while (parts.length) {
+      let ring = parts.shift();
+      const same = (a, b) => a.lat === b.lat && a.lon === b.lon;
+      for (let grew = true; grew && !same(ring[0], ring.at(-1));) {
+        grew = false;
+        for (let k = 0; k < parts.length; k++) {
+          const p = parts[k];
+          if (same(ring.at(-1), p[0])) ring = ring.concat(p.slice(1));
+          else if (same(ring.at(-1), p.at(-1))) ring = ring.concat(p.slice(0, -1).reverse());
+          else continue;
+          parts.splice(k, 1);
+          grew = true;
+          break;
+        }
+      }
+      rings.push(ring);
+    }
+  }
+  for (const g of rings) {
+    const poly = g.map(local);
+    const xs = poly.map((p) => p.x), ys = poly.map((p) => p.y);
+    for (let j = Math.max(0, Math.ceil(Math.min(...ys) / cell)); j <= Math.min(n - 1, Math.floor(Math.max(...ys) / cell)); j++)
+      for (let i = Math.max(0, Math.ceil(Math.min(...xs) / cell)); i <= Math.min(n - 1, Math.floor(Math.max(...xs) / cell)); i++) {
+        const x = i * cell, y = j * cell;
+        let c = false;
+        for (let a = 0, b = poly.length - 1; a < poly.length; b = a++)
+          if (poly[a].y > y !== poly[b].y > y && x < ((poly[b].x - poly[a].x) * (y - poly[a].y)) / (poly[b].y - poly[a].y) + poly[a].x) c = !c;
+        if (c) water[j * n + i] = 1;
+      }
+  }
+  return { river, water };
 }

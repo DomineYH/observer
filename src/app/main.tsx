@@ -1,7 +1,7 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useMemo, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { underCanopy, validateReplay, type Mode, type ReplayData, type TerrainData } from '@sim'; // PROTOTYPE (#58): TerrainData
+import { underCanopy, validateReplay, type Mode, type ReplayData, type Scenario, type TerrainData } from '@sim'; // PROTOTYPE (#58, #72): TerrainData, Scenario
 import type { StoredRun } from '@adapters/index';
 import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
@@ -56,6 +56,10 @@ async function loadPrototypeTerrain(url: string): Promise<TerrainData> {
   const f32 = () => new Float32Array(buf, (at += nn * 4) - nn * 4, nn);
   return { ...head, ground: f32(), surface: f32(), buildings: f32(), cover: new Uint8Array(buf, at, nn) };
 }
+// PROTOTYPE (#72): `?scenario=<url>` loads a Scenario JSON (prototype/m2-terrain/measure72.mjs, the base-mungyeong draft);
+// `SCENARIO` replaces every BASE_SCENARIO read below.
+const protoScenario = new URLSearchParams(location.search).get('scenario');
+const SCENARIO: Scenario = protoScenario ? ((await (await fetch(protoScenario)).json()) as Scenario) : BASE_SCENARIO;
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
@@ -63,7 +67,7 @@ let games = 0; // a new game remounts the panels that keep their own state from 
 let game = newGame({
   seed,
   seedKind,
-  scenario: BASE_SCENARIO,
+  scenario: SCENARIO,
   guns: BASE_GUNS,
   weather: await mockWeather.load(seed, seedKind, preset ?? undefined),
   mode: 'training', // a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
@@ -78,6 +82,7 @@ const subscribe = (l: () => void) => {
 };
 const send = (input: Parameters<typeof game.session.send>[0]) => game.session.send(input);
 (window as unknown as { __send: typeof send }).__send = send; // PROTOTYPE (#58): capture script picks posts
+(window as unknown as { __state: () => typeof game.sim.state }).__state = () => game.sim.state; // PROTOTYPE (#72): capture finds the recon
 // The observation view draws every frame; the other panels read state at the publish rate.
 const frameListeners = new Set<(now: number) => void>();
 const onFrame = (draw: (now: number) => void) => {
@@ -132,7 +137,7 @@ const step = () => {
     if (e.type !== 'radio') continue;
     lines.push(e);
     const u = e.utterance;
-    if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, BASE_SCENARIO.frontY));
+    if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, SCENARIO.frontY));
     if (u.kind === 'position_report' && u.speaker === 'fdc') {
       readBack = true;
       say([reportError(s.knownOp, s.op, s.mode)]);
@@ -269,14 +274,14 @@ function App() {
             onFrame={onFrame}
             showFps={showFps}
             covered={covered}
-            friends={BASE_SCENARIO.friends}
+            friends={SCENARIO.friends}
           />
         </div>
         <LowerTabs tab={tab} onTab={setTab} />
         <div data-panel="input">
           <PrepPanel
             state={{ phase, op, picked, reportDue }}
-            scenario={BASE_SCENARIO}
+            scenario={SCENARIO}
             terrain={terrain}
             seed={seed}
             seedKind={seedKind}
@@ -298,7 +303,7 @@ function App() {
         <div data-panel="map" hidden={covered}>
           <MapPanel
             terrain={terrain}
-            scenario={BASE_SCENARIO}
+            scenario={SCENARIO}
             state={sim.state}
             send={send}
             onFrame={onFrame}

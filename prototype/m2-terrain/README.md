@@ -88,6 +88,30 @@ fps는 5초 동안 페이지의 requestAnimationFrame 횟수(관측 화면은 �
 설치한 npm 패키지: `geotiff`, `proj4` (이 폴더의 `package.json`). Windows 쪽 측정용 `playwright-core`(저장소 밖).
 Overpass 요청은 Node fetch가 이 WSL에서 연결되지 않아 `curl`로 보낸다.
 
+## 3차 (#72): 문경, 벌채 100 m, 접근로 초안
+
+- `build72.mjs [fallback]`: #58 캐시(표본 `.f32`, `osm-mungyeong.json`, `osm-water-mungyeong.json`)에서 문경을 다시 만든다.
+  #60 피복표(초본 습지 90 → `open`), 덮어쓰기 건물 > 도로 > OSM 수면 > WorldCover, 터널 제외, `_link` 도로
+  (Overpass 1회 더, `osm-links-mungyeong.json`). 도로선은 #59 8번 규칙(등급 trunk/main/local, 정사각에서 자름, 같은 등급의
+  두 선 끝만 만나는 점에서 이음, 등급 → 긴 순 → 첫 점 y → x, 남쪽 끝에서 시작). 벌채는 #70 3절: 초안 관측소 3곳 둘레 100 m의
+  **숲 칸만** `open`(아군 진지가 숲 칸이면 220 m; 초안은 해당 없음). 숲 높이 12–17 m, `fallback`이면 8–11.4 m(#70 6절).
+  → `$DATA/mungyeong72.bin`(머리에 `clearings`), `mungyeong72-grades.json`.
+- `measure72.mjs [terrain] [draft]`(저장소 루트에서): 시나리오 JSON `$DATA/base-mungyeong.json`을 쓰고(단위·첩보·신뢰도는
+  데모 그대로, `reserveOps` 추가, `supplyRoad`는 조건에 맞는 가장 긴 선), 시뮬레이션 코드(`lineOfSight`, `createSim`의 `deploy`)로
+  배치 규칙·접근로 기준(#64 결정 10)·흔들린 경로·물 칸·보급 도로·박격포 자리·무입력 판의 탐지 시각(mock 나란히)을 잰다.
+- `tune72.mjs <route> <i> [r]`: 규칙을 지키는 대체 점 찾기. `runs72.mjs`: 캡처 목록.
+- 앱: `?terrain=<url>&scenario=<url>`(`src/app/main.tsx`의 `// PROTOTYPE (#72)` 스위치). `serve.mjs`가 `.json`도 내보낸다.
+
+```bash
+node prototype/m2-terrain/build72.mjs
+node prototype/m2-terrain/measure72.mjs mungyeong72 ~/wt/observer/_notes/m2-72-draft.json
+node prototype/m2-terrain/runs72.mjs runs72.json
+# 브라우저: http://localhost:5182/?seed=1&fps=1&terrain=http://localhost:4180/mungyeong72.bin&scenario=http://localhost:4180/base-mungyeong.json
+```
+
+캡처(`shots/`): `mg72-map-x1.png`, `mg72-<op|res1|res2>-{eye,bino,map-x1-viewshed,map-x3}.png`, `mg72-recon-{bino,eye}.png`
+(작전 개시 뒤 ×8로 정찰조가 멈출 때까지 기다려 그쪽을 본 화면), 같은 세션의 mock `o3-mock-*`. 실제 Windows Chrome(창 띄움).
+
 ## 자료원과 판
 
 - GEDTM30 v1.2, `gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif` (OpenGeoHub, CC BY 4.0).
@@ -96,7 +120,7 @@ Overpass 요청은 Node fetch가 이 WSL에서 연결되지 않아 `curl`로 보
 - Copernicus GLO-30 DSM 타일 `Copernicus_DSM_COG_10_N35_00_E127_00_DEM`(진안), `…_N36_00_E128_00_DEM`(문경)
   (AWS 공개 버킷), 검산용 GLO-90 `Copernicus_DSM_COG_30_N35_00_E127_00_DEM`, `…_N36_00_E128_00_DEM`.
 - ESA WorldCover 10 m 2021 v200, 타일 `N33E126`(33–36 N, 126–129 E: 진안)과 `N36E126`(36–39 N, 126–129 E: 문경).
-- OpenStreetMap, Overpass API 정사각마다 1회(도로·건물·지명) + 집계용 1회(`waterway=river`, `natural=water`), 로컬 전용.
+- OpenStreetMap, Overpass API 정사각마다 1회(도로·건물·지명) + 1회(`waterway=river`, `natural=water`, 3차에서 피복에 넣음) + 문경 1회(`*_link` 도로, 3차), 로컬 전용.
 
 ## 출처 표시
 
