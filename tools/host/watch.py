@@ -11,7 +11,7 @@ import argparse, json, re, subprocess, sys, time
 from paths import ROUTING
 
 PROMPT = re.compile(r'Requesting permission for:|Run this command\?|Allow access to this file\?|Allow (creation|edits?|modification)'
-                    r'|Trust this folder|Hooks need review')
+                    r'|Trust this folder|hooks need review|esc close', re.I)
 
 
 def sh(args):
@@ -59,7 +59,8 @@ def self_test():
     codex_hooks = 'Hooks need review\n  1. Trust and run hooks\n  2. Review hooks\n  3. Continue without trusting\n'
     working = '● Running npm run lint…\n  ⎿  eslint .\n✻ Thinking… (esc to interrupt)\n'
     idle = '╭────────────────────────────╮\n│ >                          │\n╰────────────────────────────╯\n  ? for shortcuts\n'
-    assert all(PROMPT.search(s) for s in (agy_command, agy_file, codex_hooks))
+    codex_hooks_v167 = '⚠ 3 hooks need review before they can run.\n\n  .codex/hooks.toml: 3 hooks\n\n  t trust all · enter review · esc close\n'
+    assert all(PROMPT.search(s) for s in (agy_command, agy_file, codex_hooks, codex_hooks_v167))
     assert not PROMPT.search(working) and not PROMPT.search(idle)
 
     def run_with(polls):

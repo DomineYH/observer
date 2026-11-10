@@ -32,7 +32,8 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
   `python3 tools/host/dispatch.py <task_id> <order_id> --name <agent> --split <pane>` (or `--pane <id>` for an existing shell pane, for example a new tab made with `herdr tab create`). `--dry-run` prints the herdr commands without running them.
 - The role, harness, model and effort come from the record and `python3 .routing/resolve_models.py --role <id>`, never from memory or a flag.
 - Exit codes: 0 `DISPATCHED` (the only case in which a worker counts as started), 2 `REFUSED`, 3 `MANUAL` (fix by hand, then rerun with `--no-start`), 4 `NOT_WORKING`.
-- codex shows `Trust this folder` (enter) on the first start in a folder and `Hooks need review` on every start (`down down enter`, continue without trusting); dispatch answers both.
+- codex shows `Trust this folder` (enter) on the first start in a folder and a hooks screen on every start. codex v0.167 shows `⚠ <n> hooks need review before they can run.` with `t trust all · enter review · esc close` (close it with `esc`, which continues without trusting); older versions show a `Hooks need review` menu (`down down enter`). dispatch answers all three, even when `agent start` reports ready, and stops with exit 3 if a dialog stays on screen.
+- dispatch counts a worker as started only when `herdr agent prompt` exits 0, no startup dialog is left on screen afterwards, and the agent reads `working` on two reads at least 3 s apart; otherwise exit 4. A dialog can swallow the prompt and still let the agent read as working.
 - A prompt sent right after a start can sit unsubmitted in the input box while the agent reads as idle. dispatch sends `enter` once if the agent is not `working` within 15 s. Whenever you prompt by hand, check `working` a few seconds later.
 - opencode has no model flag. dispatch starts it with `--auto` and exits 3. Then prompt `/model`, `herdr pane send-text <pane> "<model display name>"`, send `enter`, check that the footer shows the model and effort from `resolve_models.py`, and rerun with `--no-start`.
 - A second order to the same pane (planner, then implementer) uses `--no-start`.
@@ -48,7 +49,13 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
 
 - agy asks permission for every shell command and file write, and a pending prompt reads as `idle`, not `blocked`.
 - One tab per researcher (a small pane cuts off the command being approved). Agent `res-<n>`, order `research-<n>-o<k>`.
-- Run `python3 tools/host/approve.py --check`, then `python3 tools/host/approve.py <n> [<n> ...]` in the background. It approves only read-only one-line pipelines, AST-checked scripts under `/tmp/research-<n>/`, reads of the researcher's own order, and creation of `.routing/evidence/research-<n>-o1.{json,md}`; anything else returns `NEEDS_HOST` for the host to judge.
+- Run `python3 tools/host/approve.py --check`, then `python3 tools/host/approve.py <n> [<n> ...]` in the background. It approves only:
+  - one-line pipelines of read-only tools (`curl grep sed head tail gh ls tr cut wc sort uniq jq`), checked on their real arguments: `sed` takes only line or range prints (`-n '5,20p'`) and `s/…/…/` with `g`, `i`, `p` flags; `sort`, `uniq`, `jq` and `curl` take only allowlisted options, so output files (`sort -o`, a second `uniq` operand, `curl -D/-c/--trace`), script or config files and programs to run are refused;
+  - `curl -sL <https url> -o /tmp/research-<n>/<file>`, `git show origin/research/...` and the researcher's own report line;
+  - `python3 /tmp/research-<n>/<name>.py` when the script imports only the allowed standard-library modules and every write goes to a plain string-literal path inside `/tmp/research-<n>/` (no `..`, no f-string or computed path, no write-mode `io.open`/`ZipFile`, `.write` only on handles from such an `open`);
+  - reads of the researcher's own order and of files under `/tmp/research-<n>/` (no `..`), and creation of `.routing/evidence/research-<n>-o1.{json,md}`.
+
+  Anything else returns `NEEDS_HOST` for the host to judge by hand; when in doubt the loop asks rather than approves.
 - Researchers put multi-line code in `/tmp/research-<n>/*.py`; folded commands are declined. Inputs from elsewhere are copied into `/tmp/research-<n>/` by the host.
 - Before reading a research report, check that its claims table is complete (every claim has a row; facts quote a primary source; computed numbers name a script and an independent library cross-check or say it was not run). Return incomplete reports.
 
