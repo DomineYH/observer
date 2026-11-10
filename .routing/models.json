@@ -11,8 +11,8 @@
   "roles": {
     "planner": {
       "harness": "claude",
-      "model": "fable-5-1",
-      "effort": "medium"
+      "model": "fable-5-2",
+      "effort": "high"
     },
     "implementer": {
       "harness": "claude",
