@@ -29,8 +29,10 @@ The host reads and approves each command by hand, so a script that imports a lib
 - Both output files are written, and the report is sent to `observer-host`.
 
 ## Output
-1. `.routing/evidence/research-@N@-o1.json`: a JSON list with fields `question, fact, kind (fact|computed|proposal), source_url, source_title, retrieved_on, section_or_quote (at most 25 words), script, cross_check, version_or_date_of_source, confidence (high|medium|low), limitations, conflicts_with_other_sources`.
-2. `.routing/evidence/research-@N@-o1.md`: a report in @LANGUAGE@ that starts with the claims table, then a summary, with citations for every claim and repository-relative paths. Unconfirmed items go in their own section.
+1. `<repo>/.routing/evidence/research-@N@-o1.json`: a JSON list with fields `question, fact, kind (fact|computed|proposal), source_url, source_title, retrieved_on, section_or_quote (at most 25 words), script, cross_check, version_or_date_of_source, confidence (high|medium|low), limitations, conflicts_with_other_sources`.
+2. `<repo>/.routing/evidence/research-@N@-o1.md`: a report in @LANGUAGE@ that starts with the claims table, then a summary, with citations for every claim and repository-relative paths. Unconfirmed items go in their own section.
+
+`<repo>` is the absolute path of the repository you were started in. Use absolute paths in every command, script and file write; the host declines relative paths.
 
 ## Scope
 - read_scope: the web, the repository read-only.
