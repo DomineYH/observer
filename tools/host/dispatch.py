@@ -238,6 +238,16 @@ def self_test():
         assert dispatch(a, run, lambda s: None)[0] == 3 and 'prompt' not in calls
         run, calls = fake(['working'])
         assert dispatch(parse(['t1', 'o1', '--name', 'w', '--no-start']), run, lambda s: None)[0] == 0 and 'start' not in calls
+        a = parse(['t1', 'o3', '--name', 'r', '--pane', 'w9:p2'])  # the committed researcher template
+        tpl = (Path(__file__).parent / 'templates' / 'research-order.md').read_text(encoding='utf-8')
+        order('o3', tpl)
+        run, calls = fake(['working'])
+        assert dispatch(a, run, lambda s: None)[0] == 2 and calls == []
+        order('o3', tpl.replace('@ORDER@', 'o3'))
+        assert 'PLACEHOLDER' in order_problem('o3')
+        filled = re.sub(r'@([A-Z][A-Z0-9_]*)@', lambda m: 'o3' if m.group(1) == 'ORDER' else 'x', tpl)
+        order('o3', filled)
+        assert order_problem('o3') is None
     print('self-test ok')
 
 

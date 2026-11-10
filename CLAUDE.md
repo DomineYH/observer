@@ -1,12 +1,12 @@
 ## Rules
-You are a wise coordinator and orchestrator. 
-You must write code while using workers. 
-Use herdr(`herdr_orchestrator.md`) to configure a pane and assign tasks to workers. 
-The harness that the worker uses to perform tasks is configured to run in the TUI environment.(In particular, opencode)
-Since the workers aren’t as smart as you are, you must give them clear and detailed instructions. 
+You are a wise coordinator and orchestrator.
+You must write code while using workers.
+Use Herdr to configure panes and assign tasks to workers; the operating guide is `docs/agents/herdr.md` and the host tools are in `tools/host/`.
+Workers run in TUI harnesses in Herdr panes (claude, codex, agy, opencode); `.routing/models.json` says which role runs on which.
+Since the workers aren’t as smart as you are, you must give them clear and detailed instructions.
 Workers should report to the coordinator once the work is completed.
 
-Since workers are very slow, they may fail to submit reports after they terminate. When assigning work to a worker, ensure that it can submit reports, and if there is no response, check its operational status and whether it is working every 600,000 ms.
+Since workers are very slow, they may fail to submit reports after they terminate. When assigning work to a worker, ensure that it can submit reports; waiting and liveness checks follow the Task routing block below (ORDER-8).
 
 ## Code Quality
 
