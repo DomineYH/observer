@@ -1,7 +1,7 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
 import { StrictMode, useMemo, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
+import { underCanopy, validateReplay, type Mode, type ReplayData, type TerrainData } from '@sim'; // PROTOTYPE (#58): TerrainData
 import type { StoredRun } from '@adapters/index';
 import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
@@ -43,7 +43,19 @@ selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
 // The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
 const { seed, seedKind } = chooseSeed(location.search, Date.now());
-const terrain = await mockTerrain.load(seed);
+// PROTOTYPE (#58): `?terrain=<url>` loads a file written by prototype/m2-terrain/build.mjs instead of the mock terrain.
+const protoTerrain = new URLSearchParams(location.search).get('terrain');
+const terrain = protoTerrain ? await loadPrototypeTerrain(protoTerrain) : await mockTerrain.load(seed);
+// PROTOTYPE (#58): header length (u32 LE), JSON header, pad to 4, then ground, surface, buildings (f32) and cover (u8).
+async function loadPrototypeTerrain(url: string): Promise<TerrainData> {
+  const buf = await (await fetch(url)).arrayBuffer();
+  const len = new DataView(buf).getUint32(0, true);
+  const head = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, len))) as Omit<TerrainData, 'ground' | 'surface' | 'buildings' | 'cover'>;
+  const nn = head.n * head.n;
+  let at = 4 + len + ((4 - ((4 + len) % 4)) % 4);
+  const f32 = () => new Float32Array(buf, (at += nn * 4) - nn * 4, nn);
+  return { ...head, ground: f32(), surface: f32(), buildings: f32(), cover: new Uint8Array(buf, at, nn) };
+}
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
@@ -65,6 +77,7 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 const send = (input: Parameters<typeof game.session.send>[0]) => game.session.send(input);
+(window as unknown as { __send: typeof send }).__send = send; // PROTOTYPE (#58): capture script picks posts
 // The observation view draws every frame; the other panels read state at the publish rate.
 const frameListeners = new Set<(now: number) => void>();
 const onFrame = (draw: (now: number) => void) => {
