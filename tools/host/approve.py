@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host approval loop for agy researchers (named res-<n>). Approves only read-only actions; exits to the host on anything
 else or after 10 minutes. Usage: approve.py <n> [<n> ...]   Self-check: approve.py --check (or --self-test)"""
-import ast, re, subprocess, sys, time
+import ast, os, re, shlex, subprocess, sys, time
 
 from paths import NOTES, ROOT
 
@@ -10,6 +10,45 @@ SAFE_IMPORTS = {'urllib.request', 'urllib.parse', 'urllib.error', 're', 'ssl', '
                 'struct', 'math', 'io', 'zipfile', 'xml.etree.ElementTree', 'glob'}
 BAD = re.compile(r'[;&`$<>]|\b(sh|bash|zsh|python\d?|node|perl|ruby|tee|xargs|rm|mv|cp|sudo|dd)\b'
                  r'|\s-(o|O|d|T|F|X)\b|--(data|upload|output|request|form|config)')
+# Options each tool may take; anything else (an output file, a script file, a program to run) goes to the host.
+CURL_FLAG = re.compile(r'-[sSLfIk]+|--(compressed|globoff|fail|silent|location|head)')
+CURL_ARG = re.compile(r'-[AHmr]|--(max-time|retry|user-agent|header)')
+SED_ADDR = r'(?:\d+|\$|/(?:[^/\\\n]|\\.)*/)'
+SED_PROG = re.compile(rf'{SED_ADDR}(?:,{SED_ADDR})?p|(?:{SED_ADDR}(?:,{SED_ADDR})?)?s/(?:[^/\\\n]|\\.)*/(?:[^/\\\n]|\\.)*/[gip]*')
+
+
+def args_ok(words):
+    """Read-only forms of each tool, checked on the real (unquoted) arguments."""
+    tool, args, i, pos = words[0], words[1:], 0, []
+    while i < len(args):
+        a = args[i]
+        if tool == 'curl' and CURL_ARG.fullmatch(a):
+            i += 1
+        elif tool == 'curl' and a.startswith('-') and not CURL_FLAG.fullmatch(a):
+            return False
+        elif tool == 'sed' and a == '-e' and i + 1 < len(args):
+            pos, i = pos + ['-e', args[i + 1]], i + 1
+        elif tool == 'sed' and a.startswith('-') and not re.fullmatch(r'-[nEr]+', a):
+            return False
+        elif tool == 'sort' and a.startswith('-') and not re.fullmatch(r'-[bfghMnrsuV]+|-[kt]\S*', a):
+            return False
+        elif tool == 'uniq' and a in ('-f', '-s', '-w') and i + 1 < len(args) and args[i + 1].isdigit():
+            i += 1
+        elif tool == 'uniq' and a.startswith('-') and not re.fullmatch(r'-[cdiu]+|-[fsw]\d+', a):
+            return False
+        elif tool == 'jq' and a == '--arg' and i + 2 < len(args):
+            i += 2
+        elif tool == 'jq' and a.startswith('-') and not re.fullmatch(r'-[rcsSenj]+|--(raw-output|compact-output|slurp|sort-keys)', a):
+            return False
+        elif not (tool in ('sed', 'sort', 'uniq', 'jq', 'curl') and a.startswith('-')):
+            pos.append(a)
+        i += 1
+    if tool == 'sed':
+        progs = [pos[k + 1] for k in range(len(pos) - 1) if pos[k] == '-e'] if '-e' in pos else pos[:1]
+        return bool(progs) and all(SED_PROG.fullmatch(p) for p in progs)
+    if tool == 'uniq':
+        return len(pos) <= 1  # a second operand is an output file
+    return True
 
 
 def pane(t, source):
@@ -28,6 +67,7 @@ def command_of(out):
 def pipeline_ok(c):
     if not c:
         return False
+    orig = c
     # A double-quoted plain URL may carry & and ?; $ and backticks stay banned.
     # Double-quoted strings without $ or backticks (and single-quoted strings) cannot run anything: treat each as one word.
     c = re.sub(r'"[^"$`]*"', 'Q', c)
@@ -42,7 +82,16 @@ def pipeline_ok(c):
             return False
         if words[0] == 'gh' and not re.fullmatch(r'gh issue view \d+( --json [\w,]+| --comments)?', seg.strip()):
             return False
-    return True
+    try:
+        lex = shlex.shlex(orig.replace('2>/dev/null', ''), posix=True, punctuation_chars='|')
+        lex.whitespace_split = True
+        tokens = list(lex)
+    except ValueError:
+        return False
+    segs = [[]]
+    for w in tokens:
+        segs.append([]) if w == '|' else segs[-1].append(w)
+    return all(seg and args_ok(seg) for seg in segs)
 
 
 def special_ok(c, t):
@@ -60,12 +109,43 @@ def script_ok(c, t):
     hosts = set(re.findall(r'https?://[^/"\' ]+', src))
     overpass_count = hosts <= {'https://overpass-api.de', 'https://overpass.kumi.systems'} and 'out count' in src \
         and not re.search(r'out (body|geom|center)', src)
-    for x in ast.walk(ast.parse(src)):
+    tree = ast.parse(src)
+    nodes = list(ast.walk(tree))
+    alias = {a.asname or a.name: a.name for x in nodes if isinstance(x, ast.ImportFrom) for a in x.names}
+    called = {id(x.func) for x in nodes if isinstance(x, ast.Call)}
+
+    def name(f):  # the called name, through `from m import n as a`
+        return f.attr if isinstance(f, ast.Attribute) else alias.get(f.id, f.id) if isinstance(f, ast.Name) else ''
+
+    def is_open(v):
+        return isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and name(v.func) == 'open'
+    # File handles: names bound only by `x = open(...)` or `with open(...) as x` (each open is checked below).
+    handle_stores = {id(x.targets[0]) for x in nodes if isinstance(x, ast.Assign) and len(x.targets) == 1 and is_open(x.value)}
+    handle_stores |= {id(w.optional_vars) for w in nodes if isinstance(w, ast.withitem) and is_open(w.context_expr)}
+    stores = [x for x in nodes if isinstance(x, ast.Name) and not isinstance(x.ctx, ast.Load)]
+    other = {x.id for x in stores if id(x) not in handle_stores} | {x.arg for x in nodes if isinstance(x, ast.arg)} | set(alias)
+    handles = {x.id for x in stores if id(x) in handle_stores} - other
+
+    def handle_ok(v):
+        return v is None or (isinstance(v, ast.Name) and v.id in handles) or ast.unparse(v) in ('sys.stdout', 'sys.stderr', 'sys.stdout.buffer')
+
+    def path_ok(v):  # a write path is a plain literal inside the folder
+        return isinstance(v, ast.Constant) and isinstance(v.value, str) and '..' not in v.value \
+            and os.path.normpath(v.value).startswith(folder)
+
+    def arg(call, pos, kw):
+        hit = [k.value for k in call.keywords if k.arg == kw]
+        return hit[0] if hit else call.args[pos] if len(call.args) > pos else None
+
+    def read_mode(v):
+        return v is None or (isinstance(v, ast.Constant) and v.value in ('r', 'rb', 'rt'))
+    for x in nodes:
         if isinstance(x, ast.Import) and any(a.name not in SAFE_IMPORTS for a in x.names):
             return False
-        if isinstance(x, ast.ImportFrom) and (x.module or '') not in SAFE_IMPORTS:
+        if isinstance(x, ast.ImportFrom) and ((x.module or '') not in SAFE_IMPORTS or any(a.name == 'main' for a in x.names)):
             return False
-        if isinstance(x, ast.Name) and x.id in ('eval', 'exec', 'compile', '__import__', 'getattr', 'setattr', 'globals', 'locals'):
+        if isinstance(x, ast.Name) and x.id in ('eval', 'exec', 'compile', '__import__', 'getattr', 'setattr', 'globals', 'locals',
+                                                 'vars', '__builtins__', 'breakpoint', 'help'):
             return False
         if isinstance(x, ast.Attribute) and x.attr in ('extract', 'extractall', 'write_bytes', 'write_text'):
             return False
@@ -73,14 +153,36 @@ def script_ok(c, t):
             return False
         if isinstance(x, ast.keyword) and x.arg == 'method' and not (isinstance(x.value, ast.Constant) and x.value.value in ('GET', 'HEAD')):
             return False
-        if isinstance(x, ast.Call) and getattr(x.func, 'id', '') == 'open':
-            mode = x.args[1].value if len(x.args) > 1 and isinstance(x.args[1], ast.Constant) else 'r'
-            if mode in ('r', 'rb'):
-                continue
-            a0 = x.args[0]
-            head = a0.values[0] if isinstance(a0, ast.JoinedStr) and a0.values else a0
-            if not (isinstance(head, ast.Constant) and str(head.value).startswith(folder) and '..' not in ast.unparse(a0)):
+        # Write sinks reachable from SAFE_IMPORTS: anything not provably inside the folder goes to the host.
+        if isinstance(x, ast.Attribute) and (x.attr.startswith('__') or x.attr in ('main', 'retrieve', 'modules', 'keylog_filename')
+                                             or (not isinstance(x.ctx, ast.Load) and ast.unparse(x.value) == 'sys')):
+            return False
+        if isinstance(x, (ast.Name, ast.Attribute)) and id(x) not in called and name(x) in ('open', 'write', 'writelines', 'print', 'dump', 'urlretrieve'):
+            return False
+        if not isinstance(x, ast.Call):
+            continue
+        n = name(x.func)
+        if n in ('open', 'write', 'writelines', 'print', 'dump', 'urlretrieve', 'ZipFile', 'PyZipFile') and (
+                any(isinstance(a, ast.Starred) for a in x.args) or any(k.arg is None for k in x.keywords)):
+            return False
+        if n in ('FileIO', 'TextIOWrapper', 'BufferedWriter', 'BufferedRandom', 'BufferedRWPair'):
+            return False
+        if n == 'open' and isinstance(x.func, ast.Attribute):  # io.open, ZipFile.open, zipfile.Path.open: reads only
+            first = x.args[0] if x.args else None
+            if not read_mode(arg(x, 1, 'mode')) or (isinstance(first, ast.Constant) and re.fullmatch(r'[rwxabt+U]*[wax+][rwxabt+U]*', str(first.value))):
                 return False
+        elif n == 'open' and not read_mode(arg(x, 1, 'mode')) and not path_ok(arg(x, 0, 'file')):
+            return False
+        if n in ('ZipFile', 'PyZipFile') and not read_mode(arg(x, 1, 'mode')):
+            return False
+        if n in ('write', 'writelines') and isinstance(x.func, ast.Attribute) and not handle_ok(x.func.value):
+            return False
+        if n == 'print' and not handle_ok(arg(x, 99, 'file')):
+            return False
+        if n == 'dump' and not handle_ok(arg(x, 1, 'fp')):
+            return False
+        if n == 'urlretrieve' and not path_ok(arg(x, 1, 'filename')):
+            return False
     return True
 
 
@@ -120,12 +222,39 @@ def check():
     assert special_ok('curl -sL https://a.org/f.json -o /tmp/research-99/f.json', 99)
     assert not special_ok('curl -sL https://a.org/f.json -o /tmp/f.json', 99)
     assert s('import urllib.request,re,ssl\nprint(1)\n')
-    assert s('l="a"\nopen(f"/tmp/research-99/{l}.pdf","wb")\n')
+    assert not s('l="a"\nopen(f"/tmp/research-99/{l}.pdf","wb")\n')  # flipped by host decision (o4 Q2): f-string write path
     assert not s('import os\n') and not s('import subprocess\n') and not s('eval("1")\n')
     assert not s('open("/home/x","w")\n') and not s('l="a"\nopen(f"{l}/x","wb")\n')
     assert not s('import urllib.request as u\nu.Request("http://x",data=b"a")\n')
     assert s('import urllib.request as u\nq="out count;"\nu.Request("https://overpass-api.de/api/interpreter",data=b"a")\n')
     assert not s('import urllib.request as u\nq="out body;"\nu.Request("https://overpass-api.de/api/interpreter",data=b"a")\n')
+    # R1 (o4): writing forms of allowlisted tools and write sinks of allowed imports go to the host
+    for c in ("sed '1w /tmp/escaped' /etc/passwd", "sed -n 'w /tmp/x' f", "sed 's/a/b/w /tmp/x' f", "sed 's/a/b/e' f",
+              "sed -e '1r /etc/x' f", 'sed -f prog.sed f', "sed --expression=p f", "sed -n '5,20p;w x' f", 'sort -uo /tmp/x f',
+              'sort --outp /tmp/x f', 'sort --compress-program=x f', 'uniq f /tmp/x', 'jq -f prog f', 'jq --rawfile a b . f',
+              'curl -sL -D /tmp/x https://a', 'curl -sL -c /tmp/x https://a', 'curl -sL --trace /tmp/x https://a', 'curl -K x https://a'):
+        assert not pipeline_ok(c), c
+    for c in ("sed -n '5,20p' f", "curl -sL https://a | sed -n '/<td>/,/<\\/td>/p'", "sed 's/<[^>]*>//g' f", "sed -E 's/ +/ /gp' f",
+              'sort -u f', 'sort -t, -k2 -n f', 'uniq -c', 'uniq -f 2 f', "jq -r '.items[] | .name' f", "jq --arg k v '.[$k]' f",
+              'curl -sSL -A x -m 30 https://a'):
+        assert pipeline_ok(c), c
+    for src in ("open('/tmp/escaped', mode='w')\n", "p='../escaped'\nopen(f'/tmp/research-99/{p}', 'w')\n",
+                "open('/tmp/research-99/../x', 'w')\n", "m='w'\nopen('/tmp/escaped', m)\n", "o=open\no('/tmp/x','w')\n",
+                "import io\nio.open('/tmp/x','w')\n", "import zipfile\nzipfile.ZipFile('/tmp/x.zip','w')\n",
+                "import zipfile\nzipfile.Path('/tmp/research-99/a.zip').open('w')\n", "import zipfile\nzipfile.main(['-c','x.zip','y'])\n",
+                "import xml.etree.ElementTree as ET\nET.parse('a').write('/tmp/x')\n",
+                "import xml.etree.ElementTree as ET\nt=ET.parse('a')\nt.write('/tmp/x')\n",
+                "import xml.etree.ElementTree as ET\nprint('/tmp/x', file=ET.parse('a'))\n",
+                "import json, xml.etree.ElementTree as ET\njson.dump('x', ET.parse('a'))\n",
+                "f=open('/tmp/research-99/a','w')\nimport xml.etree.ElementTree as ET\nf=ET.parse('a')\nf.write('/tmp/x')\n",
+                "import urllib.request as u\nu.urlretrieve('https://a', '/tmp/x')\n", "().__class__.__bases__[0].__subclasses__()\n",
+                "import sys, xml.etree.ElementTree as ET\nsys.stdout = ET.parse('a')\n", "vars()['x'] = 1\n",
+                "import ssl\nssl.create_default_context().keylog_filename = '/tmp/x'\n", "import io\nio.FileIO('/tmp/x', 'w')\n"):
+        assert not s(src), src
+    assert s("import json, ssl, zipfile, urllib.request as u\nctx = ssl.create_default_context()\nctx.check_hostname = False\n"
+             "with open('/tmp/research-99/out.json', 'w') as f:\n    json.dump({'a': 1}, f)\n    f.write('x')\n"
+             "g = open('/tmp/research-99/log.txt', 'a')\nprint('done', file=g)\nz = zipfile.ZipFile('/tmp/research-99/a.zip')\n"
+             "z.open('n').read()\nu.urlretrieve('https://a.org/f.pdf', '/tmp/research-99/f.pdf')\nprint(open('/tmp/research-99/a').read())\n")
     os.remove('/tmp/research-99/_chk.py')
     read = lambda p: file_prompt_ok(f'Allow access to this file?\nRead: {p}\nReason: order\n', 99)[0]
     make = lambda *ps: file_prompt_ok('Allow creation of this file?\n' + ''.join(f'  {p} +12\n' for p in ps), 99)[0]
