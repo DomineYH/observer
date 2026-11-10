@@ -1,7 +1,10 @@
 
 # jev_task_routing: local task records
-.routing/tasks/*.json
-.routing/evidence/*.json
+.routing/tasks/*
+!.routing/tasks/.gitkeep
+.routing/evidence/*
+!.routing/evidence/.gitkeep
+__pycache__/
 .routing/hook_log.jsonl
 node_modules/
 dist/

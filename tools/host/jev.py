@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host-side Jev call + decision rules. Usage: jev.py <request.json> <out.json>   Self-test: jev.py --self-test
 request.json = templates.request shape (task, context, testing_evidence, trusted_flags, inherited_risk_floor)."""
-import json, os, sys, urllib.request
+import json, os, re, sys, urllib.request
 
 from paths import ROUTING
 
@@ -68,6 +68,22 @@ def decide(ans, req, pol):
     return status, risk, prov, fired
 
 
+def record_fields(out):
+    """The task-record fields this result fills; record.py put --jev merges them."""
+    ans = out["answers"]
+    pick = lambda k: (ans.get(k) or {}).get("choice")
+    wm, tm = pick("work_mode"), pick("testing_mode")
+    t = ans.get("testing_mode") or {}
+    return {"router_requested_model": out["request_model"], "router_actual_model": out["response_model"],
+            "status": out["status"], "risk": out["risk"], "provisional_risk": out["provisional_risk"],
+            # "CLS-3(standard)" and "CLS-4:task_type" become their schema rule ids
+            "decision_rule_ids": list(dict.fromkeys(re.match(r"[A-Z]+-\d+[a-z]?", r).group() for r in out["decision_rule_ids"])),
+            "jev_answers": ans, "task_type": pick("task_type"),
+            "mode": wm if wm in ("delivery", "exploration", "emergency") else None,
+            "testing_mode": tm if tm != "needs_context" else None,
+            "testing_decision": {"source": "jev", "probability": (t.get("probabilities") or {}).get(tm), "confidence": t.get("confidence")}}
+
+
 def main(req_path, out_path):
     pol, models = load()
     req = json.load(open(req_path))
@@ -76,6 +92,7 @@ def main(req_path, out_path):
     status, risk, prov, fired = decide(ans, req, pol)
     out = {"request_model": models["router"]["model"], "response_model": resp.get("model"), "usage": resp.get("usage"), "answers": ans,
            "status": status, "risk": risk, "provisional_risk": prov, "decision_rule_ids": fired}
+    out["record_fields"] = record_fields(out)
     json.dump(out, open(out_path, "w"), indent=1, ensure_ascii=False)
     print(json.dumps({k: out[k] for k in ("status", "risk", "provisional_risk", "decision_rule_ids", "response_model")}))
     print({k: (v.get("choice"), round(v.get("confidence", 0), 2)) if v["type"] == "choice" else round(v["noul"], 3) for k, v in ans.items()})
@@ -119,6 +136,11 @@ def self_test():
     unsure = {"choice": "feature", "probabilities": {"feature": 0.7, "bug_fix": 0.3}}
     st, risk, prov, fired = decide(answers(task_type=unsure), req, pol)
     assert st == "NEEDS_CONTEXT" and "CLS-4:task_type" in fired
+    out = {"request_model": "jev-x", "response_model": "jev-x", "answers": answers(), "status": "READY_FOR_PREFLIGHT",
+           "risk": "standard", "provisional_risk": False, "decision_rule_ids": ["CLS-3(standard)", "CLS-4:task_type", "CLS-10"]}
+    rf = record_fields(out)
+    assert rf["decision_rule_ids"] == ["CLS-3", "CLS-4", "CLS-10"] and (rf["task_type"], rf["mode"], rf["testing_mode"]) == ("feature", "delivery", "test_with_change")
+    assert rf["testing_decision"] == {"source": "jev", "probability": 1.0, "confidence": 0.95}
     print("self-test ok")
 
 
