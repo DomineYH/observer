@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host approval loop for agy researchers (named res-<n>). Approves only read-only actions; exits to the host on anything
 else or after 10 minutes. Usage: approve.py <n> [<n> ...]   Self-check: approve.py --check (or --self-test)"""
-import ast, os, re, shlex, subprocess, sys, time
+import ast, json, os, re, shlex, subprocess, sys, time
 
 from paths import NOTES, ROOT
 
@@ -11,45 +11,84 @@ SAFE_IMPORTS = {'urllib.request', 'urllib.parse', 'urllib.error', 're', 'ssl', '
 # Second layer, on every token: program names and output/upload options never pass, even inside quotes.
 BAD_TOKEN = re.compile(r'\b(sh|bash|zsh|python\d?|node|perl|ruby|tee|xargs|rm|mv|cp|sudo|dd)\b'
                        r'|^-(o|O|d|T|F|X)$|^--(data|upload|output|request|form|config)')
-# Options each tool may take; anything else (an output file, a script file, a program to run) goes to the host.
-CURL_FLAG = re.compile(r'-[sSLfIk]+|--(compressed|globoff|fail|silent|location|head)')
-CURL_ARG = re.compile(r'-[AHmr]|--(max-time|retry|user-agent|header)')
+# Options each tool may take: (flags without a value, options that take the next word, options with an attached value).
+# Anything else (an output file, a script or config file, a program to run) goes to the host.
+OPTS = {
+    'curl': (r'-[sSLfIk]+|--(compressed|globoff|fail|silent|location|head)', r'-[AHmr]|--(max-time|retry|user-agent|header)', None),
+    'grep': (r'-[iEvwncohHsqaxrlLzF]+|--color', r'-[eABCm]', r'-[ABCm]\d+|--(include|exclude|exclude-dir|color)=\S+'),
+    'sed': (r'-[nEr]+', r'-e', None),
+    'head': (r'-q|-\d+', r'-[nc]', r'-[nc][+-]?\d+'),
+    'tail': (r'-q|-\d+', r'-[nc]', r'-[nc][+-]?\d+'),
+    'ls': (r'-[alhRt1Sr]+', None, None),
+    'wc': (r'-[lwcm]+', None, None),
+    'cut': (None, r'-[dfc]', r'-[dfc]\S+'),
+    'tr': (r'-[dsc]+', None, None),
+    'sort': (r'-[bfghMnrsuV]+', r'-[kt]', r'-[kt]\S+'),
+    'uniq': (r'-[cdiu]+', r'-[fsw]', r'-[fsw]\d+'),
+    'jq': (r'-[rcsSenj]+|--(raw-output|compact-output|slurp|sort-keys)', None, None),
+    'gh': (r'--comments', r'--json', None),
+}
+DATA_FIRST = {'grep', 'sed', 'jq'}  # the first operand is a pattern or program, not a file (unless given with -e)
+NO_FILES = {'curl', 'tr', 'gh'}
 SED_ADDR = r'(?:\d+|\$|/(?:[^/\\\n]|\\.)*/)'
 SED_PROG = re.compile(rf'{SED_ADDR}(?:,{SED_ADDR})?p|(?:{SED_ADDR}(?:,{SED_ADDR})?)?s/(?:[^/\\\n]|\\.)*/(?:[^/\\\n]|\\.)*/[gip]*')
+JQ_BAD = re.compile(r'\b(env|input_filename|import|include|modulemeta|get_search_list)\b|\$')  # environment, module files
 
 
-def args_ok(words):
-    """Read-only forms of each tool, checked on the real (unquoted) arguments."""
-    tool, args, i, pos = words[0], words[1:], 0, []
+def read_ok(path, t=None, cwd=None, recursive=False):
+    """A file or directory a researcher may read: /tmp/research-<t>/, its own order, the repository (not .git/,
+    .routing/tasks/ or .routing/hook_log.jsonl) or /dev/null, after resolving links. Relative paths need a known cwd."""
+    if path == '-':
+        return True  # stdin
+    if not path or path.startswith('~') or (not os.path.isabs(path) and not cwd):
+        return False
+    p = os.path.realpath(os.path.join(cwd or '/', path))
+    under = lambda a, b: a == b or a.startswith(b.rstrip('/') + '/')
+    if p == '/dev/null':
+        return not recursive
+    if t is not None and (under(p, os.path.realpath(f'/tmp/research-{t}'))
+                          or re.fullmatch(re.escape(os.path.realpath(NOTES / 'orders')) + rf'/research-{t}-o\d+\.md', p)):
+        return True
+    root = os.path.realpath(ROOT)
+    blocked = [os.path.join(root, '.git'), os.path.join(root, '.routing', 'tasks'), os.path.join(root, '.routing', 'hook_log.jsonl')]
+    return under(p, root) and not any(under(p, b) for b in blocked) and not (recursive and any(under(b, p) for b in blocked))
+
+
+def args_ok(words, t=None, cwd=None):
+    """Read-only forms of each tool, checked on the real (unquoted) arguments; every file operand must pass read_ok."""
+    tool, args, i, pos, data = words[0], words[1:], 0, [], []
+    flags, with_value, attached = (re.compile(r) if r else None for r in OPTS[tool])
+    recursive = False
     while i < len(args):
         a = args[i]
-        if tool == 'curl' and CURL_ARG.fullmatch(a):
-            i += 1
-        elif tool == 'curl' and a.startswith('-') and not CURL_FLAG.fullmatch(a):
-            return False
-        elif tool == 'sed' and a == '-e' and i + 1 < len(args):
-            pos, i = pos + ['-e', args[i + 1]], i + 1
-        elif tool == 'sed' and a.startswith('-') and not re.fullmatch(r'-[nEr]+', a):
-            return False
-        elif tool == 'sort' and a.startswith('-') and not re.fullmatch(r'-[bfghMnrsuV]+|-[kt]\S*', a):
-            return False
-        elif tool == 'uniq' and a in ('-f', '-s', '-w') and i + 1 < len(args) and args[i + 1].isdigit():
-            i += 1
-        elif tool == 'uniq' and a.startswith('-') and not re.fullmatch(r'-[cdiu]+|-[fsw]\d+', a):
-            return False
-        elif tool == 'jq' and a == '--arg' and i + 2 < len(args):
-            i += 2
-        elif tool == 'jq' and a.startswith('-') and not re.fullmatch(r'-[rcsSenj]+|--(raw-output|compact-output|slurp|sort-keys)', a):
-            return False
-        elif not (tool in ('sed', 'sort', 'uniq', 'jq', 'curl') and a.startswith('-')):
+        if a.startswith('-') and a != '-':
+            if with_value and with_value.fullmatch(a) and i + 1 < len(args):
+                if a in ('-e', '--arg'):
+                    data.append(args[i + 1])
+                i += 1
+            elif tool == 'jq' and a == '--arg' and i + 2 < len(args):
+                i += 2
+            elif not ((flags and flags.fullmatch(a)) or (attached and attached.fullmatch(a))):
+                return False
+            recursive = recursive or (tool in ('grep', 'ls') and bool(re.fullmatch(r'-[a-zA-Z]*[rR][a-zA-Z]*', a)))
+        else:
             pos.append(a)
         i += 1
-    if tool == 'sed':
-        progs = [pos[k + 1] for k in range(len(pos) - 1) if pos[k] == '-e'] if '-e' in pos else pos[:1]
-        return bool(progs) and all(SED_PROG.fullmatch(p) for p in progs)
-    if tool == 'uniq':
-        return len(pos) <= 1  # a second operand is an output file
-    return True
+    if tool in DATA_FIRST and not data:
+        if not pos:
+            return False
+        data, pos = [pos[0]], pos[1:]
+    if tool == 'sed' and not all(SED_PROG.fullmatch(p) for p in data):
+        return False
+    if tool == 'jq' and any(JQ_BAD.search(p) for p in data):
+        return False
+    if tool == 'curl':
+        return all(re.match(r'https?://', p) for p in pos)
+    if tool == 'uniq' and len(pos) > 1:
+        return False  # a second operand is an output file
+    if tool == 'grep' and any(re.fullmatch(r'-[a-zA-Z]*R[a-zA-Z]*', a) for a in args):
+        return False  # -R follows links out of the tree
+    return tool in NO_FILES or all(read_ok(p, t, cwd, recursive) for p in pos)
 
 
 def pane(t, source):
@@ -83,7 +122,7 @@ def unquoted(c):
     return None if q else ''.join(out)
 
 
-def pipeline_ok(c):
+def pipeline_ok(c, t=None, cwd=None):
     """One pipeline of allowlisted read-only tools. No expansion, no operator other than |."""
     if not c or re.search(r'[$`\n]', c):  # raw text, quoted or not: no substitution of any kind
         return False
@@ -109,7 +148,7 @@ def pipeline_ok(c):
             return False
         if seg[0] == 'gh' and not re.fullmatch(r'gh issue view \d+( --json [\w,]+| --comments)?', ' '.join(seg)):
             return False
-        if not args_ok(seg):
+        if not args_ok(seg, t, cwd):
             return False
     return True
 
@@ -231,7 +270,7 @@ def refs_ok(tree):
     return True
 
 
-def script_ok(c, t):
+def script_ok(c, t, cwd=None):
     m = re.fullmatch(rf'python3 (/tmp/research-{t}/[\w-]+\.py)', c or '')
     if not m:
         return False
@@ -272,6 +311,38 @@ def script_ok(c, t):
 
     def read_mode(v):
         return v is None or (isinstance(v, ast.Constant) and v.value in ('r', 'rb', 'rt'))
+
+    def read_path_ok(v):  # a read path is a literal inside the read roots (read_ok)
+        return isinstance(v, ast.Constant) and isinstance(v.value, str) and '..' not in v.value and read_ok(v.value, t, cwd)
+    # URLs must be http(s): a literal, an f-string or + starting with one, '...'.format on one, a Request of one, or a
+    # name bound only by assignments or a for-loop over a literal list of such values (urllib also reads file: URLs).
+    binds = {}
+    for x in nodes:
+        if isinstance(x, ast.Assign) and len(x.targets) == 1 and isinstance(x.targets[0], ast.Name):
+            binds.setdefault(x.targets[0].id, []).append([x.value])
+        elif isinstance(x, ast.For) and isinstance(x.target, ast.Name) and isinstance(x.iter, (ast.List, ast.Tuple)):
+            binds.setdefault(x.target.id, []).append(list(x.iter.elts))
+    store_count = {}
+    for x in stores:
+        store_count[x.id] = store_count.get(x.id, 0) + 1
+    arg_names = {x.arg for x in nodes if isinstance(x, ast.arg)}
+
+    def url_ok(v, depth=0):
+        if v is None or depth > 20:
+            return False
+        if isinstance(v, ast.Constant):
+            return isinstance(v.value, str) and bool(re.match(r'https?://', v.value))
+        if isinstance(v, ast.JoinedStr):
+            return bool(v.values) and url_ok(v.values[0], depth + 1)
+        if isinstance(v, ast.BinOp) and isinstance(v.op, ast.Add):
+            return url_ok(v.left, depth + 1)
+        if isinstance(v, ast.Call) and isinstance(v.func, ast.Attribute) and v.func.attr == 'format':
+            return url_ok(v.func.value, depth + 1)
+        if isinstance(v, ast.Call) and name(v.func) == 'Request':
+            return url_ok(arg(v, 0, 'url'), depth + 1)
+        if isinstance(v, ast.Name) and v.id in binds and v.id not in arg_names and store_count.get(v.id) == len(binds[v.id]):
+            return all(url_ok(e, depth + 1) for site in binds[v.id] for e in site)
+        return False
     for x in nodes:
         if isinstance(x, ast.Import) and any(a.name not in SAFE_IMPORTS for a in x.names):
             return False
@@ -306,6 +377,15 @@ def script_ok(c, t):
                 return False
         elif n == 'open' and not read_mode(arg(x, 1, 'mode')) and not path_ok(arg(x, 0, 'file')):
             return False
+        elif n == 'open' and read_mode(arg(x, 1, 'mode')) and not read_path_ok(arg(x, 0, 'file')):
+            return False
+        if n in ('ZipFile', 'PyZipFile') and not (read_path_ok(arg(x, 0, 'file')) or (
+                isinstance(arg(x, 0, 'file'), ast.Call) and name(arg(x, 0, 'file').func) == 'BytesIO')):
+            return False
+        if n == 'glob' and not (len(x.args) == 1 and not x.keywords and read_path_ok(x.args[0])):
+            return False
+        if n in ('urlopen', 'Request', 'urlretrieve') and not url_ok(arg(x, 0, 'url')):
+            return False
         if n in ('ZipFile', 'PyZipFile') and not read_mode(arg(x, 1, 'mode')):
             return False
         if n in ('write', 'writelines') and isinstance(x.func, ast.Attribute) and not handle_ok(x.func.value):
@@ -323,7 +403,7 @@ def file_prompt_ok(v, t):
     if 'Allow access to this file?' in v:
         m = re.search(r'Read:\s*(.*?)\s*Reason:', v, re.S)
         path = re.sub(r'\s+', '', m.group(1)) if m else ''
-        return bool(re.fullmatch(rf'({re.escape(str(NOTES))}/orders/research-{t}-o\d\.md|/tmp/research-{t}/(?!.*\.\.)[\w./-]+)', path)), path
+        return '..' not in path and read_ok(path, t), path
     if re.search(r'Allow (creation|edits?|modification)', v):
         paths = re.findall(r'^\s*(/\S+)(?:\s+\+\d+.*)?$', v, re.M)
         ok = len(paths) == 1 and paths[0] in (str(ROOT / f'.routing/evidence/research-{t}-o1.json'),
@@ -370,7 +450,7 @@ def check():
     for c in ("sed -n '5,20p' f", "curl -sL https://a | sed -n '/<td>/,/<\\/td>/p'", "sed 's/<[^>]*>//g' f", "sed -E 's/ +/ /gp' f",
               'sort -u f', 'sort -t, -k2 -n f', 'uniq -c', 'uniq -f 2 f', "jq -r '.items[] | .name' f", "jq --arg k v '.[]' f",
               'curl -sSL -A x -m 30 https://a'):
-        assert pipeline_ok(c), c
+        assert pipeline_ok(c, 99, str(ROOT)), c  # o8: the relative file f now needs a known cwd (here the repo root)
     for src in ("open('/tmp/escaped', mode='w')\n", "p='../escaped'\nopen(f'/tmp/research-99/{p}', 'w')\n",
                 "open('/tmp/research-99/../x', 'w')\n", "m='w'\nopen('/tmp/escaped', m)\n", "o=open\no('/tmp/x','w')\n",
                 "import io\nio.open('/tmp/x','w')\n", "import zipfile\nzipfile.ZipFile('/tmp/x.zip','w')\n",
@@ -404,6 +484,36 @@ def check():
                 "'{0.__class__}'.format(1)\n", "'{0.real}'.format(1)\n", "f = print\n", "def g():\n    pass\ng = 1\ng()\n",
                 "class A:\n    pass\n", "print(len)()\n", "import zipfile\nzipfile.Path('a')\n"):
         assert not s(src), src
+    # R (o8): reads only inside /tmp/research-<n>/, the own order, the repository (not .git, .routing/tasks, hook log), /dev/null
+    r = str(ROOT)
+    for c in ('head /proc/self/environ', 'grep KEY /proc/self/environ', 'tail ~/.bashrc', 'cat ../../x', 'jq -n env',
+              "jq -n 'env.HOME'", "jq 'input_filename' /tmp/research-99/a.json", "jq -n 'import \"a\" as a; 1'",
+              'head ../../x', 'head /dev/zero', 'head /etc/passwd', 'ls /', f'head {r}/.git/config',
+              f'head {r}/.routing/tasks/t1.json', f'head {r}/.routing/hook_log.jsonl', f'grep -r KEY {r}',
+              f'grep -r KEY {r}/.routing', f'grep -R x {r}/src', f'ls -R {r}', 'curl -sL file:///etc/passwd',
+              'grep -e x /etc/passwd', 'head /tmp/research-98/a.json', 'sed -n 1p /etc/passwd', 'sort /etc/passwd',
+              'wc -l /etc/passwd', 'cut -d: -f1 /etc/passwd', 'uniq /etc/passwd', 'jq . /etc/passwd'):
+        assert not pipeline_ok(c, 99, r), c
+    for c in ('head -n 5 /tmp/research-99/a.json', f'grep -rn foo {r}/src', 'jq . /tmp/research-99/a.json', f'ls {r}/docs',
+              'curl -sL https://a | grep x', 'head src/main.ts', 'head /dev/null', f'wc -l {r}/README.md', 'grep -e x -e y /tmp/research-99/a'):
+        assert pipeline_ok(c, 99, r), c
+    assert not pipeline_ok('head src/main.ts', 99) and not pipeline_ok('head /tmp/research-99/a.json')  # no cwd, no t
+    for src in ("print(open('/proc/self/environ').read())\n", "import glob\nglob.glob('/tmp/*')\n",
+                "p = '/tmp/research-99/a.json'\nopen(p)\n", "import urllib.request as u\nu.urlopen('file:///etc/passwd')\n",
+                "import urllib.request as u\nx = 'file:///etc/passwd'\nu.urlopen(x)\n", "import urllib.request as u\nu.urlopen(input)\n",
+                "import urllib.request as u\nfor x in ['https://a', 'file:///b']:\n    u.urlopen(x)\n",
+                "import urllib.request as u\nx = 'https://a'\nx = 'file:///b'\nu.urlopen(x)\n",
+                "import zipfile\nzipfile.ZipFile('/etc/x.zip')\n", f"open('{r}/.git/config')\n", "import glob\nglob.glob('/tmp/research-99/../*')\n",
+                "import json\njson.load(open('/etc/passwd'))\n", "open('a.json')\n"):
+        assert not s(src), src
+    for src in (f"print(open('{r}/README.md').read())\n", "import json\nprint(json.load(open('/tmp/research-99/a.json')))\n",
+                "import glob\nprint(glob.glob('/tmp/research-99/*.json'))\n",
+                "import urllib.request as u\nfor x in ['https://a', 'https://b']:\n    u.urlopen(x)\n",
+                "import urllib.request as u\nu.urlopen(f'https://a/{1}').read()\n"):
+        assert s(src), src
+    assert file_prompt_ok(f'Allow access to this file?\nRead: {r}/README.md\nReason: x\n', 99)[0] is True
+    for p in ('/proc/self/environ', f'{r}/.git/config', f'{r}/.routing/tasks/t1.json', '/etc/passwd', '/tmp/research-99/../x'):
+        assert file_prompt_ok(f'Allow access to this file?\nRead: {p}\nReason: x\n', 99)[0] is False, p
     # D1 (o6): allow-list of names; aliases of allowed or denied callables go to the host
     for src in ("import io\ncreate = io.FileIO\ncreate('/tmp/escaped', 'w')\n", "import zipfile\nZ = zipfile.ZipFile\nZ('/tmp/x.zip', 'w')\n",
                 "b = open\nb('/tmp/x', 'w')\n", "list(map(open, ['/tmp/x']))\n", "from io import FileIO\nFileIO('/tmp/x', 'w')\n",
@@ -479,7 +589,13 @@ def main(ts):
             c = command_of(pane(t, 'recent-unwrapped'))
             if c is None:
                 continue
-            if pipeline_ok(c) or special_ok(c, t) or script_ok(c, t):
+            try:  # relative file operands resolve against the researcher's own working directory
+                cwd = json.loads(subprocess.run(['herdr', 'agent', 'get', f'res-{t}'], capture_output=True, text=True).stdout
+                                 )['result']['agent'].get('foreground_cwd')
+                ok = pipeline_ok(c, t, cwd) or special_ok(c, t) or script_ok(c, t, cwd)
+            except Exception:  # an unreadable script or odd output: the host decides
+                ok = False
+            if ok:
                 subprocess.run(['herdr', 'agent', 'send-keys', f'res-{t}', 'enter'], capture_output=True)
                 n += 1
                 print('approved', t, c[:150], flush=True)
