@@ -50,5 +50,5 @@ Every shell command needs host approval, and only read-only commands get approve
 Question answered or declared unresolvable after a bounded search; any write outside write_scope; any need for a credential.
 
 ## Report (mandatory, one line)
-`herdr agent prompt observer-host "RESULT_SUBMITTED @ORDER@: answered <n>/<m> parts; claims <rows> (computed <k>, cross-checked <j>); unconfirmed <short>; files .routing/evidence/research-@N@-o1.{json,md}"`
+`herdr agent prompt observer-host "RESULT_SUBMITTED @ORDER@: answered <n>/<m> parts; claims <rows> (computed <k>, cross-checked <j>); unconfirmed <short>; files <repo>/.routing/evidence/research-@N@-o1.json <repo>/.routing/evidence/research-@N@-o1.md"`
 If the prompt fails, wait 60 s and retry once. Finishing without the report counts as no result.
