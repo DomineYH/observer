@@ -88,7 +88,7 @@ def file_prompt_ok(v, t):
     if 'Allow access to this file?' in v:
         m = re.search(r'Read:\s*(.*?)\s*Reason:', v, re.S)
         path = re.sub(r'\s+', '', m.group(1)) if m else ''
-        return bool(re.fullmatch(rf'({re.escape(str(NOTES))}/orders/research-{t}-o\d\.md|/tmp/research-{t}/[\w./-]+|{re.escape(str(NOTES))}/m2-t64-draft\.json)', path)), path
+        return bool(re.fullmatch(rf'({re.escape(str(NOTES))}/orders/research-{t}-o\d\.md|/tmp/research-{t}/(?!.*\.\.)[\w./-]+)', path)), path
     if re.search(r'Allow (creation|edits?|modification)', v):
         paths = re.findall(r'^\s*(/\S+)(?:\s+\+\d+.*)?$', v, re.M)
         ok = len(paths) == 1 and paths[0] in (str(ROOT / f'.routing/evidence/research-{t}-o1.json'),
@@ -127,6 +127,15 @@ def check():
     assert s('import urllib.request as u\nq="out count;"\nu.Request("https://overpass-api.de/api/interpreter",data=b"a")\n')
     assert not s('import urllib.request as u\nq="out body;"\nu.Request("https://overpass-api.de/api/interpreter",data=b"a")\n')
     os.remove('/tmp/research-99/_chk.py')
+    read = lambda p: file_prompt_ok(f'Allow access to this file?\nRead: {p}\nReason: order\n', 99)[0]
+    make = lambda *ps: file_prompt_ok('Allow creation of this file?\n' + ''.join(f'  {p} +12\n' for p in ps), 99)[0]
+    evidence = str(ROOT / '.routing/evidence/research-99-o1.md')
+    assert read(f'{NOTES}/orders/research-99-o1.md') is True and read('/tmp/research-99/a.json') is True
+    assert make(evidence) is True
+    assert read(f'{NOTES}/orders/research-98-o1.md') is False and read(f'{NOTES}/m2-t64-draft.json') is False
+    assert read('/srv/x/a.json') is False and make('/srv/x/research-99-o1.md') is False
+    assert make(evidence, str(ROOT / '.routing/evidence/research-99-o1.json')) is False
+    assert read('/tmp/research-99/../x') is False
     print('check ok')
 
 
