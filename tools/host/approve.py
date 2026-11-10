@@ -120,29 +120,57 @@ def special_ok(c, t):
                 or re.fullmatch(rf'curl -sL https://[^\s;&|`$<>]+ -o /tmp/research-{t}/[\w.-]+', c))
 
 
-# Allow-list for scripts: every name and every module attribute chain a script uses must be listed here or be the
-# script's own. Anything else goes to the host. The deny checks in script_ok stay as a second layer.
+# Allow-list for scripts. Every call is to an enumerated module function, an allowed builtin, the script's own def,
+# or a METHODS method; every attribute is an enumerated module name or in METHODS/ATTRS; nothing starts with _.
+# Anything else goes to the host. The deny checks in script_ok stay as a second layer.
 PURE_BUILTINS = {'len', 'range', 'sorted', 'min', 'max', 'sum', 'str', 'int', 'float', 'list', 'dict', 'set', 'tuple',
                  'enumerate', 'zip', 'round', 'abs', 'isinstance', 'bool', 'bytes', 'any', 'all', 'reversed', 'map',
-                 'filter', 'repr', 'ord', 'chr', 'hex', 'divmod', 'pow', 'iter', 'next', 'format', 'frozenset'}
+                 'filter', 'repr', 'ord', 'chr', 'hex', 'divmod', 'pow', 'iter', 'next', 'frozenset'}
 CALL_ONLY_BUILTINS = {'open', 'print'}  # write-capable: direct calls only, checked by the deny layer
-VALUE_NAMES = {'__name__', 'Exception', 'ValueError', 'KeyError', 'IndexError', 'TypeError', 'TimeoutError',
-               'OSError', 'StopIteration', 'UnicodeDecodeError', 'AttributeError'}
-ALLOWED_CALLS = {'urllib.request.urlopen', 'urllib.request.Request', 'urllib.request.urlretrieve',
-                 'urllib.request.build_opener', 'urllib.request.HTTPSHandler', 'json.load', 'json.loads', 'json.dumps',
-                 'json.dump', 'ssl.create_default_context', 'ssl.SSLContext', 'zipfile.ZipFile', 'zipfile.is_zipfile',
-                 'io.BytesIO', 'io.StringIO', 'glob.glob', 'glob.iglob', 'time.sleep', 'time.time', 'time.monotonic',
-                 'time.strftime', 'sys.exit', 'sys.stdout.write', 'sys.stderr.write', 'sys.stdout.flush',
-                 'xml.etree.ElementTree.fromstring'}
-ALLOWED_VALUES = {'urllib.error.HTTPError', 'urllib.error.URLError', 'json.JSONDecodeError', 'ssl.CERT_NONE',
-                  'ssl.CERT_REQUIRED', 'ssl.PROTOCOL_TLS_CLIENT', 'zipfile.BadZipFile', 'sys.argv', 'sys.stdout',
-                  'sys.stderr', 'xml.etree.ElementTree.ParseError'}
-PURE_MODULES = {'math', 're', 'urllib.parse', 'struct', 'html'}  # every public function and constant is side-effect free
+VALUE_NAMES = {'Exception', 'ValueError', 'KeyError', 'IndexError', 'TypeError', 'TimeoutError', 'OSError',
+               'StopIteration', 'UnicodeDecodeError', 'AttributeError'}
+MODULE_CALLS = {
+    'urllib.request': {'urlopen', 'Request', 'urlretrieve'},
+    'urllib.parse': {'quote', 'quote_plus', 'unquote', 'unquote_plus', 'urlencode', 'urlparse', 'urlsplit',
+                     'urlunparse', 'parse_qs', 'parse_qsl'},
+    're': {'compile', 'search', 'match', 'fullmatch', 'findall', 'finditer', 'sub', 'subn', 'split', 'escape'},
+    'json': {'load', 'loads', 'dumps', 'dump'},
+    'html': {'unescape', 'escape'},
+    'math': {'sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'radians', 'degrees', 'hypot', 'floor',
+             'ceil', 'fabs', 'log', 'log10', 'exp', 'isclose', 'fsum', 'isnan', 'isfinite', 'copysign'},
+    'struct': {'unpack', 'unpack_from', 'pack', 'calcsize', 'iter_unpack'},
+    'ssl': {'create_default_context'},
+    'zipfile': {'ZipFile'},
+    'io': {'BytesIO', 'StringIO'},
+    'glob': {'glob'},
+    'time': {'sleep', 'time', 'monotonic', 'strftime'},
+    'sys': {'exit'},
+    'sys.stdout': {'write', 'flush'},
+    'sys.stderr': {'write'},
+    'xml.etree.ElementTree': {'fromstring'},
+}
+MODULE_VALUES = {'urllib.error.HTTPError', 'urllib.error.URLError', 'json.JSONDecodeError', 'ssl.CERT_NONE',
+                 'ssl.CERT_REQUIRED', 'zipfile.BadZipFile', 'sys.argv', 'sys.stdout', 'sys.stderr',
+                 'xml.etree.ElementTree.ParseError', 're.S', 're.I', 're.M', 're.X', 're.DOTALL', 're.IGNORECASE',
+                 're.MULTILINE', 're.VERBOSE', 'math.pi', 'math.e', 'math.inf', 'math.nan'}
+METHODS = {'read', 'readline', 'readlines', 'decode', 'encode', 'split', 'rsplit', 'splitlines', 'strip', 'lstrip',
+           'rstrip', 'replace', 'lower', 'upper', 'title', 'startswith', 'endswith', 'find', 'rfind', 'join', 'format',
+           'zfill', 'ljust', 'rjust', 'center', 'isdigit', 'isalpha', 'isspace', 'group', 'groups', 'groupdict', 'span',
+           'start', 'end', 'findall', 'finditer', 'search', 'match', 'fullmatch', 'sub', 'get', 'items', 'keys',
+           'values', 'append', 'extend', 'insert', 'pop', 'sort', 'reverse', 'count', 'index', 'copy', 'update',
+           'setdefault', 'add', 'getcode', 'geturl', 'getheader', 'namelist', 'infolist', 'findtext', 'iter',
+           'itertext', 'close', 'flush', 'open', 'write', 'writelines', 'hex', 'is_integer'}  # open/write: deny layer rules
+ATTRS = {'status', 'headers', 'text', 'tag', 'attrib', 'code', 'reason', 'check_hostname', 'verify_mode'}
+BANNED_NAMES = {'getattr', 'setattr', 'delattr', 'globals', 'locals', 'vars', 'type', 'super', 'compile', 'eval', 'exec',
+                'object', 'breakpoint', 'help', 'input', 'memoryview', 'classmethod', 'staticmethod', 'property'}
 
 
 def refs_ok(tree):
-    """True when every name and module attribute chain in the script is allowed (see the lists above)."""
+    """True when every name, attribute and call in the script is on the allow-list above."""
     nodes = list(ast.walk(tree))
+    if any(isinstance(x, (ast.ClassDef, ast.AsyncFunctionDef, ast.Await, ast.AsyncFor, ast.AsyncWith, ast.Global,
+                          ast.Nonlocal)) or getattr(x, 'decorator_list', None) for x in nodes):
+        return False
     imported = {}
     for x in nodes:
         if isinstance(x, ast.Import):
@@ -150,36 +178,56 @@ def refs_ok(tree):
             imported.update({a.name.split('.')[0]: a.name.split('.')[0] for a in x.names if not a.asname})
         elif isinstance(x, ast.ImportFrom):
             imported.update({a.asname or a.name: f'{x.module}.{a.name}' for a in x.names})
-    local = {x.id for x in nodes if isinstance(x, ast.Name) and not isinstance(x.ctx, ast.Load)}
-    local |= {x.name for x in nodes if isinstance(x, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
-    local |= {x.arg for x in nodes if isinstance(x, ast.arg)} | {x.name for x in nodes if isinstance(x, ast.ExceptHandler) and x.name}
+    stores = [x for x in nodes if isinstance(x, ast.Name) and not isinstance(x.ctx, ast.Load)]
+    args = {x.arg for x in nodes if isinstance(x, ast.arg)} | {x.name for x in nodes if isinstance(x, ast.ExceptHandler) and x.name}
+    defs = [x.name for x in nodes if isinstance(x, ast.FunctionDef)]
+    local = {x.id for x in stores} | args | set(defs)
+    own_defs = {d for d in defs if defs.count(d) == 1 and d not in args and all(x.id != d for x in stores)}
+    names = [x.id for x in nodes if isinstance(x, ast.Name)] + list(local) + list(imported)
+    attrs = [x.attr for x in nodes if isinstance(x, ast.Attribute)]
+    if any(n.startswith('_') or n in BANNED_NAMES for n in names) or any(a.startswith('_') for a in attrs):
+        return False
     if local & (set(imported) | PURE_BUILTINS | CALL_ONLY_BUILTINS | VALUE_NAMES):
         return False  # rebinding an allowed name
     called = {id(x.func) for x in nodes if isinstance(x, ast.Call)}
     inner = {id(x.value) for x in nodes if isinstance(x, ast.Attribute)}
 
-    def module_ref_ok(full, node):
+    def module_name(x):  # 'urllib.request.urlopen' for a chain rooted at an import, else None
+        parts = []
+        while isinstance(x, ast.Attribute):
+            parts.insert(0, x.attr)
+            x = x.value
+        return '.'.join([imported[x.id]] + parts) if isinstance(x, ast.Name) and x.id in imported else None
+
+    def module_ok(full, as_call):
         mod, _, attr = full.rpartition('.')
-        if full in ALLOWED_VALUES or (mod in PURE_MODULES and attr and not attr.startswith('_')):
-            return True
-        return full in ALLOWED_CALLS and id(node) in called
+        return (as_call and attr in MODULE_CALLS.get(mod, ())) or (not as_call and full in MODULE_VALUES)
     for x in nodes:
-        if id(x) in inner or not isinstance(x, (ast.Name, ast.Attribute)):
-            continue
-        parts, base = [], x
-        while isinstance(base, ast.Attribute):
-            parts.insert(0, base.attr)
-            base = base.value
-        if not isinstance(base, ast.Name):
-            continue  # a method or attribute of a value the script computed: the deny layer checks it
-        root = base.id
-        if root in local or (not parts and (root in PURE_BUILTINS or root in VALUE_NAMES)):
-            continue
-        if not parts and root in CALL_ONLY_BUILTINS and id(x) in called:
-            continue
-        if root in imported and isinstance(x.ctx, ast.Load) and module_ref_ok('.'.join([imported[root]] + parts), x):
-            continue
-        return False
+        if isinstance(x, ast.Call):
+            f = x.func
+            if isinstance(f, ast.Name):
+                full = imported.get(f.id)
+                if not (f.id in PURE_BUILTINS or f.id in CALL_ONLY_BUILTINS or f.id in own_defs or (full and module_ok(full, True))):
+                    return False
+            elif isinstance(f, ast.Attribute):
+                full = module_name(f)
+                if not (module_ok(full, True) if full else f.attr in METHODS):
+                    return False
+                if f.attr == 'format' and not full and not (isinstance(f.value, ast.Constant) and re.fullmatch(r'[^.\[\]]*', str(f.value.value))):
+                    return False  # str.format only on a literal without attribute or index lookups
+            else:
+                return False  # a subscript, lambda or call result as the function
+        elif isinstance(x, ast.Attribute) and id(x) not in inner and id(x) not in called:
+            full = module_name(x)
+            if not (module_ok(full, False) if full else x.attr in METHODS | ATTRS):
+                return False
+        elif isinstance(x, ast.Attribute) and id(x) in inner:
+            full = module_name(x)
+            if full is None and x.attr not in METHODS | ATTRS:
+                return False
+        elif isinstance(x, ast.Name) and id(x) not in inner and id(x) not in called and isinstance(x.ctx, ast.Load):
+            if not (x.id in local or x.id in PURE_BUILTINS or x.id in VALUE_NAMES or (x.id in imported and module_ok(imported[x.id], False))):
+                return False
     return True
 
 
@@ -347,6 +395,15 @@ def check():
               'grep "unterminated f'):
         assert not pipeline_ok(c), c
     assert pipeline_ok('curl -sL "https://a/b?x=1&y=2" | grep -E "a|b" | head -n 5')
+    # S (o8): strict allow-list, no traversal (review-3 F2 and its class)
+    for src in ("import re\ne = re.enum\ns = e.sys\nb = s._getframe().f_builtins\nb['open']('/tmp/escaped', 'w')\n",
+                "import re\nre.enum.sys._getframe().f_builtins['open']('/tmp/escaped', 'w')\n",
+                "import re\nf = getattr(re, 'enum')\n", "d = {'a': print}\nd['a']('x')\n", "(lambda: 1)()\n",
+                "x = 'a'\nx.maketrans('a', 'b')\n", "import json\njson.decoder.scanstring('a', 0)\n", "x = [1]\nx.__class__\n",
+                "_x = 1\n", "import sys\nsys.modules\n", "import io\nb = io.BytesIO()\nb.getbuffer()\n", "type(1)\n",
+                "'{0.__class__}'.format(1)\n", "'{0.real}'.format(1)\n", "f = print\n", "def g():\n    pass\ng = 1\ng()\n",
+                "class A:\n    pass\n", "print(len)()\n", "import zipfile\nzipfile.Path('a')\n"):
+        assert not s(src), src
     # D1 (o6): allow-list of names; aliases of allowed or denied callables go to the host
     for src in ("import io\ncreate = io.FileIO\ncreate('/tmp/escaped', 'w')\n", "import zipfile\nZ = zipfile.ZipFile\nZ('/tmp/x.zip', 'w')\n",
                 "b = open\nb('/tmp/x', 'w')\n", "list(map(open, ['/tmp/x']))\n", "from io import FileIO\nFileIO('/tmp/x', 'w')\n",
@@ -388,8 +445,7 @@ from urllib.parse import quote as q
 def dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 pts = json.load(open('/tmp/research-99/pts.json'))
-if __name__ == '__main__':
-    print(round(dist(pts[0], pts[1]), 1), q(sys.argv[0]), math.pi)
+print(round(dist(pts[0], pts[1]), 1), q(sys.argv[0]), math.pi)
 """)
     os.remove('/tmp/research-99/_chk.py')
     read = lambda p: file_prompt_ok(f'Allow access to this file?\nRead: {p}\nReason: order\n', 99)[0]
