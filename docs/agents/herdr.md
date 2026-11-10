@@ -54,13 +54,11 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
 
 - agy asks permission for every shell command and file write, and a pending prompt reads as `idle`, not `blocked`.
 - One tab per researcher (a small pane cuts off the command being approved). Agent `res-<n>`, order `research-<n>-o<k>`.
-- The host approves each prompt by hand. Approve only when all of these hold; when unsure, decline and ask the researcher:
-  - the command is read-only;
-  - it has no `$`, backticks or redirection (`>`, `>>`, `<`);
-  - it reads and writes only inside `/tmp/research-<n>/`, the researcher's order file or the repository (not `.git/` or `.routing/tasks/`);
-  - no option takes a `@file` value (for example `curl -d @file`);
-  - a script is read in full before it is approved.
-- `watch.py` returns as `prompt` when a researcher's screen shows a permission prompt, so the host notices it.
+- The host approves each prompt by hand and declines when unsure. Three kinds of prompt are approved, each only when its checks hold:
+  - **Shell commands:** read-only; no `$`, backticks, `;`, `&` or redirection (`>`, `>>`, `<`); no option that takes a `@file` value (for example `curl -H @file`, `curl -d @file`); every file or folder it reads, after resolving `..`, symlinks and glob matches (run `realpath` or `ls` on them yourself if unsure), lies inside `/tmp/research-<n>/`, the researcher's own order file or the repository, and not in `.git/`, `.routing/tasks/` or `.routing/hook_log.jsonl`. A path with spaces, a wrapped path or a glob you cannot expand is declined. A script (`python3 /tmp/research-<n>/<name>.py`) is read in full first and judged by the same rules for every file it opens.
+  - **File writes:** only to `/tmp/research-<n>/` (scratch files) and the two evidence files the order names, `.routing/evidence/research-<n>-o<k>.json` and `.md`. Check that the shown target is a plain path with no `..` or spaces, and that it is not an existing symlink (`ls -l`).
+  - **The report:** exactly `herdr agent prompt observer-host "RESULT_SUBMITTED research-<n>-o<k>: ..."` (or `NEEDS_DECISION` / `BLOCKED`) for the researcher's own order id, with no `$`, backticks or second command.
+- `watch.py` returns when a researcher's screen shows a permission prompt, as `prompt`, or as `changed` if the status changed at the same time; on any return, look at the screen.
 - Automatic approval waits for the researcher sandbox in issue #89.
 - Researchers put multi-line code in `/tmp/research-<n>/*.py`; folded commands are declined. Inputs from elsewhere are copied into `/tmp/research-<n>/` by the host.
 - Before reading a research report, check that its claims table is complete (every claim has a row; facts quote a primary source; computed numbers name a script and an independent library cross-check or say it was not run). Return incomplete reports.
