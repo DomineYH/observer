@@ -1,4 +1,4 @@
-# 시제품 #58: 진안 실제 지형으로 관측 화면·지도 그려 보기 (버리는 코드)
+# 시제품 #58: 후보 전장(진안·문경) 실제 지형으로 관측 화면·지도 그려 보기 (버리는 코드)
 
 PROTOTYPE. 제품 코드가 아니다. 이 브랜치(`prototype/m2-terrain-preview`)는 #58의 질문에 답하려고 만든 일회용이다.
 지형 자료(고도·피복·건물 격자)는 저장소에 넣지 않는다. 스크립트가 저장소 밖 `$M2_58_DATA`
@@ -7,33 +7,45 @@ PROTOTYPE. 제품 코드가 아니다. 이 브랜치(`prototype/m2-terrain-previ
 
 ## 정사각
 
-- 후보 C 진안 중심 35.79 N, 127.42 E → UTM 52N (EPSG:32652) (357216, 3961808), MGRS 52S CE 57216 61808.
-- 정사각은 옮기지 않았다(중심을 10 m로 반올림만). #68에서 OSM 표본 확인을 한 범위(35.7439–35.8361 N,
-  127.3634–127.4766 E)가 바로 이 정사각이라서다.
-- 격자: `n = 1024`, `cell = 10`. 칸 (i, j)는 UTM (352100 + 10 i, 3956690 + 10 j)에 **놓인다**(마디 범위 10,230 m).
-  100 km 방안 CE 안에서 동 52–62 km, 북 56–67 km라 가장자리에서 10 km 이상 떨어진다.
+| | C 진안 (`jinan`) | A 문경 (`mungyeong`) |
+|---|---|---|
+| 중심(#68이 확인한 그대로) | 35.79 N, 127.42 E | 36.76 N, 128.13 E |
+| UTM 52N 중심 | (357216, 3961808) | (422347, 4068602) |
+| SW 마디 (X0, Y0) | (352100, 3956690) | (417230, 4063490) |
+| MGRS 범위 | 52S CE 52100 56690 – 62330 66920 | 52S DF 17230 63490 – 27460 73720 |
+
+- 정사각은 옮기지 않았다(중심을 10 m로 반올림만, `lib.mjs` `originOf`). #68의 OSM 표본 확인 범위가 이 정사각이다.
+  두 곳 모두 100 km 방안 가장자리에서 10 km 이상 떨어진다.
+- 격자: `n = 1024`, `cell = 10`. 칸 (i, j)는 UTM (X0 + 10 i, Y0 + 10 j)에 **놓인다**(마디 범위 10,230 m).
 - 정렬: 각 마디를 UTM에서 경위도로 되돌린 뒤 원자료를 **그 점에서** 샘플링한다(고도는 원자료 화소 중심 사이
   이중선형, 피복은 가장 가까운 화소). GDAL `-te … -ts 1024`식 면적 재표본을 쓰지 않으므로 5 m 어긋남이 없다.
   GLO-30·GLO-90은 PixelIsPoint(타이포인트 = 화소 중심, 정수 각초), GEDTM30·WorldCover는 PixelIsArea(타이포인트 =
-  모서리)로 읽어 중심을 계산한다(`lib.mjs` `readBox`). 도북·진북 차(약 0.9°)는 투영으로 처리된다.
-- `grid`(방안 기준): 가상 `{ letters: 'CH', e0: 40000, n0: 30000 }` (mock과 같음, #67).
+  모서리)로 읽어 중심을 계산한다(`lib.mjs` `readBox`). 도북·진북 차(약 1°)는 투영으로 처리된다.
+- `grid`(방안 기준): 가상 `{ letters: 'CH', e0: 40000, n0: 30000 }` (mock과 같음, #67), 두 곳 같음.
 
-## 지면 세 가지 (모두 같은 정사각)
+## 지형
 
-| | `ground` | `surface` |
-|---|---|---|
-| V1 | GEDTM30 v1.2 (맨땅) | ground + 데모 숲 높이(숲 칸) + 건물 높이 |
-| V2 | GLO-30 DSM 그대로 | 같음 |
-| V3 | GLO-30 − 데모 숲 높이(숲 칸) − 건물 높이 | 같음 |
-
-- 데모 숲 높이: 숲 칸마다 12–17 m(mock 규칙, 칸별 해시). 임분고가 아니다.
+- `ground` = GEDTM30 v1.2 (맨땅). 사용자 결정(2026-11-10)으로 기본값. o1의 V2(GLO-30 그대로)·V3(GLO-30 − 숲)는
+  버렸다. o1 판 스크립트와 캡처는 커밋 `b162763`에 있다(`shots/v1-*`·`v2-*`·`v3-*`·`v?c-*`·`mock-*`·`profile.png`는 o1).
+- `surface` = ground + 데모 숲 높이(숲 칸마다 12–17 m, mock 규칙, 칸별 해시. 임분고가 아니다) + 건물 높이.
 - 건물: OSM `building` 다각형을 칸 마디로 래스터화. 높이는 `height`, 없으면 `building:levels`×3+1.5 m, 둘 다 없으면 6 m.
   다각형 안에 마디가 없는 작은 건물은 중심에 가장 가까운 칸 하나.
 - 도로: OSM `highway` motorway–residential를 8 m 간격으로 칸에 찍어 피복 `road`로. 지도 선은 tertiary 이상과
   unclassified만, 정사각 안으로 잘라 넣었다. 지명: OSM `place=town|village|hamlet` 이름 노드.
 - 군사 관련 지물은 요청하지 않았고, 응답에 섞여 와도 `military`/`landuse=military`/`building=military|bunker|barracks`는 버린다.
-- 덤(질문 1의 가정 확인): `jinan-v{1,2,3}-clear.bin`은 P4 (4450, 1950) 둘레 60 m 숲을 베어 낸 판(피복 open,
-  표면 = 지면). 지면은 그대로라 V3의 뺀 바닥은 남는다.
+- GLO-30은 GEDTM30 배율 판정과 GLO-90(DSM) 거친 대조에만 쓴다.
+
+## 관측소 벌채 규칙 (o2)
+
+자료로 적용한다(`clear.mjs`): 관측소마다 반경 R 안의 칸은 `open`이 되고 숲·건물 높이가 없어 `surface = ground`.
+그 밖은 바꾸지 않는다. R = 30 m, 60 m. 관측소는 `posts.mjs`가 고른다:
+
+- 후보: 남쪽 1/3(y 200–3410 m, x 200–10030 m)의 국지 고점(반경 100 m 안에서 가장 높은 마디).
+- 점수: 후보마다 반경 R을 베었다고 보고 북쪽 땅 가시 비율(o1과 같은 기준: 관측소 북쪽 600 m부터 y 9.9 km까지,
+  x 0.3–9.9 km의 200 m 격자 표적, 15 m 간격 가시선, 눈 = 지면 + 3.5 m. 표면 가시 비율과, 숲 아닌 표적에서 선 사람
+  (지면 + 1.7 m) 가시 비율). 표면 비율로 줄 세워 서로 1 km 이상 떨어진 상위 3곳을 남긴다.
+- 선택 폭: 표면 30 % 이상인 후보 수(그중 1 km 이상 떨어진 수).
+- `<site>-r<R>.bin`은 그 상위 3곳을 벤 지형이다.
 
 ### 피복 대응(제안)
 
@@ -54,16 +66,19 @@ PROTOTYPE. 제품 코드가 아니다. 이 브랜치(`prototype/m2-terrain-previ
 
 ```bash
 cd prototype/m2-terrain && npm ci           # geotiff, proj4 (이 폴더 전용 의존성)
-node build.mjs                              # 원격 범위 읽기 + Overpass 1회 → $M2_58_DATA/*.bin, stats.json
+node build.mjs jinan; node build.mjs mungyeong   # 원격 범위 읽기 + Overpass 1회씩 → $M2_58_DATA/<site>.bin, stats-<site>.json
+for s in jinan mungyeong; do for R in 30 60; do node posts.mjs $s $R; node clear.mjs $s $R; done; done
 (cd ../.. && node prototype/m2-terrain/mock-dump.mjs)   # mock 비교용 mock-1.bin
-node posts.mjs jinan-v2 [60]                # 관측소 후보와 북쪽 가시 비율 (60 = 둘레 60 m 벌채 가정)
-node units.mjs jinan-v2                     # 기본 시나리오 점들이 놓이는 피복·지면
-node profile.mjs shots                      # 숲 사면 2 km 단면 (질문 6)
-node overview.mjs                           # 24 km 음영도(정사각 고르기용)
+node posts.mjs mock-1 0 5120,1800           # 고정 관측소 점수 (o1 mock 기준)
+node compare.mjs jinan 60 4380,1950         # 북쪽 도로 가시, 고도 분포, 남쪽 가장자리 거울 대 실제
+node units.mjs jinan                        # 기본 시나리오 점들이 놓이는 피복·지면
+node water.mjs jinan                        # OSM 건물·지명·강/물 칸 집계(#60). 물 Overpass 1회 더, 피복은 안 바꿈
+node overview.mjs mungyeong                 # 24 km 음영도
 node serve.mjs 4180 &                       # 자료 파일을 CORS로 내보냄
 cd ../.. && npx vite build && npx vite preview --port 5182 --host 0.0.0.0 &
-# 브라우저: http://localhost:5182/?seed=1&fps=1&terrain=http://localhost:4180/jinan-v1.bin
-node prototype/m2-terrain/capture.mjs http://localhost:5182 http://localhost:4180 <out dir> [chrome]
+# 브라우저: http://localhost:5182/?seed=1&fps=1&terrain=http://localhost:4180/jinan-r60.bin
+node prototype/m2-terrain/runs.mjs runs.json
+node prototype/m2-terrain/capture.mjs http://localhost:5182 http://localhost:4180 <out dir> chrome runs.json
 ```
 
 `capture.mjs`는 `window.__send`(PROTOTYPE 스위치)로 관측소 후보를 고르고 훈련 모드 미리보기·가시권 표시를 찍는다.
@@ -78,9 +93,10 @@ Overpass 요청은 Node fetch가 이 WSL에서 연결되지 않아 `curl`로 보
 - GEDTM30 v1.2, `gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif` (OpenGeoHub, CC BY 4.0).
   파일은 Float32, scale/offset 태그 없음, nodata 3.4e38, 연직 EGM2008. 값이 GLO-30과 같은 범위(평균 394 m 대 401 m)라
   **m 그대로**(배율 1)로 읽었다. 문서에 "Use for testing purposes only"가 있다.
-- Copernicus GLO-30 DSM `Copernicus_DSM_COG_10_N35_00_E127_00_DEM` (AWS 공개 버킷), 검산용 GLO-90 `…_COG_30_…`.
-- ESA WorldCover 10 m 2021 v200, 타일 `N33E126`(33–36 N, 126–129 E가 35.79 N 127.42 E를 덮음).
-- OpenStreetMap, Overpass API 1회(도로·건물·지명), 로컬 전용.
+- Copernicus GLO-30 DSM 타일 `Copernicus_DSM_COG_10_N35_00_E127_00_DEM`(진안), `…_N36_00_E128_00_DEM`(문경)
+  (AWS 공개 버킷), 검산용 GLO-90 `Copernicus_DSM_COG_30_N35_00_E127_00_DEM`, `…_N36_00_E128_00_DEM`.
+- ESA WorldCover 10 m 2021 v200, 타일 `N33E126`(33–36 N, 126–129 E: 진안)과 `N36E126`(36–39 N, 126–129 E: 문경).
+- OpenStreetMap, Overpass API 정사각마다 1회(도로·건물·지명) + 집계용 1회(`waterway=river`, `natural=water`), 로컬 전용.
 
 ## 출처 표시
 
@@ -92,6 +108,12 @@ Overpass 요청은 Node fetch가 이 WSL에서 연결되지 않아 `curl`로 보
 - 지도 캡처의 도로·건물·지명: © OpenStreetMap contributors, ODbL.
 
 ## 캡처 (`shots/`)
+
+o2: `<site>-r<R>-map-x1.png` 지도 전체, `<site>-r<R>-best-map-x1-viewshed.png` 최선 관측소 가시권, `-best-map-x3.png`
+관측소 중심 ×3(벌채 원이 보이는 크기), `-best-eye.png`/`-bino.png` 육안·쌍안경(북쪽), R = 60에서 `-best-edge-south.png`
+남쪽 가장자리 쪽 육안(방위각 3220 밀). `o2-mock-*` 같은 세션의 mock. 실제 Windows Chrome 156(창 띄움).
+
+o1:
 
 실제 Windows Chrome 156(창 띄움)에서 찍었다. `profile.png`만 headless.
 `<판>-map-x1.png` 지도 전체, `<판>-<관측소>-map-x1-viewshed.png` 가시권 표시, `<판>-<관측소>-map-x3.png` 관측소 중심 ×3,

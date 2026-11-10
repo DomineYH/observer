@@ -1,9 +1,9 @@
 // PROTOTYPE (#58): where the base scenario's points land on a terrain file (cover and ground). Throwaway.
-// Usage: node units.mjs [file=jinan-v2]
+// Usage: node units.mjs [file=jinan]  ($DATA/<file>.bin)
 /* global process, console */
 import { DATA, readTerrain } from './lib.mjs';
 
-const t = readTerrain(`${DATA}/${process.argv[2] ?? 'jinan-v2'}.bin`);
+const t = readTerrain(`${DATA}/${process.argv[2] ?? 'jinan'}.bin`);
 const COVER = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'];
 const k = (p) => Math.round(p.y / t.cell) * t.n + Math.round(p.x / t.cell);
 const at = (name, p) => console.log(`${name.padEnd(14)} ${String(p.x).padStart(5)},${String(p.y).padStart(5)}  ${COVER[t.cover[k(p)]].padEnd(8)} ground ${t.ground[k(p)].toFixed(0)} m`);

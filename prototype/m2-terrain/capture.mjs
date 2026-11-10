@@ -1,21 +1,16 @@
-// PROTOTYPE (#58): screenshots and fps for the mock and the three 진안 variants. Throwaway.
-// Usage: node capture.mjs <app url> <data url> <out dir> [chrome|headless] [run ids, e.g. v1c,v2c]
+// PROTOTYPE (#58): screenshots and fps for the mock and the candidate squares. Throwaway.
+// Usage: node capture.mjs <app url> <data url> <out dir> <chrome|headless> <runs.json>
+//   runs.json  [{ id, terrain: '<file>.bin' | null (mock), posts: { name: [x, y] }, fps: repeats, edge: true }]
+//              fps: measure naked eye and binoculars this many times at each post; edge: also a naked-eye view south.
 //   app url  e.g. http://localhost:5182 (vite preview of this branch)   data url  e.g. http://localhost:4180 (serve.mjs)
 //   chrome   launch real Chrome (channel 'chrome', headed); otherwise headless Chromium from @playwright/test.
 // Runs with either playwright-core (a Windows temp folder) or @playwright/test (this repo).
-/* global process, console, window, performance, requestAnimationFrame */
+/* global process, console, window, document, performance, requestAnimationFrame */
+import { readFileSync } from 'node:fs';
 const { chromium } = await import('playwright-core').catch(() => import('@playwright/test'));
-const [app, data, out, how, only] = process.argv.slice(2);
+const [app, data, out, how, runs] = process.argv.slice(2);
 const real = how === 'chrome';
-const POSTS = { P1: [4750, 1900], P2: [7350, 2100], P3: [9750, 300] }; // see README: forest-free 550 m, forest-free, forested SE summit
-const RUNS = [
-  { id: 'mock', terrain: null, posts: { P0: [5120, 1800] } }, // the planned post
-  { id: 'v1', terrain: 'jinan-v1.bin', posts: POSTS },
-  { id: 'v2', terrain: 'jinan-v2.bin', posts: POSTS },
-  { id: 'v3', terrain: 'jinan-v3.bin', posts: POSTS },
-  // what-if: a 60 m clearing cut at P4 on the southern ridge (build.mjs)
-  ...['v1', 'v2', 'v3'].map((v) => ({ id: `${v}c`, terrain: `jinan-${v}-clear.bin`, posts: { P4: [4450, 1950] } })),
-];
+const RUNS = JSON.parse(readFileSync(runs, 'utf8'));
 
 const browser = await chromium.launch(real ? { channel: 'chrome', headless: false } : {});
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
@@ -37,7 +32,7 @@ const shot = (loc, name) => loc.screenshot({ path: `${out}/${name}.png` });
 const button = (name) => page.getByRole('button', { name, exact: true });
 
 const table = [];
-for (const r of RUNS.filter((r) => !only || only.split(',').includes(r.id))) {
+for (const r of RUNS) {
   const q = `?seed=1&fps=1${r.terrain ? `&terrain=${data}/${r.terrain}` : ''}`;
   await page.goto(`${app}/${q}`);
   await page.waitForSelector('canvas');
@@ -55,23 +50,31 @@ for (const r of RUNS.filter((r) => !only || only.split(',').includes(r.id))) {
     await button('전체 지도').click();
     await wait(300);
     await shot(map, `${r.id}-${pid}-map-x1-viewshed`);
+    await page.getByRole('checkbox').uncheck();
     await button('관측소로').click();
     await wait(300);
     await shot(map, `${r.id}-${pid}-map-x3`);
-    await page.getByRole('checkbox').uncheck();
     await button('전체 지도').click();
     await view.scrollIntoViewIfNeeded();
     await wait(1000);
     await shot(view, `${r.id}-${pid}-eye`);
-    const timed = ['P0', 'P1', 'P4'].includes(pid);
-    const eye = timed ? await fps() : null;
+    const eye = [], bino = [];
+    for (let k = 0; k < (r.fps ?? 0); k++) eye.push(await fps());
     await button('쌍안경').click();
     await wait(1000);
     await shot(view, `${r.id}-${pid}-bino`);
-    const bino = timed ? await fps() : null;
+    for (let k = 0; k < (r.fps ?? 0); k++) bino.push(await fps());
     await button('쌍안경').click();
     await wait(500);
-    if (eye !== null) table.push({ run: r.id, post: pid, eye, bino });
+    if (r.fps) table.push({ run: r.id, post: pid, eye, bino });
+    if (r.edge) {
+      // turn to the south (16 × 200 mil) to look across the near map edge; the 조준 keys listen on the document
+      await page.evaluate(() => document.activeElement?.blur());
+      for (let k = 0; k < 16; k++) await page.keyboard.press('Shift+ArrowRight');
+      await wait(1000);
+      await shot(view, `${r.id}-${pid}-edge-south`);
+      for (let k = 0; k < 16; k++) await page.keyboard.press('Shift+ArrowLeft');
+    }
   }
 }
 console.log(JSON.stringify({ browser: real ? 'chrome (headed)' : 'chromium (headless)', version: browser.version(), fps: table }, null, 1));

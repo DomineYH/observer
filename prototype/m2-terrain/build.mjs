@@ -1,19 +1,23 @@
-// PROTOTYPE (#58): builds three TerrainData files for candidate C 진안 from public data. Throwaway.
-// Usage: node build.mjs   (network; writes $DATA/jinan-v{1,2,3}.bin, jinan-v{1,2,3}-clear.bin, the sample-*.f32 and
-// osm.json caches and stats.json; nothing in the repo)
+// PROTOTYPE (#58): builds the TerrainData file of a candidate square from public data. Throwaway.
+// Usage: node build.mjs <jinan|mungyeong>   (network; writes $DATA/<site>.bin, the <site>-sample-*.f32 and
+// osm-<site>.json caches and stats-<site>.json; nothing in the repo). Ground is GEDTM30 (user decision 2026-11-10).
+// Observation-post clearings are applied afterwards by clear.mjs.
 //
-// The square: UTM 52N nodes at (X0 + 10 i, Y0 + 10 j), i, j = 0..1023 (span 10,230 m). Each node is projected back to
-// lon/lat and every source is sampled AT that point: bilinear between the source's pixel centres for elevation, nearest
-// pixel for land cover. No GDAL-style area resampling, so there is no half-pixel offset.
-/* global console, Buffer */
+// The square: UTM 52N nodes at (X0 + 10 i, Y0 + 10 j), i, j = 0..1023 (span 10,230 m), centred on the site's centre as
+// #68 checked it. Each node is projected back to lon/lat and every source is sampled AT that point: bilinear between the
+// source's pixel centres for elevation, nearest pixel for land cover. No GDAL-style area resampling, so no half-pixel offset.
+/* global process, console */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { bilinear, DATA, nearest, readBox, readTerrain, SRC, toLonLat, toUtm } from './lib.mjs';
+import proj4 from 'proj4';
+import { bilinear, DATA, GEDTM, nearest, originOf, readBox, SITES, toLonLat, toUtm, writeTerrain } from './lib.mjs';
 
+const site = process.argv[2];
+if (!SITES[site]) throw new Error(`usage: node build.mjs <${Object.keys(SITES).join('|')}>`);
+const SRC = SITES[site];
 const N = 1024, CELL = 10;
-// Candidate centre 35.79 N 127.42 E → UTM 52N (357216, 3961808); the square keeps that centre (rounded to 10 m), so it
-// stays inside the box #68 sampled on OSM (35.7439–35.8361 N, 127.3634–127.4766 E).
-const X0 = 352100, Y0 = 3956690;
+const [X0, Y0] = originOf(site);
+console.log(site, 'origin', X0, Y0, 'centre MGRS', proj4.mgrs.forward(SRC.centre), 'SW', proj4.mgrs.forward(toLonLat(X0, Y0)), 'NE', proj4.mgrs.forward(toLonLat(X0 + 10230, Y0 + 10230)));
 const GRID = { letters: 'CH', e0: 40000, n0: 30000 }; // virtual 방안 기준, the mock's (#67)
 
 // ESA WorldCover 2021 class → COVER index ('open','field','forest','water','road','village','building'). A proposal.
@@ -38,7 +42,7 @@ console.log('lon/lat box', box.map((v) => v.toFixed(5)).join(' '));
 
 // Sampled sources are cached in $DATA (sample-<name>.f32); range reads are retried, the WorldCover host resets sometimes.
 async function sampled(url, read) {
-  const cache = `${DATA}/sample-${url.split('/').pop()}.f32`;
+  const cache = `${DATA}/${site}-sample-${url.split('/').pop()}.f32`;
   if (existsSync(cache)) return new Float32Array(readFileSync(cache).buffer.slice(0));
   let r;
   for (let a = 1; !r; a++) r = await readBox(url, box).catch((err) => { if (a >= 4) throw err; console.log('retry', a, err.message); });
@@ -50,7 +54,7 @@ async function sampled(url, read) {
 }
 const glo30 = await sampled(SRC.glo30, bilinear);
 const glo90 = await sampled(SRC.glo90, bilinear);
-const gedtmRaw = await sampled(SRC.gedtm, bilinear);
+const gedtmRaw = await sampled(GEDTM, bilinear);
 const wc = await sampled(SRC.cover, nearest);
 
 // GEDTM30 scale: the file is Float32 with no scale/offset tag. Decide from the values against GLO-30 (metres).
@@ -59,8 +63,8 @@ const gedtmScale = Math.abs(mean(gedtmRaw) / mean(glo30) - 1) < 0.5 ? 1 : 0.1;
 console.log('GEDTM30 raw mean', mean(gedtmRaw).toFixed(1), 'GLO-30 mean', mean(glo30).toFixed(1), '→ scale', gedtmScale);
 const gedtm = gedtmRaw.map((v) => v * gedtmScale);
 
-// --- OSM roads, buildings, place names: one Overpass request, cached in $DATA/osm.json
-const osmPath = `${DATA}/osm.json`;
+// --- OSM roads, buildings, place names: one Overpass request, cached in $DATA/osm-<site>.json
+const osmPath = `${DATA}/osm-${site}.json`;
 if (!existsSync(osmPath)) {
   const bb = `${s},${w},${n},${e}`;
   const q = `[out:json][timeout:90];(way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)$"](${bb});way["building"](${bb});node["place"~"^(town|village|hamlet)$"](${bb}););out geom;`;
@@ -136,46 +140,25 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
   if (cover[k] === FOREST) fh[k] = forestH(i, j);
 }
 
-// --- variants
-const variants = {
-  v1: { label: 'GEDTM30 v1.2', ground: gedtm },
-  v2: { label: 'GLO-30 raw', ground: glo30 },
-  v3: { label: 'GLO-30 − demo forest height − building height', ground: glo30.map((h, k) => h - fh[k] - buildings[k]) },
-};
-const stats = { square: { X0, Y0, N, CELL, box }, gedtmScale, worldcover: [...counts].sort((a, b) => a[0] - b[0]), osm: { roads: roads.length, buildings: nb, places: villages.length }, variants: {} };
+// --- the terrain: GEDTM30 ground; surface adds the demo forest height and the buildings
+const ground = gedtm;
+const surface = ground.map((h, k) => h + fh[k] + buildings[k]);
+writeTerrain(`${DATA}/${site}.bin`, { n: N, cell: CELL, grid: GRID, roads, villages, ground, surface, buildings, cover }, `${site} GEDTM30 v1.2`);
+
+// cross-check against GLO-90 (a DSM: coarse sanity check only)
 const band = (h) => Math.floor(h / 20);
-for (const [id, v] of Object.entries(variants)) {
-  const surface = v.ground.map((h, k) => h + fh[k] + buildings[k]);
-  const header = Buffer.from(JSON.stringify({ n: N, cell: CELL, grid: GRID, roads, villages, label: v.label }));
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(header.length);
-  const pad = Buffer.alloc((4 - ((4 + header.length) % 4)) % 4, 32);
-  writeFileSync(`${DATA}/jinan-${id}.bin`, Buffer.concat([len, header, pad, ...[v.ground, surface, buildings].map((a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength)), Buffer.from(cover.buffer)]));
-  let d2 = 0, same = 0, lo = Infinity, hi = -Infinity;
-  for (let k = 0; k < N * N; k++) {
-    d2 += (v.ground[k] - glo90[k]) ** 2;
-    if (band(v.ground[k]) === band(glo90[k])) same++;
-    lo = Math.min(lo, v.ground[k]); hi = Math.max(hi, v.ground[k]);
-  }
-  stats.variants[id] = { label: v.label, mean: +mean(v.ground).toFixed(1), min: +lo.toFixed(1), max: +hi.toFixed(1), rmsVsGlo90: +Math.sqrt(d2 / (N * N)).toFixed(1), same20mBandAsGlo90: +(same / (N * N)).toFixed(3) };
-  console.log('wrote', `${DATA}/jinan-${id}.bin`, stats.variants[id]);
+let d2 = 0, same = 0, lo = Infinity, hi = -Infinity;
+for (let k = 0; k < N * N; k++) {
+  d2 += (ground[k] - glo90[k]) ** 2;
+  if (band(ground[k]) === band(glo90[k])) same++;
+  lo = Math.min(lo, ground[k]); hi = Math.max(hi, ground[k]);
 }
-// What-if (#58 question 1): the same variants with a 60 m clearing cut around post P4 (4450, 1950) on the southern
-// ridge: cover → open and surface → ground there. Ground stays, so V3 keeps its subtracted floor. Separate files.
-const P4 = { x: 4450, y: 1950, r: 60 };
-for (const id of Object.keys(variants)) {
-  const t = readTerrain(`${DATA}/jinan-${id}.bin`);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const k = j * N + i;
-    if (t.cover[k] === FOREST && Math.hypot(i * CELL - P4.x, j * CELL - P4.y) < P4.r) { t.cover[k] = OPEN; t.surface[k] = t.ground[k]; }
-  }
-  const header = Buffer.from(JSON.stringify({ n: N, cell: CELL, grid: GRID, roads, villages, label: `${t.label} + 60 m clearing at P4` }));
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(header.length);
-  const pad = Buffer.alloc((4 - ((4 + header.length) % 4)) % 4, 32);
-  writeFileSync(`${DATA}/jinan-${id}-clear.bin`, Buffer.concat([len, header, pad, ...[t.ground, t.surface, t.buildings].map((a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength)), Buffer.from(t.cover.buffer, t.cover.byteOffset, t.cover.byteLength)]));
-}
-stats.glo90 = { mean: +mean(glo90).toFixed(1) };
-stats.forestShare = +(cover.filter((c) => c === FOREST).length / (N * N)).toFixed(3);
-writeFileSync(`${DATA}/stats.json`, JSON.stringify(stats, null, 1));
-console.log(JSON.stringify({ glo90: stats.glo90, forestShare: stats.forestShare, worldcover: stats.worldcover }));
+const stats = {
+  site, square: { X0, Y0, N, CELL, box }, gedtmScale,
+  ground: { mean: +mean(ground).toFixed(1), min: +lo.toFixed(1), max: +hi.toFixed(1), rmsVsGlo90: +Math.sqrt(d2 / (N * N)).toFixed(1), same20mBandAsGlo90: +(same / (N * N)).toFixed(3) },
+  glo30: { mean: +mean(glo30).toFixed(1) }, glo90: { mean: +mean(glo90).toFixed(1) },
+  forestShare: +(cover.filter((c) => c === FOREST).length / (N * N)).toFixed(3),
+  worldcover: [...counts].sort((a, b) => a[0] - b[0]), osm: { roads: roads.length, buildings: nb, places: villages.length },
+};
+writeFileSync(`${DATA}/stats-${site}.json`, JSON.stringify(stats, null, 1));
+console.log(JSON.stringify(stats));

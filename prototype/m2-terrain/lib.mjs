@@ -10,12 +10,19 @@ export const UTM52 = '+proj=utm +zone=52 +datum=WGS84 +units=m +no_defs';
 export const toLonLat = (x, y) => proj4(UTM52, 'WGS84', [x, y]);
 export const toUtm = (lon, lat) => proj4('WGS84', UTM52, [lon, lat]);
 
-export const SRC = {
-  glo30: 'https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N35_00_E127_00_DEM/Copernicus_DSM_COG_10_N35_00_E127_00_DEM.tif',
-  glo90: 'https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N35_00_E127_00_DEM/Copernicus_DSM_COG_30_N35_00_E127_00_DEM.tif',
-  gedtm: 'https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif',
-  cover: 'https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N33E126_Map.tif',
+const GLO = (res, lat, lon) => {
+  const t = `Copernicus_DSM_COG_${res}_N${lat}_00_E${lon}_00_DEM`;
+  return `https://copernicus-dem-${res === 10 ? 30 : 90}m.s3.amazonaws.com/${t}/${t}.tif`;
 };
+export const GEDTM = 'https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif';
+const WORLDCOVER = (tile) => `https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_${tile}_Map.tif`;
+/** The candidate squares: centre as #68 checked it, and the source tiles that cover it (WorldCover tiles are 3° by SW corner). */
+export const SITES = {
+  jinan: { centre: [127.42, 35.79], glo30: GLO(10, 35, 127), glo90: GLO(30, 35, 127), cover: WORLDCOVER('N33E126') },
+  mungyeong: { centre: [128.13, 36.76], glo30: GLO(10, 36, 128), glo90: GLO(30, 36, 128), cover: WORLDCOVER('N36E126') },
+};
+/** SW node of a site's square: the centre in UTM 52N minus half the 10,230 m node span, rounded to 10 m. */
+export const originOf = (site) => toUtm(...SITES[site].centre).map((v) => Math.round((v - 5115) / 10) * 10);
 
 /**
  * Reads the pixels covering a lon/lat box (plus 2 pixels) with HTTP range reads. Returns a raster with
@@ -101,4 +108,15 @@ export function readTerrain(path) {
   let at = 4 + len + ((4 - ((4 + len) % 4)) % 4);
   const f32 = () => new Float32Array(buf, (at += nn * 4) - nn * 4, nn);
   return { ...head, ground: f32(), surface: f32(), buildings: f32(), cover: new Uint8Array(buf, at, nn) };
+}
+
+/** Writes a terrain in the layout readTerrain and the src/app/main.tsx PROTOTYPE loader read. */
+export function writeTerrain(path, t, label) {
+  const header = Buffer.from(JSON.stringify({ n: t.n, cell: t.cell, grid: t.grid, roads: t.roads, villages: t.villages, label }));
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(header.length);
+  const pad = Buffer.alloc((4 - ((4 + header.length) % 4)) % 4, 32);
+  const bytes = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
+  writeFileSync(path, Buffer.concat([len, header, pad, bytes(t.ground), bytes(t.surface), bytes(t.buildings), bytes(t.cover)]));
+  console.log('wrote', path);
 }
