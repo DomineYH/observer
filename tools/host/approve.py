@@ -100,6 +100,69 @@ def special_ok(c, t):
                 or re.fullmatch(rf'curl -sL https://[^\s;&|`$<>]+ -o /tmp/research-{t}/[\w.-]+', c))
 
 
+# Allow-list for scripts: every name and every module attribute chain a script uses must be listed here or be the
+# script's own. Anything else goes to the host. The deny checks in script_ok stay as a second layer.
+PURE_BUILTINS = {'len', 'range', 'sorted', 'min', 'max', 'sum', 'str', 'int', 'float', 'list', 'dict', 'set', 'tuple',
+                 'enumerate', 'zip', 'round', 'abs', 'isinstance', 'bool', 'bytes', 'any', 'all', 'reversed', 'map',
+                 'filter', 'repr', 'ord', 'chr', 'hex', 'divmod', 'pow', 'iter', 'next', 'format', 'frozenset'}
+CALL_ONLY_BUILTINS = {'open', 'print'}  # write-capable: direct calls only, checked by the deny layer
+VALUE_NAMES = {'__name__', 'Exception', 'ValueError', 'KeyError', 'IndexError', 'TypeError', 'TimeoutError',
+               'OSError', 'StopIteration', 'UnicodeDecodeError', 'AttributeError'}
+ALLOWED_CALLS = {'urllib.request.urlopen', 'urllib.request.Request', 'urllib.request.urlretrieve',
+                 'urllib.request.build_opener', 'urllib.request.HTTPSHandler', 'json.load', 'json.loads', 'json.dumps',
+                 'json.dump', 'ssl.create_default_context', 'ssl.SSLContext', 'zipfile.ZipFile', 'zipfile.is_zipfile',
+                 'io.BytesIO', 'io.StringIO', 'glob.glob', 'glob.iglob', 'time.sleep', 'time.time', 'time.monotonic',
+                 'time.strftime', 'sys.exit', 'sys.stdout.write', 'sys.stderr.write', 'sys.stdout.flush',
+                 'xml.etree.ElementTree.fromstring'}
+ALLOWED_VALUES = {'urllib.error.HTTPError', 'urllib.error.URLError', 'json.JSONDecodeError', 'ssl.CERT_NONE',
+                  'ssl.CERT_REQUIRED', 'ssl.PROTOCOL_TLS_CLIENT', 'zipfile.BadZipFile', 'sys.argv', 'sys.stdout',
+                  'sys.stderr', 'xml.etree.ElementTree.ParseError'}
+PURE_MODULES = {'math', 're', 'urllib.parse', 'struct', 'html'}  # every public function and constant is side-effect free
+
+
+def refs_ok(tree):
+    """True when every name and module attribute chain in the script is allowed (see the lists above)."""
+    nodes = list(ast.walk(tree))
+    imported = {}
+    for x in nodes:
+        if isinstance(x, ast.Import):
+            imported.update({a.asname: a.name for a in x.names if a.asname})
+            imported.update({a.name.split('.')[0]: a.name.split('.')[0] for a in x.names if not a.asname})
+        elif isinstance(x, ast.ImportFrom):
+            imported.update({a.asname or a.name: f'{x.module}.{a.name}' for a in x.names})
+    local = {x.id for x in nodes if isinstance(x, ast.Name) and not isinstance(x.ctx, ast.Load)}
+    local |= {x.name for x in nodes if isinstance(x, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    local |= {x.arg for x in nodes if isinstance(x, ast.arg)} | {x.name for x in nodes if isinstance(x, ast.ExceptHandler) and x.name}
+    if local & (set(imported) | PURE_BUILTINS | CALL_ONLY_BUILTINS | VALUE_NAMES):
+        return False  # rebinding an allowed name
+    called = {id(x.func) for x in nodes if isinstance(x, ast.Call)}
+    inner = {id(x.value) for x in nodes if isinstance(x, ast.Attribute)}
+
+    def module_ref_ok(full, node):
+        mod, _, attr = full.rpartition('.')
+        if full in ALLOWED_VALUES or (mod in PURE_MODULES and attr and not attr.startswith('_')):
+            return True
+        return full in ALLOWED_CALLS and id(node) in called
+    for x in nodes:
+        if id(x) in inner or not isinstance(x, (ast.Name, ast.Attribute)):
+            continue
+        parts, base = [], x
+        while isinstance(base, ast.Attribute):
+            parts.insert(0, base.attr)
+            base = base.value
+        if not isinstance(base, ast.Name):
+            continue  # a method or attribute of a value the script computed: the deny layer checks it
+        root = base.id
+        if root in local or (not parts and (root in PURE_BUILTINS or root in VALUE_NAMES)):
+            continue
+        if not parts and root in CALL_ONLY_BUILTINS and id(x) in called:
+            continue
+        if root in imported and isinstance(x.ctx, ast.Load) and module_ref_ok('.'.join([imported[root]] + parts), x):
+            continue
+        return False
+    return True
+
+
 def script_ok(c, t):
     m = re.fullmatch(rf'python3 (/tmp/research-{t}/[\w-]+\.py)', c or '')
     if not m:
@@ -110,6 +173,8 @@ def script_ok(c, t):
     overpass_count = hosts <= {'https://overpass-api.de', 'https://overpass.kumi.systems'} and 'out count' in src \
         and not re.search(r'out (body|geom|center)', src)
     tree = ast.parse(src)
+    if not refs_ok(tree):
+        return False
     nodes = list(ast.walk(tree))
     alias = {a.asname or a.name: a.name for x in nodes if isinstance(x, ast.ImportFrom) for a in x.names}
     called = {id(x.func) for x in nodes if isinstance(x, ast.Call)}
@@ -255,6 +320,50 @@ def check():
              "with open('/tmp/research-99/out.json', 'w') as f:\n    json.dump({'a': 1}, f)\n    f.write('x')\n"
              "g = open('/tmp/research-99/log.txt', 'a')\nprint('done', file=g)\nz = zipfile.ZipFile('/tmp/research-99/a.zip')\n"
              "z.open('n').read()\nu.urlretrieve('https://a.org/f.pdf', '/tmp/research-99/f.pdf')\nprint(open('/tmp/research-99/a').read())\n")
+    # D1 (o6): allow-list of names; aliases of allowed or denied callables go to the host
+    for src in ("import io\ncreate = io.FileIO\ncreate('/tmp/escaped', 'w')\n", "import zipfile\nZ = zipfile.ZipFile\nZ('/tmp/x.zip', 'w')\n",
+                "b = open\nb('/tmp/x', 'w')\n", "list(map(open, ['/tmp/x']))\n", "from io import FileIO\nFileIO('/tmp/x', 'w')\n",
+                "from zipfile import ZipFile as Z\nZ('/tmp/x.zip', 'w')\n", "import json\nd = json.dump\nd(1, None)\n",
+                "import urllib.request as u\nr = u.urlretrieve\nr('https://a', '/tmp/x')\n", "import io\nm = io\n",
+                "type(1)\n", "import re\nre = 1\n", "def f(open):\n    return open\n", "import sys\nsys.stdout.buffer.write(b'x')\n",
+                "import xml.etree.ElementTree as ET\nET.ElementTree(ET.fromstring('<a/>'))\n", "exit()\n"):
+        assert not s(src), src
+    assert s("""import urllib.request, urllib.parse, re, json, ssl, time
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+rows = []
+for q in ['a', 'b']:
+    url = 'https://www.example.go.kr/a.do?q=' + urllib.parse.quote(q)
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        page = urllib.request.urlopen(req, context=ctx, timeout=30).read().decode('utf-8', 'replace')
+    except urllib.error.HTTPError as e:
+        print('error', e.code)
+        continue
+    for m in re.finditer(r'<td>(.*?)</td>', page, re.S):
+        rows.append({'q': q, 'cell': m.group(1).strip()})
+    time.sleep(1)
+with open('/tmp/research-99/rows.json', 'w') as f:
+    json.dump(rows, f, ensure_ascii=False, indent=1)
+print(len(rows), sorted(rows, key=len)[:1])
+""")
+    assert s("""import zipfile, io, urllib.request, xml.etree.ElementTree as ET
+data = urllib.request.urlopen('https://example.org/a.zip').read()
+z = zipfile.ZipFile(io.BytesIO(data))
+for name in z.namelist():
+    if name.endswith('.xml'):
+        root = ET.fromstring(z.read(name))
+        print(name, len(root.findall('.//item')))
+""")
+    assert s("""import math, json, sys
+from urllib.parse import quote as q
+def dist(a, b):
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+pts = json.load(open('/tmp/research-99/pts.json'))
+if __name__ == '__main__':
+    print(round(dist(pts[0], pts[1]), 1), q(sys.argv[0]), math.pi)
+""")
     os.remove('/tmp/research-99/_chk.py')
     read = lambda p: file_prompt_ok(f'Allow access to this file?\nRead: {p}\nReason: order\n', 99)[0]
     make = lambda *ps: file_prompt_ok('Allow creation of this file?\n' + ''.join(f'  {p} +12\n' for p in ps), 99)[0]
