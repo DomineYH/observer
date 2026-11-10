@@ -22,9 +22,11 @@ UNKNOWN = 'unknown'  # some other hooks screen (for example cut off): no keys, t
 
 
 def dialog_keys(screen):
-    """Keys that answer a known startup dialog, UNKNOWN for an unrecognised hooks screen, None for no dialog."""
-    keys = next((k for pat, k in DIALOGS if pat.search(screen)), None)
-    return UNKNOWN if keys is None and HOOKS.search(screen) else keys
+    """Keys that answer a known startup dialog, UNKNOWN for an unrecognised hooks screen, None for no dialog.
+    Hooks text that is neither known hooks screen wins over every other match, `trust this folder` included."""
+    if HOOKS.search(screen):
+        return next((k for pat, k in DIALOGS[:2] if pat.search(screen)), UNKNOWN)
+    return next((k for pat, k in DIALOGS[2:] if pat.search(screen)), None)
 
 
 def screen_of(run, pane):
@@ -150,8 +152,8 @@ def dispatch(a, run=sh, sleep=time.sleep):
     if not a.no_start and harness == 'opencode':
         return 3, f'MANUAL pick the {model} model in {a.name} with /model as docs/agents/herdr.md says, then rerun with --no-start'
     info = agent(run, a.name)  # only a free agent can take the order, so a later `working` belongs to it
-    if info.get('agent_status') == 'working' or info.get('interactive_ready') is not True:
-        return 3, (f'MANUAL agent busy: {a.name} is {info.get("agent_status")} (interactive_ready={info.get("interactive_ready")}); '
+    if info.get('agent_status') not in ('idle', 'done') or info.get('interactive_ready') is not True:
+        return 3, (f'MANUAL agent busy or unknown: {a.name} is {info.get("agent_status")} (interactive_ready={info.get("interactive_ready")}); '
                    'wait until it is idle or done, then rerun with --no-start')
 
     r = run(['herdr', 'agent', 'prompt', a.name, prompt])
@@ -276,10 +278,13 @@ def self_test():
         run, calls = fake(['idle', 'working'], prompt_rc=1)
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 prompt failed (exit 1)') and calls.count('send-keys') == 0
         # D2: a busy agent gets no prompt, so a later `working` always belongs to the new order
-        for args, ready in ((no_start, True), (a, True), (no_start, False)):
-            run, calls = fake(['working'] if ready else ['idle'], ready=ready)
+        for args, status, ready in ((no_start, 'working', True), (a, 'working', True), (no_start, 'idle', False),
+                                    (no_start, 'unknown', True), (a, 'blocked', True), (no_start, None, True)):
+            run, calls = fake([status], ready=ready)
             code, last = dispatch(args, run, nap)
-            assert code == 3 and last.startswith('MANUAL agent busy') and 'prompt' not in calls, (last, calls)
+            assert code == 3 and last.startswith('MANUAL agent busy or unknown') and 'prompt' not in calls, (status, last, calls)
+        run, calls = fake(['done', 'working'])
+        assert dispatch(a, run, nap)[0] == 0
         run, calls = fake(['idle', 'working', 'idle'])  # working once, idle 3 s later
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 status=idle')
         # D3: a screen that cannot be read is never a clear screen
@@ -298,6 +303,12 @@ def self_test():
         assert dialog_keys('Lifecycle hooks\n⚠ 2 hooks need review before they can run.') == ['esc']
         assert dialog_keys(truncated) == UNKNOWN and dialog_keys('Hooks need review\n  1. Trust') == UNKNOWN
         assert dialog_keys('Do you trust this folder?') == ['enter'] and dialog_keys('› Ask Codex to do anything') is None
+        combined = '⚠ 3 hooks need review before they can run.\nDo you trust this folder?'  # review-3 F4
+        assert dialog_keys(combined) == UNKNOWN and dialog_keys(hooks_new + 'Do you trust this folder?') == ['esc']
+        with contextlib.redirect_stderr(io.StringIO()):
+            run, calls = fake(['idle'], screens=[combined])
+            code, last = dispatch(a, run, nap)
+            assert last.startswith('MANUAL unknown hooks screen') and not any(c.startswith('pane-keys') for c in calls), calls
         run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_new, ''])
         assert dispatch(a, run, nap)[0] == 0 and 'pane-keys esc' in calls and calls.index('pane-keys esc') < calls.index('prompt')
         run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_old, ''])
