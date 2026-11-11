@@ -1,10 +1,15 @@
 // The 가공 seam (npm run terrain:build) on synthetic input: the cover table and overwrite order, clearings, the stop
 // list and the 지형 판 규칙. Results are read back through the app's unpackTerrain, never from 가공's own arrays.
+import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { describe, expect, test } from 'vitest';
 import { COVER, type Cover } from '@sim';
-import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { bodyStart, unpackTerrain } from '@adapters/terrainFile/unpack';
 import { readConfig, type Config } from '../../terrain/pipeline/config';
-import { buildTerrain } from '../../terrain/pipeline/rules/build';
+import { buildAndWrite, checkFile } from '../../terrain/pipeline/build/build';
+import { buildTerrain, checkInvariants } from '../../terrain/pipeline/rules/build';
 import type { OsmElement, Snapshot } from '../../terrain/pipeline/snapshot';
 
 // A made-up 24×24 square (no real place). Its 1 km remainders (230, 490) match the grid origin's.
@@ -39,6 +44,26 @@ const ring = (x0: number, y0: number, x1: number, y1: number): [number, number][
 const tiny = (i: number, j: number) => ring(i * U + 10, j * U + 10, i * U + 40, j * U + 40);
 
 const name = (c: number) => COVER[c];
+
+const fresh = () => ({ data: mkdtempSync(join(tmpdir(), 'terrain-data-')), source: mkdtempSync(join(tmpdir(), 'terrain-source-')) });
+type Dirs = ReturnType<typeof fresh>;
+/** Every file in both folders with its bytes, so "nothing written" is checked byte for byte. */
+const contents = (d: Dirs) =>
+  [d.data, d.source].flatMap((dir) => readdirSync(dir).sort().map((f) => [join(dir, f), readFileSync(join(dir, f)).toString('base64')]));
+
+/** Runs 가공 into fresh folders, expects it to stop with `message`, and both folders to stay empty. */
+async function expectStop(cfg: Config, snap: Snapshot, message: RegExp) {
+  const dirs = fresh();
+  await expect(buildAndWrite(dirs, 'synth', cfg, snap)).rejects.toThrow(message);
+  expect(contents(dirs)).toEqual([]);
+}
+
+/** Integer hash in [0, 1), for noise no gzip can shrink. */
+const noise = (i: number, j: number) => {
+  let h = Math.imul(i, 374761393) + Math.imul(j, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
 
 describe('가공', () => {
   test('가공: 대응표와 덮어쓰기 순서', async () => {
@@ -122,4 +147,56 @@ describe('가공', () => {
       expect(h >= 12 && h < 17, `forest height ${h}`).toBe(true);
     }
   });
+
+  test('가공: 멈춤 목록', async () => {
+    const plain = snapshot([]);
+    await expectStop(SYNTH, snapshot([], 10, [[3, 4, 15]]), /^가공: 대응표에 없는 피복 값 15 \(칸 99\)$/);
+    await expectStop({ ...SYNTH, grid: { ...SYNTH.grid, e0: 40000 } }, plain, /^가공: 방안 기준/);
+    await expectStop({ ...SYNTH, grid: { ...SYNTH.grid, letters: 'AB' } }, plain, /^가공: 방안 기준/);
+    await expectStop({ ...SYNTH, coverShare: { ...ALL, forest: [0, 50] } }, plain, /^가공: 피복 forest 비율 100%가 범위 \[0, 50\] 밖이다$/);
+    await expectStop({ ...SYNTH, coverShare: null }, plain, /^가공: 피복 비율 범위가 비어 있다\. 잰 비율: \{"open":0,"field":0,"forest":100,/);
+    await expectStop({ ...SYNTH, clearings: [{ x: 50, y: 50, r: 100, kind: 'reserve' }] }, snapshot([], 40), /^가공: 벌채 원 \(50, 50\)에 숲 칸이 없다$/);
+    await expectStop({ ...SYNTH, sources: { ...SYNTH.sources, ground: { ...SYNTH.sources.ground, kind: 'DSM' } } }, plain, /^가공: 불변 조건: 지면의 종류가 DTM이 아니다/);
+    await expectStop(SYNTH, snapshot([{ type: 'relation', id: 1, tags: { natural: 'water' }, members: [] }]), /^가공: natural=water 관계 요소는 아직 다루지 않는다$/);
+
+    // Over 1.5 MB: 1024² cells of ground noise (±300 m) that gzip cannot shrink.
+    const big = 1024;
+    const ground = new Int32Array(big * big);
+    for (let j = 0; j < big; j++) for (let i = 0; i < big; i++) ground[j * big + i] = Math.round(50000 + (noise(i, j) - 0.5) * 60000);
+    const noisy: Snapshot = { ...plain, ground, cover: new Uint8Array(big * big).fill(10) };
+    await expectStop({ ...SYNTH, frame: { ...SYNTH.frame, n: big } }, noisy, /^가공: 지형 파일이 1\.5 MB를 넘는다 \(\d+ bytes\)$/);
+
+    // Same 판, other content: the committed files stay byte for byte.
+    const dirs = fresh();
+    await buildAndWrite(dirs, 'synth', SYNTH, plain);
+    const before = contents(dirs);
+    const changed = snapshot([]);
+    changed.ground[k(7, 7)]! += 100;
+    await expect(buildAndWrite(dirs, 'synth', SYNTH, changed)).rejects.toThrow(/^가공: 판이 같은데 내용이 다르다\. 가공 설정의 version을 올린다$/);
+    expect(contents(dirs)).toEqual(before);
+
+    // Not reachable through inputs: the exported checks on doctored values.
+    const built = await buildTerrain('synth', SYNTH, plain);
+    const body = gunzipSync(built.file);
+    const L = body.readUInt32LE(0);
+    const head = JSON.parse(body.subarray(4, 4 + L).toString('utf8'));
+    const json = Buffer.from(JSON.stringify({ ...head, frame: SYNTH.frame }));
+    const doctored = Buffer.alloc(bodyStart(json.length) + body.length - bodyStart(L), 0x20);
+    doctored.writeUInt32LE(json.length, 0);
+    json.copy(doctored, 4);
+    body.copy(doctored, bodyStart(json.length), bodyStart(L));
+    expect(() => checkFile(gzipSync(doctored))).toThrow(/^가공: 지형 파일 머리의 키가 허용 목록과 다르다/);
+    expect(() => checkFile(built.file)).not.toThrow();
+
+    const t = await unpackTerrain(built.file);
+    expect(() => checkInvariants(t, built.header)).not.toThrow();
+    const sunk = { ...t, surface: t.surface.slice() };
+    sunk.surface[5] = sunk.ground[5]! - 1;
+    expect(() => checkInvariants(sunk, built.header)).toThrow(/^가공: 불변 조건: 표면이 지면보다 낮다 \(칸 5\)$/);
+    const nan = { ...t, ground: t.ground.slice() };
+    nan.ground[6] = NaN;
+    expect(() => checkInvariants(nan, built.header)).toThrow(/^가공: 불변 조건: 유한하지 않은 값 \(칸 6\)$/);
+    const counts = { ...built.header, coverCounts: { ...built.header.coverCounts, forest: 1 } };
+    expect(() => checkInvariants(t, counts)).toThrow(/^가공: 불변 조건: 머리의 피복 칸 수가 실제와 다르다$/);
+  }, 30_000);
 });
