@@ -8,7 +8,6 @@ import { mockArchive } from '@adapters/mock/records';
 import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
 import { gridOf, type Pin } from '@render/mapView';
 import { DEFAULT_QUALITY, type Quality } from '@render/projection';
 import { terrainColours } from '@render/shade';
@@ -29,7 +28,7 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { selectBackend, terrainSourceOf } from './backend';
+import { placementOf, selectBackend, terrainSourceOf } from './backend';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame } from './game';
@@ -43,6 +42,8 @@ const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 // The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
 const { seed, seedKind } = chooseSeed(location.search, Date.now());
 const terrain = await terrainSourceOf(backend).load(seed);
+// After the terrain load, so a real build still stops at the 지형 원천 first.
+const { scenario, briefing } = placementOf(backend);
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
@@ -50,7 +51,7 @@ let games = 0; // a new game remounts the panels that keep their own state from 
 let game = newGame({
   seed,
   seedKind,
-  scenario: BASE_SCENARIO,
+  scenario,
   guns: BASE_GUNS,
   weather: await mockWeather.load(seed, seedKind, preset ?? undefined),
   mode: 'training', // a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
@@ -118,7 +119,7 @@ const step = () => {
     if (e.type !== 'radio') continue;
     lines.push(e);
     const u = e.utterance;
-    if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, BASE_SCENARIO.frontY));
+    if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, scenario.frontY));
     if (u.kind === 'position_report' && u.speaker === 'fdc') {
       readBack = true;
       say([reportError(s.knownOp, s.op, s.mode)]);
@@ -212,7 +213,7 @@ function App() {
   // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
-      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} />}
+      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} briefing={briefing} />}
       <div className="app" data-tab={tab}>
         <HeadBand
           tick={tick}
@@ -255,14 +256,15 @@ function App() {
             onFrame={onFrame}
             showFps={showFps}
             covered={covered}
-            friends={BASE_SCENARIO.friends}
+            friends={scenario.friends}
           />
         </div>
         <LowerTabs tab={tab} onTab={setTab} />
         <div data-panel="input">
           <PrepPanel
             state={{ phase, op, picked, reportDue }}
-            scenario={BASE_SCENARIO}
+            scenario={scenario}
+            briefing={briefing}
             terrain={terrain}
             seed={seed}
             seedKind={seedKind}
@@ -284,7 +286,7 @@ function App() {
         <div data-panel="map" hidden={covered}>
           <MapPanel
             terrain={terrain}
-            scenario={BASE_SCENARIO}
+            scenario={scenario}
             state={sim.state}
             send={send}
             onFrame={onFrame}

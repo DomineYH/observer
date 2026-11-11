@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import type { Input, SeedKind, TerrainData } from '@sim';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
+import { MOCK_PLACEMENT } from '@content/placement';
 import { pressStart, PrepPanel, type PrepState } from './PrepPanel';
 
 const WEATHER = {
@@ -16,11 +17,12 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } })) =>
+const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } }), placement = MOCK_PLACEMENT) =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
-      scenario={BASE_SCENARIO}
+      scenario={placement.scenario}
+      briefing={placement.briefing}
       terrain={terrain}
       seed={seed}
       seedKind={seedKind}
