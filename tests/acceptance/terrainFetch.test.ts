@@ -7,7 +7,7 @@ import { describe, expect, test } from 'vitest';
 import { readConfig, type Config } from '../../terrain/pipeline/config';
 import { fetchTerrain, retry, type Sources } from '../../terrain/pipeline/fetch/fetch';
 import { bilinear, nearest, nodeLonLat, rasterOf, windowOf, type Box, type Geo } from '../../terrain/pipeline/fetch/sample';
-import { decodeCover, decodeGround, encodeCover, encodeGround } from '../../terrain/pipeline/snapshot';
+import { decodeCover, decodeGround, encodeCover, encodeGround, sha256, type Manifest } from '../../terrain/pipeline/snapshot';
 
 // 4×3, values not linear in either direction, so a wrong weight shows.
 const DATA = [1, 2, 4, 8, 3, 7, 13, 21, 10, 20, 31, 45];
@@ -63,6 +63,12 @@ function fakeSources(f: Fakes = {}): Sources {
     overpass: f.overpass ?? (async () => structuredClone(f.osm ?? GOOD_OSM)),
   };
 }
+
+// The committed snapshot, read with bare readFileSync: a missing file fails, never skips.
+const SNAP = 'terrain/mungyeong/snapshot';
+const readSnap = (file: string) => readFileSync(join(SNAP, file));
+const manifest = () => JSON.parse(readSnap('manifest.json').toString('utf8')) as Manifest;
+const osmLines = () => readSnap('osm.json').toString('utf8');
 
 const fresh = () => mkdtempSync(join(tmpdir(), 'terrain-fetch-'));
 
@@ -162,5 +168,72 @@ describe('받기', () => {
     await expect(retry(down, [0, 0, 0])).rejects.toThrow('fail 4');
     expect(calls).toBe(4);
     await expectStop({ overpass: async () => Promise.reject(new Error('받기: Overpass에 닿지 못했다')) }, '받기: Overpass에 닿지 못했다');
+  });
+
+  test('받기: 스냅샷의 SHA-256이 목록과 같다', () => {
+    expect(readdirSync(SNAP).sort()).toEqual(['cover.bin', 'ground.bin', 'manifest.json', 'osm.json']);
+    const m = manifest();
+    expect(sha256(readSnap('ground.bin'))).toBe(m.sources.ground.sha256);
+    expect(sha256(readSnap('cover.bin'))).toBe(m.sources.cover.sha256);
+    expect(sha256(readSnap('osm.json'))).toBe(m.sources.osm.sha256);
+    expect([m.sources.ground.file, m.sources.cover.file, m.sources.osm.file]).toEqual(['ground.bin', 'cover.bin', 'osm.json']);
+  });
+
+  test('받기: 스냅샷에 군사 지물 태그가 없다', () => {
+    const elements = JSON.parse(osmLines()) as { tags: Record<string, string> }[];
+    expect(elements.length).toBeGreaterThan(0);
+    for (const { tags } of elements) {
+      expect(Object.hasOwn(tags, 'military')).toBe(false);
+      expect(tags.landuse).not.toBe('military');
+      expect(['military', 'bunker', 'barracks']).not.toContain(tags.building);
+    }
+    const m = manifest();
+    expect(m.sources.osm.military).toBe(0);
+    // The zero means something only because the query asked for them.
+    const { query } = readConfig('terrain/mungyeong').sources.osm;
+    for (const q of [query, m.sources.osm.query]) {
+      expect(q).toContain('nwr["military"]');
+      expect(q).toContain('nwr["landuse"="military"]');
+      expect(q).toContain('nwr["building"~"^(military|bunker|barracks)$"]');
+    }
+  });
+
+  test('받기: 스냅샷 목록과 요소의 모양', () => {
+    const m = manifest();
+    expect(Object.keys(m)).toEqual(['format', 'n', 'cell', 'tools', 'sources']);
+    expect([m.format, m.n, m.cell]).toEqual([1, 1024, 10]);
+    expect(Object.keys(m.tools)).toEqual(['node', 'geotiff', 'proj4']);
+    for (const v of Object.values(m.tools)) expect(v).toMatch(/^\d+\.\d+\.\d+/);
+    expect(Object.keys(m.sources)).toEqual(['ground', 'cover', 'osm']);
+    for (const r of [m.sources.ground, m.sources.cover]) {
+      expect(Object.keys(r)).toEqual(['version', 'url', 'pixel', 'bytes', 'etag', 'file', 'sha256']);
+      expect(['area', 'point']).toContain(r.pixel);
+    }
+    expect(Object.keys(m.sources.osm)).toEqual(['url', 'query', 'osmBase', 'file', 'sha256', 'counts', 'military']);
+    expect(Object.keys(m.sources.osm.counts)).toEqual(['node', 'way', 'relation']);
+    // The OpenStreetMap base time is the only date: no wall-clock time anywhere else.
+    expect(m.sources.osm.osmBase).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+    expect(JSON.stringify({ ...m, sources: { ...m.sources, osm: { ...m.sources.osm, osmBase: '' } } })).not.toMatch(/\d{4}-\d\d-\d\dT/);
+
+    const text = osmLines();
+    expect(text).not.toContain('\r');
+    const elements = JSON.parse(text) as { type: string; id: number; pts?: number[][]; members?: { pts: number[][] }[] }[];
+    expect(text.split('\n').length - 1).toBe(elements.length + 2);
+    const { counts } = m.sources.osm;
+    expect(counts.node + counts.way + counts.relation).toBe(elements.length);
+    for (const key of ['"lat"', '"lon"', '"bounds"', '"center"', '"geometry"']) expect(text).not.toContain(key);
+    const order = ['node', 'way', 'relation'];
+    elements.forEach((e, k) => {
+      for (const key of Object.keys(e)) expect(['type', 'id', 'tags', 'pts', 'members']).toContain(key);
+      const pts = [...(e.pts ?? []), ...(e.members ?? []).flatMap((mb) => mb.pts)];
+      for (const p of pts) expect(p.every(Number.isInteger) && p.length === 2).toBe(true);
+      const prev = elements[k - 1];
+      if (prev) expect(order.indexOf(prev.type) * 2 ** 40 + prev.id).toBeLessThan(order.indexOf(e.type) * 2 ** 40 + e.id);
+    });
+
+    const ground = decodeGround(readSnap('ground.bin'), 1024);
+    expect(ground.length).toBe(1024 * 1024);
+    expect(ground.every((v) => v >= -10_000 && v <= 250_000)).toBe(true);
+    expect(decodeCover(readSnap('cover.bin')).length).toBe(1024 * 1024);
   });
 });
