@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO, BRIEFING } from '@content/scenario';
 import { MOCK_PLACEMENT } from '@content/placement';
+import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
 import { placementOf, selectBackend, terrainSourceOf } from './backend';
 
 test('조립 지점: real을 받는다', () => {
@@ -26,5 +27,7 @@ test('배치: 조립 지점이 지형 원천과 짝지어 고른다', async () =
     const terrain = await terrainSourceOf('mock').load(seed);
     expect({ id: terrain.id, version: terrain.version }, String(seed)).toEqual(placement.terrain);
   }
-  expect(() => placementOf('real')).toThrow(/배치가 아직 없다/);
+  // real pairs the 문경 배치 with the 문경 지형 (its source arrives in M2-9: until then real stops at the terrain)
+  expect(placementOf('real')).toBe(MUNGYEONG_PLACEMENT);
+  expect(placementOf('real').terrain).toEqual({ id: 'mungyeong', version: 2 });
 }, 30_000); // two mock terrain generations: several seconds, more under load
