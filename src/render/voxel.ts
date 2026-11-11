@@ -57,7 +57,7 @@ export function renderView(
     pix32.fill(pack((s1[0] + (s0[0] - s1[0]) * k) | 0, (s1[1] + (s0[1] - s1[1]) * k) | 0, (s1[2] + (s0[2] - s1[2]) * k) | 0), y * VW, (y + 1) * VW);
   }
   dbuf.fill(Infinity);
-  vbuf.fill(0);
+  if (veil) vbuf.fill(0);
   ybuf.fill(VH);
   const dx = Math.sin(h), dy = Math.cos(h), rx = Math.cos(h), ry = -Math.sin(h);
   const SM = (N - 1) * CELL - 1e-3;
@@ -67,14 +67,22 @@ export function renderView(
     if (v > SM) v = Math.max(0, 2 * SM - v);
     return v;
   };
-  // Column i, rows y0..y1-1: this colour at this distance, under this much 안개 띠.
-  const put = (i: number, y0: number, y1: number, colour: number, dist: number, v: number) => {
-    for (let y = y0; y < y1; y++) {
-      pix32[y * VW + i] = colour;
-      dbuf[y * VW + i] = dist;
-      vbuf[y * VW + i] = v;
-    }
-  };
+  // Column i, rows y0..y1-1: this colour at this distance, under this much 안개 띠 (kept only for a veil: the mirror
+  // path stays as fast as before).
+  const put = veil
+    ? (i: number, y0: number, y1: number, colour: number, dist: number, v: number) => {
+        for (let y = y0; y < y1; y++) {
+          pix32[y * VW + i] = colour;
+          dbuf[y * VW + i] = dist;
+          vbuf[y * VW + i] = v;
+        }
+      }
+    : (i: number, y0: number, y1: number, colour: number, dist: number) => {
+        for (let y = y0; y < y1; y++) {
+          pix32[y * VW + i] = colour;
+          dbuf[y * VW + i] = dist;
+        }
+      };
   let z = bino ? 40 : 4;
   while (z < Z_MAX) {
     const half = z * tanH;
@@ -146,7 +154,7 @@ export function renderView(
     }
     z += bino ? (z < 9000 ? Math.max(3, Math.min(10, z * 0.0028)) : z * 0.004) : Math.max(1.2, z * 0.0072);
   }
-  ridgeLines(buf, atm.sigma);
+  ridgeLines(buf, atm.sigma, veil);
   const geom = { eye, h: aim.h, focal, cx: VW / 2, hor };
   under?.(buf, geom);
   posterize(buf);
@@ -154,14 +162,14 @@ export function renderView(
 }
 
 /** A dark line where the distance jumps (ridge outlines); the 안개 띠 fades it, so mirrored ridges stay hidden. */
-function ridgeLines({ w, h, pix, dbuf, vbuf }: ViewBuffers, sigma: number): void {
+function ridgeLines({ w, h, pix, dbuf, vbuf }: ViewBuffers, sigma: number, veil: boolean): void {
   for (let y = 1; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const d = dbuf[i]!;
       if (d === Infinity) continue;
       if (dbuf[i - w]! > d * 1.25 + 50) {
-        const k = 1 - 0.5 * Math.exp(-sigma * d) * (1 - vbuf[i]!);
+        const k = 1 - 0.5 * Math.exp(-sigma * d) * (veil ? 1 - vbuf[i]! : 1);
         const o = i * 4;
         pix[o] = pix[o]! * k;
         pix[o + 1] = pix[o + 1]! * k;
