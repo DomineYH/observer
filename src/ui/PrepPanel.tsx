@@ -2,7 +2,7 @@
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
 import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
-import { BRIEFING } from '@content/scenario';
+import type { Briefing } from '@content/placement';
 import { gridOf, underCanopy } from '@render/mapView';
 import { startInput } from './prep';
 import { gridLabel } from './radio/readings';
@@ -12,6 +12,7 @@ export type PrepState = Pick<ReadonlySimState, 'phase' | 'op' | 'picked' | 'repo
 export interface PrepPanelProps {
   state: PrepState;
   scenario: Scenario;
+  briefing: Briefing; // the chosen 배치's 작전 준비 글
   terrain: TerrainData; // its 방안 기준 labels grids; its forest marks a candidate under the canopy
   seed: number;
   seedKind: SeedKind;
@@ -51,7 +52,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
@@ -66,7 +67,7 @@ export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, s
     <section aria-label="작전 준비">
       <h2>작전 준비 — 관측소 선정</h2>
       <p>
-        <b>적정(첩보)</b> {BRIEFING.enemy}
+        <b>적정(첩보)</b> {briefing.enemy}
       </p>
       <p>
         <b>첩보 지점</b> (지도 주황 원)
@@ -74,16 +75,16 @@ export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, s
       <ul>
         {scenario.nais.map((a, i) => (
           <li key={i}>
-            NAI {i + 1} {BRIEFING.nais[i]} (신뢰도 {BRIEFING.conf[a.conf]})
+            NAI {i + 1} {briefing.nais[i]} (신뢰도 {briefing.conf[a.conf]})
           </li>
         ))}
       </ul>
       <p>
         <b>예상 접근로</b> (지도 붉은 점선){' '}
-        {scenario.intelRoutes.map((r) => `${BRIEFING.routes[r.route]}(가능성 ${BRIEFING.conf[r.conf]})`).join(', ')}
+        {scenario.intelRoutes.map((r) => `${briefing.routes[r.route]}(가능성 ${briefing.conf[r.conf]})`).join(', ')}
       </p>
       <p>
-        <b>임무</b> {BRIEFING.mission}
+        <b>임무</b> {briefing.mission}
       </p>
       <p>
         <b>기상</b> {weatherText(weather)}
@@ -107,12 +108,14 @@ export function PrepPanel({ state, scenario, terrain, seed, seedKind, weather, s
         </p>
       )}
       <p>
-        <b>주의</b> {BRIEFING.caution} 계획된 관측소 1번 고지 {at(scenario.plannedOp)}.
+        <b>주의</b> {briefing.caution} 계획된 관측소 {briefing.plannedOp} {at(scenario.plannedOp)}.
+        {scenario.reserveOps?.length ? ` 예비 관측소 ${scenario.reserveOps.map((p, i) => `예비 ${i + 1} ${at(p)}`).join(', ')}.` : ''}
       </p>
       <p>
         {state.picked
           ? `관측소 후보: ${at(state.op)}${underCanopy(terrain, state.op.x, state.op.y) ? ' · 숲 속 — 시야 가림' : ''}`
-          : '지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 1번 고지를 점령합니다.'}
+          : // ponytail: the particle is fixed as 를; both M2 배치 name the post "1번 고지". Pick by 받침 when a name ends in a consonant.
+            `지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 ${briefing.plannedOp}를 점령합니다.`}
       </p>
       <button type="button" onClick={() => pressStart({ state, live, queued, send })}>
         관측소 점령 · 작전 개시
