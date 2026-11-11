@@ -21,22 +21,29 @@ export function realTerrain(at: { url: string; expected: Expected }, hash: (t: T
   return { load: () => (once ??= load()) };
 
   async function load(): Promise<TerrainData> {
-    if (typeof DecompressionStream === 'undefined') throw new TerrainLoadError('unsupported');
-    let bytes: Uint8Array<ArrayBuffer>;
     try {
-      const res = await get(at.url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      new DecompressionStream('gzip'); // absent, or present without gzip: both are 지원하지 않음
+    } catch {
+      throw new TerrainLoadError('unsupported');
+    }
+    let bytes: Uint8Array<ArrayBuffer>;
+    const deadline = new AbortController(); // one limit over the request and its body
+    const timer = setTimeout(() => deadline.abort(), TIMEOUT_MS);
+    try {
+      const res = await get(at.url, { signal: deadline.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       bytes = new Uint8Array(await res.arrayBuffer());
     } catch (cause) {
       throw new TerrainLoadError('fetch', { cause });
+    } finally {
+      clearTimeout(timer);
     }
-    let t: TerrainData;
     try {
-      t = await unpackTerrain(bytes);
+      const t = await unpackTerrain(bytes);
+      if (t.id !== at.expected.id || t.version !== at.expected.version || hash(t) !== at.expected.hash) throw new Error('다른 지형');
+      return t;
     } catch (cause) {
-      throw new TerrainLoadError('mismatch', { cause });
+      throw new TerrainLoadError('mismatch', { cause }); // a header the unpacker passes can still break the hash
     }
-    if (t.id !== at.expected.id || t.version !== at.expected.version || hash(t) !== at.expected.hash) throw new TerrainLoadError('mismatch');
-    return t;
   }
 }

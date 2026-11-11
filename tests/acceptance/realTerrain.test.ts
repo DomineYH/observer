@@ -4,6 +4,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { EYE_HEIGHT, heightAt, lineOfSight, replay, terrainHash, validateReplay, type SeedKind } from '@sim';
 import { TerrainLoadError, type TerrainFailure } from '@adapters/index';
+import { loadTerrain, type BootScreen } from '@app/backend';
 import { MUNGYEONG, realTerrain } from '@adapters/realTerrain';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { mockWeather } from '@adapters/mock/weather';
@@ -30,16 +31,28 @@ async function reason(load: Promise<unknown>): Promise<TerrainFailure> {
   return (e as TerrainLoadError).reason;
 }
 
-afterEach(() => void vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+/** What the boot screen was asked to show, in order. */
+function screen() {
+  const calls: string[] = [];
+  const s: BootScreen = { loading: () => void calls.push('loading'), error: (r) => void calls.push(`error ${r}`) };
+  return { calls, s };
+}
 
 describe('실제 지형 원천', () => {
   test('F-15: 실제 지형 원천은 어느 시드에도 같은 정체', async () => {
     expect(EXPECTED).toEqual({ id: 'mungyeong', version: 2, hash: expect.any(String) });
-    for (const source of [realTerrain(MUNGYEONG, terrainHash, serve()), realTerrain(MUNGYEONG, terrainHash, serve())])
-      for (const seed of [1, 20261106, 20261107]) {
-        const t = await source.load(seed);
-        expect({ id: t.id, version: t.version, hash: terrainHash(t) }, String(seed)).toEqual(EXPECTED);
-      }
+    // A fresh source per seed, so each seed's land is fetched and unpacked on its own (no cache shared across seeds).
+    for (const seed of [1, 20261106, 20261107]) {
+      const get = vi.fn(serve());
+      const t = await realTerrain(MUNGYEONG, terrainHash, get).load(seed);
+      expect(get, String(seed)).toHaveBeenCalledTimes(1);
+      expect({ id: t.id, version: t.version, hash: terrainHash(t) }, String(seed)).toEqual(EXPECTED);
+    }
   }, 30_000);
 
   test('실제 지형 원천: 거부하고 mock으로 돌아가지 않는다', async () => {
@@ -73,8 +86,56 @@ describe('실제 지형 원천', () => {
     vi.stubGlobal('DecompressionStream', undefined);
     const get = vi.fn(serve());
     expect(await reason(load(get))).toBe('unsupported');
+    // ... or the constructor is there but refuses gzip.
+    vi.stubGlobal(
+      'DecompressionStream',
+      class {
+        constructor(format: string) {
+          if (format === 'gzip') throw new TypeError(`unsupported format ${format}`);
+        }
+      },
+    );
+    expect(await reason(load(get))).toBe('unsupported');
     expect(get).not.toHaveBeenCalled();
   }, 60_000);
+
+  test('실제 지형 원천: 오류 화면 — 머리가 틀린 파일도 맞지 않음', async () => {
+    // A gzip of the right length whose header keeps id and version but has no grid: it unpacks, then the check must refuse it.
+    const body = gunzipSync(FILE);
+    const L = body.readUInt32LE(0);
+    const header = { ...JSON.parse(body.subarray(4, 4 + L).toString('utf8')), grid: null };
+    const json = Buffer.from(JSON.stringify(header));
+    const pad = Buffer.alloc((4 - (json.length % 4)) % 4, 0x20);
+    const len = Buffer.alloc(4);
+    len.writeUInt32LE(json.length);
+    const bad = new Uint8Array(gzipSync(Buffer.concat([len, json, pad, body.subarray(4 + L + ((4 - (L % 4)) % 4))])));
+    const f = screen();
+    await expect(loadTerrain('real', 1, f.s, realTerrain(MUNGYEONG, terrainHash, serve(bad)))).rejects.toBeInstanceOf(TerrainLoadError);
+    expect(f.calls).toEqual(['loading', 'error mismatch']);
+  }, 30_000);
+
+  test('실제 지형 원천: 오류 화면 — 60초 안에 받지 못함', async () => {
+    vi.useFakeTimers();
+    // A stub fetch that, like fetch, rejects the request or errors the body once its signal aborts; otherwise it stalls.
+    const stall = (stage: 'request' | 'body') => async (_: unknown, init?: RequestInit) => {
+      const signal = init!.signal!;
+      const aborted = new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+      if (stage === 'request') return aborted;
+      return new Response(new ReadableStream({ start: (c) => void aborted.catch((e) => c.error(e)) }));
+    };
+    for (const stage of ['request', 'body'] as const) {
+      const f = screen();
+      let done = false;
+      const loading = loadTerrain('real', 1, f.s, realTerrain(MUNGYEONG, terrainHash, stall(stage))).finally(() => (done = true));
+      loading.catch(() => {});
+      await vi.advanceTimersByTimeAsync(59_999);
+      expect([done, f.calls], stage).toEqual([false, ['loading']]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(done, stage).toBe(true);
+      await expect(loading, stage).rejects.toBeInstanceOf(TerrainLoadError);
+      expect(f.calls, stage).toEqual(['loading', 'error fetch']);
+    }
+  });
 
   test('실제 지형 원천: 받기는 쪽을 열 때 한 번', async () => {
     const get = vi.fn(serve());
@@ -98,18 +159,25 @@ describe('실제 지형 원천', () => {
     return game;
   }
 
+  /** The game started at its 계획 관측소, stepped as the app does until it has ended, and the submission it then makes. */
+  function finished(game: ReturnType<typeof newGame>) {
+    game.session.send(startInput(game.sim.state, []));
+    while (game.sim.state.phase !== 'ended') game.session.step();
+    return submissionOf('참새12', game.sim, game.init, game.session.log);
+  }
+
   test('실제 지형 원천: 재생 자료의 terrain', async () => {
-    const g = await played(20261106, 'daily', 100);
-    expect(g.sim.state.phase).toBe('live');
-    const { replay: data } = submissionOf('참새12', g.sim, g.init, g.session.log);
+    const g = await played(20261106, 'daily', 0);
+    const { replay: data } = finished(g);
     expect(data.terrain).toEqual({ id: 'mungyeong', version: 2 });
     expect(validateReplay(JSON.parse(JSON.stringify(data))).ok).toBe(true);
     const again = replay(data, await mungyeong, scenario);
     expect(again.record).toEqual(g.sim.record());
-    // A game on the mock land carries no terrain key at all.
-    const mock = newGame({ ...g.init, terrain: await mockTerrain.load(1) });
-    expect('terrain' in submissionOf('참새12', mock.sim, mock.init, mock.session.log).replay).toBe(false);
-  }, 60_000);
+    // A finished game on the mock land carries no terrain key at all.
+    const mock = finished(newGame({ ...g.init, terrain: await mockTerrain.load(1) }));
+    expect(mock.record.score).toEqual(expect.any(Number));
+    expect('terrain' in mock.replay).toBe(false);
+  }, 240_000);
 
   test('F-30: 실제 지형에서 시드는 땅을 고르지 않는다', async () => {
     const land = (g: Awaited<ReturnType<typeof played>>) => terrainHash(g.init.terrain);
