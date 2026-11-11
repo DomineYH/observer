@@ -253,7 +253,8 @@ describe('가공', () => {
     const keys = (o: object) => Object.keys(o);
     const COVERS = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'];
 
-    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'roads', 'size']);
+    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'roads', 'names', 'size']);
+    expect(keys(log.names)).toEqual(['villages', 'water', 'peak', 'pass']);
     expect(keys(log.roads)).toEqual(['elements', 'tunnels', 'pieces', 'lines']);
     expect(keys(log.roads.elements)).toEqual(['trunk', 'main', 'local']);
     expect(keys(log.roads.lines)).toEqual(['trunk', 'main', 'local']);
@@ -280,6 +281,7 @@ describe('가공', () => {
     expect(log.ground).toEqual({ min: 100, max: 120.7, mean: 110.35 });
     expect(log.buildings).toEqual({ count: 1, height: { tag: 0, levels: 0, default: 1 }, discarded: [] });
     expect(log.roads).toEqual({ elements: { trunk: 0, main: 1, local: 0 }, tunnels: 0, pieces: 1, lines: { trunk: 0, main: 1, local: 0 } });
+    expect(log.names).toEqual({ villages: 0, water: 0, peak: 0, pass: 0 });
 
     const shares = COVERS.reduce((sum, name) => sum + log.cover.final[name as Cover].share, 0);
     expect(Math.abs(shares - 100)).toBeLessThanOrEqual(0.05);
@@ -389,6 +391,63 @@ describe('가공', () => {
     fails([a!, b!, ...rest, { class: 'local', line: line([1, 0], [1, 231]) }], 'outside');
     fails([b!, a!, ...rest], 'swapped');
     fails([{ ...a!, line: [...a!.line].reverse() }, b!, ...rest], 'reversed');
+  });
+
+  test('가공: 마을과 지명 고르기', async () => {
+    // 100 m cells: the square is 0 … 2300 m, wide enough for the 1 km gap between peaks. Points in metres, ×10 for the snapshot.
+    const cfg = { ...SYNTH, frame: { ...SYNTH.frame, cell: 100 } };
+    const node = (tags: Record<string, string>, x: number, y: number): OsmElement => ({ type: 'node', id: nextId++, tags, pts: [[x * 10, y * 10]] });
+    const m = (pts: [number, number][]): [number, number][] => pts.map(([x, y]) => [x * 10, y * 10]);
+    const peak = (name: string, x: number, y: number) => node({ natural: 'peak', name }, x, y);
+    const pass = (name: string, x: number, y: number) => node({ mountain_pass: 'yes', name }, x, y);
+    const osm = [
+      node({ place: 'town', name: '읍' }, 500, 2000),
+      node({ place: 'village', name: '리' }, 1500, 2000),
+      { type: 'node', id: nextId++, tags: { place: 'hamlet', name: '말' }, pts: [[18004, 21006]] } as OsmElement, // → (1800, 2101)
+      node({ place: 'village' }, 600, 600), // no name
+      node({ place: 'village', name: '밖' }, -50, 100), // outside
+      node({ place: 'city', name: '시' }, 700, 700),
+      // Peaks in snapshot order against height order. 나봉 is 500 m from 가봉 and lower; 사봉 is exactly 1 km from 가봉.
+      peak('차봉', 1000, 2000), peak('자봉', 2000, 1000), peak('아봉', 0, 1000), peak('사봉', 1000, 0), peak('바봉', 2000, 2000),
+      peak('마봉', 0, 2000), peak('라봉', 2000, 0), peak('다봉', 0, 0), peak('나봉', 1000, 1500),
+      { type: 'node', id: nextId++, tags: { natural: 'peak', name: '가봉' }, pts: [[10004, 9996]] } as OsmElement, // → (1000, 1000)
+      node({ natural: 'peak' }, 1500, 500), // no name
+      peak('밖봉', 2400, 0), // outside
+      pass('바재', 800, 300), pass('가재', 300, 300), pass('마재', 700, 300), pass('나재', 400, 300), pass('라재', 600, 300), pass('다재', 500, 300),
+      // Water: 가천 in two ways (1700 m) before the longer single way 나강 (1200 m); 다강 counts only its 100 m inside.
+      way({ waterway: 'river', name: '가천' }, m([[0, 500], [1000, 500]])),
+      way({ waterway: 'river', name: '가천' }, m([[1000, 500], [1000, 1200]])),
+      way({ waterway: 'river', name: '나강' }, m([[100, 1500], [1300, 1500]])),
+      way({ waterway: 'river', name: '다강' }, m([[2000, 2200], [2000, 3000]])),
+      way({ waterway: 'river' }, m([[100, 100], [2000, 100]])), // no name
+      way({ natural: 'water', water: 'reservoir', name: '라저수지' }, m(ring(300, 600, 500, 800))), // 0.04 km²
+      way({ natural: 'water', water: 'reservoir', name: '마저수지' }, m(ring(1500, 300, 1900, 600))), // 0.12 km²
+      way({ natural: 'water', water: 'reservoir', name: '바저수지' }, m(ring(1600, 1700, 1700, 1800))),
+      way({ natural: 'water', name: '가천' }, m(ring(100, 1000, 900, 1400))), // a name already taken
+    ];
+    const snap = snapshot(osm);
+    const HEIGHT: [number, number, number][] = [
+      [10, 10, 950], [10, 15, 940], [0, 0, 930], [20, 0, 920], [0, 20, 910], [20, 20, 900], [10, 0, 890], [0, 10, 880], [20, 10, 870], [10, 20, 860],
+      [15, 5, 999], [3, 3, 700], [4, 3, 690], [5, 3, 680], [6, 3, 670], [7, 3, 660], [8, 3, 650],
+    ];
+    for (const [i, j, h] of HEIGHT) snap.ground[k(i, j)] = h * 100;
+    const built = await buildTerrain('synth', cfg, snap);
+    const t = await unpackTerrain(built.file);
+
+    expect(t.villages).toEqual([
+      { name: '읍', x: 500, y: 2000, r: 330 },
+      { name: '리', x: 1500, y: 2000, r: 170 },
+      { name: '말', x: 1800, y: 2101, r: 110 },
+    ]);
+    const named = (kind: string, list: [string, number, number][]) => list.map(([name, x, y]) => ({ name, x, y, kind }));
+    expect(t.names).toEqual([
+      // Rivers at half their longest piece, then the largest reservoir at its box centre; 6 names → 4.
+      ...named('water', [['가천', 500, 500], ['나강', 700, 1500], ['다강', 2000, 2250], ['마저수지', 1700, 450]]),
+      // By ground height at the nearest node; 나봉 skipped (500 m from 가봉), 차봉 is the ninth.
+      ...named('peak', [['가봉', 1000, 1000], ['다봉', 0, 0], ['라봉', 2000, 0], ['마봉', 0, 2000], ['바봉', 2000, 2000], ['사봉', 1000, 0], ['아봉', 0, 1000], ['자봉', 2000, 1000]]),
+      ...named('pass', [['가재', 300, 300], ['나재', 400, 300], ['다재', 500, 300], ['라재', 600, 300]]),
+    ]);
+    expect(built.log.names).toEqual({ villages: 3, water: 4, peak: 8, pass: 4 });
   });
 
   test('가공: 불변 조건 하나하나', async () => {

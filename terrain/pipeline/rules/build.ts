@@ -1,13 +1,14 @@
 // 가공: 원자료 스냅샷 + 가공 설정 → 지형 파일 bytes, 지형 기대값, 가공 자료 머리 and 가공 기록, in memory. The self-check
 // unpacks the bytes with the app's own unpackTerrain and hashes what the app will see. Writing is build/build.ts.
 import { gunzipSync } from 'node:zlib';
-import { COVER, terrainHash, type Cover, type TerrainData } from '@sim';
+import { COVER, terrainHash, type Cover, type PlaceName, type TerrainData } from '@sim';
 import type { ForestRule } from '@adapters/terrainFile/cellHash';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import type { Clearing, Config, Frame } from '../config';
 import type { Snapshot } from '../snapshot';
 import { layers, SCALE, type Discarded } from './layers';
 import { packTerrain } from './pack';
+import { namesOf, villagesOf } from './names';
 import { compareRoads, roadLines, startsLater, type RoadLog } from './roads';
 
 export const FOREST: ForestRule = { min: 12, max: 17, salt: 0 };
@@ -43,6 +44,7 @@ export interface Log {
   ground: { min: number; max: number; mean: number };
   buildings: { count: number; height: { tag: number; levels: number; default: number }; discarded: Discarded[] };
   roads: RoadLog;
+  names: { villages: number; water: number; peak: number; pass: number };
   size: { body: number; header: number };
 }
 
@@ -82,6 +84,12 @@ export function checkInvariants(t: TerrainData, header: Header): void {
   if (header.ground.kind !== 'DTM') fail(`지면의 종류가 DTM이 아니다 (${header.ground.kind})`);
 }
 
+const count = (names: readonly PlaceName[]) => ({
+  water: names.filter((p) => p.kind === 'water').length,
+  peak: names.filter((p) => p.kind === 'peak').length,
+  pass: names.filter((p) => p.kind === 'pass').length,
+});
+
 /** Percent of cells, two decimals. */
 export const shareOf = (count: number, cells: number): number => Math.round((count * 10000) / cells) / 100;
 
@@ -97,9 +105,11 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
   if (e0 + n * cell > 99_999 || n0 + n * cell > 99_999) stop(`정사각이 100 km 방안 하나를 넘는다 (동 ${e0}–${e0 + n * cell}, 북 ${n0}–${n0 + n * cell})`);
   const L = layers(config, snap);
   const R = roadLines(snap, n, cell);
+  const villages = villagesOf(snap, n, cell);
+  const names = namesOf(snap, L.groundTenths, n, cell);
   const credits = [sources.ground.credit, sources.cover.credit, sources.osm.credit];
   const file = packTerrain(
-    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: R.roads, villages: [], names: [], edge: 'veil', grid: config.grid },
+    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: R.roads, villages, names, edge: 'veil', grid: config.grid },
     SCALE,
     FOREST,
   );
@@ -145,6 +155,7 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
     ground: { min: min / SCALE, max: max / SCALE, mean: Math.round((sum * 100) / SCALE / cells) / 100 },
     buildings: { count: L.buildingCount, height: L.heightFrom, discarded: L.discarded },
     roads: R.log,
+    names: { villages: villages.length, ...count(names) },
     size: { body: body.length, header: body.readUInt32LE(0) },
   };
 
