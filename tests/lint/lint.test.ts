@@ -1,7 +1,17 @@
+import { globSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { ESLint } from 'eslint';
 
-const eslint = new ESLint({ cwd: new URL('../..', import.meta.url).pathname });
+const ROOT = new URL('../..', import.meta.url).pathname;
+const eslint = new ESLint({ cwd: ROOT });
+
+/** What `source` reads from the build environment that is not VITE_OBSERVER_BACKEND: other VITE_ names, and any
+ * import.meta.env not followed by `.VITE_OBSERVER_BACKEND` (computed, aliased or spread reads hide the name). */
+function otherEnvReads(source: string): string[] {
+  const names = (source.match(/\bVITE_\w+/g) ?? []).filter((n) => n !== 'VITE_OBSERVER_BACKEND');
+  const reads = (source.match(/import\.meta\.env\b(?!\.VITE_OBSERVER_BACKEND\b).{0,20}/g) ?? []).map((r) => `읽기: ${r}`);
+  return [...names, ...reads];
+}
 
 /** Rule ids reported for `code` as if it lived at `filePath`. */
 async function rulesFor(filePath: string, code: string): Promise<(string | null)[]> {
@@ -183,5 +193,16 @@ describe('린트', () => {
     for (const code of raw)
       for (const file of ['src/ui/__probe__.tsx', 'src/app/__probe__.tsx']) expect(await rulesFor(file, code), `${file}: ${code}`).toContain('no-restricted-syntax');
     expect(await rulesFor('src/ui/__probe__.tsx', 'export const X = ({ s }: { s: string }) => <b>{s}</b>;')).toEqual([]);
+  });
+
+  test('린트: VITE_ 변수는 하나', () => {
+    // The matcher itself.
+    expect(otherEnvReads('selectBackend(import.meta.env.VITE_OBSERVER_BACKEND); // VITE_OBSERVER_BACKEND')).toEqual([]);
+    for (const code of ['import.meta.env.VITE_API_KEY', 'import.meta.env[k]', 'const e = import.meta.env;', "const k = 'VITE_TOKEN';", 'import.meta.env.MODE'])
+      expect(otherEnvReads(code), code).not.toEqual([]);
+    // The app and the engines pages read the one switch only.
+    const files = globSync('{src/**/*.{ts,tsx},tests/engines/*.ts}', { cwd: ROOT });
+    expect(files.length).toBeGreaterThan(50);
+    for (const file of files) expect(otherEnvReads(readFileSync(ROOT + file, 'utf8')), file).toEqual([]);
   });
 });

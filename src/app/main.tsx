@@ -28,7 +28,8 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { placementOf, selectBackend, terrainSourceOf } from './backend';
+import { loadTerrain, placementOf, selectBackend } from './backend';
+import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame } from './game';
@@ -41,8 +42,8 @@ const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
 // The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
 const { seed, seedKind } = chooseSeed(location.search, Date.now());
-const terrain = await terrainSourceOf(backend).load(seed);
-// After the terrain load, so a real build still stops at the 지형 원천 first.
+// On real: the 받는 중 line until the 지형 자료 is in; a refusal shows the 오류 화면 and stops here (no game, no mock land).
+const terrain = await loadTerrain(backend, seed, bootScreen(document.getElementById('root')!));
 const { scenario, briefing } = placementOf(backend);
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
