@@ -2,7 +2,7 @@
 // weights (demo line 1552); a practice seed takes the preset chosen. Gusts and the weather code are not in the value.
 import type { Weather } from '@sim';
 import type { WeatherPreset, WeatherSource } from '../index';
-import { hash } from './terrain/noise';
+import { hash } from '../terrainFile/cellHash';
 
 const PRESETS: Record<WeatherPreset, Weather> = {
   clear: { visibilityM: 24000, cloudPct: 15, windFromDeg: 285, windSpeedTenthMs: 26, tempTenthC: 94, precipTenthMmH: 0, pressureHpa: 1023, humidityPct: 48 },
