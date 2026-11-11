@@ -283,6 +283,80 @@ describe('가공', () => {
     expect(written).not.toMatch(/gzip|mtime|time/i);
   });
 
+  test('가공: 방안 기준과 정사각', async () => {
+    const plain = snapshot([]);
+    const at = (e0: number, n0: number) => ({ ...SYNTH, grid: { letters: 'CH', e0, n0 } });
+    // A wrong origin: another 1 km square, or the right square with another 1 km remainder than the real position's.
+    for (const [e0, n0] of [[41230, 30490], [40230, 31490], [40330, 30490], [40230, 30590], [40230.5, 30490]])
+      await expectStop(at(e0!, n0!), plain, /^가공: 방안 기준/);
+    // The square stays inside one 100 km square: east 40230 + 24 · 2490 m = 99990 builds, 24 · 2491 m = 100014 stops.
+    const cell = (c: number) => ({ ...SYNTH, frame: { ...SYNTH.frame, cell: c } });
+    await expect(buildTerrain('synth', cell(2490), plain)).resolves.toBeDefined();
+    await expectStop(cell(2491), plain, /^가공: 정사각이 100 km 방안 하나를 넘는다 \(동 40230–100014, 북 30490–90274\)$/);
+  });
+
+  test('가공: 피복 스냅샷의 길이', async () => {
+    // A short cover.bin must not leave its missing cells as open land; a long one must not be cut.
+    for (const len of [N * N - 1, N * N + 1])
+      await expectStop(SYNTH, { ...snapshot([]), cover: new Uint8Array(len).fill(10) }, new RegExp(`^가공: cover\\.bin 길이 ${len} ≠ ${N * N}$`));
+  });
+
+  test('가공: 도로 등급과 그 밖의 선', async () => {
+    const graded = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential'].flatMap((g) => [g, `${g}_link`]);
+    const left: Record<string, string>[] = [{ highway: 'primary', tunnel: 'yes' }, { highway: 'track' }, { highway: 'path' }, { highway: 'service' }, { waterway: 'stream' }];
+    const row = (j: number): [number, number][] => [[0, j * U], [(N - 1) * U, j * U]];
+    const osm = [...graded.map((h, j) => way({ highway: h }, row(j))), ...left.map((tags, j) => way(tags, row(graded.length + j)))];
+    const t = await unpackTerrain((await buildTerrain('synth', SYNTH, snapshot(osm))).file);
+    const coverOf = (j: number) => [...Array(N).keys()].map((i) => name(t.cover[k(i, j)]!));
+    graded.forEach((h, j) => expect(coverOf(j), h).toEqual(Array(N).fill('road')));
+    left.forEach((tags, j) => expect(coverOf(graded.length + j), JSON.stringify(tags)).toEqual(Array(N).fill('forest')));
+  });
+
+  test('가공: 불변 조건 하나하나', async () => {
+    const built = await buildTerrain('synth', SYNTH, snapshot([way({ building: 'yes' }, tiny(3, 3))]));
+    const t = await unpackTerrain(built.file);
+    const fails = (doctored: typeof t, message: RegExp, what: string) => expect(() => checkInvariants(doctored, built.header), what).toThrow(message);
+    for (const layer of ['ground', 'surface', 'buildings', 'cover'] as const)
+      fails({ ...t, [layer]: t[layer].slice(1) }, /^가공: 불변 조건: 층 길이가 격자 크기와 다르다$/, layer);
+    for (const layer of ['surface', 'buildings'] as const) {
+      const inf = { ...t, [layer]: t[layer].slice() };
+      inf[layer][7] = Infinity;
+      fails(inf, /^가공: 불변 조건: 유한하지 않은 값 \(칸 7\)$/, layer);
+    }
+    const negative = { ...t, buildings: t.buildings.slice() };
+    negative.buildings[8] = -0.1;
+    fails(negative, /^가공: 불변 조건: 건물 높이가 음수다 \(칸 8\)$/, 'building height');
+    for (const v of [7, 255]) {
+      const cover = { ...t, cover: t.cover.slice() };
+      cover.cover[9] = v;
+      fails(cover, new RegExp(`^가공: 불변 조건: 피복 번호 ${v} \\(칸 9\\)$`), `cover ${v}`);
+    }
+  });
+
+  test('가공: 높이 태그가 없는 값이면 층수, 지면은 마디마다 0.1 m', async () => {
+    const osm = [
+      way({ building: 'yes', height: 'abc', 'building:levels': '2' }, tiny(4, 4)), // levels: 2 · 3 + 1.5
+      way({ building: 'yes', height: '-3', 'building:levels': '1' }, tiny(6, 4)), // levels: 1 · 3 + 1.5
+      way({ building: 'yes', height: '0', 'building:levels': 'x' }, tiny(8, 4)), // both fail: 6 m
+    ];
+    const snap = snapshot(osm);
+    // Ground in 0.01 m → whole 0.1 m, node by node (no tie on .5).
+    const ground: [number, number][] = [[10004, 1000], [10006, 1001], [9996, 1000], [9994, 999], [12351, 1235], [-1236, -124]];
+    ground.forEach(([v], i) => (snap.ground[k(i, 1)] = v));
+    const built = await buildTerrain('synth', SYNTH, snap);
+    const t = await unpackTerrain(built.file);
+
+    for (const [i, h] of [[4, 7.5], [6, 4.5], [8, 6]] as const) expect(t.buildings[k(i, 4)], `building (${i}, 4)`).toBeCloseTo(h, 5);
+    expect(built.log.buildings.height).toEqual({ tag: 0, levels: 2, default: 1 });
+    expect(built.log.buildings.discarded).toEqual([
+      { id: osm[0]!.id, tag: 'height', value: 'abc' },
+      { id: osm[1]!.id, tag: 'height', value: '-3' },
+      { id: osm[2]!.id, tag: 'height', value: '0' },
+      { id: osm[2]!.id, tag: 'building:levels', value: 'x' },
+    ]);
+    ground.forEach(([v, tenths], i) => expect(Math.round(t.ground[k(i, 1)]! * 10), `ground ${v}`).toBe(tenths));
+  });
+
   // The committed 문경 지형 1판, read with bare readFileSync: a missing file fails, never skips.
   const DATA = 'terrain/mungyeong';
   const SOURCE = 'src/adapters/realTerrain/mungyeong';

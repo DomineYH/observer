@@ -13,7 +13,9 @@ export const WORLDCOVER: readonly (readonly [number, Cover])[] = [
   [10, 'forest'], [20, 'open'], [30, 'open'], [40, 'field'], [50, 'village'], [60, 'open'],
   [70, 'open'], [80, 'water'], [90, 'open'], [95, 'forest'], [100, 'open'],
 ];
-const ROAD = /^(motorway|trunk|primary|secondary|tertiary)(_link)?$|^(unclassified|residential)$/;
+// ponytail: config.json's Overpass query still asks for the old set (no unclassified_link, residential_link); the manifest
+// records that query, so it stays until the next 받기, which must widen it to this set.
+const ROAD = /^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)(_link)?$/;
 const STAMP_STEP = 8; // m between stamped points along a line; below one cell, so no cell is skipped
 
 const c = (name: Cover) => COVER.indexOf(name);
@@ -44,7 +46,8 @@ export function layers(config: Config, snap: Snapshot): Layers {
   const u = cell * 10;
   const cells = n * n;
 
-  // 1. WorldCover → 피복.
+  // 1. WorldCover → 피복. A cover.bin of another length would leave missing cells as 0 (open) or cut extra ones.
+  if (snap.cover.length !== cells) stop(`cover.bin 길이 ${snap.cover.length} ≠ ${cells}`);
   const lookup = new Int16Array(256).fill(-1);
   for (const [v, name] of WORLDCOVER) lookup[v] = c(name);
   const perValue = new Float64Array(256);

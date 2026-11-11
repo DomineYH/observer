@@ -79,6 +79,12 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
   const { frame, sources } = config;
   const { n, cell } = frame;
   const cells = n * n;
+  // 방안 기준: 찰리호텔, origin exactly km square 40/30 plus the real position's 1 km remainders, and the whole square
+  // inside that one 100 km square (no wrap in toGrid).
+  const { letters, e0, n0 } = config.grid;
+  if (letters !== 'CH' || e0 !== 40_000 + (frame.x0 % 1000) || n0 !== 30_000 + (frame.y0 % 1000))
+    stop(`방안 기준이 정한 값이 아니거나 1 km 나머지가 실제 위치와 다르다 (${letters} ${e0} ${n0})`);
+  if (e0 + n * cell > 99_999 || n0 + n * cell > 99_999) stop(`정사각이 100 km 방안 하나를 넘는다 (동 ${e0}–${e0 + n * cell}, 북 ${n0}–${n0 + n * cell})`);
   const L = layers(config, snap);
   const credits = [sources.ground.credit, sources.cover.credit, sources.osm.credit];
   const file = packTerrain(
@@ -131,10 +137,6 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
   };
 
   checkInvariants(t, header);
-  // 방안 기준: 찰리호텔, origin in km square 40/30, and its 1 km remainders equal to the real position's.
-  const { letters, e0, n0 } = config.grid;
-  if (letters !== 'CH' || Math.floor(e0 / 1000) !== 40 || Math.floor(n0 / 1000) !== 30 || e0 % 1000 !== frame.x0 % 1000 || n0 % 1000 !== frame.y0 % 1000)
-    stop(`방안 기준이 정한 값이 아니거나 1 km 나머지가 실제 위치와 다르다 (${letters} ${e0} ${n0})`);
   const ranges = config.coverShare;
   if (ranges === null) {
     const measured = {} as Record<Cover, number>;
