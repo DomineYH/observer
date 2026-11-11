@@ -109,6 +109,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
       )}
       <p>
         <b>주의</b> {briefing.caution} 계획된 관측소 {briefing.plannedOp} {at(scenario.plannedOp)}.
+        {scenario.reserveOps?.length ? ` 예비 관측소 ${scenario.reserveOps.map((p, i) => `예비 ${i + 1} ${at(p)}`).join(', ')}.` : ''}
       </p>
       <p>
         {state.picked
