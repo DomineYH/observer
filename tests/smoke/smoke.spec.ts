@@ -212,9 +212,9 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
   const fresh = await settledMap(page, map);
-  // 화질 is the player's, not the game's: 보통 chosen in prep stays through the weather change.
-  await quality('보통').click();
-  await expect(quality('보통')).toHaveAttribute('aria-pressed', 'true');
+  // 화질 is the player's, not the game's: 높음 chosen in prep stays through the weather change.
+  await quality('높음').click();
+  await expect(quality('높음')).toHaveAttribute('aria-pressed', 'true');
 
   // Prep state the simulation holds and the screen shows: the line of sight turned east (the map's sight wedge) and the
   // binoculars on.
@@ -231,8 +231,8 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
   await expect(tick).toHaveText('0');
-  await expect(quality('보통')).toHaveAttribute('aria-pressed', 'true');
-  await expect(quality('높음')).toHaveAttribute('aria-pressed', 'false');
+  await expect(quality('높음')).toHaveAttribute('aria-pressed', 'true');
+  await expect(quality('보통')).toHaveAttribute('aria-pressed', 'false');
 
   // 작전 개시 runs the new game from that post: its clock moves, and none of the old game's inputs (the turned sight,
   // the binoculars) reach it.
@@ -241,11 +241,11 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   await expect(prep).toContainText('작전 개시 — 찰리호텔 4512 3256 점령.');
   await expect(bino).toHaveAttribute('aria-pressed', 'false');
   expect(await mapPixels(map)).toBe(fresh);
-  // 보통 still applies once the view draws: 2-pixel blocks; 높음 (640 internal pixels) does not draw so.
+  // 높음 still applies once the view draws: 640 internal pixels, no 2-pixel blocks; 보통 (480) draws them.
   const view = page.getByRole('img', { name: '관측 화면' });
-  await expect.poll(() => doubled(view)).toBe(true);
-  await quality('높음').click();
   await expect.poll(() => doubled(view)).toBe(false);
+  await quality('보통').click();
+  await expect.poll(() => doubled(view)).toBe(true);
 });
 
 test('스모크: 보이는 적을 누르면 표적 탭에 표적이 생긴다', async ({ page }) => {
