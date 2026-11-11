@@ -343,6 +343,20 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
   c.stroke();
   c.fillStyle = '#0c1a2a';
   c.fillText('OP', ox + 8, oy + 4);
+  // 예비 관측소: hollow dashed triangles the OP's size, in its ink. Start values; M2-H1 judges them on screen.
+  (sc.reserveOps ?? []).forEach((p, i) => {
+    const x = mx(p.x);
+    const y = my(p.y);
+    c.setLineDash([3, 2]);
+    c.beginPath();
+    c.moveTo(x, y - 7);
+    c.lineTo(x - 6, y + 5);
+    c.lineTo(x + 6, y + 5);
+    c.closePath();
+    c.stroke();
+    c.setLineDash([]);
+    c.fillText(`예비 ${i + 1}`, x + 8, y + 4);
+  });
   if (m.dest) {
     c.strokeStyle = 'rgba(98,174,230,.95)';
     c.setLineDash([4, 3]);

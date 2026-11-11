@@ -8,7 +8,9 @@ import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain, mainRoad } from './terrain';
 import { angleTo, idAt, oneUnit, started } from './enemy';
-import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, untilImpact } from './mission';
+import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, unstarted, untilImpact } from './mission';
+import { cleared } from './end';
+import { TEST_PLACEMENT } from './placement';
 
 type Path = [number, number][];
 
@@ -174,6 +176,33 @@ describe('F-06', () => {
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
+  });
+
+  test('F-06: 예비 관측소 표시', () => {
+    // 0.05 px/m: (4000, 1000) is drawn at (200, 462), (6000, 900) at (300, 467).
+    const t = flatTerrain({ n: 1024 });
+    const scenario = TEST_PLACEMENT.scenario;
+    const fixed: MapMarks = { scenario, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const fromSim = (sim: ReturnType<typeof unstarted>): MapMarks => ({ ...fixed, op: sim.state.op, knownOp: sim.state.op, platoons: sim.state.platoons, mode: sim.state.mode, missions: sim.state.missions, tick: sim.state.tick });
+    const prep = unstarted();
+    const live = emptyField();
+    const ended = cleared().sim;
+    expect([prep, live, ended].map((x) => x.state.phase)).toEqual(['prep', 'live', 'ended']);
+    // Both modes and every 국면: a hollow dashed triangle the OP's size and "예비 N" beside it, for each 예비 관측소.
+    for (const marks of [fixed, { ...fixed, mode: 'training' as const }, fromSim(prep), fromSim(live), fromSim(ended)]) {
+      const { dashes, texts } = draw(t, FULL_VIEW, marks);
+      expect(dashes).toContainEqual([[200, 455], [194, 467], [206, 467]]);
+      expect(dashes).toContainEqual([[300, 460], [294, 472], [306, 472]]);
+      expect(texts).toContainEqual({ text: '예비 1', x: 208, y: 466 });
+      expect(texts).toContainEqual({ text: '예비 2', x: 308, y: 471 });
+    }
+    // The mock scenario has none, and nothing else on the map moves or changes style.
+    const reserve = draw(t, FULL_VIEW, fixed).ops;
+    const base = draw(t, FULL_VIEW, { ...fixed, scenario: BASE_SCENARIO }).ops;
+    expect(base.some((o) => o.op !== 'stroke' && o.text.startsWith('예비'))).toBe(false);
+    const marks = new Set(['200,455', '300,460']);
+    expect(reserve.filter((o) => (o.op === 'stroke' ? !marks.has(String(o.path[0])) : !o.text.startsWith('예비')))).toEqual(base);
+    expect(reserve.length - base.length).toBe(4);
   });
 
   test('F-17: 바람 화살표', () => {
