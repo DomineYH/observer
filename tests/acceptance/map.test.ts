@@ -23,6 +23,8 @@ function recorder() {
   const arcs: [number, number][] = [];
   const texts: { text: string; x: number; y: number }[] = [];
   const rects: [number, number, number, number][] = [];
+  const closed = new Set<Path>(); // paths closed with closePath()
+  const filled = new Set<Path>(); // paths filled with fill()
   // Every stroke and text in drawing order, with the style it was drawn in.
   type Word = { op: 'fillText' | 'strokeText'; text: string; x: number; y: number; font: string; style: string; width: number };
   const ops: ({ op: 'stroke'; path: Path; width: number; style: string } | Word)[] = [];
@@ -55,12 +57,12 @@ function recorder() {
     strokeText: (text, x, y) => word({ op: 'strokeText', text, x, y, font: ctx.font, style: String(ctx.strokeStyle), width: ctx.lineWidth }),
     setLineDash: (d) => void (dashed = [...d].length > 0),
     arc: (x, y) => void arcs.push([x, y]),
-    fill: () => {},
-    closePath: () => {},
+    fill: () => void filled.add(path),
+    closePath: () => void closed.add(path),
     fillRect: () => {},
     strokeRect: (x, y, w, h) => void rects.push([x, y, w, h]),
   };
-  return { ctx, strokes, dashes, arcs, texts, rects, ops, words };
+  return { ctx, strokes, dashes, arcs, texts, rects, ops, words, closed, filled };
 }
 
 const draw = (t: TerrainData, view?: MapView, marks?: MapMarks) => {
@@ -190,9 +192,15 @@ describe('F-06', () => {
     expect([prep, live, ended].map((x) => x.state.phase)).toEqual(['prep', 'live', 'ended']);
     // Both modes and every 국면: a hollow dashed triangle the OP's size and "예비 N" beside it, for each 예비 관측소.
     for (const marks of [fixed, { ...fixed, mode: 'training' as const }, fromSim(prep), fromSim(live), fromSim(ended)]) {
-      const { dashes, texts } = draw(t, FULL_VIEW, marks);
+      const { dashes, texts, closed, filled } = draw(t, FULL_VIEW, marks);
       expect(dashes).toContainEqual([[200, 455], [194, 467], [206, 467]]);
       expect(dashes).toContainEqual([[300, 460], [294, 472], [306, 472]]);
+      const symbols = dashes.filter((p) => p.length === 3 && ['200,455', '300,460'].includes(String(p[0])));
+      expect(symbols).toHaveLength(2);
+      for (const p of symbols) {
+        expect(closed.has(p)).toBe(true);
+        expect(filled.has(p)).toBe(false);
+      }
       expect(texts).toContainEqual({ text: '예비 1', x: 208, y: 466 });
       expect(texts).toContainEqual({ text: '예비 2', x: 308, y: 471 });
     }
