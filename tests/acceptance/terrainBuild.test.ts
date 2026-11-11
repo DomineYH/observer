@@ -374,6 +374,13 @@ describe('가공', () => {
     expect(built.expected.hash).toBe(terrainHash(await unpackTerrain(file)));
   }, 30_000);
 
+  test('가공: 2판의 칸 층은 1판과 같다', async () => {
+    // 1판 had no road lines, villages or names, so with those emptied the hash is 1판's: every cell layer, n, cell, grid
+    // and edge are bit-identical. A later 판 that changes a cell layer on purpose replaces this literal.
+    const t = await unpackTerrain(committedFile());
+    expect(terrainHash({ ...t, roads: [], villages: [], names: [] })).toBe('eb93e51936a69346');
+  });
+
   test('가공: 지형 파일의 머리 키와 크기', () => {
     const file = committedFile();
     const body = gunzipSync(file);
