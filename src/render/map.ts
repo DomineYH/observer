@@ -111,7 +111,7 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     c.strokeStyle = colour;
     for (const road of t.roads) {
       c.beginPath();
-      road.forEach((p, i) => (i ? c.lineTo(mx(p.x), my(p.y)) : c.moveTo(mx(p.x), my(p.y))));
+      road.line.forEach((p, i) => (i ? c.lineTo(mx(p.x), my(p.y)) : c.moveTo(mx(p.x), my(p.y))));
       c.stroke();
     }
   }

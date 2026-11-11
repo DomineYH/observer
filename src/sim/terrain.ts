@@ -20,6 +20,26 @@ export interface GridRef {
   n0: number;
 }
 
+/** 도로 등급. The arrays give the 지형 해시 a stable index, like COVER. */
+export const ROAD_CLASS = ['trunk', 'main', 'local'] as const;
+export type RoadClass = (typeof ROAD_CLASS)[number];
+export const NAME_KIND = ['peak', 'pass', 'water'] as const;
+/** How the map draws outside the square: mirrored terrain or a veil. */
+export const EDGE = ['mirror', 'veil'] as const;
+
+export interface Road {
+  class: RoadClass;
+  line: readonly Point[]; // centreline
+}
+
+/** 지명. */
+export interface PlaceName {
+  name: string;
+  x: number;
+  y: number;
+  kind: (typeof NAME_KIND)[number];
+}
+
 export interface Village {
   name: string;
   x: number;
@@ -29,14 +49,19 @@ export interface Village {
 
 /** 지형 자료. Cell (i, j) is index j*n + i at x = i*cell, y = j*cell. */
 export interface TerrainData {
+  id: string; // 전장 식별자
+  version: number; // 지형 판
+  credits: readonly string[]; // 자료 출처 문구
   n: number;
   cell: number;
   ground: Float32Array; // 지면 높이
   surface: Float32Array; // 지면 + 숲 + 건물
   cover: Uint8Array; // index into COVER
   buildings: Float32Array; // building height per cell, 0 = none
-  roads: readonly (readonly Point[])[]; // centrelines
+  roads: readonly Road[];
   villages: readonly Village[];
+  names: readonly PlaceName[];
+  edge: (typeof EDGE)[number];
   grid: GridRef;
 }
 
@@ -117,8 +142,8 @@ export function terrainHash(t: TerrainData): string {
   }
   h.u32(t.roads.length);
   for (const road of t.roads) {
-    h.u32(road.length);
-    for (const p of road) {
+    h.u32(road.line.length);
+    for (const p of road.line) {
       h.f64(p.x);
       h.f64(p.y);
     }

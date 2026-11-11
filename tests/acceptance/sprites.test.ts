@@ -9,7 +9,7 @@ import { drawEffects } from '@render/effects';
 import { createViewBuffers } from '@render/voxel';
 import { drawSprites, spritesOf, type Sprite, type SpriteContext } from '@render/sprites';
 import { mortarAt, oneUnit, run, started, until } from './enemy';
-import { flatTerrain } from './terrain';
+import { flatTerrain, mainRoad } from './terrain';
 
 const W = 640;
 const EYE = { x: 320, y: 320, z: 103.5 };
@@ -165,7 +165,7 @@ describe('F-27: 아군', () => {
     const FRIEND = { x: 640, y: 900 };
     const scenario = { ...oneUnit({ type: 'recon', route: 'A', t0: 9999 }), friends: [FRIEND], supplyRoad: 1 };
     const field = (rows: number[] = []) => {
-      const t = { ...flatTerrain({ n: 256 }), roads: [[], [{ x: 400, y: 400 }, { x: 400, y: 1400 }]] };
+      const t = { ...flatTerrain({ n: 256 }), roads: [mainRoad([]), mainRoad([{ x: 400, y: 400 }, { x: 400, y: 1400 }])] };
       for (const j of rows) for (let i = 0; i < t.n; i++) t.surface[j * t.n + i]! += 50;
       return t;
     };

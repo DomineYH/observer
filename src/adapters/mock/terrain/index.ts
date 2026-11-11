@@ -1,6 +1,6 @@
 // mock 지형 원천: seeded procedural terrain (demo lines 200–262). Headless and deterministic: it follows the
 // simulation's bans and uses only 결정적 수학 from sim, because server replay regenerates it from the seed.
-import type { COVER, Point, TerrainData } from '@sim';
+import type { COVER, Point, Road, TerrainData } from '@sim';
 import { cos, exp, sin } from '@sim/math';
 import type { TerrainSource } from '../../index';
 import { CELL, FRIEND_HILLS, GRID, N, OP_HILL, ROADS, VILLAGES } from './features';
@@ -70,7 +70,7 @@ export function generateTerrain(seed: number): TerrainData {
   }
 
   // 도로: rasterised every 8 m, centreline kept every 40 m for the map
-  const roads = ROADS.map((waypoints) => {
+  const roads = ROADS.map((waypoints): Road => {
     const line: Point[] = [];
     for (let s = 1; s < waypoints.length; s++) {
       const a = waypoints[s - 1]!;
@@ -85,7 +85,7 @@ export function generateTerrain(seed: number): TerrainData {
         if (i >= 0 && i < N && j >= 0 && j < N) road[j * N + i] = 1;
       }
     }
-    return line;
+    return { class: 'main', line };
   });
 
   // 건물: draws come from the salted hash, one counter per village
@@ -134,6 +134,9 @@ export function generateTerrain(seed: number): TerrainData {
     }
 
   return {
+    id: 'mock',
+    version: 1,
+    credits: [],
     n: N,
     cell: CELL,
     ground,
@@ -142,6 +145,8 @@ export function generateTerrain(seed: number): TerrainData {
     buildings,
     roads,
     villages: VILLAGES.map(({ name, x, y, r }) => ({ name, x, y, r })),
+    names: [],
+    edge: 'mirror',
     grid: GRID,
   };
 }

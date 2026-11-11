@@ -29,8 +29,8 @@ describe('F-25', () => {
     expect(terrain.villages.map((v) => v.name)).toEqual(['청계읍', '새터마을', '솔미리', '아랫말', '갈골', '북원리', '윗말']);
     expect(terrain.roads).toHaveLength(6);
     for (const road of terrain.roads) {
-      expect(road.length).toBeGreaterThan(10);
-      for (const p of road) if (p.x >= 0 && p.y >= 0 && p.x < n * cell && p.y < n * cell) expect(is(at(p.x, p.y), 'road')).toBe(true);
+      expect(road.line.length).toBeGreaterThan(10);
+      for (const p of road.line) if (p.x >= 0 && p.y >= 0 && p.x < n * cell && p.y < n * cell) expect(is(at(p.x, p.y), 'road')).toBe(true);
     }
     for (const v of terrain.villages) {
       let houses = 0;
@@ -61,6 +61,21 @@ describe('좌표', () => {
       expect(e0 + p.x, `${p.x},${p.y}`).toBeLessThanOrEqual(99999);
       expect(n0 + p.y, `${p.x},${p.y}`).toBeGreaterThanOrEqual(0);
       expect(n0 + p.y, `${p.x},${p.y}`).toBeLessThanOrEqual(99999);
+    }
+  });
+});
+
+describe('지형 계약', () => {
+  test('지형 계약: mock의 값', () => {
+    expect(terrain.id).toBe('mock');
+    expect(terrain.version).toBe(1);
+    expect(terrain.credits).toEqual([]);
+    expect(terrain.names).toEqual([]);
+    expect(terrain.edge).toBe('mirror');
+    expect(terrain.roads).toHaveLength(6);
+    for (const road of terrain.roads) {
+      expect(road.class).toBe('main');
+      expect(road.line.length).toBeGreaterThan(10);
     }
   });
 });
