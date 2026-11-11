@@ -20,8 +20,8 @@ DIALOGS = ((re.compile(r'hooks need review.*(esc close|t trust all|Lifecycle hoo
            (re.compile(r'trust this folder', re.I), ['enter']))
 UNKNOWN = 'unknown'  # some other hooks screen (for example cut off): no keys, the host looks
 # each harness's own input-box mark: `agent start` can report ready while the shell still shows (agy, 2026-11-11)
-READY = {'agy': re.compile(r'\? for shortcuts'), 'codex': re.compile(r'Ask Codex'),
-         'claude': re.compile(r'^❯(?![ \t]*\d)', re.M)}  # the prompt line, not a `❯ 1.` menu choice
+# claude: the input footer from --dangerously-skip-permissions; its `❯` prompt glyph is a shell prompt too
+READY = {'agy': re.compile(r'\? for shortcuts'), 'codex': re.compile(r'Ask Codex'), 'claude': re.compile(r'bypass permissions on')}
 
 
 def dialog_keys(screen):
@@ -135,14 +135,20 @@ def dispatch(a, run=sh, sleep=time.sleep):
     if code:
         return 2, f'REFUSED could not record pane {pane}: ' + ' | '.join(lines[:3])
 
-    screen = screen_of(run, pane)
-    for _ in range(0 if a.no_start else 3):  # answer known startup dialogs, even when start reported ready
+    screen, rounds, mark = screen_of(run, pane), 0, None if a.no_start else READY.get(harness)
+    for _ in range(0 if a.no_start else 30):  # answer known startup dialogs (3 rounds), then wait up to 30 s for the mark
         keys = None if screen is None else dialog_keys(screen)
-        if keys in (None, UNKNOWN):
+        if screen is None or keys == UNKNOWN or rounds == 3 and keys:
             break
-        run(['herdr', 'pane', 'send-keys', pane, *keys])
-        sleep(3)
-        started = started or agent(run, a.name).get('interactive_ready') is True
+        if not keys and (not mark or mark.search(screen)):
+            break
+        if keys:
+            rounds += 1
+            run(['herdr', 'pane', 'send-keys', pane, *keys])
+            sleep(3)
+            started = started or agent(run, a.name).get('interactive_ready') is True
+        else:
+            sleep(1)
         screen = screen_of(run, pane)
     if screen is None:
         return 3, f'MANUAL screen unreadable: herdr pane read {pane} failed; check {a.name} by hand, then rerun with --no-start'
@@ -152,14 +158,8 @@ def dispatch(a, run=sh, sleep=time.sleep):
             print(screen.rstrip(), file=sys.stderr)
         what = 'unknown hooks screen' if keys == UNKNOWN else 'not ready'
         return 3, f'MANUAL {what}: {a.name} in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
-    mark = None if a.no_start else READY.get(harness)
-    for _ in range(30 if mark else 0):  # poll the screen for up to 30 s
-        if screen is not None and mark.search(screen):
-            break
-        sleep(1)
-        screen = screen_of(run, pane)
-    if mark and (screen is None or not mark.search(screen)):
-        if screen and screen.strip():
+    if mark and not mark.search(screen):
+        if screen.strip():
             print(screen.rstrip(), file=sys.stderr)
         return 3, f'MANUAL not ready: {a.name} shows no ready mark in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
     if not a.no_start and harness == 'opencode':
@@ -180,6 +180,12 @@ def dispatch(a, run=sh, sleep=time.sleep):
         sleep(3)
         status = agent(run, a.name).get('agent_status')
         after = screen_of(run, pane)
+        keys = None if after is None else dialog_keys(after)
+        if keys and keys != UNKNOWN:  # codex can show its hooks screen after taking the prompt (2026-11-11): answer once
+            run(['herdr', 'pane', 'send-keys', pane, *keys])
+            sleep(3)
+            status = agent(run, a.name).get('agent_status')
+            after = screen_of(run, pane)
         status = 'screen-unreadable' if after is None else 'startup-dialog-on-screen' if dialog_keys(after) else status
     if status != 'working':
         return 4, f'NOT_WORKING {a.order_id} pane={pane} status={status}'
@@ -224,7 +230,9 @@ def self_test():
         def order(oid, body=None):
             (ORDERS / f'{oid}.md').write_text(body if body is not None else f'# Work order {oid} (revision 1)\n\n## Objective\nx\n\n' + report.replace('@ORDER@', oid))
 
-        def fake(statuses, harness='claude', start_rc=0, screens=('❯ ',), prompt_rc=0, ready=True):
+        claude_ui = '────\n❯ \n────\n  ⏵⏵ bypass permissions on (shift+tab to cycle)\n'  # footer seen live 2026-11-11
+
+        def fake(statuses, harness='claude', start_rc=0, screens=(claude_ui,), prompt_rc=0, ready=True):
             calls, seen, shown = [], iter(statuses), iter(screens)
 
             def run(args):
@@ -297,7 +305,6 @@ def self_test():
             run, calls = fake(['idle', 'working'], harness='agy', screens=[shell])  # the mark never comes
             code, last = dispatch(a, run, nap)
         assert code == 3 and last.startswith('MANUAL not ready: w shows no ready mark') and 'prompt' not in calls, (last, calls)
-        assert READY['claude'].search(' ❯ 1. Yes, I trust this folder\n❯ 2. No') is None and READY['claude'].search('──\n❯ \n──')
         # R2: a failed prompt is never a dispatch
         run, calls = fake(['idle', 'working'], prompt_rc=1)
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 prompt failed (exit 1)') and calls.count('send-keys') == 0
@@ -316,7 +323,7 @@ def self_test():
         assert dispatch(a, run, nap)[1].startswith('MANUAL screen unreadable') and 'prompt' not in calls
         run, calls = fake(['idle', 'idle', 'working'], screens=[None])
         assert dispatch(no_start, run, nap)[0] == 3 and 'prompt' not in calls
-        run, calls = fake(['idle', 'working'], screens=['❯ ', None])
+        run, calls = fake(['idle', 'working'], screens=[claude_ui, None])
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 status=screen-unreadable')
         # L1/D4: each codex dialog by its own text; any other hooks screen stops with no keys
         hooks_new = ('⚠ 3 hooks need review before they can run.\n\n  .codex/hooks.toml: 3 hooks\n\n'
@@ -333,9 +340,9 @@ def self_test():
             run, calls = fake(['idle'], screens=[combined])
             code, last = dispatch(a, run, nap)
             assert last.startswith('MANUAL unknown hooks screen') and not any(c.startswith('pane-keys') for c in calls), calls
-        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_new, '❯ '])
+        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_new, claude_ui])
         assert dispatch(a, run, nap)[0] == 0 and 'pane-keys esc' in calls and calls.index('pane-keys esc') < calls.index('prompt')
-        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_old, '❯ '])
+        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_old, claude_ui])
         assert dispatch(a, run, nap)[0] == 0 and 'pane-keys down down enter' in calls
         with contextlib.redirect_stderr(io.StringIO()):
             run, calls = fake(['idle'], screens=[hooks_new])  # the screen never closes
@@ -343,8 +350,34 @@ def self_test():
             run, calls = fake(['idle'], screens=[truncated])
             code, last = dispatch(a, run, nap)
             assert code == 3 and last.startswith('MANUAL unknown hooks screen') and not any(c.startswith('pane-keys') for c in calls), calls
-        run, calls = fake(['idle', 'working'], screens=['❯ ', hooks_new])  # a dialog after the prompt: it never arrived
+        run, calls = fake(['idle', 'working'], screens=[claude_ui, hooks_new])  # a dialog after the prompt: it never arrived
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 status=startup-dialog-on-screen')
+        # o3 review F3: a shell prompt with `❯` is not claude's input box
+        with contextlib.redirect_stderr(io.StringIO()):
+            run, calls = fake(['idle', 'working'], screens=['~/wt/observer\n❯ '])
+            code, last = dispatch(a, run, nap)
+        assert code == 3 and last.startswith('MANUAL not ready') and 'prompt' not in calls  # o3
+        # o3 review F1: dialogs during the ready wait; an unknown hooks screen gets no keys and no prompt
+        codex_ui = '› Ask Codex to do anything\n'
+        with contextlib.redirect_stderr(io.StringIO()):
+            run, calls = fake(['idle', 'working'], harness='codex', screens=[shell, 'Hooks need review\nAsk Codex'])
+            code, last = dispatch(a, run, nap)
+        assert code == 3 and last.startswith('MANUAL unknown hooks screen') and 'prompt' not in calls  # o3
+        assert not any(c.startswith('pane-keys') for c in calls)  # o3
+        run, calls = fake(['idle', 'working'], harness='codex', screens=[shell, hooks_new, codex_ui])
+        code, last = dispatch(a, run, nap)
+        assert code == 0 and 'pane-keys esc' in calls and calls.index('pane-keys esc') < calls.index('prompt')  # o3
+        # o3 review F2: a failed read during the wait stops at once
+        run, calls = fake(['idle', 'working'], harness='agy', screens=[shell, None])
+        code, last = dispatch(a, run, nap)
+        assert code == 3 and last.startswith('MANUAL screen unreadable') and calls.count('read') == 2 and 'prompt' not in calls  # o3
+        # o3 item 4: codex takes the prompt, then shows its hooks screen: answered once, then confirmed
+        run, calls = fake(['idle', 'working'], harness='codex', screens=[codex_ui, hooks_new, codex_ui])
+        code, last = dispatch(a, run, nap)
+        assert code == 0 and calls.count('pane-keys esc') == 1 and calls.index('prompt') < calls.index('pane-keys esc')  # o3
+        run, calls = fake(['idle', 'working'], harness='codex', screens=[codex_ui, truncated])
+        code, last = dispatch(a, run, nap)
+        assert code == 4 and last.endswith('status=startup-dialog-on-screen') and not any(c.startswith('pane-keys') for c in calls)  # o3
         # R3: without jsonschema the record check refuses before any herdr call
         saved, sys.modules['jsonschema'] = sys.modules.get('jsonschema'), None
         try:
