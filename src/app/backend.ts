@@ -14,7 +14,18 @@ export function selectBackend(value: string | undefined): Backend {
   throw new Error(`VITE_OBSERVER_BACKEND=${JSON.stringify(value)}: mock 또는 real이어야 한다`);
 }
 
-// 이음매 표, started with the 지형 원천 (M2-10 finishes it): real is the 문경 지형 파일, checked by the sim's 지형 해시.
+// 이음매 표: what each seam is under VITE_OBSERVER_BACKEND. Only the first two rows differ, and they are the two records
+// below; the others are wired in main.tsx the same way on both.
+//
+// | 이음매      | mock                                       | real                                                  |
+// | ----------- | ------------------------------------------ | ----------------------------------------------------- |
+// | 지형 원천   | mockTerrain: the seed makes the land       | realTerrain(MUNGYEONG): the 문경 지형 파일, any seed, |
+// |             |                                            | checked by the sim's 지형 해시                        |
+// | 배치        | MOCK_PLACEMENT (base@1)                    | MUNGYEONG_PLACEMENT (base-mungyeong@1)                |
+// | 기상        | mockWeather                                | mockWeather                                           |
+// | 계정        | mockAccount (this browser's localStorage)  | mockAccount (this browser's localStorage)             |
+// | 기록 보관소 | mockArchive (this browser's localStorage)  | mockArchive (this browser's localStorage)             |
+// | 음성 출력   | webSpeech, or silentVoice without speechSynthesis in the browser (not chosen by the backend) | same     |
 const TERRAIN: Record<Backend, TerrainSource> = { mock: mockTerrain, real: realTerrain(MUNGYEONG, terrainHash) };
 
 export const terrainSourceOf = (backend: Backend): TerrainSource => TERRAIN[backend];
