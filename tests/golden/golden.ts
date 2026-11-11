@@ -18,12 +18,25 @@ export const headerVersions = (d: ReplayData): Versions => ({
   scenario: d.scenario,
 });
 
+function sameIds(a: Versions, b: Versions, what: string): void {
+  for (const k of ['terrain', 'scenario'] as const) if (a[k].id !== b[k].id) throw new Error(`${what} ${k} ${a[k].id} is not ${b[k].id}`);
+}
+
+/** The header a golden is replayed and written with: the script's, at the code's versions (mock terrain stays absent).
+ * Throws when a terrain or scenario id differs. */
+export function currentHeader(d: ReplayData, now: Versions): ReplayData {
+  sameIds(headerVersions(d), now, 'script');
+  const h: ReplayData = { ...d, simVersion: now.simVersion, scenario: now.scenario };
+  if (now.terrain.id === 'mock') delete h.terrain;
+  else h.terrain = now.terrain;
+  return h;
+}
+
 /** 골든 다시 만들기: write when there is no file, or when some version is bigger on the code side and none smaller.
  * Throws when a terrain or scenario id differs or any version is smaller. */
 export function shouldWrite(golden: Versions | null, now: Versions): boolean {
   if (!golden) return true;
-  for (const k of ['terrain', 'scenario'] as const)
-    if (golden[k].id !== now[k].id) throw new Error(`golden ${k} ${golden[k].id} is not ${now[k].id}`);
+  sameIds(golden, now, 'golden');
   const pairs = [
     ['simVersion', golden.simVersion, now.simVersion],
     ['terrain', golden.terrain.version, now.terrain.version],
