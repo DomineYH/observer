@@ -1,5 +1,6 @@
 // 작전 준비 (F-22, demo lines 922–936): the briefing, the seed and weather, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
+// The 지형 자료's 자료 출처 lines close the prep screen; the mock land has none, so its screen is unchanged.
 import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
 import type { Briefing } from '@content/placement';
@@ -120,6 +121,11 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
       <button type="button" onClick={() => pressStart({ state, live, queued, send })}>
         관측소 점령 · 작전 개시
       </button>
+      {terrain.credits.map((c) => (
+        <p key={c}>
+          <small>{c}</small>
+        </p>
+      ))}
     </section>
   );
 }
