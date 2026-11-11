@@ -8,7 +8,7 @@ import type { Clearing, Config, Frame } from '../config';
 import type { Snapshot } from '../snapshot';
 import { layers, SCALE, type Discarded } from './layers';
 import { packTerrain } from './pack';
-import { namesOf, villagesOf } from './names';
+import { gap2, NAME_CAP, namesOf, PEAK_GAP, villagesOf } from './names';
 import { compareRoads, roadLines, startsLater, type RoadLog } from './roads';
 
 export const FOREST: ForestRule = { min: 12, max: 17, salt: 0 };
@@ -55,6 +55,8 @@ export interface Built {
   log: Log;
 }
 
+const NAME_ORDER = ['water', 'peak', 'pass'] as const;
+
 const stop = (why: string): never => {
   throw new Error(`가공: ${why}`);
 };
@@ -81,6 +83,17 @@ export function checkInvariants(t: TerrainData, header: Header): void {
     if (startsLater(r.line)) fail(`도로선 ${i}이 남쪽(같으면 서쪽) 끝에서 시작하지 않는다`);
     if (i > 0 && compareRoads(t.roads[i - 1]!, r) > 0) fail(`도로선 ${i - 1}과 ${i}의 순서가 규칙과 다르다`);
   });
+  t.villages.forEach((v, i) => inside(v) || fail(`마을 ${i}이 정사각 밖이다`));
+  t.names.forEach((p, i) => {
+    if (!inside(p)) fail(`지명 ${i}이 정사각 밖이다`);
+    if (i > 0 && NAME_ORDER.indexOf(p.kind) < NAME_ORDER.indexOf(t.names[i - 1]!.kind)) fail(`지명 ${i}의 종류가 물 → 산 → 고개 순서가 아니다`);
+    if (p.kind === 'peak')
+      t.names.forEach((q, j) => j < i && q.kind === 'peak' && gap2(p, q) < PEAK_GAP * PEAK_GAP && fail(`지명 ${j}과 ${i}의 산이 1 km보다 가깝다`));
+  });
+  for (const kind of NAME_ORDER) {
+    const count = t.names.filter((p) => p.kind === kind).length;
+    if (count > NAME_CAP[kind]) fail(`지명 ${kind}이 ${NAME_CAP[kind]}개를 넘는다 (${count})`);
+  }
   if (header.ground.kind !== 'DTM') fail(`지면의 종류가 DTM이 아니다 (${header.ground.kind})`);
 }
 

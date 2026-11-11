@@ -450,6 +450,32 @@ describe('가공', () => {
     expect(built.log.names).toEqual({ villages: 3, water: 4, peak: 8, pass: 4 });
   });
 
+  test('가공: 지명 규칙 위반에서 멈춘다', async () => {
+    // Picking keeps the caps and the gap, so no snapshot reaches these stops: the exported checks on doctored lists, as in
+    // 가공: 멈춤 목록 (whose DSM case shows that a checkInvariants stop writes nothing).
+    const cfg = { ...SYNTH, frame: { ...SYNTH.frame, cell: 100 } }; // square 0 … 2300 m
+    const built = await buildTerrain('synth', cfg, snapshot([]));
+    const t = await unpackTerrain(built.file);
+    const at = (kind: 'water' | 'peak' | 'pass', x: number, y: number, name = `${kind}${x},${y}`) => ({ name, x, y, kind });
+    const ok = (names: ReturnType<typeof at>[]) => expect(() => checkInvariants({ ...t, names }, built.header)).not.toThrow();
+    const fails = (names: ReturnType<typeof at>[], message: RegExp) => expect(() => checkInvariants({ ...t, names }, built.header)).toThrow(message);
+    const grid = [0, 1000, 2000].flatMap((x) => [0, 1000, 2000].map((y) => at('peak', x, y)));
+    const row = (kind: 'water' | 'pass', count: number) => [...Array(count).keys()].map((i) => at(kind, i * 10, 50));
+
+    ok([...row('water', 4), ...grid.slice(0, 8), ...row('pass', 4)]);
+    fails(grid, /^가공: 불변 조건: 지명 peak이 8개를 넘는다 \(9\)$/);
+    fails(row('pass', 5), /^가공: 불변 조건: 지명 pass이 4개를 넘는다 \(5\)$/);
+    fails(row('water', 5), /^가공: 불변 조건: 지명 water이 4개를 넘는다 \(5\)$/);
+    ok([at('peak', 0, 0), at('peak', 0, 1000)]);
+    fails([at('peak', 0, 0), at('peak', 0, 999)], /^가공: 불변 조건: 지명 0과 1의 산이 1 km보다 가깝다$/);
+    fails([at('peak', 0, 0), at('water', 500, 500)], /^가공: 불변 조건: 지명 1의 종류가 물 → 산 → 고개 순서가 아니다$/);
+    fails([at('pass', 0, 0), at('peak', 500, 500)], /^가공: 불변 조건: 지명 1의 종류가 물 → 산 → 고개 순서가 아니다$/);
+    ok([at('water', 2300, 2300)]);
+    fails([at('water', 2301, 0)], /^가공: 불변 조건: 지명 0이 정사각 밖이다$/);
+    fails([at('pass', 0, -1)], /^가공: 불변 조건: 지명 0이 정사각 밖이다$/);
+    expect(() => checkInvariants({ ...t, villages: [{ name: '리', x: -1, y: 0, r: 170 }] }, built.header)).toThrow(/^가공: 불변 조건: 마을 0이 정사각 밖이다$/);
+  });
+
   test('가공: 불변 조건 하나하나', async () => {
     const built = await buildTerrain('synth', SYNTH, snapshot([way({ building: 'yes' }, tiny(3, 3))]));
     const t = await unpackTerrain(built.file);
