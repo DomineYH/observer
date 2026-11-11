@@ -3,10 +3,10 @@ import { describe, expect, test } from 'vitest';
 import type { TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
-import { drawMap, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
+import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
-import { flatTerrain } from './terrain';
+import { flatTerrain, mainRoad } from './terrain';
 import { angleTo, idAt, oneUnit, started } from './enemy';
 import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, untilImpact } from './mission';
 
@@ -21,6 +21,11 @@ function recorder() {
   const arcs: [number, number][] = [];
   const texts: { text: string; x: number; y: number }[] = [];
   const rects: [number, number, number, number][] = [];
+  // Every stroke and text in drawing order, with the style it was drawn in.
+  type Word = { op: 'fillText' | 'strokeText'; text: string; x: number; y: number; font: string; style: string; width: number };
+  const ops: ({ op: 'stroke'; path: Path; width: number; style: string } | Word)[] = [];
+  const words: Word[] = []; // the text ops alone
+  const word = (w: Word) => void (ops.push(w), words.push(w));
   const ctx: MapContext = {
     imageSmoothingEnabled: true,
     lineCap: 'butt',
@@ -37,11 +42,15 @@ function recorder() {
     moveTo: (x, y) => void path.push([x, y]),
     lineTo: (x, y) => void path.push([x, y]),
     stroke: () => {
+      ops.push({ op: 'stroke', path, width: ctx.lineWidth, style: String(ctx.strokeStyle) });
       strokes.push(path);
       if (dashed) dashes.push(path);
     },
-    fillText: (text, x, y) => void texts.push({ text, x, y }),
-    strokeText: () => {},
+    fillText: (text, x, y) => {
+      word({ op: 'fillText', text, x, y, font: ctx.font, style: String(ctx.fillStyle), width: ctx.lineWidth });
+      texts.push({ text, x, y });
+    },
+    strokeText: (text, x, y) => word({ op: 'strokeText', text, x, y, font: ctx.font, style: String(ctx.strokeStyle), width: ctx.lineWidth }),
     setLineDash: (d) => void (dashed = [...d].length > 0),
     arc: (x, y) => void arcs.push([x, y]),
     fill: () => {},
@@ -49,7 +58,7 @@ function recorder() {
     fillRect: () => {},
     strokeRect: (x, y, w, h) => void rects.push([x, y, w, h]),
   };
-  return { ctx, strokes, dashes, arcs, texts, rects };
+  return { ctx, strokes, dashes, arcs, texts, rects, ops, words };
 }
 
 const draw = (t: TerrainData, view?: MapView, marks?: MapMarks) => {
@@ -283,3 +292,111 @@ describe('F-06', () => {
     expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(false);
   });
 });
+
+describe('지도', () => {
+  test('지도: 문경 방안 기준의 방안선 자리', () => {
+    const t = flatTerrain({ n: 1024, grid: { letters: 'CH', e0: 40230, n0: 30490 } });
+    const km = gridLines(t, 1000);
+    const at = (axis: 'e' | 'n') => km.filter((l) => l.axis === axis).map((l) => [Math.round(l.at * 1e6) / 1e6, l.label]);
+    expect(at('e')).toEqual([...Array(10).keys()].map((k) => [770 + 1000 * k, String(41 + k)]));
+    expect(at('n')).toEqual([...Array(10).keys()].map((k) => [510 + 1000 * k, String(31 + k)]));
+    // 100 m lines: every one 70 m (east) and 10 m (north) past the hundred; no line on the map's edges.
+    const fine = gridLines(t, 100);
+    const rem = (axis: 'e' | 'n') => new Set(fine.filter((l) => l.axis === axis).map((l) => Math.round(l.at) % 100));
+    expect(rem('e')).toEqual(new Set([70]));
+    expect(rem('n')).toEqual(new Set([10]));
+    expect(fine.filter((l) => l.axis === 'e')).toHaveLength(102);
+  });
+
+  test('지도: 도로 등급별 굵기와 긋는 순서', async () => {
+    const CASING = 'rgba(60,40,20,.75)';
+    const INNER = 'rgba(250,240,215,.95)';
+    const roadOps = (r: ReturnType<typeof draw>) =>
+      r.ops.flatMap((o) => (o.op === 'stroke' && (o.style === CASING || o.style === INNER) ? [[o.style === CASING ? 'casing' : 'inner', o.width, o.path] as const] : []));
+    // 0.8 px/m on the 640 m flat terrain.
+    const line = (y: number) => [{ x: 0, y }, { x: 640, y }];
+    const at = (y: number): Path => [[0, 512 - y * 0.8], [512, 512 - y * 0.8]];
+    const t: TerrainData = { ...flatTerrain(), roads: [{ class: 'trunk', line: line(100) }, { class: 'local', line: line(200) }, mainRoad(line(300))] };
+    expect(roadOps(draw(t))).toEqual([
+      ['casing', 4.4, at(100)],
+      ['casing', 2.0, at(200)],
+      ['casing', 3.2, at(300)],
+      ['inner', 0.9, at(200)],
+      ['inner', 1.6, at(300)],
+      ['inner', 2.8, at(100)],
+    ]);
+    // The mock's roads are all main: the demo line, casings first, both in data order.
+    const mock = await mockTerrain.load(20261106);
+    const k = 512 / 10240;
+    const path = (r: (typeof mock.roads)[number]): Path => r.line.map((p) => [p.x * k, 512 - p.y * k]);
+    expect(mock.roads.every((r) => r.class === 'main')).toBe(true);
+    expect(roadOps(draw(mock))).toEqual([...mock.roads.map((r) => ['casing', 3.2, path(r)]), ...mock.roads.map((r) => ['inner', 1.6, path(r)])]);
+  }, 30000);
+
+  test('지도: 방안 숫자의 흰 테두리', async () => {
+    // Every 방안 숫자, on the mock and zoomed in, has its white 3 px edge stroked just before it is filled.
+    const mock = await mockTerrain.load(20261106);
+    for (const view of [FULL_VIEW, { z: 3, x0: 100, y0: 200 }]) {
+      const { ops } = draw(mock, view);
+      const digits = ops.flatMap((o, i) => (o.op === 'fillText' && /^\d\d$/.test(o.text) ? [{ i, o }] : []));
+      expect(digits.length).toBeGreaterThan(5);
+      for (const { i, o } of digits) {
+        expect(ops[i - 1]).toMatchObject({ op: 'strokeText', text: o.text, x: o.x, y: o.y, width: 3, style: 'rgba(255,255,255,.8)', font: '9px monospace' });
+        expect(o).toMatchObject({ font: '9px monospace', style: 'rgba(20,25,40,.85)' });
+      }
+      // The 방안선 themselves stay 1 px.
+      expect(ops.filter((o) => o.op === 'stroke' && o.style.startsWith('rgba(20,30,60,')).every((o) => o.op === 'stroke' && o.width === 1)).toBe(true);
+    }
+  }, 30000);
+
+  test('지도: 이름표 건너뛰기', async () => {
+    // 0.05 px/m at ×1. Two villages 200 m apart (10 px): their labels overlap at ×1 but not at ×8 (80 px).
+    const t: TerrainData = {
+      ...flatTerrain({ n: 1024 }),
+      villages: [
+        { name: '작은마을', x: 5200, y: 5000, r: 110 },
+        { name: '큰마을', x: 5000, y: 5000, r: 330 },
+        // Same 반경: the one listed first wins.
+        { name: '앞마을', x: 2000, y: 2000, r: 170 },
+        { name: '뒷마을', x: 2100, y: 2000, r: 170 },
+      ],
+    };
+    const names = (view: MapView, only = /마을/) => draw(t, view).words.filter((o) => only.test(o.text)).map((o) => [o.op, o.text]);
+    // The bigger village is drawn first; the smaller one, overlapping it, is skipped (edge and letters both).
+    expect(names(FULL_VIEW)).toEqual([['strokeText', '큰마을'], ['fillText', '큰마을'], ['strokeText', '앞마을'], ['fillText', '앞마을']]);
+    // Zoomed in on them, both come back (painted in data order).
+    expect(names(centreOn(t, FULL_VIEW, { x: 5100, y: 5000 }, 8), /큰|작은/).map(([, n]) => n)).toEqual(['작은마을', '작은마을', '큰마을', '큰마을']);
+    expect(names(centreOn(t, FULL_VIEW, { x: 2050, y: 2000 }, 8), /앞|뒷/).map(([, n]) => n)).toEqual(['앞마을', '앞마을', '뒷마을', '뒷마을']);
+    // The mock skips none at ×1.
+    const mock = await mockTerrain.load(20261106);
+    const drawn = draw(mock).texts.map((x) => x.text);
+    for (const v of mock.villages) expect(drawn).toContain(v.name);
+  }, 30000);
+
+  test('지도: 지명', () => {
+    // 0.05 px/m at ×1: (5000, 5000) is drawn at (250, 262).
+    const bare: TerrainData = { ...flatTerrain({ n: 1024 }), villages: [{ name: '큰마을', x: 5000, y: 5000, r: 330 }] };
+    const t: TerrainData = {
+      ...bare,
+      names: [
+        { name: '남강', x: 2000, y: 3000, kind: 'water' },
+        { name: '큰산', x: 8000, y: 8000, kind: 'peak' },
+        { name: '겹친봉', x: 5000, y: 5300, kind: 'peak' }, // on top of the village's label: skipped like one
+        { name: '새고개', x: 3000, y: 8000, kind: 'pass' },
+      ],
+    };
+    const lettering = draw(t).words.filter((o) => !/^\d\d$/.test(o.text));
+    // After the village names, in data order, each on its white edge; only water in dark blue; no 표고 numbers.
+    expect(lettering.map((o) => [o.op, o.text])).toEqual(
+      ['큰마을', '남강', '큰산', '새고개'].flatMap((n) => [['strokeText', n], ['fillText', n]]),
+    );
+    const fills = lettering.filter((o) => o.op === 'fillText');
+    for (const o of lettering.slice(2)) expect(o).toMatchObject({ font: '9px monospace' });
+    for (const o of lettering.filter((o) => o.op === 'strokeText')) expect(o).toMatchObject({ width: 3, style: 'rgba(255,255,255,.8)' });
+    expect(fills.map((o) => o.style)).toEqual(['#2a2418', '#1a3c78', '#2a2418', '#2a2418']);
+    expect(fills[1]).toMatchObject({ x: 100, y: 365 }); // centred on its point
+    // No 지명: nothing more than the village name.
+    expect(draw(bare).words.filter((o) => !/^\d\d$/.test(o.text)).map((o) => o.text)).toEqual(['큰마을', '큰마을']);
+  });
+});
+
