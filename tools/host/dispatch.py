@@ -19,6 +19,9 @@ DIALOGS = ((re.compile(r'hooks need review.*(esc close|t trust all|Lifecycle hoo
            (re.compile(r'hooks need review.*continue without trusting', re.I | re.S), ['down', 'down', 'enter']),  # old menu
            (re.compile(r'trust this folder', re.I), ['enter']))
 UNKNOWN = 'unknown'  # some other hooks screen (for example cut off): no keys, the host looks
+# each harness's own input-box mark: `agent start` can report ready while the shell still shows (agy, 2026-11-11)
+READY = {'agy': re.compile(r'\? for shortcuts'), 'codex': re.compile(r'Ask Codex'),
+         'claude': re.compile(r'^❯(?![ \t]*\d)', re.M)}  # the prompt line, not a `❯ 1.` menu choice
 
 
 def dialog_keys(screen):
@@ -149,6 +152,16 @@ def dispatch(a, run=sh, sleep=time.sleep):
             print(screen.rstrip(), file=sys.stderr)
         what = 'unknown hooks screen' if keys == UNKNOWN else 'not ready'
         return 3, f'MANUAL {what}: {a.name} in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
+    mark = None if a.no_start else READY.get(harness)
+    for _ in range(30 if mark else 0):  # poll the screen for up to 30 s
+        if screen is not None and mark.search(screen):
+            break
+        sleep(1)
+        screen = screen_of(run, pane)
+    if mark and (screen is None or not mark.search(screen)):
+        if screen and screen.strip():
+            print(screen.rstrip(), file=sys.stderr)
+        return 3, f'MANUAL not ready: {a.name} shows no ready mark in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
     if not a.no_start and harness == 'opencode':
         return 3, f'MANUAL pick the {model} model in {a.name} with /model as docs/agents/herdr.md says, then rerun with --no-start'
     info = agent(run, a.name)  # only a free agent can take the order, so a later `working` belongs to it
@@ -211,7 +224,7 @@ def self_test():
         def order(oid, body=None):
             (ORDERS / f'{oid}.md').write_text(body if body is not None else f'# Work order {oid} (revision 1)\n\n## Objective\nx\n\n' + report.replace('@ORDER@', oid))
 
-        def fake(statuses, harness='claude', start_rc=0, screens=('',), prompt_rc=0, ready=True):
+        def fake(statuses, harness='claude', start_rc=0, screens=('❯ ',), prompt_rc=0, ready=True):
             calls, seen, shown = [], iter(statuses), iter(screens)
 
             def run(args):
@@ -267,13 +280,24 @@ def self_test():
         assert record.load('t1')['role_work_items']['o1']['pane_id'] == 'w9:p2'
         run, calls = fake(['idle'], harness='gemini')
         assert dispatch(a, run, nap)[0] == 2 and calls == ['resolve']
-        run, calls = fake(['idle'], start_rc=1)
+        run, calls = fake(['idle'], start_rc=1, screens=('',))
         assert dispatch(a, run, nap)[0] == 3 and 'prompt' not in calls
         run, calls = fake(['idle'], harness='opencode')
         assert dispatch(a, run, nap)[0] == 3 and 'prompt' not in calls
         no_start = parse(['t1', 'o1', '--name', 'w', '--no-start'])
         run, calls = fake(['idle', 'idle', 'working'])
         assert dispatch(no_start, run, nap)[0] == 0 and 'start' not in calls
+        # S1: start reports ready while the pane still shows the shell; the prompt waits for the harness's own mark
+        shell = 'user@host:~/wt$ agy --model fable-5-2-high\n'
+        banner = shell + '\n  Antigravity CLI\n\n  > \n  ? for shortcuts\n'
+        run, calls = fake(['idle', 'working'], harness='agy', screens=[shell, shell, banner])
+        assert dispatch(a, run, nap)[0] == 0, calls
+        assert calls[:calls.index('prompt')].count('read') == 3, calls
+        with contextlib.redirect_stderr(io.StringIO()):
+            run, calls = fake(['idle', 'working'], harness='agy', screens=[shell])  # the mark never comes
+            code, last = dispatch(a, run, nap)
+        assert code == 3 and last.startswith('MANUAL not ready: w shows no ready mark') and 'prompt' not in calls, (last, calls)
+        assert READY['claude'].search(' ❯ 1. Yes, I trust this folder\n❯ 2. No') is None and READY['claude'].search('──\n❯ \n──')
         # R2: a failed prompt is never a dispatch
         run, calls = fake(['idle', 'working'], prompt_rc=1)
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 prompt failed (exit 1)') and calls.count('send-keys') == 0
@@ -292,7 +316,7 @@ def self_test():
         assert dispatch(a, run, nap)[1].startswith('MANUAL screen unreadable') and 'prompt' not in calls
         run, calls = fake(['idle', 'idle', 'working'], screens=[None])
         assert dispatch(no_start, run, nap)[0] == 3 and 'prompt' not in calls
-        run, calls = fake(['idle', 'working'], screens=['', None])
+        run, calls = fake(['idle', 'working'], screens=['❯ ', None])
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 status=screen-unreadable')
         # L1/D4: each codex dialog by its own text; any other hooks screen stops with no keys
         hooks_new = ('⚠ 3 hooks need review before they can run.\n\n  .codex/hooks.toml: 3 hooks\n\n'
@@ -309,9 +333,9 @@ def self_test():
             run, calls = fake(['idle'], screens=[combined])
             code, last = dispatch(a, run, nap)
             assert last.startswith('MANUAL unknown hooks screen') and not any(c.startswith('pane-keys') for c in calls), calls
-        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_new, ''])
+        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_new, '❯ '])
         assert dispatch(a, run, nap)[0] == 0 and 'pane-keys esc' in calls and calls.index('pane-keys esc') < calls.index('prompt')
-        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_old, ''])
+        run, calls = fake(['idle', 'idle', 'working'], screens=[hooks_old, '❯ '])
         assert dispatch(a, run, nap)[0] == 0 and 'pane-keys down down enter' in calls
         with contextlib.redirect_stderr(io.StringIO()):
             run, calls = fake(['idle'], screens=[hooks_new])  # the screen never closes
@@ -319,7 +343,7 @@ def self_test():
             run, calls = fake(['idle'], screens=[truncated])
             code, last = dispatch(a, run, nap)
             assert code == 3 and last.startswith('MANUAL unknown hooks screen') and not any(c.startswith('pane-keys') for c in calls), calls
-        run, calls = fake(['idle', 'working'], screens=['', hooks_new])  # a dialog after the prompt: it never arrived
+        run, calls = fake(['idle', 'working'], screens=['❯ ', hooks_new])  # a dialog after the prompt: it never arrived
         assert dispatch(a, run, nap) == (4, 'NOT_WORKING o1 pane=w9:p2 status=startup-dialog-on-screen')
         # R3: without jsonschema the record check refuses before any herdr call
         saved, sys.modules['jsonschema'] = sys.modules.get('jsonschema'), None
