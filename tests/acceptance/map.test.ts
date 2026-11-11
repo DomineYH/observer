@@ -7,10 +7,11 @@ import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } f
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain, mainRoad } from './terrain';
-import { angleTo, idAt, oneUnit, started } from './enemy';
+import { angleTo, idAt, mortarAt, oneUnit, started } from './enemy';
 import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, unstarted, untilImpact } from './mission';
 import { cleared } from './end';
 import { TEST_PLACEMENT } from './placement';
+import { watch } from './strike';
 
 type Path = [number, number][];
 
@@ -309,6 +310,27 @@ describe('F-06', () => {
     expect(r.arcs).toContainEqual([at[0], at[1]]);
     expect(r.texts).toEqual(expect.arrayContaining([{ text: '?', x: at[0] - 3, y: at[1] + 3 }, { text: 'T1', x: at[0] + 9, y: at[1] + 3 }]));
     expect(r.dashes.filter(fromPost)).toEqual([]);
+  });
+
+  test('F-06: 훈련 지도의 병종 표식 (보·장·박)', () => {
+    // Each unit 1–2 km north of the post, watched until its type is known: a box with 보, 장 or 박 where it really is.
+    const t = flatTerrain({ n: 1024 });
+    const route = [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 600 }];
+    const cases = [
+      ['보', oneUnit({ type: 'inf', route: 'A', t0: 0 }, route)],
+      ['장', oneUnit({ type: 'apc', route: 'A', t0: 0 }, route)],
+      ['박', mortarAt({ x: 320, y: 1320 })],
+    ] as const;
+    for (const [mark, scenario] of cases) {
+      const sim = started(scenario, { terrain: t, mode: 'training' });
+      watch(sim, 0, 2);
+      const { platoons, op, tick } = sim.state;
+      const r = draw(t, FULL_VIEW, { scenario: BASE_SCENARIO, op, knownOp: op, dest: null, az: 0, fovMil: 1066, pin: null, platoons, mode: 'training', missions: [], tick, weather: CLEAR_WEATHER, viewshed: null });
+      const [x, y] = [platoons[0]!.x * 0.05, 512 - platoons[0]!.y * 0.05];
+      expect(r.rects, mark).toContainEqual([x - 7, y - 5, 14, 10]);
+      expect(r.texts, mark).toEqual(expect.arrayContaining([{ text: mark, x: x - 5, y: y + 4 }, { text: 'T1', x: x + 9, y: y + 3 }]));
+      expect(r.texts.filter((w) => w.text === '?'), mark).toEqual([]);
+    }
   });
 
   test('F-10: 지도에 탄착과 요구 좌표', () => {

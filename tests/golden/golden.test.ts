@@ -137,7 +137,7 @@ describe('골든', () => {
       }
     const said = (speaker: string, kind: string) => events.some((e) => e.type === 'radio' && e.utterance.speaker === speaker && e.utterance.kind === kind);
     const at = (a: string) => data.inputs.find((i) => i.a === a)!;
-    expect(sim.state.lases.some((l) => l.range !== null)).toBe(true);
+    expect(sim.state.lases.map((l) => l.range?.dist)).toEqual([at('loc').v?.[2]]); // the polar request uses the lase's answer
     expect(impacts.some((t) => t > at('corr').t)).toBe(true); // the 효력사 after the correction
     expect(said('observer', 'move_notice') && said('fdc', 'move_notice')).toBe(true);
     expect(said('fdc', 'position_report')).toBe(true);
