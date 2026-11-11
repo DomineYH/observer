@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { describe, expect, test } from 'vitest';
-import { COVER, type Cover } from '@sim';
+import { COVER, terrainHash, type Cover } from '@sim';
 import { bodyStart, unpackTerrain } from '@adapters/terrainFile/unpack';
 import { readConfig, type Config } from '../../terrain/pipeline/config';
 import { buildAndWrite, checkFile, text } from '../../terrain/pipeline/build/build';
 import { buildTerrain, checkInvariants } from '../../terrain/pipeline/rules/build';
-import type { OsmElement, Snapshot } from '../../terrain/pipeline/snapshot';
+import { readSnapshot, sha256, type OsmElement, type Snapshot } from '../../terrain/pipeline/snapshot';
 
 // A made-up 24×24 square (no real place). Its 1 km remainders (230, 490) match the grid origin's.
 const N = 24;
@@ -281,5 +281,50 @@ describe('가공', () => {
     const written = text({ ...log, input: { ...log.input, osmBase: '' } });
     expect(written).not.toMatch(/\d{4}-\d\d-\d\dT/);
     expect(written).not.toMatch(/gzip|mtime|time/i);
+  });
+
+  // The committed 문경 지형 1판, read with bare readFileSync: a missing file fails, never skips.
+  const DATA = 'terrain/mungyeong';
+  const SOURCE = 'src/adapters/realTerrain/mungyeong';
+  const committedFile = () => new Uint8Array(readFileSync(join(SOURCE, 'terrain.bin')));
+  const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
+
+  test('가공: 다시 만들어 견주기', async () => {
+    const config = readConfig(DATA);
+    const built = await buildTerrain('mungyeong', config, readSnapshot(join(DATA, 'snapshot'), config.frame.n));
+    const file = committedFile();
+    expect(gunzipSync(built.file).equals(gunzipSync(file))).toBe(true); // content, never the gzip bytes
+    expect(text(built.expected)).toBe(readFileSync(join(SOURCE, 'expected.json'), 'utf8'));
+    expect(text(built.header)).toBe(readFileSync(join(DATA, 'header.json'), 'utf8'));
+    expect(text(built.log)).toBe(readFileSync(join(DATA, 'log.json'), 'utf8'));
+    expect(built.expected.hash).toBe(terrainHash(await unpackTerrain(file)));
+  }, 30_000);
+
+  test('가공: 지형 파일의 머리 키와 크기', () => {
+    const file = committedFile();
+    const body = gunzipSync(file);
+    const head = JSON.parse(body.subarray(4, 4 + body.readUInt32LE(0)).toString('utf8'));
+    expect(Object.keys(head)).toEqual(['format', 'id', 'version', 'n', 'cell', 'scale', 'grid', 'edge', 'credits', 'forest', 'roads', 'villages', 'names']);
+    expect(head).not.toHaveProperty('frame');
+    expect(file.length).toBeLessThanOrEqual(1_500_000);
+  });
+
+  test('가공: 세 파일의 정체가 같다', async () => {
+    const t = await unpackTerrain(committedFile());
+    const header = json(join(DATA, 'header.json'));
+    const expected = json(join(SOURCE, 'expected.json'));
+    const identity = { id: t.id, version: t.version, hash: terrainHash(t) };
+    expect(expected).toEqual(identity); // exactly these three keys
+    expect({ id: header.id, version: header.version, hash: header.hash }).toEqual(identity);
+    expect(identity.id).toBe('mungyeong');
+    expect(identity.version).toBe(json(join(DATA, 'config.json')).version);
+  });
+
+  test('가공: 머리의 스냅샷 SHA-256과 벌채 원 목록', () => {
+    const header = json(join(DATA, 'header.json'));
+    for (const f of ['ground.bin', 'cover.bin', 'osm.json']) expect(header.snapshot[f], f).toBe(sha256(readFileSync(join(DATA, 'snapshot', f))));
+    const { clearings } = json(join(DATA, 'config.json'));
+    expect(header.clearings).toEqual(clearings);
+    expect(header.clearings).toHaveLength(3);
   });
 });
