@@ -123,7 +123,7 @@ function text(h: Hasher, s: string): void {
   for (let i = 0; i < s.length; i++) h.u32(s.charCodeAt(i));
 }
 
-/** 지형 해시: hashed once after generation for the golden header. Fixed field order; Float32 cells as their bits. */
+/** 지형 해시: hashed once after generation for the golden header. Fixed field order; Float32 cells as their bits; content only, not id/version/credits. */
 export function terrainHash(t: TerrainData): string {
   const h = new Hasher();
   h.u32(t.n);
@@ -147,6 +147,26 @@ export function terrainHash(t: TerrainData): string {
       h.f64(p.x);
       h.f64(p.y);
     }
+  }
+  // Frozen above. Tagged chunks follow in tag order, each left out at its mock default so the mock hash holds.
+  // 전장 식별자, 지형 판 and credits are never hashed. Free to change until 문경 1판 exists; then it raises 지형 판.
+  if (t.roads.some((r) => r.class !== 'main')) {
+    h.u32(1);
+    for (const r of t.roads) h.byte(ROAD_CLASS.indexOf(r.class));
+  }
+  if (t.names.length > 0) {
+    h.u32(2);
+    h.u32(t.names.length);
+    for (const p of t.names) {
+      text(h, p.name);
+      h.f64(p.x);
+      h.f64(p.y);
+      h.byte(NAME_KIND.indexOf(p.kind));
+    }
+  }
+  if (t.edge !== 'mirror') {
+    h.u32(3);
+    h.byte(EDGE.indexOf(t.edge));
   }
   return h.hex();
 }

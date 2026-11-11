@@ -1,6 +1,6 @@
 // The mock 지형 원천 seam: 지형 해시, 마을과 도로, 방안 하나 불변 조건.
 import { describe, expect, test } from 'vitest';
-import { COVER, terrainHash } from '@sim';
+import { COVER, terrainHash, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { readGolden } from '../golden/golden';
@@ -78,4 +78,18 @@ describe('지형 계약', () => {
       expect(road.line.length).toBeGreaterThan(10);
     }
   });
+
+  test('지형 계약: 해시의 꼬리 덩이', () => {
+    const H = readGolden('0-empty.json').terrainHash;
+    const [first, ...rest] = terrain.roads;
+    const trunk: TerrainData = { ...terrain, roads: [{ ...first!, class: 'trunk' }, ...rest] };
+    const named: TerrainData = { ...terrain, names: [{ name: '주흘산', x: 5000, y: 6000, kind: 'peak' }] };
+    const veiled: TerrainData = { ...terrain, edge: 'veil' };
+    const relabelled: TerrainData = { ...terrain, id: 'x', version: 9, credits: ['c'] };
+    expect(terrainHash(terrain)).toBe(H);
+    expect(terrainHash(relabelled)).toBe(H); // 전장 식별자, 지형 판, 출처 문구 are not hashed
+    const tails = [trunk, named, veiled].map(terrainHash);
+    for (const h of tails) expect(h).not.toBe(H);
+    expect(new Set(tails).size).toBe(3);
+  }, 30_000);
 });
