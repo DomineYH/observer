@@ -1,3 +1,6 @@
 # 원자료 스냅샷 and 가공 설정: bytes are frozen by SHA-256, so no line-ending conversion.
 terrain/*/config.json -text
 terrain/*/snapshot/* -text
+terrain/*/header.json -text
+terrain/*/log.json -text
+src/adapters/realTerrain/*/* -text

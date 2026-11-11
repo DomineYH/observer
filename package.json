@@ -15,7 +15,8 @@
     "test:engines": "playwright test -c playwright.engines.config.ts",
     "test:e2e": "playwright test -c playwright.e2e.config.ts",
     "golden:update": "vitest run --config vitest.golden-update.config.ts",
-    "terrain:fetch": "vitest run --config vitest.terrain-fetch.config.ts"
+    "terrain:fetch": "vitest run --config vitest.terrain-fetch.config.ts",
+    "terrain:build": "vitest run --config vitest.terrain-build.config.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
