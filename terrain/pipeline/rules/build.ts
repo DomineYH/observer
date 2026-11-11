@@ -8,6 +8,7 @@ import type { Clearing, Config, Frame } from '../config';
 import type { Snapshot } from '../snapshot';
 import { layers, SCALE, type Discarded } from './layers';
 import { packTerrain } from './pack';
+import { compareRoads, roadLines, startsLater, type RoadLog } from './roads';
 
 export const FOREST: ForestRule = { min: 12, max: 17, salt: 0 };
 
@@ -41,6 +42,7 @@ export interface Log {
   };
   ground: { min: number; max: number; mean: number };
   buildings: { count: number; height: { tag: number; levels: number; default: number }; discarded: Discarded[] };
+  roads: RoadLog;
   size: { body: number; header: number };
 }
 
@@ -69,6 +71,14 @@ export function checkInvariants(t: TerrainData, header: Header): void {
     counts[t.cover[k]!]!++;
   }
   if (COVER.some((name, c) => header.coverCounts[name] !== counts[c])) fail('머리의 피복 칸 수가 실제와 다르다');
+  const max = (t.n - 1) * t.cell;
+  const inside = (p: { x: number; y: number }) => p.x >= 0 && p.x <= max && p.y >= 0 && p.y <= max;
+  t.roads.forEach((r, i) => {
+    if (r.line.length < 2) fail(`도로선 ${i}의 점이 둘보다 적다`);
+    if (!r.line.every(inside)) fail(`도로선 ${i}이 정사각 밖으로 나간다`);
+    if (startsLater(r.line)) fail(`도로선 ${i}이 남쪽(같으면 서쪽) 끝에서 시작하지 않는다`);
+    if (i > 0 && compareRoads(t.roads[i - 1]!, r) > 0) fail(`도로선 ${i - 1}과 ${i}의 순서가 규칙과 다르다`);
+  });
   if (header.ground.kind !== 'DTM') fail(`지면의 종류가 DTM이 아니다 (${header.ground.kind})`);
 }
 
@@ -86,9 +96,10 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
     stop(`방안 기준이 정한 값이 아니거나 1 km 나머지가 실제 위치와 다르다 (${letters} ${e0} ${n0})`);
   if (e0 + n * cell > 99_999 || n0 + n * cell > 99_999) stop(`정사각이 100 km 방안 하나를 넘는다 (동 ${e0}–${e0 + n * cell}, 북 ${n0}–${n0 + n * cell})`);
   const L = layers(config, snap);
+  const R = roadLines(snap, n, cell);
   const credits = [sources.ground.credit, sources.cover.credit, sources.osm.credit];
   const file = packTerrain(
-    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: [], villages: [], names: [], edge: 'veil', grid: config.grid },
+    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: R.roads, villages: [], names: [], edge: 'veil', grid: config.grid },
     SCALE,
     FOREST,
   );
@@ -133,6 +144,7 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
     cover: { worldcover: L.worldcover, overwritten: L.overwritten, final },
     ground: { min: min / SCALE, max: max / SCALE, mean: Math.round((sum * 100) / SCALE / cells) / 100 },
     buildings: { count: L.buildingCount, height: L.heightFrom, discarded: L.discarded },
+    roads: R.log,
     size: { body: body.length, header: body.readUInt32LE(0) },
   };
 

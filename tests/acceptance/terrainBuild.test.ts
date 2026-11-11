@@ -109,8 +109,9 @@ describe('가공', () => {
       { id: osm[9]!.id, tag: 'height', value: '150' },
     ]);
     expect(built.log.buildings.height).toEqual({ tag: 1, levels: 1, default: 3 });
-    // 1판 has no road lines, villages or names (M2-6 replaces this line).
-    expect([t.roads, t.villages, t.names]).toEqual([[], [], []]);
+    // The tertiary way is the one road line (the tunnel and the track give none); no places, no names.
+    expect(t.roads).toEqual([{ class: 'main', line: [{ x: 0, y: 60 }, { x: 230, y: 60 }] }]);
+    expect([t.villages, t.names]).toEqual([[], []]);
   });
 
   test('가공: 벌채지는 숲 칸만 바꾼다', async () => {
@@ -252,7 +253,10 @@ describe('가공', () => {
     const keys = (o: object) => Object.keys(o);
     const COVERS = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'];
 
-    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'size']);
+    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'roads', 'size']);
+    expect(keys(log.roads)).toEqual(['elements', 'tunnels', 'pieces', 'lines']);
+    expect(keys(log.roads.elements)).toEqual(['trunk', 'main', 'local']);
+    expect(keys(log.roads.lines)).toEqual(['trunk', 'main', 'local']);
     expect(keys(log.input)).toEqual(['snapshot', 'osmBase', 'rules']);
     expect(keys(log.input.snapshot)).toEqual(['ground.bin', 'cover.bin', 'osm.json']);
     expect(keys(log.cover)).toEqual(['worldcover', 'overwritten', 'final']);
@@ -275,6 +279,7 @@ describe('가공', () => {
     expect(log.cover.overwritten).toEqual({ water: 9, road: 24, building: 1, clearing: 29 });
     expect(log.ground).toEqual({ min: 100, max: 120.7, mean: 110.35 });
     expect(log.buildings).toEqual({ count: 1, height: { tag: 0, levels: 0, default: 1 }, discarded: [] });
+    expect(log.roads).toEqual({ elements: { trunk: 0, main: 1, local: 0 }, tunnels: 0, pieces: 1, lines: { trunk: 0, main: 1, local: 0 } });
 
     const shares = COVERS.reduce((sum, name) => sum + log.cover.final[name as Cover].share, 0);
     expect(Math.abs(shares - 100)).toBeLessThanOrEqual(0.05);
@@ -310,6 +315,80 @@ describe('가공', () => {
     const coverOf = (j: number) => [...Array(N).keys()].map((i) => name(t.cover[k(i, j)]!));
     graded.forEach((h, j) => expect(coverOf(j), h).toEqual(Array(N).fill('road')));
     left.forEach((tags, j) => expect(coverOf(graded.length + j), JSON.stringify(tags)).toEqual(Array(N).fill('forest')));
+  });
+
+  test('가공: 도로선 자르기·잇기·순서', async () => {
+    // Way points in 0.1 m; road lines come back in whole metres. The square is 0 … 230 m on both axes.
+    const linesOf = async (osm: OsmElement[]) => {
+      const built = await buildTerrain('synth', SYNTH, snapshot(osm));
+      return { built, t: await unpackTerrain(built.file) };
+    };
+    const line = (...pts: [number, number][]) => pts.map(([x, y]) => ({ x, y }));
+    const m = (pts: [number, number][]): [number, number][] => pts.map(([x, y]) => [x * 10, y * 10]);
+
+    // Grades: each value alone on its own row, 50 m long, so one grade's lines are ordered by their y.
+    const graded = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential'].flatMap((g) => [g, `${g}_link`]);
+    const left: Record<string, string>[] = [{ highway: 'primary', tunnel: 'yes' }, { highway: 'track' }, { highway: 'path' }, { highway: 'service' }];
+    const row = (j: number) => m([[0, j * 10], [50, j * 10]]);
+    const grades = await linesOf([...graded.map((h, j) => way({ highway: h }, row(j))), ...left.map((tags, j) => way(tags, row(graded.length + j)))]);
+    const GRADE = ['trunk', 'trunk', 'trunk', 'trunk', 'trunk', 'trunk', 'main', 'main', 'main', 'main', 'local', 'local', 'local', 'local'];
+    expect(grades.t.roads).toEqual(GRADE.map((c, j) => ({ class: c, line: line([0, j * 10], [50, j * 10]) })));
+    expect(grades.built.log.roads).toEqual({ elements: { trunk: 6, main: 4, local: 4 }, tunnels: 1, pieces: 14, lines: { trunk: 6, main: 4, local: 4 } });
+
+    // Cut on the square's edge: across it; out through the north edge and back; wholly outside.
+    const cut = await linesOf([
+      way({ highway: 'secondary' }, m([[-100, 100], [100, 200], [300, 200]])), // enters the west edge at y 150, leaves the east
+      way({ highway: 'secondary' }, m([[100, 50], [100, 260], [140, 260], [140, 50]])),
+      way({ highway: 'secondary' }, m([[-50, -50], [-10, -10]])),
+    ]);
+    expect(cut.t.roads).toEqual([
+      { class: 'main', line: line([0, 150], [100, 200], [230, 200]) }, // 241.8 m
+      { class: 'main', line: line([100, 50], [100, 230]) }, // 180 m, x 100 before x 140
+      { class: 'main', line: line([140, 50], [140, 230]) }, // started at its south end
+    ]);
+    expect(cut.built.log.roads).toEqual({ elements: { trunk: 0, main: 3, local: 0 }, tunnels: 0, pieces: 3, lines: { trunk: 0, main: 3, local: 0 } });
+
+    // Join only where exactly two ends of one grade meet; rings, merged points and short pieces.
+    const joined = await linesOf([
+      way({ highway: 'residential' }, m([[10, 10], [50, 10]])),
+      way({ highway: 'residential' }, m([[50, 60], [50, 10]])), // → one line with the one before
+      way({ highway: 'residential' }, m([[80, 100], [100, 100]])), // three ends at (100, 100): three lines
+      way({ highway: 'residential' }, m([[120, 100], [100, 100]])),
+      way({ highway: 'residential' }, m([[100, 130], [100, 100]])),
+      way({ highway: 'tertiary' }, m([[150, 10], [170, 10]])), // a main end and a local end: two lines
+      way({ highway: 'unclassified' }, m([[170, 10], [190, 10]])),
+      way({ highway: 'secondary' }, m([[150, 50], [170, 50]])), // two main ends and a local end: the mains join
+      way({ highway: 'secondary_link' }, m([[170, 50], [170, 80]])),
+      way({ highway: 'residential_link' }, m([[170, 50], [190, 50]])),
+      way({ highway: 'residential' }, m([[200, 200], [220, 200], [220, 220], [200, 220], [200, 200]])), // closed ring
+      way({ highway: 'residential' }, [[1500, 300], [1503, 300], [1800, 300]]), // points 0.3 m apart merge
+      way({ highway: 'residential' }, [[2000, 1500], [2020, 1500]]), // a 2 m piece is kept
+    ]);
+    expect(joined.t.roads).toEqual([
+      { class: 'main', line: line([150, 50], [170, 50], [170, 80]) },
+      { class: 'main', line: line([150, 10], [170, 10]) },
+      { class: 'local', line: line([10, 10], [50, 10], [50, 60]) }, // 90 m
+      { class: 'local', line: line([200, 200], [220, 200], [220, 220], [200, 220], [200, 200]) }, // 80 m
+      { class: 'local', line: line([150, 30], [180, 30]) }, // 30 m, y 30
+      { class: 'local', line: line([100, 100], [100, 130]) }, // 30 m, y 100
+      { class: 'local', line: line([170, 10], [190, 10]) }, // 20 m, y 10
+      { class: 'local', line: line([170, 50], [190, 50]) }, // 20 m, y 50
+      { class: 'local', line: line([80, 100], [100, 100]) }, // 20 m, y 100, x 80: the west end first
+      { class: 'local', line: line([100, 100], [120, 100]) }, // 20 m, y 100, x 100
+      { class: 'local', line: line([200, 150], [202, 150]) }, // 2 m
+    ]);
+    expect(joined.built.log.roads).toEqual({ elements: { trunk: 0, main: 3, local: 10 }, tunnels: 0, pieces: 13, lines: { trunk: 0, main: 2, local: 9 } });
+
+    // Not reachable through inputs: the exported checks on doctored lines.
+    const { t, built } = joined;
+    const fails = (roads: typeof t.roads, what: string) =>
+      expect(() => checkInvariants({ ...t, roads }, built.header), what).toThrow(/^가공: 불변 조건: 도로선/);
+    expect(() => checkInvariants(t, built.header)).not.toThrow();
+    const [a, b, ...rest] = t.roads;
+    fails([{ ...a!, line: [a!.line[0]!] }, b!, ...rest], 'one point');
+    fails([a!, b!, ...rest, { class: 'local', line: line([1, 0], [1, 231]) }], 'outside');
+    fails([b!, a!, ...rest], 'swapped');
+    fails([{ ...a!, line: [...a!.line].reverse() }, b!, ...rest], 'reversed');
   });
 
   test('가공: 불변 조건 하나하나', async () => {
