@@ -4,7 +4,8 @@ import type { COVER, Point, Road, TerrainData } from '@sim';
 import { cos, exp, sin } from '@sim/math';
 import type { TerrainSource } from '../../index';
 import { CELL, FRIEND_HILLS, GRID, N, OP_HILL, ROADS, VILLAGES } from './features';
-import { fbm, hash, ss } from './noise';
+import { forestHeight, hash } from '../../terrainFile/cellHash';
+import { fbm, ss } from './noise';
 
 const TAU = Math.PI * 2;
 // Only 결정적 수학 may come from sim as values here; the type check keeps this tuple equal to sim's COVER.
@@ -111,6 +112,7 @@ export function generateTerrain(seed: number): TerrainData {
   });
 
   // 피복 분류와 표면 높이
+  const FOREST_RULE = { min: 12, max: 17, salt: S(5) };
   for (let j = 0; j < N; j++)
     for (let i = 0; i < N; i++) {
       const k = j * N + i;
@@ -123,7 +125,7 @@ export function generateTerrain(seed: number): TerrainData {
         const dObs = dist2(x, y, OP_HILL);
         forest = y > 2300 ? g > 0.12 && dObs > 350 * 350 : y < 2300 && g > 0.28 && dObs > 500 * 500;
       }
-      surface[k] = ground[k]! + (forest ? 12 + 5 * hash(i, j, S(5)) : 0) + buildings[k]!;
+      surface[k] = ground[k]! + (forest ? forestHeight(FOREST_RULE, i, j) : 0) + buildings[k]!;
       if (buildings[k]) cover[k] = BUILDING;
       else if (road[k]) cover[k] = ROAD;
       else if (rd < 30) cover[k] = WATER;
