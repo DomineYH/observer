@@ -1,8 +1,9 @@
-// 문경 지형 1판 as the app will see it: the committed 지형 파일 unpacked with the app's own unpackTerrain and checked
+// 문경 지형 as the app will see it: the committed 지형 파일 unpacked with the app's own unpackTerrain and checked
 // on the contract's fields only. No import from the processing code, no network, no skip: a missing file fails.
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { COVER, type Cover } from '@sim';
+import { ROAD_CLASS } from '@sim/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 
 const terrain = unpackTerrain(new Uint8Array(readFileSync('src/adapters/realTerrain/mungyeong/terrain.bin')));
@@ -91,5 +92,61 @@ describe('문경 지형', () => {
       expect(n0 + p.y, `${p.x},${p.y}`).toBeGreaterThanOrEqual(0);
       expect(n0 + p.y, `${p.x},${p.y}`).toBeLessThanOrEqual(99999);
     }
+  });
+
+  test('F-25: 문경 지형 — 도로선', async () => {
+    const t = await terrain;
+    const max = (t.n - 1) * t.cell;
+    const length = (line: readonly { x: number; y: number }[]) =>
+      line.slice(1).reduce((sum, p, k) => sum + Math.sqrt((p.x - line[k]!.x) ** 2 + (p.y - line[k]!.y) ** 2), 0);
+    expect(t.roads.length).toBeGreaterThan(0);
+    t.roads.forEach((r, i) => {
+      const { line } = r;
+      if (!ROAD_CLASS.includes(r.class)) expect.fail(`도로선 ${i}: 등급 ${r.class}`);
+      if (line.length < 2) expect.fail(`도로선 ${i}: 점 ${line.length}개`);
+      line.forEach((p, k) => {
+        if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) expect.fail(`도로선 ${i} 점 ${k}: 1 m 정수가 아니다 (${p.x}, ${p.y})`);
+        if (!(p.x >= 0 && p.x <= max && p.y >= 0 && p.y <= max)) expect.fail(`도로선 ${i} 점 ${k}: 정사각 밖 (${p.x}, ${p.y})`);
+        if (k > 0 && p.x === line[k - 1]!.x && p.y === line[k - 1]!.y) expect.fail(`도로선 ${i} 점 ${k}: 앞 점과 같다`);
+      });
+      const [a, b] = [line[0]!, line[line.length - 1]!];
+      if (b.y < a.y || (b.y === a.y && b.x < a.x)) expect.fail(`도로선 ${i}: 남쪽(같으면 서쪽) 끝에서 시작하지 않는다`);
+      if (i === 0) return;
+      // Order: grade → longer first → first point's y → its x.
+      const prev = t.roads[i - 1]!;
+      const key = (q: typeof r) => [ROAD_CLASS.indexOf(q.class), -length(q.line), q.line[0]!.y, q.line[0]!.x];
+      const [p, c] = [key(prev), key(r)];
+      const at = p.findIndex((v, k) => v !== c[k]);
+      if (at >= 0 && p[at]! > c[at]!) expect.fail(`도로선 ${i - 1}과 ${i}: 순서 규칙과 다르다`);
+    });
+  });
+
+  test('F-25: 문경 지형 — 마을과 지명의 자리', async () => {
+    const t = await terrain;
+    const max = (t.n - 1) * t.cell;
+    expect(t.villages.length).toBeGreaterThan(0);
+    for (const [what, list] of [['마을', t.villages], ['지명', t.names]] as const)
+      list.forEach((p, i) => {
+        if (p.name.trim() === '') expect.fail(`${what} ${i}: 이름이 비었다`);
+        if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) expect.fail(`${what} ${i} ${p.name}: 1 m 정수가 아니다 (${p.x}, ${p.y})`);
+        if (!(p.x >= 0 && p.x <= max && p.y >= 0 && p.y <= max)) expect.fail(`${what} ${i} ${p.name}: 정사각 밖 (${p.x}, ${p.y})`);
+      });
+    for (const v of t.villages) expect([330, 170, 110], v.name).toContain(v.r);
+  });
+
+  test('F-25: 문경 지형 — 지명', async () => {
+    const t = await terrain;
+    const KINDS = ['water', 'peak', 'pass'] as const;
+    const CAP = { water: 4, peak: 8, pass: 4 };
+    expect(t.names.length).toBeGreaterThan(0);
+    for (const kind of KINDS) expect(t.names.filter((p) => p.kind === kind).length, kind).toBeLessThanOrEqual(CAP[kind]);
+    const order = t.names.map((p) => KINDS.indexOf(p.kind));
+    expect(order).toEqual([...order].sort((a, b) => a - b)); // water → peak → pass
+    const peaks = t.names.filter((p) => p.kind === 'peak');
+    peaks.forEach((a, i) =>
+      peaks.slice(i + 1).forEach((b) => {
+        if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 < 1000 ** 2) expect.fail(`산 ${a.name}과 ${b.name}: 1 km보다 가깝다`);
+      }),
+    );
   });
 });
