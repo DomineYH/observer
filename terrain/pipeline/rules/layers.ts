@@ -142,6 +142,23 @@ export function layers(config: Config, snap: Snapshot): Layers {
     for (const k of ks) height[k] = Math.max(height[k]!, h);
   }
 
+  // 5. 벌채지: forest cells within each circle become open land. Every circle is matched against the cover before any clearing.
+  const forest = c('forest');
+  const inCircle = config.clearings.map(({ x, y, r }) => {
+    const ks: number[] = [];
+    for (let j = Math.max(0, Math.ceil((y - r) / cell)); j <= Math.min(n - 1, Math.floor((y + r) / cell)); j++)
+      for (let i = Math.max(0, Math.ceil((x - r) / cell)); i <= Math.min(n - 1, Math.floor((x + r) / cell)); i++) {
+        const k = j * n + i;
+        const dx = i * cell - x;
+        const dy = j * cell - y;
+        if (dx * dx + dy * dy <= r * r && cover[k] === forest) ks.push(k);
+      }
+    if (!ks.length) stop(`벌채 원 (${x}, ${y})에 숲 칸이 없다`);
+    return ks;
+  });
+  let clearing = 0;
+  for (const ks of inCircle) clearing += paint(ks, c('open'));
+
   // 6. Building height layer and ground rounded to the 지면 눈금 (packTerrain's own rounding is then the identity).
   const buildings = new Float32Array(cells);
   const ground = new Float32Array(cells);
@@ -154,7 +171,7 @@ export function layers(config: Config, snap: Snapshot): Layers {
 
   return {
     ground, groundTenths, cover, buildings, worldcover,
-    overwritten: { water, road, building, clearing: 0 },
+    overwritten: { water, road, building, clearing },
     buildingCount, heightFrom, discarded,
   };
 }

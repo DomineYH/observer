@@ -87,4 +87,39 @@ describe('가공', () => {
     // 1판 has no road lines, villages or names (M2-6 replaces this line).
     expect([t.roads, t.villages, t.names]).toEqual([[], [], []]);
   });
+
+  test('가공: 벌채지는 숲 칸만 바꾼다', async () => {
+    // A 40 m circle on node (12, 12) over forest, a road row, a building, water, a village and a field cell.
+    const osm = [
+      way({ highway: 'residential' }, [[1000, 1400], [1400, 1400]]), // nodes (10..14, 14)
+      way({ building: 'yes' }, tiny(13, 13)),
+      way({ natural: 'water' }, ring(1050, 1050, 1150, 1150)), // node (11, 11)
+    ];
+    const cfg = { ...SYNTH, clearings: [{ x: 120, y: 120, r: 40, kind: 'planned' as const }] };
+    const snap = snapshot(osm, 10, [[12, 10, 50], [10, 12, 40]]);
+    const before = await unpackTerrain((await buildTerrain('synth', SYNTH, snap)).file);
+    const t = await unpackTerrain((await buildTerrain('synth', cfg, snap)).file);
+
+    let cleared = 0;
+    for (let j = 0; j < N; j++)
+      for (let i = 0; i < N; i++) {
+        const at = k(i, j);
+        const d2 = (i - 12) * (i - 12) + (j - 12) * (j - 12);
+        if (d2 <= 16 && name(before.cover[at]!) === 'forest') {
+          cleared++;
+          expect(name(t.cover[at]!)).toBe('open');
+          expect(t.surface[at]).toBe(t.ground[at]);
+        } else {
+          expect(name(t.cover[at]!), `cell (${i}, ${j})`).toBe(name(before.cover[at]!));
+          expect(t.surface[at]).toBe(before.surface[at]);
+          expect(t.buildings[at]).toBe(before.buildings[at]);
+        }
+      }
+    expect(cleared).toBe(49 - 5 - 4); // 49 nodes within 4 cells; road 5, building, water, village, field 4
+    for (const [i, j] of [[17, 12], [12, 17], [7, 12], [12, 7]] as const) {
+      expect(name(t.cover[k(i, j)]!)).toBe('forest');
+      const h = t.surface[k(i, j)]! - t.ground[k(i, j)]!;
+      expect(h >= 12 && h < 17, `forest height ${h}`).toBe(true);
+    }
+  });
 });
