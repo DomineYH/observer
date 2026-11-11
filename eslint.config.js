@@ -52,7 +52,9 @@ const NORMALISED = [
 const NO_DOTS = '(?!.*/\\.\\.?(?:/|$))';
 const SIM_TYPES_ONLY = ban(`^@sim${NO_DOTS}(/|$)`, '이 모듈은 sim의 타입만 쓴다 (import type)', true);
 const ONLY_SIM = ban('^(?!\\.|@sim(/|$))', '이 모듈은 sim의 타입에만 의존한다');
-const imports = (...patterns) => ({ '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...NORMALISED, ...patterns] }] });
+// The terrain processing folder sits outside the app; relative routes to it are closed by LEAVES_MODULE below.
+const NO_TERRAIN = ban('^[@/]?terrain(/|$)', '앱 소스는 지형 가공 폴더를 가져오지 않는다');
+const imports = (...patterns) => ({ '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...NORMALISED, NO_TERRAIN, ...patterns] }] });
 
 // One config object per directory depth below the module root: a relative import may climb at most to that root.
 // ponytail: files deeper than MAX_DEPTH may not climb at all; raise MAX_DEPTH if a module ever nests deeper.
@@ -86,8 +88,11 @@ export default defineConfig(
     ban('^@adapters/mock(/|$)', 'ui는 어댑터 인터페이스만 쓰고 구체 어댑터는 주입받는다'),
   ]),
   ...moduleImports('src/app', []),
-  // Determinism bans: the simulation and the mock terrain generator (same rules, ADR 0002).
-  { files: ['src/sim/**', 'src/adapters/mock/terrain/**'], rules: determinism },
+  // The terrain processing folder reuses the app's 풀기 and hashes but never the scenario.
+  { files: ['terrain/**'], rules: imports(ban('(^@content|(^|/)src/content)(/|$)', '지형 가공은 시나리오 모듈을 가져오지 않는다')) },
+  // Determinism bans: the simulation, the mock terrain generator, the 지형 파일 code they share, and the
+  // processing rules (same rules, ADR 0002). The fetch stage beside the rules is free of them.
+  { files: ['src/sim/**', 'src/adapters/mock/terrain/**', 'src/adapters/terrainFile/**', 'terrain/pipeline/rules/**'], rules: determinism },
   // Stored strings (callsigns, records) reach the screen only as React text, which escapes them.
   {
     files: ['src/ui/**', 'src/app/**'],
