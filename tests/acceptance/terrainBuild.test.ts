@@ -545,6 +545,17 @@ describe('가공', () => {
     expect(terrainHash({ ...t, roads: [], villages: [], names: [] })).toBe('eb93e51936a69346');
   });
 
+  test('가공: 안내 문서의 자료 출처 문구', async () => {
+    const readme = readFileSync('terrain/README.md', 'utf8');
+    const lines = readme.split('\n');
+    const t = await unpackTerrain(committedFile());
+    for (const credit of t.credits) expect(lines, credit).toContain(credit); // a line of its own, letter for letter
+    for (const command of ['npm run terrain:fetch', 'npm run terrain:build']) expect(readme).toContain(command);
+    const { sources } = json(join(DATA, 'config.json'));
+    for (const key of ['ground', 'cover', 'osm'])
+      for (const field of ['name', 'url', 'license']) expect(readme, `${key}.${field}`).toContain(sources[key][field]);
+  });
+
   test('가공: 지형 파일의 머리 키와 크기', () => {
     const file = committedFile();
     const body = gunzipSync(file);
