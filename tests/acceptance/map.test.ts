@@ -1,16 +1,17 @@
 // 지도 바탕: the map panel's drawing, observed through a recording 2D context.
 import { describe, expect, test } from 'vitest';
-import type { TerrainData } from '@sim';
+import { COVER, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain, mainRoad } from './terrain';
-import { angleTo, idAt, oneUnit, started } from './enemy';
+import { angleTo, idAt, mortarAt, oneUnit, started } from './enemy';
 import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, unstarted, untilImpact } from './mission';
 import { cleared } from './end';
 import { TEST_PLACEMENT } from './placement';
+import { watch } from './strike';
 
 type Path = [number, number][];
 
@@ -123,6 +124,26 @@ describe('F-06', () => {
     expect(index).toBeLessThan(plain);
     expect(plain).toBeLessThan(lum(15));
   }, 30000);
+
+  test('F-06: 지도 팔레트와 음영', () => {
+    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per column.
+    const palette = { open: [152, 138, 84], field: [182, 162, 104], forest: [56, 76, 44], water: [78, 104, 122], road: [160, 150, 128], village: [176, 164, 128], building: [150, 72, 56] };
+    const t = flatTerrain({ n: 8 });
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 7; i++) t.cover[j * 8 + i] = i;
+    const px = mapBase(t);
+    const at = (p: Uint8ClampedArray, i: number, j = 3, n = 8) => [...p.slice(((n - 1 - j) * n + i) * 4, ((n - 1 - j) * n + i) * 4 + 3)];
+    COVER.forEach((c, i) => expect(at(px, i), c).toEqual(palette[c]));
+    // Lit from the north-west: × (1 + 0.05 per m above that neighbour), between 0.7 and 1.25. Cell 1 of each slope sits
+    // inside one 20 m band, so no contour darkens it.
+    const slope = (base: number, rise: number) => {
+      const s = flatTerrain({ n: 8 });
+      for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) s.ground[j * 8 + i] = base + rise * i;
+      return at(mapBase(s), 1);
+    };
+    expect(slope(101, 1)).toEqual([160, 145, 88]); // 1 m: × 1.05
+    expect(slope(110, 10)).toEqual([190, 172, 105]); // 10 m: × 1.25 (172.5 rounds to even)
+    expect(slope(200, -10)).toEqual([106, 97, 59]); // −10 m: × 0.7
+  });
 
   test('F-06: 좌표자', () => {
     const t = flatTerrain({ n: 1024 }); // 10 240 m square, 방안 기준 동 40000·북 30000
@@ -289,6 +310,27 @@ describe('F-06', () => {
     expect(r.arcs).toContainEqual([at[0], at[1]]);
     expect(r.texts).toEqual(expect.arrayContaining([{ text: '?', x: at[0] - 3, y: at[1] + 3 }, { text: 'T1', x: at[0] + 9, y: at[1] + 3 }]));
     expect(r.dashes.filter(fromPost)).toEqual([]);
+  });
+
+  test('F-06: 훈련 지도의 병종 표식 (보·장·박)', () => {
+    // Each unit 1–2 km north of the post, watched until its type is known: a box with 보, 장 or 박 where it really is.
+    const t = flatTerrain({ n: 1024 });
+    const route = [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 600 }];
+    const cases = [
+      ['보', oneUnit({ type: 'inf', route: 'A', t0: 0 }, route)],
+      ['장', oneUnit({ type: 'apc', route: 'A', t0: 0 }, route)],
+      ['박', mortarAt({ x: 320, y: 1320 })],
+    ] as const;
+    for (const [mark, scenario] of cases) {
+      const sim = started(scenario, { terrain: t, mode: 'training' });
+      watch(sim, 0, 2);
+      const { platoons, op, tick } = sim.state;
+      const r = draw(t, FULL_VIEW, { scenario: BASE_SCENARIO, op, knownOp: op, dest: null, az: 0, fovMil: 1066, pin: null, platoons, mode: 'training', missions: [], tick, weather: CLEAR_WEATHER, viewshed: null });
+      const [x, y] = [platoons[0]!.x * 0.05, 512 - platoons[0]!.y * 0.05];
+      expect(r.rects, mark).toContainEqual([x - 7, y - 5, 14, 10]);
+      expect(r.texts, mark).toEqual(expect.arrayContaining([{ text: mark, x: x - 5, y: y + 4 }, { text: 'T1', x: x + 9, y: y + 3 }]));
+      expect(r.texts.filter((w) => w.text === '?'), mark).toEqual([]);
+    }
   });
 
   test('F-10: 지도에 탄착과 요구 좌표', () => {

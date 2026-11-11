@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { createSim, replay, validateReplay } from '@sim';
+import { COVER, createSim, replay, validateReplay } from '@sim';
 import type { Input } from '@sim';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { mockTerrain } from '@adapters/mock/terrain';
@@ -199,4 +199,30 @@ test('안개 띠: veil이면 정사각 밖 600 m부터 안개색', () => {
   expect(inside.some((r) => r.fogged)).toBe(false);
   // The same ground mirrored is not fog.
   expect(centre(flatTerrain({ n: 128 })).some((r) => r.out >= 600 && r.fogged)).toBe(false);
+});
+
+test('관측 화면: 11월 팔레트 7종', () => {
+  // The demo's cover colours (genTerrain): every cell is one of its class's colours times the light it got, and each
+  // colour shows somewhere. Flat ground in seven bands of 36 columns, wide enough for the forest and field patterns.
+  const palette: Record<(typeof COVER)[number], number[][]> = {
+    open: [[152, 138, 84]],
+    field: [[182, 162, 104], [164, 150, 92], [148, 126, 78]],
+    forest: [[56, 76, 44], [126, 90, 46], [152, 108, 48]],
+    water: [[78, 104, 122]],
+    road: [[160, 150, 128]],
+    village: [[176, 164, 128], [152, 138, 84]],
+    building: [[150, 72, 56], [72, 92, 132], [122, 122, 116], [82, 112, 92], [172, 104, 62], [196, 190, 178]],
+  };
+  const t = flatTerrain({ n: 256 });
+  for (let k = 0; k < t.cover.length; k++) t.cover[k] = Math.min(6, Math.floor((k % 256) / 36));
+  const { r, g, b, light } = terrainColours(t, CLEAR_WEATHER);
+  const seen = new Set<string>();
+  for (let k = 0; k < t.cover.length; k++) {
+    const c = COVER[t.cover[k]!]!;
+    // The channel is the colour × light truncated (light is kept as float32, hence the slack).
+    const fit = palette[c].find((rgb) => [r[k]!, g[k]!, b[k]!].every((v, ch) => Math.abs(v + 0.5 - rgb[ch]! * light[k]!) <= 0.5001));
+    if (!fit) throw new Error(`${c} cell ${k}: ${[r[k], g[k], b[k]]} at light ${light[k]}`);
+    seen.add(`${c} ${fit}`);
+  }
+  expect(seen.size).toBe(Object.values(palette).flat().length);
 });

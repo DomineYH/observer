@@ -2,6 +2,8 @@
 import { describe, expect, test } from 'vitest';
 import { replay, validateReplay, type ReplayData, type TerrainData } from '@sim';
 import { BASE_SCENARIO } from '@content/scenario';
+import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { readGolden } from '../golden/golden';
 import { replayData, START } from './init';
 import { flatTerrain } from './terrain';
 
@@ -49,5 +51,15 @@ describe('F-31', () => {
     const onX2 = { ...data(), terrain: { id: 'x', version: 2 } };
     expect(() => replay(onX2, mock, BASE_SCENARIO)).toThrow(/terrain/);
     expect(replay(onX2, x2, BASE_SCENARIO).record).toEqual(replay(data(), mock, BASE_SCENARIO).record);
+  });
+
+  // The terrain check comes before the simulation starts, so no real land is loaded here.
+  test('F-31: ⑤의 재생 자료는 terrain으로 지형을 가리킨다', () => {
+    const five = readGolden('5-real-laser-move.json').replay;
+    expect(validateReplay(five).ok).toBe(true);
+    expect(five.terrain).toEqual({ id: 'mungyeong', version: 2 });
+    const scenario = MUNGYEONG_PLACEMENT.scenario;
+    expect(() => replay(five, { ...flatTerrain(), id: 'mungyeong', version: 3 }, scenario)).toThrow(/terrain/); // another 판
+    expect(() => replay(five, flatTerrain(), scenario)).toThrow(/terrain/); // mock@1
   });
 });
