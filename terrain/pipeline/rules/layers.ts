@@ -15,7 +15,9 @@ export const WORLDCOVER: readonly (readonly [number, Cover])[] = [
 ];
 // ponytail: config.json's Overpass query still asks for the old set (no unclassified_link, residential_link); the manifest
 // records that query, so it stays until the next 받기, which must widen it to this set.
-const ROAD = /^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)(_link)?$/;
+export const ROAD = /^(motorway|trunk|primary|secondary|tertiary|unclassified|residential)(_link)?$/;
+/** The roads both the road cells and the road lines take: every graded road but tunnels. */
+export const isRoad = (e: OsmElement): boolean => ROAD.test(e.tags.highway ?? '') && e.tags.tunnel !== 'yes';
 const STAMP_STEP = 8; // m between stamped points along a line; below one cell, so no cell is skipped
 
 const c = (name: Cover) => COVER.indexOf(name);
@@ -120,7 +122,7 @@ export function layers(config: Config, snap: Snapshot): Layers {
 
   // 3. 도로 칸: every graded road, one cell wide, whatever its grade. Tunnels are left out.
   let road = 0;
-  for (const pts of ways((e) => ROAD.test(e.tags.highway ?? '') && e.tags.tunnel !== 'yes')) road += paint(stamp(pts), c('road'));
+  for (const pts of ways(isRoad)) road += paint(stamp(pts), c('road'));
 
   // 4. 건물: height tag → levels · 3 + 1.5 → 6 m. A footprint with no node inside takes the node nearest its box centre.
   const height = new Float64Array(cells);
@@ -180,7 +182,7 @@ export function layers(config: Config, snap: Snapshot): Layers {
 }
 
 /** Bounding box [minX, minY, maxX, maxY] of a point list. */
-function box(pts: [number, number][]): [number, number, number, number] {
+export function box(pts: [number, number][]): [number, number, number, number] {
   const b: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const [x, y] of pts) {
     b[0] = Math.min(b[0], x);

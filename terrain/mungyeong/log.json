@@ -106,8 +106,28 @@
     },
     "discarded": []
   },
+  "roads": {
+    "elements": {
+      "trunk": 67,
+      "main": 111,
+      "local": 339
+    },
+    "tunnels": 13,
+    "pieces": 517,
+    "lines": {
+      "trunk": 24,
+      "main": 48,
+      "local": 242
+    }
+  },
+  "names": {
+    "villages": 16,
+    "water": 2,
+    "peak": 8,
+    "pass": 0
+  },
   "size": {
-    "body": 5243296,
-    "header": 411
+    "body": 5351636,
+    "header": 108752
   }
 }

@@ -109,8 +109,9 @@ describe('가공', () => {
       { id: osm[9]!.id, tag: 'height', value: '150' },
     ]);
     expect(built.log.buildings.height).toEqual({ tag: 1, levels: 1, default: 3 });
-    // 1판 has no road lines, villages or names (M2-6 replaces this line).
-    expect([t.roads, t.villages, t.names]).toEqual([[], [], []]);
+    // The tertiary way is the one road line (the tunnel and the track give none); no places, no names.
+    expect(t.roads).toEqual([{ class: 'main', line: [{ x: 0, y: 60 }, { x: 230, y: 60 }] }]);
+    expect([t.villages, t.names]).toEqual([[], []]);
   });
 
   test('가공: 벌채지는 숲 칸만 바꾼다', async () => {
@@ -252,7 +253,11 @@ describe('가공', () => {
     const keys = (o: object) => Object.keys(o);
     const COVERS = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'];
 
-    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'size']);
+    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'roads', 'names', 'size']);
+    expect(keys(log.names)).toEqual(['villages', 'water', 'peak', 'pass']);
+    expect(keys(log.roads)).toEqual(['elements', 'tunnels', 'pieces', 'lines']);
+    expect(keys(log.roads.elements)).toEqual(['trunk', 'main', 'local']);
+    expect(keys(log.roads.lines)).toEqual(['trunk', 'main', 'local']);
     expect(keys(log.input)).toEqual(['snapshot', 'osmBase', 'rules']);
     expect(keys(log.input.snapshot)).toEqual(['ground.bin', 'cover.bin', 'osm.json']);
     expect(keys(log.cover)).toEqual(['worldcover', 'overwritten', 'final']);
@@ -275,6 +280,8 @@ describe('가공', () => {
     expect(log.cover.overwritten).toEqual({ water: 9, road: 24, building: 1, clearing: 29 });
     expect(log.ground).toEqual({ min: 100, max: 120.7, mean: 110.35 });
     expect(log.buildings).toEqual({ count: 1, height: { tag: 0, levels: 0, default: 1 }, discarded: [] });
+    expect(log.roads).toEqual({ elements: { trunk: 0, main: 1, local: 0 }, tunnels: 0, pieces: 1, lines: { trunk: 0, main: 1, local: 0 } });
+    expect(log.names).toEqual({ villages: 0, water: 0, peak: 0, pass: 0 });
 
     const shares = COVERS.reduce((sum, name) => sum + log.cover.final[name as Cover].share, 0);
     expect(Math.abs(shares - 100)).toBeLessThanOrEqual(0.05);
@@ -310,6 +317,163 @@ describe('가공', () => {
     const coverOf = (j: number) => [...Array(N).keys()].map((i) => name(t.cover[k(i, j)]!));
     graded.forEach((h, j) => expect(coverOf(j), h).toEqual(Array(N).fill('road')));
     left.forEach((tags, j) => expect(coverOf(graded.length + j), JSON.stringify(tags)).toEqual(Array(N).fill('forest')));
+  });
+
+  test('가공: 도로선 자르기·잇기·순서', async () => {
+    // Way points in 0.1 m; road lines come back in whole metres. The square is 0 … 230 m on both axes.
+    const linesOf = async (osm: OsmElement[]) => {
+      const built = await buildTerrain('synth', SYNTH, snapshot(osm));
+      return { built, t: await unpackTerrain(built.file) };
+    };
+    const line = (...pts: [number, number][]) => pts.map(([x, y]) => ({ x, y }));
+    const m = (pts: [number, number][]): [number, number][] => pts.map(([x, y]) => [x * 10, y * 10]);
+
+    // Grades: each value alone on its own row, 50 m long, so one grade's lines are ordered by their y.
+    const graded = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential'].flatMap((g) => [g, `${g}_link`]);
+    const left: Record<string, string>[] = [{ highway: 'primary', tunnel: 'yes' }, { highway: 'track' }, { highway: 'path' }, { highway: 'service' }];
+    const row = (j: number) => m([[0, j * 10], [50, j * 10]]);
+    const grades = await linesOf([...graded.map((h, j) => way({ highway: h }, row(j))), ...left.map((tags, j) => way(tags, row(graded.length + j)))]);
+    const GRADE = ['trunk', 'trunk', 'trunk', 'trunk', 'trunk', 'trunk', 'main', 'main', 'main', 'main', 'local', 'local', 'local', 'local'];
+    expect(grades.t.roads).toEqual(GRADE.map((c, j) => ({ class: c, line: line([0, j * 10], [50, j * 10]) })));
+    expect(grades.built.log.roads).toEqual({ elements: { trunk: 6, main: 4, local: 4 }, tunnels: 1, pieces: 14, lines: { trunk: 6, main: 4, local: 4 } });
+
+    // Cut on the square's edge: across it; out through the north edge and back; wholly outside.
+    const cut = await linesOf([
+      way({ highway: 'secondary' }, m([[-100, 100], [100, 200], [300, 200]])), // enters the west edge at y 150, leaves the east
+      way({ highway: 'secondary' }, m([[100, 50], [100, 260], [140, 260], [140, 50]])),
+      way({ highway: 'secondary' }, m([[-50, -50], [-10, -10]])),
+    ]);
+    expect(cut.t.roads).toEqual([
+      { class: 'main', line: line([0, 150], [100, 200], [230, 200]) }, // 241.8 m
+      { class: 'main', line: line([100, 50], [100, 230]) }, // 180 m, x 100 before x 140
+      { class: 'main', line: line([140, 50], [140, 230]) }, // started at its south end
+    ]);
+    expect(cut.built.log.roads).toEqual({ elements: { trunk: 0, main: 3, local: 0 }, tunnels: 0, pieces: 3, lines: { trunk: 0, main: 3, local: 0 } });
+
+    // Join only where exactly two ends of one grade meet; rings, merged points and short pieces.
+    const joined = await linesOf([
+      way({ highway: 'residential' }, m([[10, 10], [50, 10]])),
+      way({ highway: 'residential' }, m([[50, 60], [50, 10]])), // → one line with the one before
+      way({ highway: 'residential' }, m([[80, 100], [100, 100]])), // three ends at (100, 100): three lines
+      way({ highway: 'residential' }, m([[120, 100], [100, 100]])),
+      way({ highway: 'residential' }, m([[100, 130], [100, 100]])),
+      way({ highway: 'tertiary' }, m([[150, 10], [170, 10]])), // a main end and a local end: two lines
+      way({ highway: 'unclassified' }, m([[170, 10], [190, 10]])),
+      way({ highway: 'secondary' }, m([[150, 50], [170, 50]])), // two main ends and a local end: the mains join
+      way({ highway: 'secondary_link' }, m([[170, 50], [170, 80]])),
+      way({ highway: 'residential_link' }, m([[170, 50], [190, 50]])),
+      way({ highway: 'residential' }, m([[200, 200], [220, 200], [220, 220], [200, 220], [200, 200]])), // closed ring
+      way({ highway: 'residential' }, [[1500, 300], [1503, 300], [1800, 300]]), // points 0.3 m apart merge
+      way({ highway: 'residential' }, [[2000, 1500], [2020, 1500]]), // a 2 m piece is kept
+    ]);
+    expect(joined.t.roads).toEqual([
+      { class: 'main', line: line([150, 50], [170, 50], [170, 80]) },
+      { class: 'main', line: line([150, 10], [170, 10]) },
+      { class: 'local', line: line([10, 10], [50, 10], [50, 60]) }, // 90 m
+      { class: 'local', line: line([200, 200], [220, 200], [220, 220], [200, 220], [200, 200]) }, // 80 m
+      { class: 'local', line: line([150, 30], [180, 30]) }, // 30 m, y 30
+      { class: 'local', line: line([100, 100], [100, 130]) }, // 30 m, y 100
+      { class: 'local', line: line([170, 10], [190, 10]) }, // 20 m, y 10
+      { class: 'local', line: line([170, 50], [190, 50]) }, // 20 m, y 50
+      { class: 'local', line: line([80, 100], [100, 100]) }, // 20 m, y 100, x 80: the west end first
+      { class: 'local', line: line([100, 100], [120, 100]) }, // 20 m, y 100, x 100
+      { class: 'local', line: line([200, 150], [202, 150]) }, // 2 m
+    ]);
+    expect(joined.built.log.roads).toEqual({ elements: { trunk: 0, main: 3, local: 10 }, tunnels: 0, pieces: 13, lines: { trunk: 0, main: 2, local: 9 } });
+
+    // Not reachable through inputs: the exported checks on doctored lines.
+    const { t, built } = joined;
+    const fails = (roads: typeof t.roads, what: string) =>
+      expect(() => checkInvariants({ ...t, roads }, built.header), what).toThrow(/^가공: 불변 조건: 도로선/);
+    expect(() => checkInvariants(t, built.header)).not.toThrow();
+    const [a, b, ...rest] = t.roads;
+    fails([{ ...a!, line: [a!.line[0]!] }, b!, ...rest], 'one point');
+    fails([a!, b!, ...rest, { class: 'local', line: line([1, 0], [1, 231]) }], 'outside');
+    fails([b!, a!, ...rest], 'swapped');
+    fails([{ ...a!, line: [...a!.line].reverse() }, b!, ...rest], 'reversed');
+  });
+
+  test('가공: 마을과 지명 고르기', async () => {
+    // 100 m cells: the square is 0 … 2300 m, wide enough for the 1 km gap between peaks. Points in metres, ×10 for the snapshot.
+    const cfg = { ...SYNTH, frame: { ...SYNTH.frame, cell: 100 } };
+    const node = (tags: Record<string, string>, x: number, y: number): OsmElement => ({ type: 'node', id: nextId++, tags, pts: [[x * 10, y * 10]] });
+    const m = (pts: [number, number][]): [number, number][] => pts.map(([x, y]) => [x * 10, y * 10]);
+    const peak = (name: string, x: number, y: number) => node({ natural: 'peak', name }, x, y);
+    const pass = (name: string, x: number, y: number) => node({ mountain_pass: 'yes', name }, x, y);
+    const osm = [
+      node({ place: 'town', name: '읍' }, 500, 2000),
+      node({ place: 'village', name: '리' }, 1500, 2000),
+      { type: 'node', id: nextId++, tags: { place: 'hamlet', name: '말' }, pts: [[18004, 21006]] } as OsmElement, // → (1800, 2101)
+      node({ place: 'village' }, 600, 600), // no name
+      node({ place: 'village', name: '밖' }, -50, 100), // outside
+      node({ place: 'city', name: '시' }, 700, 700),
+      // Peaks in snapshot order against height order. 나봉 is 500 m from 가봉 and lower; 사봉 is exactly 1 km from 가봉.
+      peak('차봉', 1000, 2000), peak('자봉', 2000, 1000), peak('아봉', 0, 1000), peak('사봉', 1000, 0), peak('바봉', 2000, 2000),
+      peak('마봉', 0, 2000), peak('라봉', 2000, 0), peak('다봉', 0, 0), peak('나봉', 1000, 1500),
+      { type: 'node', id: nextId++, tags: { natural: 'peak', name: '가봉' }, pts: [[10004, 9996]] } as OsmElement, // → (1000, 1000)
+      node({ natural: 'peak' }, 1500, 500), // no name
+      peak('밖봉', 2400, 0), // outside
+      pass('바재', 800, 300), pass('가재', 300, 300), pass('마재', 700, 300), pass('나재', 400, 300), pass('라재', 600, 300), pass('다재', 500, 300),
+      // Water: 가천 in two ways (1700 m) before the longer single way 나강 (1200 m); 다강 counts only its 100 m inside.
+      way({ waterway: 'river', name: '가천' }, m([[0, 500], [1000, 500]])),
+      way({ waterway: 'river', name: '가천' }, m([[1000, 500], [1000, 1200]])),
+      way({ waterway: 'river', name: '나강' }, m([[100, 1500], [1300, 1500]])),
+      way({ waterway: 'river', name: '다강' }, m([[2000, 2200], [2000, 3000]])),
+      way({ waterway: 'river' }, m([[100, 100], [2000, 100]])), // no name
+      way({ natural: 'water', water: 'reservoir', name: '라저수지' }, m(ring(300, 600, 500, 800))), // 0.04 km²
+      way({ natural: 'water', water: 'reservoir', name: '마저수지' }, m(ring(1500, 300, 1900, 600))), // 0.12 km²
+      way({ natural: 'water', water: 'reservoir', name: '바저수지' }, m(ring(1600, 1700, 1700, 1800))),
+      way({ natural: 'water', name: '가천' }, m(ring(100, 1000, 900, 1400))), // a name already taken
+    ];
+    const snap = snapshot(osm);
+    const HEIGHT: [number, number, number][] = [
+      [10, 10, 950], [10, 15, 940], [0, 0, 930], [20, 0, 920], [0, 20, 910], [20, 20, 900], [10, 0, 890], [0, 10, 880], [20, 10, 870], [10, 20, 860],
+      [15, 5, 999], [3, 3, 700], [4, 3, 690], [5, 3, 680], [6, 3, 670], [7, 3, 660], [8, 3, 650],
+    ];
+    for (const [i, j, h] of HEIGHT) snap.ground[k(i, j)] = h * 100;
+    const built = await buildTerrain('synth', cfg, snap);
+    const t = await unpackTerrain(built.file);
+
+    expect(t.villages).toEqual([
+      { name: '읍', x: 500, y: 2000, r: 330 },
+      { name: '리', x: 1500, y: 2000, r: 170 },
+      { name: '말', x: 1800, y: 2101, r: 110 },
+    ]);
+    const named = (kind: string, list: [string, number, number][]) => list.map(([name, x, y]) => ({ name, x, y, kind }));
+    expect(t.names).toEqual([
+      // Rivers at half their longest piece, then the largest reservoir at its box centre; 6 names → 4.
+      ...named('water', [['가천', 500, 500], ['나강', 700, 1500], ['다강', 2000, 2250], ['마저수지', 1700, 450]]),
+      // By ground height at the nearest node; 나봉 skipped (500 m from 가봉), 차봉 is the ninth.
+      ...named('peak', [['가봉', 1000, 1000], ['다봉', 0, 0], ['라봉', 2000, 0], ['마봉', 0, 2000], ['바봉', 2000, 2000], ['사봉', 1000, 0], ['아봉', 0, 1000], ['자봉', 2000, 1000]]),
+      ...named('pass', [['가재', 300, 300], ['나재', 400, 300], ['다재', 500, 300], ['라재', 600, 300]]),
+    ]);
+    expect(built.log.names).toEqual({ villages: 3, water: 4, peak: 8, pass: 4 });
+  });
+
+  test('가공: 지명 규칙 위반에서 멈춘다', async () => {
+    // Picking keeps the caps and the gap, so no snapshot reaches these stops: the exported checks on doctored lists, as in
+    // 가공: 멈춤 목록 (whose DSM case shows that a checkInvariants stop writes nothing).
+    const cfg = { ...SYNTH, frame: { ...SYNTH.frame, cell: 100 } }; // square 0 … 2300 m
+    const built = await buildTerrain('synth', cfg, snapshot([]));
+    const t = await unpackTerrain(built.file);
+    const at = (kind: 'water' | 'peak' | 'pass', x: number, y: number, name = `${kind}${x},${y}`) => ({ name, x, y, kind });
+    const ok = (names: ReturnType<typeof at>[]) => expect(() => checkInvariants({ ...t, names }, built.header)).not.toThrow();
+    const fails = (names: ReturnType<typeof at>[], message: RegExp) => expect(() => checkInvariants({ ...t, names }, built.header)).toThrow(message);
+    const grid = [0, 1000, 2000].flatMap((x) => [0, 1000, 2000].map((y) => at('peak', x, y)));
+    const row = (kind: 'water' | 'pass', count: number) => [...Array(count).keys()].map((i) => at(kind, i * 10, 50));
+
+    ok([...row('water', 4), ...grid.slice(0, 8), ...row('pass', 4)]);
+    fails(grid, /^가공: 불변 조건: 지명 peak이 8개를 넘는다 \(9\)$/);
+    fails(row('pass', 5), /^가공: 불변 조건: 지명 pass이 4개를 넘는다 \(5\)$/);
+    fails(row('water', 5), /^가공: 불변 조건: 지명 water이 4개를 넘는다 \(5\)$/);
+    ok([at('peak', 0, 0), at('peak', 0, 1000)]);
+    fails([at('peak', 0, 0), at('peak', 0, 999)], /^가공: 불변 조건: 지명 0과 1의 산이 1 km보다 가깝다$/);
+    fails([at('peak', 0, 0), at('water', 500, 500)], /^가공: 불변 조건: 지명 1의 종류가 물 → 산 → 고개 순서가 아니다$/);
+    fails([at('pass', 0, 0), at('peak', 500, 500)], /^가공: 불변 조건: 지명 1의 종류가 물 → 산 → 고개 순서가 아니다$/);
+    ok([at('water', 2300, 2300)]);
+    fails([at('water', 2301, 0)], /^가공: 불변 조건: 지명 0이 정사각 밖이다$/);
+    fails([at('pass', 0, -1)], /^가공: 불변 조건: 지명 0이 정사각 밖이다$/);
+    expect(() => checkInvariants({ ...t, villages: [{ name: '리', x: -1, y: 0, r: 170 }] }, built.header)).toThrow(/^가공: 불변 조건: 마을 0이 정사각 밖이다$/);
   });
 
   test('가공: 불변 조건 하나하나', async () => {
@@ -373,6 +537,24 @@ describe('가공', () => {
     expect(text(built.log)).toBe(readFileSync(join(DATA, 'log.json'), 'utf8'));
     expect(built.expected.hash).toBe(terrainHash(await unpackTerrain(file)));
   }, 30_000);
+
+  test('가공: 2판의 칸 층은 1판과 같다', async () => {
+    // 1판 had no road lines, villages or names, so with those emptied the hash is 1판's: every cell layer, n, cell, grid
+    // and edge are bit-identical. A later 판 that changes a cell layer on purpose replaces this literal.
+    const t = await unpackTerrain(committedFile());
+    expect(terrainHash({ ...t, roads: [], villages: [], names: [] })).toBe('eb93e51936a69346');
+  });
+
+  test('가공: 안내 문서의 자료 출처 문구', async () => {
+    const readme = readFileSync('terrain/README.md', 'utf8');
+    const lines = readme.split('\n');
+    const t = await unpackTerrain(committedFile());
+    for (const credit of t.credits) expect(lines, credit).toContain(credit); // a line of its own, letter for letter
+    for (const command of ['npm run terrain:fetch', 'npm run terrain:build']) expect(readme).toContain(command);
+    const { sources } = json(join(DATA, 'config.json'));
+    for (const key of ['ground', 'cover', 'osm'])
+      for (const field of ['name', 'url', 'license']) expect(readme, `${key}.${field}`).toContain(sources[key][field]);
+  });
 
   test('가공: 지형 파일의 머리 키와 크기', () => {
     const file = committedFile();

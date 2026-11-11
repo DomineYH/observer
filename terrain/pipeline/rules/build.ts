@@ -1,13 +1,15 @@
 // 가공: 원자료 스냅샷 + 가공 설정 → 지형 파일 bytes, 지형 기대값, 가공 자료 머리 and 가공 기록, in memory. The self-check
 // unpacks the bytes with the app's own unpackTerrain and hashes what the app will see. Writing is build/build.ts.
 import { gunzipSync } from 'node:zlib';
-import { COVER, terrainHash, type Cover, type TerrainData } from '@sim';
+import { COVER, terrainHash, type Cover, type PlaceName, type TerrainData } from '@sim';
 import type { ForestRule } from '@adapters/terrainFile/cellHash';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import type { Clearing, Config, Frame } from '../config';
 import type { Snapshot } from '../snapshot';
 import { layers, SCALE, type Discarded } from './layers';
 import { packTerrain } from './pack';
+import { gap2, NAME_CAP, namesOf, PEAK_GAP, villagesOf } from './names';
+import { compareRoads, roadLines, startsLater, type RoadLog } from './roads';
 
 export const FOREST: ForestRule = { min: 12, max: 17, salt: 0 };
 
@@ -41,6 +43,8 @@ export interface Log {
   };
   ground: { min: number; max: number; mean: number };
   buildings: { count: number; height: { tag: number; levels: number; default: number }; discarded: Discarded[] };
+  roads: RoadLog;
+  names: { villages: number; water: number; peak: number; pass: number };
   size: { body: number; header: number };
 }
 
@@ -50,6 +54,8 @@ export interface Built {
   header: Header;
   log: Log;
 }
+
+const NAME_ORDER = ['water', 'peak', 'pass'] as const;
 
 const stop = (why: string): never => {
   throw new Error(`가공: ${why}`);
@@ -69,8 +75,33 @@ export function checkInvariants(t: TerrainData, header: Header): void {
     counts[t.cover[k]!]!++;
   }
   if (COVER.some((name, c) => header.coverCounts[name] !== counts[c])) fail('머리의 피복 칸 수가 실제와 다르다');
+  const max = (t.n - 1) * t.cell;
+  const inside = (p: { x: number; y: number }) => p.x >= 0 && p.x <= max && p.y >= 0 && p.y <= max;
+  t.roads.forEach((r, i) => {
+    if (r.line.length < 2) fail(`도로선 ${i}의 점이 둘보다 적다`);
+    if (!r.line.every(inside)) fail(`도로선 ${i}이 정사각 밖으로 나간다`);
+    if (startsLater(r.line)) fail(`도로선 ${i}이 남쪽(같으면 서쪽) 끝에서 시작하지 않는다`);
+    if (i > 0 && compareRoads(t.roads[i - 1]!, r) > 0) fail(`도로선 ${i - 1}과 ${i}의 순서가 규칙과 다르다`);
+  });
+  t.villages.forEach((v, i) => inside(v) || fail(`마을 ${i}이 정사각 밖이다`));
+  t.names.forEach((p, i) => {
+    if (!inside(p)) fail(`지명 ${i}이 정사각 밖이다`);
+    if (i > 0 && NAME_ORDER.indexOf(p.kind) < NAME_ORDER.indexOf(t.names[i - 1]!.kind)) fail(`지명 ${i}의 종류가 물 → 산 → 고개 순서가 아니다`);
+    if (p.kind === 'peak')
+      t.names.forEach((q, j) => j < i && q.kind === 'peak' && gap2(p, q) < PEAK_GAP * PEAK_GAP && fail(`지명 ${j}과 ${i}의 산이 1 km보다 가깝다`));
+  });
+  for (const kind of NAME_ORDER) {
+    const count = t.names.filter((p) => p.kind === kind).length;
+    if (count > NAME_CAP[kind]) fail(`지명 ${kind}이 ${NAME_CAP[kind]}개를 넘는다 (${count})`);
+  }
   if (header.ground.kind !== 'DTM') fail(`지면의 종류가 DTM이 아니다 (${header.ground.kind})`);
 }
+
+const count = (names: readonly PlaceName[]) => ({
+  water: names.filter((p) => p.kind === 'water').length,
+  peak: names.filter((p) => p.kind === 'peak').length,
+  pass: names.filter((p) => p.kind === 'pass').length,
+});
 
 /** Percent of cells, two decimals. */
 export const shareOf = (count: number, cells: number): number => Math.round((count * 10000) / cells) / 100;
@@ -86,9 +117,12 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
     stop(`방안 기준이 정한 값이 아니거나 1 km 나머지가 실제 위치와 다르다 (${letters} ${e0} ${n0})`);
   if (e0 + n * cell > 99_999 || n0 + n * cell > 99_999) stop(`정사각이 100 km 방안 하나를 넘는다 (동 ${e0}–${e0 + n * cell}, 북 ${n0}–${n0 + n * cell})`);
   const L = layers(config, snap);
+  const R = roadLines(snap, n, cell);
+  const villages = villagesOf(snap, n, cell);
+  const names = namesOf(snap, L.groundTenths, n, cell);
   const credits = [sources.ground.credit, sources.cover.credit, sources.osm.credit];
   const file = packTerrain(
-    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: [], villages: [], names: [], edge: 'veil', grid: config.grid },
+    { id, version: config.version, credits, n, cell, ground: L.ground, buildings: L.buildings, cover: L.cover, roads: R.roads, villages, names, edge: 'veil', grid: config.grid },
     SCALE,
     FOREST,
   );
@@ -133,6 +167,8 @@ export async function buildTerrain(id: string, config: Config, snap: Snapshot): 
     cover: { worldcover: L.worldcover, overwritten: L.overwritten, final },
     ground: { min: min / SCALE, max: max / SCALE, mean: Math.round((sum * 100) / SCALE / cells) / 100 },
     buildings: { count: L.buildingCount, height: L.heightFrom, discarded: L.discarded },
+    roads: R.log,
+    names: { villages: villages.length, ...count(names) },
     size: { body: body.length, header: body.readUInt32LE(0) },
   };
 
