@@ -125,11 +125,12 @@ describe('문경 배치', () => {
       };
     });
     const good = score.filter((s) => s.seen >= 50 && s.forest <= 30);
-    const worst = score.reduce((a, b) => (b.seen < a.seen ? b : a));
     expect(good.length, JSON.stringify(score)).toBeGreaterThanOrEqual(2);
-    expect(worst.seen, JSON.stringify(worst)).toBeGreaterThanOrEqual(40);
-    expect(worst.forest, JSON.stringify(worst)).toBeLessThanOrEqual(35);
-    for (const s of score) expect(s.last, s.k).toBeGreaterThanOrEqual(50);
+    for (const s of score) {
+      expect(s.seen, JSON.stringify(s)).toBeGreaterThanOrEqual(40);
+      expect(s.forest, JSON.stringify(s)).toBeLessThanOrEqual(35);
+      expect(s.last, JSON.stringify(s)).toBeGreaterThanOrEqual(50);
+    }
   }, 60_000);
 
   test('배치: 정찰조 자리', async () => {
@@ -141,9 +142,12 @@ describe('문경 배치', () => {
       expect(coverAt(t, stop.x, stop.y), k).not.toBe('forest');
       expect(seen(t, stop.x, stop.y), k).toBe(true);
       expect(dist(stop, op), k).toBeLessThanOrEqual(BINO_M);
-      // the route's points are jittered 30 m: its leader is seen from every spot within 30 m (5 m grid)
-      const hidden: Point[] = [];
-      for (let v = -30; v <= 30; v += 5) for (let u = -30; u <= 30; u += 5) if (u * u + v * v <= 900 && !seen(t, stop.x + u, stop.y + v)) hidden.push({ x: u, y: v });
+      // the route's points are jittered 30 m: its leader is seen from every spot within 30 m (1 m grid over the disc
+      // and every degree of its edge)
+      const spots: Point[] = [];
+      for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) spots.push({ x: u, y: v });
+      for (let a = 0; a < 360; a++) spots.push({ x: 30 * Math.cos((a * Math.PI) / 180), y: 30 * Math.sin((a * Math.PI) / 180) });
+      const hidden = spots.filter((d) => !seen(t, stop.x + d.x, stop.y + d.y));
       expect(hidden, `${k} (${stop.x}, ${stop.y})`).toEqual([]);
     }
   }, 30_000);
@@ -158,10 +162,13 @@ describe('문경 배치', () => {
     const n = sc.nais[mortar.nai]!;
     const [hx, hy] = [mortar.spread.x / 2, mortar.spread.y / 2];
     expect(cells(n.x - hx - 100, n.x + hx + 100, n.y - hy - 100, n.y + hy + 100).filter((p) => house(t, p.x, p.y))).toEqual([]);
-    // the simulation's own test for a spot in the open (deploy): surface less than 3 m above the ground here and 30 m east
+    // the simulation's own test for a spot in the open (deploy): surface less than 3 m above the ground here and 30 m
+    // east, at continuous spots drawn evenly over the box; measured at the middle of every 1 m square
     const open = (x: number, y: number) => surfaceAt(t, x, y) - heightAt(t, x, y) < 3;
-    const box = cells(n.x - hx, n.x + hx, n.y - hy, n.y + hy);
-    expect(share(box, (p) => open(p.x, p.y) && open(p.x + 30, p.y))).toBeGreaterThanOrEqual(15);
+    let usable = 0;
+    for (let v = 0.5; v < mortar.spread.y; v++) for (let u = 0.5; u < mortar.spread.x; u++) if (open(n.x - hx + u, n.y - hy + v) && open(n.x - hx + u + 30, n.y - hy + v)) usable++;
+    // 13.5 %, not the ticket's 15 %: user decision on #82 (2026-11-11) — no box within 5.0 km reaches 15 % (best 13.94 %)
+    expect((100 * usable) / (mortar.spread.x * mortar.spread.y)).toBeGreaterThanOrEqual(13.5);
     expect(dist(n, op)).toBeLessThanOrEqual(5000);
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) expect(dist({ x: n.x + sx * hx, y: n.y + sy * hy }, op)).toBeLessThanOrEqual(5000);
   }, 30_000);
