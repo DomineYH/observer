@@ -1,12 +1,7 @@
 // The demo's value noise (demo lines 216–219), integer hashing only, so it is the same in every engine.
-
-/** Uniform in [0, 1) from a cell and a salt. */
-export function hash(ix: number, iy: number, s: number): number {
-  let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(s, 982451653)) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
+import { hash as sharedHash } from '../../terrainFile/cellHash';
+// A local binding: Vitest reads an imported name through a getter on every call, which doubled generation time here.
+const hash = sharedHash;
 
 function vnoise(x: number, y: number, s: number): number {
   const ix = Math.floor(x);

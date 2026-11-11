@@ -1,14 +1,14 @@
 // mock 지형 원천: seeded procedural terrain (demo lines 200–262). Headless and deterministic: it follows the
 // simulation's bans and uses only 결정적 수학 from sim, because server replay regenerates it from the seed.
-import type { COVER, Point, Road, TerrainData } from '@sim';
+import type { Point, Road, TerrainData } from '@sim';
 import { cos, exp, sin } from '@sim/math';
 import type { TerrainSource } from '../../index';
 import { CELL, FRIEND_HILLS, GRID, N, OP_HILL, ROADS, VILLAGES } from './features';
-import { fbm, hash, ss } from './noise';
+import { forestHeight, hash } from '../../terrainFile/cellHash';
+import { COVER_ORDER as ORDER } from '../../terrainFile/unpack';
+import { fbm, ss } from './noise';
 
 const TAU = Math.PI * 2;
-// Only 결정적 수학 may come from sim as values here; the type check keeps this tuple equal to sim's COVER.
-const ORDER = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'] as const satisfies typeof COVER;
 const C = (c: (typeof ORDER)[number]): number => ORDER.indexOf(c);
 const [OPEN, FIELD, FOREST, WATER, ROAD, VILLAGE, BUILDING] = [C('open'), C('field'), C('forest'), C('water'), C('road'), C('village'), C('building')];
 
@@ -111,6 +111,7 @@ export function generateTerrain(seed: number): TerrainData {
   });
 
   // 피복 분류와 표면 높이
+  const FOREST_RULE = { min: 12, max: 17, salt: S(5) };
   for (let j = 0; j < N; j++)
     for (let i = 0; i < N; i++) {
       const k = j * N + i;
@@ -123,7 +124,7 @@ export function generateTerrain(seed: number): TerrainData {
         const dObs = dist2(x, y, OP_HILL);
         forest = y > 2300 ? g > 0.12 && dObs > 350 * 350 : y < 2300 && g > 0.28 && dObs > 500 * 500;
       }
-      surface[k] = ground[k]! + (forest ? 12 + 5 * hash(i, j, S(5)) : 0) + buildings[k]!;
+      surface[k] = ground[k]! + (forest ? forestHeight(FOREST_RULE, i, j) : 0) + buildings[k]!;
       if (buildings[k]) cover[k] = BUILDING;
       else if (road[k]) cover[k] = ROAD;
       else if (rd < 30) cover[k] = WATER;

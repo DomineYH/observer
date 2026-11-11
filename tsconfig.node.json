@@ -6,6 +6,6 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node"]
   },
-  "include": ["*.ts", "tests/**/*.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
+  "include": ["*.ts", "tests/**/*.ts", "terrain/**/*.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
   "exclude": ["tests/engines/main.ts"]
 }
