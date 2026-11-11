@@ -1,5 +1,6 @@
 import type { TerrainSource } from '@adapters/index';
 import { mockTerrain } from '@adapters/mock/terrain';
+import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
 import { MOCK_PLACEMENT, type Placement } from '@content/placement';
 
 export type Backend = 'mock' | 'real';
@@ -20,11 +21,7 @@ export function terrainSourceOf(backend: Backend): TerrainSource {
   return source;
 }
 
-// 배치, paired with the 지형 원천 by the same key. The real 배치 (문경) arrives in M2-8.
-const PLACEMENT: Record<Backend, Placement | null> = { mock: MOCK_PLACEMENT, real: null };
+// 배치, paired with the 지형 원천 by the same key.
+const PLACEMENT: Record<Backend, Placement> = { mock: MOCK_PLACEMENT, real: MUNGYEONG_PLACEMENT };
 
-export function placementOf(backend: Backend): Placement {
-  const placement = PLACEMENT[backend];
-  if (!placement) throw new Error('문경 배치가 아직 없다 (VITE_OBSERVER_BACKEND=real)');
-  return placement;
-}
+export const placementOf = (backend: Backend): Placement => PLACEMENT[backend];
