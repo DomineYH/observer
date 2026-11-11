@@ -86,7 +86,7 @@ def wait_working(run, sleep, name, seconds):
     return status
 
 
-def dispatch(a, run=sh, sleep=time.sleep):
+def dispatch(a, run=sh, sleep=time.sleep, clock=time.monotonic):
     """Returns (exit code, last line)."""
     problem = order_problem(a.order_id)
     code, lines = record.check([a.task_id]) if not problem else (0, [])
@@ -136,7 +136,8 @@ def dispatch(a, run=sh, sleep=time.sleep):
         return 2, f'REFUSED could not record pane {pane}: ' + ' | '.join(lines[:3])
 
     screen, rounds, mark = screen_of(run, pane), 0, None if a.no_start else READY.get(harness)
-    for _ in range(0 if a.no_start else 30):  # answer known startup dialogs (3 rounds), then wait up to 30 s for the mark
+    deadline, late = clock() + 30, False
+    while not a.no_start and not late:  # answer known startup dialogs (3 rounds) and wait for the mark, 30 s in all
         keys = None if screen is None else dialog_keys(screen)
         if screen is None or keys == UNKNOWN or rounds == 3 and keys:
             break
@@ -150,6 +151,7 @@ def dispatch(a, run=sh, sleep=time.sleep):
         else:
             sleep(1)
         screen = screen_of(run, pane)
+        late = clock() > deadline  # a screen read after the deadline never counts as ready
     if screen is None:
         return 3, f'MANUAL screen unreadable: herdr pane read {pane} failed; check {a.name} by hand, then rerun with --no-start'
     keys = dialog_keys(screen)
@@ -158,7 +160,7 @@ def dispatch(a, run=sh, sleep=time.sleep):
             print(screen.rstrip(), file=sys.stderr)
         what = 'unknown hooks screen' if keys == UNKNOWN else 'not ready'
         return 3, f'MANUAL {what}: {a.name} in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
-    if mark and not mark.search(screen):
+    if mark and (late or not mark.search(screen)):
         if screen.strip():
             print(screen.rstrip(), file=sys.stderr)
         return 3, f'MANUAL not ready: {a.name} shows no ready mark in pane {pane} (screen above); fix it by hand, then rerun with --no-start'
@@ -181,7 +183,7 @@ def dispatch(a, run=sh, sleep=time.sleep):
         status = agent(run, a.name).get('agent_status')
         after = screen_of(run, pane)
         keys = None if after is None else dialog_keys(after)
-        if keys and keys != UNKNOWN:  # codex can show its hooks screen after taking the prompt (2026-11-11): answer once
+        if not a.no_start and keys and keys != UNKNOWN:  # codex can show its hooks screen after taking the prompt (2026-11-11): answer once
             run(['herdr', 'pane', 'send-keys', pane, *keys])
             sleep(3)
             status = agent(run, a.name).get('agent_status')
@@ -378,6 +380,26 @@ def self_test():
         run, calls = fake(['idle', 'working'], harness='codex', screens=[codex_ui, truncated])
         code, last = dispatch(a, run, nap)
         assert code == 4 and last.endswith('status=startup-dialog-on-screen') and not any(c.startswith('pane-keys') for c in calls)  # o3
+        # o5 review-2 F1: with --no-start a dialog during confirmation is exit 4 and gets no keys, as before
+        run, calls = fake(['idle', 'idle', 'working'], harness='codex', screens=[codex_ui, hooks_new, codex_ui])
+        code, last = dispatch(no_start, run, nap)
+        assert code == 4 and last.endswith('status=startup-dialog-on-screen') and not any('send-keys' in c or c.startswith('pane-keys') for c in calls)  # o5
+        # o5 review-2 F2: the ready wait ends 30 s after it starts by the clock, dialog rounds included
+        for later in (codex_ui, shell):
+            t = [0.0]
+            tick = lambda s: t.__setitem__(0, t[0] + s)
+            run, calls = fake(['idle', 'working'], harness='codex', screens=[hooks_new] + [shell] * 27 + [later] + [shell])
+            with contextlib.redirect_stderr(io.StringIO()):
+                code, last = dispatch(a, run, tick, clock=lambda: t[0])
+            if later is codex_ui:  # the mark on the read at 30 s still counts
+                assert code == 0 and 'pane-keys esc' in calls  # o5
+            else:  # one dialog round, then no mark: stops at the deadline
+                assert code == 3 and last.startswith('MANUAL not ready: w shows no ready mark') and 'prompt' not in calls and t[0] == 31  # o5
+        t = [0.0]
+        run, calls = fake(['idle', 'working'], harness='codex', screens=[hooks_new] + [shell] * 28 + [codex_ui])
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, last = dispatch(a, run, lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+        assert code == 3 and 'prompt' not in calls  # o5: a mark read after the deadline is not accepted
         # R3: without jsonschema the record check refuses before any herdr call
         saved, sys.modules['jsonschema'] = sys.modules.get('jsonschema'), None
         try:
