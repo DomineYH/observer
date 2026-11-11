@@ -100,3 +100,17 @@ test('F-30: 랭킹 자격 — 한 틱 안에 훈련으로 바꿨다 돌아온 �
   expect([stored.record.mode, stored.ranked]).toEqual(['training', false]);
   expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새56');
 });
+
+test('F-31: 재생 자료 — mock 판에는 terrain이 없다', () => {
+  const at = { ...init(20261106), scenario: NO_ENEMY };
+  const g = play(at);
+  g.take(START);
+  for (let k = 0; k < 10; k++) g.step();
+  const data = replayOf(at, g.session.log, g.sim.state.tick);
+  // M1's keys, in M1's order
+  expect(Object.keys(data)).toEqual(['format', 'simVersion', 'seed', 'seedKind', 'scenario', 'guns', 'weather', 'mode', 'stepMs', 'inputs', 'totalTicks']);
+  expect(validateReplay(data).ok).toBe(true);
+  const other = replayOf({ ...at, terrain: { ...at.terrain, id: 'x', version: 2 } }, g.session.log, g.sim.state.tick);
+  expect(other.terrain).toEqual({ id: 'x', version: 2 });
+  expect(validateReplay(other).ok).toBe(true);
+});
