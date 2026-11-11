@@ -1,6 +1,6 @@
 // The 가공 seam (npm run terrain:build) on synthetic input: the cover table and overwrite order, clearings, the stop
 // list and the 지형 판 규칙. Results are read back through the app's unpackTerrain, never from 가공's own arrays.
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
@@ -8,7 +8,7 @@ import { describe, expect, test } from 'vitest';
 import { COVER, type Cover } from '@sim';
 import { bodyStart, unpackTerrain } from '@adapters/terrainFile/unpack';
 import { readConfig, type Config } from '../../terrain/pipeline/config';
-import { buildAndWrite, checkFile } from '../../terrain/pipeline/build/build';
+import { buildAndWrite, checkFile, text } from '../../terrain/pipeline/build/build';
 import { buildTerrain, checkInvariants } from '../../terrain/pipeline/rules/build';
 import type { OsmElement, Snapshot } from '../../terrain/pipeline/snapshot';
 
@@ -199,4 +199,87 @@ describe('가공', () => {
     const counts = { ...built.header, coverCounts: { ...built.header.coverCounts, forest: 1 } };
     expect(() => checkInvariants(t, counts)).toThrow(/^가공: 불변 조건: 머리의 피복 칸 수가 실제와 다르다$/);
   }, 30_000);
+
+  test('가공: 지형 판 규칙', async () => {
+    const plain = snapshot([]);
+    const other = snapshot([]);
+    other.ground[k(7, 7)]! += 100;
+    const v = (version: number) => ({ ...SYNTH, version });
+    const dirs = fresh();
+    const bin = join(dirs.source, 'terrain.bin');
+    const head = join(dirs.data, 'header.json');
+    const rejects = async (cfg: Config, snap: Snapshot, message: RegExp) => {
+      const before = contents(dirs);
+      await expect(buildAndWrite(dirs, 'synth', cfg, snap)).rejects.toThrow(message);
+      expect(contents(dirs)).toEqual(before);
+    };
+
+    // No committed 기대값: all four are written.
+    const first = await buildAndWrite(dirs, 'synth', v(1), plain);
+    expect([readdirSync(dirs.data).sort(), readdirSync(dirs.source).sort()]).toEqual([['header.json', 'log.json'], ['expected.json', 'terrain.bin']]);
+    expect(readFileSync(bin)).toEqual(Buffer.from(first.file));
+
+    // Same 판, same content: the file is the canon and is not rewritten even when its gzip bytes differ; the rest is.
+    const level1 = gzipSync(gunzipSync(first.file), { level: 1 });
+    writeFileSync(bin, level1);
+    writeFileSync(head, '{}\n');
+    await buildAndWrite(dirs, 'synth', v(1), plain);
+    expect(readFileSync(bin)).toEqual(level1);
+    expect(readFileSync(head, 'utf8')).toBe(text(first.header));
+
+    // Same 판, other content; 판 + 2; 판 − 1: rejected, nothing changes.
+    await rejects(v(1), other, /^가공: 판이 같은데 내용이 다르다/);
+    await rejects(v(3), other, /^가공: 지형 판 규칙: 커밋된 판 1에서 3로 갈 수 없다$/);
+
+    // 판 + 1: all four are written again.
+    const second = await buildAndWrite(dirs, 'synth', v(2), other);
+    expect(readFileSync(bin)).toEqual(Buffer.from(second.file));
+    expect(JSON.parse(readFileSync(join(dirs.source, 'expected.json'), 'utf8'))).toEqual({ id: 'synth', version: 2, hash: second.expected.hash });
+    expect(second.expected.hash).not.toBe(first.expected.hash);
+    expect(readFileSync(head, 'utf8')).toBe(text(second.header));
+    expect(readFileSync(join(dirs.data, 'log.json'), 'utf8')).toBe(text(second.log));
+    await rejects(v(1), plain, /^가공: 지형 판 규칙: 커밋된 판 2에서 1로 갈 수 없다$/);
+
+    // A 기대값 without its 지형 파일.
+    rmSync(bin);
+    await rejects(v(3), plain, /^가공: 지형 기대값은 있는데 지형 파일이 없다$/);
+  });
+
+  test('가공: 가공 기록의 모양', async () => {
+    const osm = [way({ highway: 'secondary' }, [[0, 600], [2300, 600]]), way({ building: 'yes' }, tiny(3, 3)), way({ natural: 'water' }, ring(150, 1050, 450, 1350))];
+    const cfg = { ...SYNTH, clearings: [{ x: 150, y: 150, r: 30, kind: 'planned' as const }] };
+    const { log, header } = await buildTerrain('synth', cfg, snapshot(osm, 10, [[0, 0, 40], [1, 0, 50], [2, 0, 30]]));
+    const keys = (o: object) => Object.keys(o);
+    const COVERS = ['open', 'field', 'forest', 'water', 'road', 'village', 'building'];
+
+    expect(keys(log)).toEqual(['input', 'cover', 'ground', 'buildings', 'size']);
+    expect(keys(log.input)).toEqual(['snapshot', 'osmBase', 'rules']);
+    expect(keys(log.input.snapshot)).toEqual(['ground.bin', 'cover.bin', 'osm.json']);
+    expect(keys(log.cover)).toEqual(['worldcover', 'overwritten', 'final']);
+    expect(log.cover.worldcover.map((w) => keys(w))).toEqual(Array(11).fill(['value', 'cells']));
+    expect(log.cover.worldcover.map((w) => w.value)).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 100]);
+    expect(keys(log.cover.overwritten)).toEqual(['water', 'road', 'building', 'clearing']);
+    expect(keys(log.cover.final)).toEqual(COVERS);
+    for (const name of COVERS) expect(keys(log.cover.final[name as Cover])).toEqual(['cells', 'share']);
+    expect(keys(log.ground)).toEqual(['min', 'max', 'mean']);
+    expect(keys(log.buildings)).toEqual(['count', 'height', 'discarded']);
+    expect(keys(log.buildings.height)).toEqual(['tag', 'levels', 'default']);
+    expect(keys(log.size)).toEqual(['body', 'header']);
+    expect(keys(header)).toEqual(['id', 'version', 'hash', 'rules', 'ground', 'cover', 'vectors', 'forest', 'coverCounts', 'frame', 'clearings', 'credits', 'snapshot']);
+    expect(keys(header.ground)).toEqual(['name', 'version', 'kind', 'vertical', 'subtracted', 'scale']);
+    expect(keys(header.coverCounts)).toEqual(COVERS);
+
+    // Worked by hand: water nodes 2..4 × 11..13; road row 6; one building; the 30 m circle on node (15, 15) holds 29 nodes.
+    // Ground: 100.0 m at (0, 0), 120.7 m at (23, 23), mean of the rounded values 110.3549 m.
+    expect(log.cover.worldcover.filter((w) => w.cells)).toEqual([{ value: 10, cells: N * N - 3 }, { value: 30, cells: 1 }, { value: 40, cells: 1 }, { value: 50, cells: 1 }]);
+    expect(log.cover.overwritten).toEqual({ water: 9, road: 24, building: 1, clearing: 29 });
+    expect(log.ground).toEqual({ min: 100, max: 120.7, mean: 110.35 });
+    expect(log.buildings).toEqual({ count: 1, height: { tag: 0, levels: 0, default: 1 }, discarded: [] });
+
+    const shares = COVERS.reduce((sum, name) => sum + log.cover.final[name as Cover].share, 0);
+    expect(Math.abs(shares - 100)).toBeLessThanOrEqual(0.05);
+    const written = text({ ...log, input: { ...log.input, osmBase: '' } });
+    expect(written).not.toMatch(/\d{4}-\d\d-\d\dT/);
+    expect(written).not.toMatch(/gzip|mtime|time/i);
+  });
 });
