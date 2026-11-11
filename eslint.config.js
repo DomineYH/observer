@@ -94,7 +94,7 @@ function srcImports(name) {
 }
 
 export default defineConfig(
-  { ignores: ['dist/', 'node_modules/', 'test-results/', 'playwright-report/'] },
+  { ignores: ['dist/', 'dist-real/', 'node_modules/', 'test-results/', 'playwright-report/'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   ...srcImports('*'),
