@@ -74,5 +74,18 @@ describe('골든', () => {
     expect(result.record).toMatchObject({ ticks: 48000, roundsTotal: 0, missions: 0, compromised: false, observerLost: false, cleared: false, clearTick: null });
     expect(result.checkpoints.at(-1)!.tick).toBe(48000);
   }, 60000); // one replay hashing every tick (~10 s alone)
+
+  test('골든: ④ 데스크톱 한 판', () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('4-desktop-play.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0); // every recorded input was taken
+    const terrain = generateTerrain(data.seed);
+    expect(terrainHash(terrain)).toBe(header);
+    const result = replay(data, terrain, BASE_SCENARIO);
+    expect(result).toEqual(expected);
+    // The game is what scripts.ts says: standard mode, three missions, ended by the 40분 한도.
+    expect(result.record).toMatchObject({ ticks: 48000, missions: 3, mode: 'standard' });
+    expect(result.checkpoints.at(-1)!.tick).toBe(48000);
+  }, 60000); // one replay hashing every tick (~10 s alone)
 });
 
