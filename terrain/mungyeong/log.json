@@ -1,0 +1,113 @@
+{
+  "input": {
+    "snapshot": {
+      "ground.bin": "e886a17891f12f078d84b7c1cc136216ad35a090c23632516a62e7a4b441ff09",
+      "cover.bin": "cc1b7fdd7a9bb5de02f293851ce7a0021a36e7ac2f243ff1e299737209dd8422",
+      "osm.json": "59493dec402750050117213125d9b29db97612fddbfe8acc64055e9e595c66c4"
+    },
+    "osmBase": "2026-11-11T08:58:20Z",
+    "rules": 2
+  },
+  "cover": {
+    "worldcover": [
+      {
+        "value": 10,
+        "cells": 852629
+      },
+      {
+        "value": 20,
+        "cells": 0
+      },
+      {
+        "value": 30,
+        "cells": 55810
+      },
+      {
+        "value": 40,
+        "cells": 101292
+      },
+      {
+        "value": 50,
+        "cells": 32333
+      },
+      {
+        "value": 60,
+        "cells": 3407
+      },
+      {
+        "value": 70,
+        "cells": 0
+      },
+      {
+        "value": 80,
+        "cells": 3105
+      },
+      {
+        "value": 90,
+        "cells": 0
+      },
+      {
+        "value": 95,
+        "cells": 0
+      },
+      {
+        "value": 100,
+        "cells": 0
+      }
+    ],
+    "overwritten": {
+      "water": 2682,
+      "road": 15045,
+      "building": 366,
+      "clearing": 951
+    },
+    "final": {
+      "open": {
+        "cells": 56832,
+        "share": 5.42
+      },
+      "field": {
+        "cells": 96693,
+        "share": 9.22
+      },
+      "forest": {
+        "cells": 849045,
+        "share": 80.97
+      },
+      "water": {
+        "cells": 5755,
+        "share": 0.55
+      },
+      "road": {
+        "cells": 15042,
+        "share": 1.43
+      },
+      "village": {
+        "cells": 24843,
+        "share": 2.37
+      },
+      "building": {
+        "cells": 366,
+        "share": 0.03
+      }
+    }
+  },
+  "ground": {
+    "min": 136.6,
+    "max": 1084.6,
+    "mean": 419.79
+  },
+  "buildings": {
+    "count": 54,
+    "height": {
+      "tag": 0,
+      "levels": 0,
+      "default": 54
+    },
+    "discarded": []
+  },
+  "size": {
+    "body": 5243296,
+    "header": 411
+  }
+}

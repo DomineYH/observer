@@ -1,7 +1,15 @@
 {
   "version": 1,
   "rules": 2,
-  "coverShare": null,
+  "coverShare": {
+    "open": [3.42, 7.42],
+    "field": [7.22, 11.22],
+    "forest": [78.97, 82.97],
+    "water": [0, 2.55],
+    "road": [0, 3.43],
+    "village": [0.37, 4.37],
+    "building": [0, 2.03]
+  },
   "grid": { "letters": "CH", "e0": 40230, "n0": 30490 },
   "frame": {
     "proj": "+proj=utm +zone=52 +datum=WGS84 +units=m +no_defs",
