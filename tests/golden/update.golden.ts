@@ -3,21 +3,20 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { test } from 'vitest';
 import { replay, SIM_VERSION, terrainHash } from '@sim';
-import { generateTerrain } from '@adapters/mock/terrain';
-import { BASE_SCENARIO } from '@content/scenario';
 import { currentHeader, GOLDEN_DIR, headerVersions, readGolden, shouldWrite, type Golden, type Versions } from './golden';
+import { landOf } from './land';
 import { SCRIPTS } from './scripts';
 
 // Every golden is decided and built before any is written, so a throw leaves all files as they were.
-test('golden:update', () => {
+test('golden:update', async () => {
   const writes: [URL, string][] = [];
   for (const { file, replay: script } of SCRIPTS) {
     const url = new URL(file, GOLDEN_DIR);
-    const terrain = generateTerrain(script.seed);
+    const { terrain, scenario } = await landOf(script); // terrain version from the land's data, scenario's from code
     const now: Versions = {
       simVersion: SIM_VERSION,
       terrain: { id: terrain.id, version: terrain.version },
-      scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version },
+      scenario: { id: scenario.id, version: scenario.version },
     };
     const old = existsSync(url) ? headerVersions(readGolden(file).replay) : null;
     if (!shouldWrite(old, now)) {
@@ -25,7 +24,7 @@ test('golden:update', () => {
       continue;
     }
     const data = currentHeader(script, now);
-    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, BASE_SCENARIO) };
+    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, scenario) };
     writes.push([url, JSON.stringify(golden, null, 2) + '\n']);
   }
   for (const [url, text] of writes) {

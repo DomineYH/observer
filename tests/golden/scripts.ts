@@ -1,6 +1,9 @@
 import { SIM_VERSION, type ReplayData } from '@sim';
 import { BASE_GUNS } from '@content/guns';
+import { MIL } from '@sim/ballistics';
+import { atan2 } from '@sim/math';
 import { BASE_SCENARIO } from '@content/scenario';
+import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 
 const HEAD = {
@@ -15,6 +18,14 @@ const HEAD = {
   stepMs: 50,
 } as const satisfies Partial<ReplayData>;
 const START = { t: 0, a: 'start', v: [BASE_SCENARIO.plannedOp.x, BASE_SCENARIO.plannedOp.y] };
+
+// ⑤'s points, read from the 문경 배치: the planned post, the bearing to NAI 3 in 0.1 mil, and the new post 80 m east.
+const MUNGYEONG = (() => {
+  const { scenario, terrain } = MUNGYEONG_PLACEMENT;
+  const op = scenario.plannedOp;
+  const nai = scenario.nais[2]!;
+  return { scenario, terrain, op, laseAz: Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL * 10), moveTo: { x: op.x + 80, y: op.y } };
+})();
 
 // 각본 입력: the source each golden file is generated from by `npm run golden:update`.
 export const SCRIPTS: { file: string; replay: ReplayData }[] = [
@@ -149,6 +160,30 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
         { t: 30695, a: 'bino', v: [0] },
       ],
       totalTicks: 48000,
+    },
+  },
+  {
+    // ⑤: ②'s first half on the 문경 land (no 전이·위험근접): 레이저 toward NAI 3, the 박격포 NAI (the ground near its
+    // middle answers: 4580 m) → 극좌표 조정 → 수정 0과 함께 효력사 → 임무끝 → 관측소 이동 80 m east (175 s on foot, 30 s
+    // setup) → 위치 보고 at its grid. Each input about 200 ticks after its stage opens (probe, SIM_VERSION 17: call 110,
+    // loc 386, desc 641, adjust 2280, effect 3999, idle 4200, set up 8504, readback 8782); no 발각 on this seed.
+    file: '5-real-laser-move.json',
+    replay: {
+      ...HEAD,
+      scenario: { id: MUNGYEONG.scenario.id, version: MUNGYEONG.scenario.version },
+      terrain: MUNGYEONG.terrain,
+      inputs: [
+        { t: 0, a: 'start', v: [MUNGYEONG.op.x, MUNGYEONG.op.y] },
+        { t: 150, a: 'lase', v: [MUNGYEONG.laseAz, -396] },
+        { t: 310, a: 'call', v: ['adjust'] },
+        { t: 586, a: 'loc', v: ['polar', Math.round(MUNGYEONG.laseAz / 10), 4580] },
+        { t: 841, a: 'desc', v: [3, 'none', 'ready', 0, 'mortar', 'halted', 'none'] },
+        { t: 2480, a: 'corr', v: ['left', 0, 'drop', 0, 'ffe'] },
+        { t: 4199, a: 'eom', v: ['neutralized'] },
+        { t: 4400, a: 'move', v: [MUNGYEONG.moveTo.x, MUNGYEONG.moveTo.y] },
+        { t: 8704, a: 'pos', v: [4665, 3115] }, // the grid of moveTo (the test ties them)
+      ],
+      totalTicks: 9182,
     },
   },
 ];
