@@ -74,8 +74,8 @@ describe('지형 파일', () => {
     for (const k of ['ground', 'surface', 'buildings'] as const) expect(back[k]).toBeInstanceOf(Float32Array);
     expect(back.cover).toBeInstanceOf(Uint8Array);
     expect(terrainHash(back)).toBe(terrainHash(t));
-    // Fixed level and header bytes: the same terrain packs to the same bytes.
-    expect(pack(t)).toEqual(bytes);
+    // The same terrain packs to the same content; compressed bytes are not compared (#77 §5), only the fixed header.
+    expect(gunzipSync(pack(t))).toEqual(gunzipSync(bytes));
     expect([...bytes.subarray(0, 10)]).toEqual([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff]);
   });
 

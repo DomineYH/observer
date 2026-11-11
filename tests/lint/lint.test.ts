@@ -127,6 +127,22 @@ describe('린트', () => {
     for (const [file, code] of forbidden) {
       expect(await rulesFor(file, code), `${file}: ${code}`).toContain('@typescript-eslint/no-restricted-imports');
     }
+    // Every file under src and every import form: dynamic import(), the entry beside the modules, unit tests.
+    const bypasses: [string, string][] = [
+      ['src/app/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/app/a.ts', `const x = import(\`../../${PACK}\`); export { x };`],
+      ['src/app/a.ts', `const x = import('${PACK}'); export { x };`],
+      ['src/sim/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/render/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/main.ts', `import { packTerrain } from '../${PACK}'; export { packTerrain };`],
+      ['src/main.ts', `export { packTerrain } from '../${PACK}';`],
+      ['src/app/check.test.ts', `import { packTerrain } from '../../${PACK}'; export { packTerrain };`],
+      ['src/ui/radio/check.test.ts', `export { packTerrain } from '../../../${PACK}';`],
+    ];
+    for (const [file, code] of bypasses) expect(await rulesFor(file, code), `${file}: ${code}`).not.toEqual([]);
+    // Unit tests still reach their fixtures under tests/, and a dynamic import inside a module still works.
+    expect(await rulesFor('src/app/check.test.ts', "import { x } from '../../tests/acceptance/init'; export { x };")).toEqual([]);
+    expect(await rulesFor('src/app/a.ts', "const x = import('./b'); export { x };")).toEqual([]);
     // The processing side reuses the app's 풀기, 지형 해시 and 피복 목록 instead of a second copy.
     const reuse = "import { COVER, terrainHash } from '@sim'; import { unpackTerrain } from '@adapters/terrainFile/unpack'; export { COVER, terrainHash, unpackTerrain };";
     expect(await rulesFor('terrain/pipeline/rules/__probe__.ts', reuse)).toEqual([]);
@@ -151,6 +167,10 @@ describe('린트', () => {
     for (const [file, code] of forbidden) {
       expect(await rulesFor(file, code), `${file}: ${code}`).toContain('@typescript-eslint/no-restricted-imports');
     }
+    for (const [file, code] of [
+      ['terrain/pipeline/rules/a.ts', "const x = import('../../../src/content/scenario'); export { x };"],
+      ['terrain/pipeline/a.ts', "const x = import('@content/scenario'); export { x };"],
+    ]) expect(await rulesFor(file!, code!), `${file}: ${code}`).not.toEqual([]);
   });
 
   test('F-31: 저장된 문자열은 글자로 보인다 — 화면에 HTML을 직접 넣지 않는다', async () => {
