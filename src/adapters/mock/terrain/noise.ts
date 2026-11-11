@@ -1,5 +1,7 @@
 // The demo's value noise (demo lines 216–219), integer hashing only, so it is the same in every engine.
-import { hash } from '../../terrainFile/cellHash';
+import { hash as sharedHash } from '../../terrainFile/cellHash';
+// A local binding: Vitest reads an imported name through a getter on every call, which doubled generation time here.
+const hash = sharedHash;
 
 function vnoise(x: number, y: number, s: number): number {
   const ix = Math.floor(x);
