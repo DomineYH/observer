@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "n": 1024,
+  "cell": 10,
+  "tools": {
+    "node": "24.21.0",
+    "geotiff": "3.0.5",
+    "proj4": "2.22.0"
+  },
+  "sources": {
+    "ground": {
+      "version": "v1.2",
+      "url": "https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif",
+      "pixel": "area",
+      "bytes": 432407644715,
+      "etag": "\"8bf9b35f45e9befaa9b91d877bf230d7-3107\"",
+      "file": "ground.bin",
+      "sha256": "e886a17891f12f078d84b7c1cc136216ad35a090c23632516a62e7a4b441ff09"
+    },
+    "cover": {
+      "version": "v200",
+      "url": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N36E126_Map.tif",
+      "pixel": "area",
+      "bytes": 87371384,
+      "etag": "\"2cbb96fd1717b9f39979b732f2821c71-11\"",
+      "file": "cover.bin",
+      "sha256": "cc1b7fdd7a9bb5de02f293851ce7a0021a36e7ac2f243ff1e299737209dd8422"
+    },
+    "osm": {
+      "url": "https://overpass-api.de/api/interpreter",
+      "query": "[out:json][timeout:90];(way[\"highway\"~\"^(motorway|trunk|primary|secondary|tertiary)(_link)?$|^(unclassified|residential)$\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);way[\"building\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);node[\"place\"~\"^(town|village|hamlet)$\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);node[\"natural\"=\"peak\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);node[\"mountain_pass\"=\"yes\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);way[\"waterway\"=\"river\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);nwr[\"natural\"=\"water\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);nwr[\"military\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);nwr[\"landuse\"=\"military\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645);nwr[\"building\"~\"^(military|bunker|barracks)$\"](36.713491290345225,128.07211706328334,36.80653996971679,128.1877609596645););out geom;",
+      "osmBase": "2026-11-11T08:58:20Z",
+      "file": "osm.json",
+      "sha256": "59493dec402750050117213125d9b29db97612fddbfe8acc64055e9e595c66c4",
+      "counts": {
+        "node": 38,
+        "way": 587,
+        "relation": 0
+      },
+      "military": 0
+    }
+  }
+}

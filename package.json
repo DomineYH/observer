@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:engines": "playwright test -c playwright.engines.config.ts",
     "test:e2e": "playwright test -c playwright.e2e.config.ts",
-    "golden:update": "vitest run --config vitest.golden-update.config.ts"
+    "golden:update": "vitest run --config vitest.golden-update.config.ts",
+    "terrain:fetch": "vitest run --config vitest.terrain-fetch.config.ts"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -28,6 +29,8 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
     "eslint": "^10.14.0",
+    "geotiff": "^3.0.5",
+    "proj4": "^2.22.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",
