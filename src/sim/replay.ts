@@ -39,7 +39,7 @@ const keysExactly = (x: Record<string, unknown>, keys: readonly string[], what: 
 const ref = (x: unknown, what: string): void => {
   if (!isObject(x)) return fail(`${what}: object expected`);
   keysExactly(x, ['id', 'version'], what);
-  if (typeof x.id !== 'string' || !/^[a-z0-9_]+$/.test(x.id)) fail(`${what}.id: ASCII identifier expected`);
+  if (typeof x.id !== 'string' || !/^[a-z0-9_]+(-[a-z0-9_]+)*$/.test(x.id)) fail(`${what}.id: ASCII identifier expected`);
   int(x.version, 1, INT32_MAX, `${what}.version`);
 };
 

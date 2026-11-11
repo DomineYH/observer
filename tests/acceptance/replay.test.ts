@@ -30,6 +30,17 @@ describe('F-31', () => {
     }
   });
 
+  test('F-31: 시나리오 식별자에 하이픈', () => {
+    const withScenario = (id: string) => validateReplay({ ...data(), scenario: { id, version: 1 } });
+    for (const id of ['base-mungyeong', 'a-b-c', 'base_2']) expect(withScenario(id).ok, id).toBe(true);
+    for (const id of ['-base', 'base-', 'base--x', 'Base-mungyeong', 'base mungyeong', 'base.x', '문경', '']) {
+      const r = withScenario(id);
+      expect(r.ok, id).toBe(false);
+      if (!r.ok) expect(r.error).toMatch(/scenario\.id/);
+    }
+    expect(validateReplay(withTerrain({ id: 'A b', version: 1 })).ok).toBe(false);
+  });
+
   test('F-31: 재생 자료의 지형이 다르면 재생하지 않는다', () => {
     const mock = flatTerrain();
     const x2: TerrainData = { ...mock, id: 'x', version: 2 };
