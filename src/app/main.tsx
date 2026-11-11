@@ -5,7 +5,6 @@ import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
 import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
-import { mockTerrain } from '@adapters/mock/terrain';
 import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
 import { BASE_GUNS } from '@content/guns';
@@ -30,7 +29,7 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { selectBackend } from './backend';
+import { selectBackend, terrainSourceOf } from './backend';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame } from './game';
@@ -39,11 +38,11 @@ import { submissionOf } from './records';
 import { chooseSeed } from './seed';
 import './app.css';
 
-selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
+const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
 // The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
 const { seed, seedKind } = chooseSeed(location.search, Date.now());
-const terrain = await mockTerrain.load(seed);
+const terrain = await terrainSourceOf(backend).load(seed);
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
