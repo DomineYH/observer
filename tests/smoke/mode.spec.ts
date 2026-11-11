@@ -115,6 +115,15 @@ test('기본: 배속 ×2로 시작', async ({ page }) => {
   }
 });
 
+test('기본: 화질 보통으로 시작', async ({ page }) => {
+  // ADR 0007: the reference desktop is under 30 fps at 높음 looking at ground, so the default is 보통.
+  await page.goto('/?seed=20261106');
+  const quality = page.getByRole('group', { name: '화질' });
+  await expect(quality.getByRole('button', { name: '보통', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(quality.getByRole('button', { name: '높음', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(quality.getByRole('button', { name: '최고', exact: true })).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('F-14: 훈련 전환 경고', async ({ page }) => {
   const { seen, answer } = dialogs(page);
   await picked(page);

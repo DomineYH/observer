@@ -9,7 +9,8 @@ export const FOV_MIL = { eye: (60 * 6400) / 360, bino: (7 * 6400) / 360 } as con
 /** 화질: internal render width (height is 9/16 of it). */
 export const QUALITIES = { medium: 480, high: 640, max: 960 } as const;
 export type Quality = keyof typeof QUALITIES;
-export const DEFAULT_QUALITY: Quality = 'high';
+// 보통: the reference desktop is under 30 fps at 높음 when looking at ground (ADR 0007, #45).
+export const DEFAULT_QUALITY: Quality = 'medium';
 
 export const fovOf = (bino: boolean): number => (bino ? FOV_MIL.bino : FOV_MIL.eye);
 /** Focal length in pixels for a view `width` pixels wide. */
