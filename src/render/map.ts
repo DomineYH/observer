@@ -1,5 +1,5 @@
 // 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
-import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type Scenario, type TerrainData, type UnitType, type Weather } from '@sim';
+import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type RoadClass, type Scenario, type TerrainData, type UnitType, type Weather } from '@sim';
 import { FULL_VIEW, projector, type MapView } from './mapView';
 
 const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
@@ -57,7 +57,12 @@ export function gridLines(t: TerrainData, step: 1000 | 100 = 1000): GridLine[] {
   return lines;
 }
 
+// 도로 등급 → casing / inner line, px. `main` is the demo line; `trunk` and `local` are starting values (#63 decision 6).
+const ROAD_PX: Record<RoadClass, readonly [number, number]> = { trunk: [4.4, 2.8], main: [3.2, 1.6], local: [2.0, 0.9] };
+
 const FINE_ZOOM = 3; // 100 m 방안선 from ×3
+const HALO = 'rgba(255,255,255,.8)'; // the white edge under map lettering
+const LABEL_GAP = 2; // px kept clear around a drawn 이름표
 
 /** The map panel's size in CSS pixels; the whole terrain fits it. */
 export const MAP_PX = 512;
@@ -106,46 +111,77 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
   c.drawImage(base, view.x0, view.y0, span, span, 0, 0, W, W);
 
   c.lineCap = c.lineJoin = 'round';
-  for (const [width, colour] of [[3.2, 'rgba(60,40,20,.75)'], [1.6, 'rgba(250,240,215,.95)']] as const) {
+  const roadLine = (road: TerrainData['roads'][number], width: number) => {
     c.lineWidth = width;
-    c.strokeStyle = colour;
-    for (const road of t.roads) {
-      c.beginPath();
-      road.line.forEach((p, i) => (i ? c.lineTo(mx(p.x), my(p.y)) : c.moveTo(mx(p.x), my(p.y))));
-      c.stroke();
-    }
-  }
+    c.beginPath();
+    road.line.forEach((p, i) => (i ? c.lineTo(mx(p.x), my(p.y)) : c.moveTo(mx(p.x), my(p.y))));
+    c.stroke();
+  };
+  // Every casing first, then the inner lines with the bigger roads on top.
+  c.strokeStyle = 'rgba(60,40,20,.75)';
+  for (const road of t.roads) roadLine(road, ROAD_PX[road.class][0]);
+  c.strokeStyle = 'rgba(250,240,215,.95)';
+  for (const cls of ['local', 'main', 'trunk'] as const) for (const road of t.roads) if (road.class === cls) roadLine(road, ROAD_PX[cls][1]);
 
   c.font = '9px monospace';
-  c.lineWidth = 1;
   c.fillStyle = 'rgba(20,25,40,.85)';
+  // 방안 숫자 with the village names' white edge (#63 decision 10: the one intended change from the demo, mock too).
+  const digits = (text: string, x: number, y: number, line: string) => {
+    c.lineWidth = 3;
+    c.strokeStyle = HALO;
+    c.strokeText(text, x, y);
+    c.fillText(text, x, y);
+    c.lineWidth = 1;
+    c.strokeStyle = line;
+  };
+  c.lineWidth = 1;
   for (const l of gridLines(t, view.z >= FINE_ZOOM ? 100 : 1000)) {
     const p = Math.round(l.axis === 'e' ? mx(l.at) : my(l.at)) + 0.5;
     if (p < -1 || p > W + 1) continue; // off the panel; the map's own edges (0.5, 512.5) stay
-    c.strokeStyle = l.label ? 'rgba(20,30,60,.5)' : 'rgba(20,30,60,.18)';
+    const line = l.label ? 'rgba(20,30,60,.5)' : 'rgba(20,30,60,.18)';
+    c.strokeStyle = line;
     c.beginPath();
     if (l.axis === 'e') {
       c.moveTo(p, 0);
       c.lineTo(p, W);
-      if (l.label && p < W - 12) c.fillText(l.label, p + 2, 9);
+      if (l.label && p < W - 12) digits(l.label, p + 2, 9, line);
     } else {
       c.moveTo(0, p);
       c.lineTo(W, p);
-      if (l.label && p > 12) c.fillText(l.label, 2, p - 3);
+      if (l.label && p > 12) digits(l.label, 2, p - 3, line);
     }
     c.stroke();
   }
 
-  c.font = 'bold 10px monospace';
   c.textAlign = 'center';
   c.lineWidth = 3;
-  c.strokeStyle = 'rgba(255,255,255,.8)';
+  c.strokeStyle = HALO;
+  // 이름표 (#63 decision 7): one that would overlap a label already placed is skipped at this zoom.
+  const boxes: [number, number, number, number][] = [];
+  const fits = (text: string, x: number, y: number, size: number) => {
+    const half = (text.length * size) / 2;
+    const box: [number, number, number, number] = [x - half, y - size, x + half, y];
+    if (boxes.some((b) => box[0] < b[2] + LABEL_GAP && b[0] < box[2] + LABEL_GAP && box[1] < b[3] + LABEL_GAP && b[1] < box[3] + LABEL_GAP)) return false;
+    boxes.push(box);
+    return true;
+  };
+  const label = (text: string, x: number, y: number) => {
+    c.strokeText(text, x, y);
+    c.fillText(text, x, y);
+  };
+  const at = (v: TerrainData['villages'][number]) => [mx(v.x), my(v.y + v.r) - 4] as const;
+  // Placed biggest first (sort is stable: equal 반경 keep the data order), painted in data order: kept labels don't
+  // overlap, so the picture is the same and the mock's drawing stays the demo's.
+  const shown = new Set([...t.villages].sort((a, b) => b.r - a.r).filter((v) => fits(v.name, ...at(v), 10)));
+  c.font = 'bold 10px monospace';
   c.fillStyle = '#2a2418';
-  for (const v of t.villages) {
-    const x = mx(v.x);
-    const y = my(v.y + v.r) - 4;
-    c.strokeText(v.name, x, y);
-    c.fillText(v.name, x, y);
+  for (const v of t.villages) if (shown.has(v)) label(v.name, ...at(v));
+  // 지명 (#63 decision 8): after the villages, centred on their point, no 표고 numbers; water in dark blue.
+  c.font = '9px monospace';
+  for (const p of t.names) {
+    if (!fits(p.name, mx(p.x), my(p.y) + 3, 9)) continue;
+    c.fillStyle = p.kind === 'water' ? '#1a3c78' : '#2a2418';
+    label(p.name, mx(p.x), my(p.y) + 3);
   }
   if (marks?.viewshed) {
     const q = marks.viewshed.g / t.n;
