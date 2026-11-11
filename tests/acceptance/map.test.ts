@@ -1,6 +1,6 @@
 // 지도 바탕: the map panel's drawing, observed through a recording 2D context.
 import { describe, expect, test } from 'vitest';
-import type { TerrainData } from '@sim';
+import { COVER, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
@@ -123,6 +123,26 @@ describe('F-06', () => {
     expect(index).toBeLessThan(plain);
     expect(plain).toBeLessThan(lum(15));
   }, 30000);
+
+  test('F-06: 지도 팔레트와 음영', () => {
+    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per column.
+    const palette = { open: [152, 138, 84], field: [182, 162, 104], forest: [56, 76, 44], water: [78, 104, 122], road: [160, 150, 128], village: [176, 164, 128], building: [150, 72, 56] };
+    const t = flatTerrain({ n: 8 });
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 7; i++) t.cover[j * 8 + i] = i;
+    const px = mapBase(t);
+    const at = (p: Uint8ClampedArray, i: number, j = 3, n = 8) => [...p.slice(((n - 1 - j) * n + i) * 4, ((n - 1 - j) * n + i) * 4 + 3)];
+    COVER.forEach((c, i) => expect(at(px, i), c).toEqual(palette[c]));
+    // Lit from the north-west: × (1 + 0.05 per m above that neighbour), between 0.7 and 1.25. Cell 1 of each slope sits
+    // inside one 20 m band, so no contour darkens it.
+    const slope = (base: number, rise: number) => {
+      const s = flatTerrain({ n: 8 });
+      for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) s.ground[j * 8 + i] = base + rise * i;
+      return at(mapBase(s), 1);
+    };
+    expect(slope(101, 1)).toEqual([160, 145, 88]); // 1 m: × 1.05
+    expect(slope(110, 10)).toEqual([190, 172, 105]); // 10 m: × 1.25 (172.5 rounds to even)
+    expect(slope(200, -10)).toEqual([106, 97, 59]); // −10 m: × 0.7
+  });
 
   test('F-06: 좌표자', () => {
     const t = flatTerrain({ n: 1024 }); // 10 240 m square, 방안 기준 동 40000·북 30000
