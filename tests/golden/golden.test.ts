@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
-import { goldenFiles, readGolden } from './golden';
+import { currentHeader, goldenFiles, headerVersions, readGolden, shouldWrite, type Versions } from './golden';
+import { SCRIPTS } from './scripts';
 
 describe('골든', () => {
   test('골든: simVersion이 코드와 같다', () => {
@@ -87,5 +88,42 @@ describe('골든', () => {
     expect(result.record).toMatchObject({ ticks: 48000, missions: 3, mode: 'standard' });
     expect(result.checkpoints.at(-1)!.tick).toBe(48000);
   }, 60000); // one replay hashing every tick (~10 s alone)
-});
 
+  test('골든: 다시 만드는 조건', () => {
+    const v = (simVersion: number, terrain: number, scenario: number, ids = { terrain: 'mock', scenario: 'base' }): Versions => ({
+      simVersion,
+      terrain: { id: ids.terrain, version: terrain },
+      scenario: { id: ids.scenario, version: scenario },
+    });
+    const golden = v(17, 1, 3);
+    expect(shouldWrite(null, golden)).toBe(true); // no file
+    expect(shouldWrite(golden, v(17, 1, 3))).toBe(false); // all equal: skip
+    for (const now of [v(18, 1, 3), v(17, 2, 3), v(17, 1, 4), v(18, 2, 3), v(17, 2, 4)]) expect(shouldWrite(golden, now), JSON.stringify(now)).toBe(true);
+    for (const now of [v(16, 1, 3), v(17, 1, 2), v(18, 1, 2), v(16, 2, 3)]) expect(() => shouldWrite(golden, now), JSON.stringify(now)).toThrow(/newer/);
+    expect(() => shouldWrite(golden, v(17, 1, 3, { terrain: 'mungyeong', scenario: 'base' }))).toThrow(/terrain/);
+    expect(() => shouldWrite(golden, v(17, 1, 3, { terrain: 'mock', scenario: 'other' }))).toThrow(/scenario/);
+    const header = readGolden('0-empty.json').replay;
+    expect(headerVersions(header)).toEqual({ simVersion: header.simVersion, terrain: { id: 'mock', version: 1 }, scenario: header.scenario });
+  });
+
+  test('골든: 다시 만드는 조건 — 재생하고 쓰는 머리는 코드의 버전이다', () => {
+    const mock = { id: 'mock', version: 1 };
+    const now: Versions = { simVersion: SIM_VERSION, terrain: mock, scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version } };
+    for (const { file, replay: d } of SCRIPTS) expect(currentHeader(d, now), file).toEqual(d); // versions unchanged: as is
+    // A version rise: ④ pins simVersion 17 and base@1, every script leaves terrain out (mock).
+    const risen: Versions = { simVersion: 99, terrain: mock, scenario: { id: 'base', version: 9 } };
+    for (const { file, replay: d } of SCRIPTS) {
+      const h = currentHeader(d, risen);
+      expect(h, file).toEqual({ ...d, simVersion: 99, scenario: { id: 'base', version: 9 } });
+      expect(Object.hasOwn(h, 'terrain'), file).toBe(false); // mock is never written
+      expect(validateReplay(h).ok, file).toBe(true);
+      expect(shouldWrite(headerVersions(d), headerVersions(h)), file).toBe(true);
+    }
+    // A non-mock terrain carries the code's terrain version.
+    const d = { ...SCRIPTS[0]!.replay, terrain: { id: 'mungyeong', version: 1 } };
+    expect(currentHeader(d, { ...now, terrain: { id: 'mungyeong', version: 2 } }).terrain).toEqual({ id: 'mungyeong', version: 2 });
+    // Ids are not rewritten.
+    expect(() => currentHeader(d, now)).toThrow(/terrain/);
+    expect(() => currentHeader(SCRIPTS[4]!.replay, { ...now, scenario: { id: 'other', version: 1 } })).toThrow(/scenario/);
+  });
+});

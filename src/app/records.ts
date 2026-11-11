@@ -2,9 +2,10 @@
 import { SIM_VERSION, type ReadonlySimState, type RecordedInput, type ReplayData, type Sim, type SimInit } from '@sim';
 import type { MissionSummary, Submission } from '@adapters/index';
 
-/** 재생 자료 of a game: its 생성 인자 (scenario by identity, no terrain) and its 입력 기록 up to `totalTicks`. */
-export function replayOf(init: Omit<SimInit, 'terrain'>, log: readonly RecordedInput[], totalTicks: number): ReplayData {
-  const { seed, seedKind, scenario, guns, weather, mode } = init;
+/** 재생 자료 of a game: its 생성 인자 (scenario and terrain by identity, mock terrain left out) and its 입력 기록 up to
+ * `totalTicks`. */
+export function replayOf(init: SimInit, log: readonly RecordedInput[], totalTicks: number): ReplayData {
+  const { seed, seedKind, scenario, guns, weather, mode, terrain } = init;
   return {
     format: 1,
     simVersion: SIM_VERSION,
@@ -17,6 +18,7 @@ export function replayOf(init: Omit<SimInit, 'terrain'>, log: readonly RecordedI
     stepMs: 50,
     inputs: [...log],
     totalTicks,
+    ...(terrain.id === 'mock' ? {} : { terrain: { id: terrain.id, version: terrain.version } }), // never `terrain: undefined`
   };
 }
 
@@ -35,7 +37,7 @@ export const missionsOf = (missions: ReadonlySimState['missions']): MissionSumma
     }));
 
 /** What goes to 기록 보관소 once a game ends. The 판 기록 carries the 모드 (training once used after 작전 개시). */
-export function submissionOf(callsign: string, sim: Sim, init: Omit<SimInit, 'terrain'>, log: readonly RecordedInput[]): Submission {
+export function submissionOf(callsign: string, sim: Sim, init: SimInit, log: readonly RecordedInput[]): Submission {
   return {
     callsign,
     record: sim.record(),
