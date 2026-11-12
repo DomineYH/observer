@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/smoke',
   fullyParallel: true, // --shard then splits by test, not by file
+  // One worker per shard on CI: the smoke tests are real-time and lose their margin when tests share a CPU (smoke.spec.ts:409).
+  workers: process.env.CI ? 1 : undefined,
   retries: 1,
   forbidOnly: !!process.env.CI,
   use: { baseURL: 'http://localhost:4173' },
