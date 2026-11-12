@@ -33,7 +33,8 @@
   "e2e": {
     "command": "npm run test:e2e",
     "critical_flows": [
-      "training-mode full run through the UI in Chromium"
+      "training-mode full run through the UI in Chromium",
+      "real build boots through 받는 중 → 작전 준비 → 개시 in Chromium (tests/smoke/real.spec.ts, since M2-9 #83)"
     ]
   },
   "unknowns": [
