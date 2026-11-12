@@ -90,6 +90,7 @@ jobs:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run test:engines
 
+  # Each shard runs the tests .github/scripts/shard-plan.mjs gives it, balanced by tests/smoke/durations.json.
   e2e-shard:
     needs: changes
     if: ${{ !cancelled() }}
@@ -106,7 +107,13 @@ jobs:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npx playwright install --with-deps chromium
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/8
+        run: |
+          set -euo pipefail
+          npx playwright test -c playwright.e2e.config.ts --list --reporter=json > "$RUNNER_TEMP/e2e-list.json"
+          node .github/scripts/shard-plan.mjs "$RUNNER_TEMP/e2e-list.json" tests/smoke/durations.json ${{ matrix.shard }} 8 > "$RUNNER_TEMP/e2e-args.txt"
+          mapfile -t args < "$RUNNER_TEMP/e2e-args.txt"
+          if [ "${#args[@]}" -eq 0 ]; then echo "shard ${{ matrix.shard }}/8: no tests planned"; exit 0; fi
+          npm run test:e2e -- "${args[@]}"
 
   # The required "e2e" check: green only when every shard succeeded (skipped, cancelled or failed is red).
   e2e:
