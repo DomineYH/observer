@@ -1,4 +1,5 @@
 // 지도 바탕: the map panel's drawing, observed through a recording 2D context.
+import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { COVER, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
@@ -126,13 +127,15 @@ describe('F-06', () => {
   }, 30000);
 
   test('F-06: 지도 팔레트와 음영', () => {
-    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per column.
+    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per terrain (a one-cell water
+    // column would be widened, #102).
     const palette = { open: [152, 138, 84], field: [182, 162, 104], forest: [56, 76, 44], water: [78, 104, 122], road: [160, 150, 128], village: [176, 164, 128], building: [150, 72, 56] };
-    const t = flatTerrain({ n: 8 });
-    for (let j = 0; j < 8; j++) for (let i = 0; i < 7; i++) t.cover[j * 8 + i] = i;
-    const px = mapBase(t);
     const at = (p: Uint8ClampedArray, i: number, j = 3, n = 8) => [...p.slice(((n - 1 - j) * n + i) * 4, ((n - 1 - j) * n + i) * 4 + 3)];
-    COVER.forEach((c, i) => expect(at(px, i), c).toEqual(palette[c]));
+    COVER.forEach((c, i) => {
+      const t = flatTerrain({ n: 8 });
+      t.cover.fill(i);
+      expect(at(mapBase(t), 3), c).toEqual(palette[c]);
+    });
     // Lit from the north-west: × (1 + 0.05 per m above that neighbour), between 0.7 and 1.25. Cell 1 of each slope sits
     // inside one 20 m band, so no contour darkens it.
     const slope = (base: number, rise: number) => {
@@ -477,5 +480,32 @@ describe('지도', () => {
     // No 지명: nothing more than the village name.
     expect(draw(bare).words.filter((o) => !/^\d\d$/.test(o.text)).map((o) => o.text)).toEqual(['큰마을', '큰마을']);
   });
-});
 
+  test('지도: 가는 수면은 지도에서 넓게', () => {
+    // Flat ground (no shade, no contour), so each pixel is its cell's base colour.
+    const WATER = [78, 104, 122];
+    const OPEN = [152, 138, 84];
+    const rgb = (t: TerrainData, i: number, j: number) => {
+      const o = ((t.n - 1 - j) * t.n + i) * 4;
+      return [...mapBase(t).slice(o, o + 3)];
+    };
+    const water = COVER.indexOf('water');
+    // A one-cell water line down column 8: drawn 5 cells wide, columns 6–10, the whole way.
+    const line = flatTerrain({ n: 20 });
+    for (let j = 0; j < 20; j++) line.cover[j * 20 + 8] = water;
+    for (const j of [0, 10, 19]) {
+      for (let i = 6; i <= 10; i++) expect(rgb(line, i, j), `${i},${j}`).toEqual(WATER);
+      for (const i of [5, 11]) expect(rgb(line, i, j), `${i},${j}`).toEqual(OPEN);
+    }
+    // A 6×6 water block, corners included (9 water cells in their 5×5), is drawn as it is.
+    const block = flatTerrain({ n: 20 });
+    for (let j = 7; j < 13; j++) for (let i = 7; i < 13; i++) block.cover[j * 20 + i] = water;
+    for (let j = 0; j < 20; j++) for (let i = 0; i < 20; i++) expect(rgb(block, i, j), `${i},${j}`).toEqual(block.cover[j * 20 + i] === water ? WATER : OPEN);
+  });
+
+  test('지도: mock 바탕 그대로', async () => {
+    const mock = await mockTerrain.load(20261106);
+    // sha256 of mapBase(mock) on main 762da78, before thin water was widened (#102).
+    expect(createHash('sha256').update(mapBase(mock)).digest('hex')).toBe('a6355f2e2dfd354487b8a3f0951b035f123ee3e7cc600cdb58310d3d3578b122');
+  }, 30000);
+});
