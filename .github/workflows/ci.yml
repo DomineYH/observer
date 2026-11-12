@@ -13,7 +13,8 @@ concurrency:
 
 jobs:
   # code=false only for a pull request whose every path is docs-only (.github/scripts/classify-changes.sh).
-  # The five required jobs still run (!cancelled()) and skip only their steps, so a failed classifier never passes a check.
+  # The five required jobs still run (!cancelled()) and skip only their steps, and only when changes succeeded with code=false,
+  # so a failed classifier never passes a check.
   changes:
     runs-on: ubuntu-latest
     outputs: { code: "${{ steps.c.outputs.code }}" }
@@ -24,21 +25,22 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" != pull_request ]; then echo code=true >> "$GITHUB_OUTPUT"; exit 0; fi
-          git -c core.quotepath=off diff --no-renames --name-only HEAD^1 HEAD | sh .github/scripts/classify-changes.sh >> "$GITHUB_OUTPUT"
+          out=$(bash .github/scripts/changes.sh git -c core.quotepath=off diff --no-renames --name-only HEAD^1 HEAD)
+          echo "$out" >> "$GITHUB_OUTPUT"
 
   typecheck:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run typecheck
 
   lint:
@@ -46,14 +48,14 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run lint
 
   test:
@@ -61,14 +63,14 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm test
 
   engines:
@@ -76,16 +78,16 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npx playwright install --with-deps chromium firefox webkit
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run test:engines
 
   e2e-shard:
@@ -94,16 +96,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4] } }
     steps:
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npx playwright install --with-deps chromium
-      - if: needs.changes.outputs.code != 'false'
+      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
   # The required "e2e" check: green only when every shard succeeded (skipped, cancelled or failed is red).
