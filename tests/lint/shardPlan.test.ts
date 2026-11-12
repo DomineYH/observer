@@ -1,6 +1,7 @@
 // .github/scripts/shard-plan.mjs: e2e shards balanced by measured duration (tests/smoke/durations.json).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
 
 type Spec = { title: string; file: string; line: number; tests: { projectName: string }[] };
@@ -38,7 +39,7 @@ const SYNTH_IDS = [
   'c.spec.ts › 모름',
 ];
 
-test('every listed spec lands in exactly one shard, as tests/smoke/<file>:<line>', async () => {
+test('every listed spec lands in exactly one shard, as an exact tests/smoke/<file> regex and line', async () => {
   const { planShards } = await load();
   for (const count of [1, 2, 3, 4, 5, 6, 7, 8, 30]) {
     const plan = planShards(SYNTH, SYNTH_DUR, count);
@@ -46,9 +47,8 @@ test('every listed spec lands in exactly one shard, as tests/smoke/<file>:<line>
     expect(ids(plan).sort()).toEqual([...SYNTH_IDS].sort());
   }
   const args = planShards(SYNTH, SYNTH_DUR, 1)[0]!.tests.map((t) => t.arg);
-  expect(args).toContain('tests/smoke/a.spec.ts:203');
-  expect(args).toContain('tests/smoke/real.spec.ts:12');
-  expect(args.every((a) => /^tests\/smoke\/[a-z.]+:\d+$/.test(a))).toBe(true);
+  expect(args).toContain('/(^|\\/)tests\\/smoke\\/a\\.spec\\.ts$/:203');
+  expect(args).toContain('/(^|\\/)tests\\/smoke\\/real\\.spec\\.ts$/:12');
 });
 
 test('the plan does not depend on suite or duration-key order', async () => {
@@ -99,4 +99,33 @@ test('real --list: 8 shards cover every spec once, and durations.json knows near
   expect(ids(planShards(list, durations, 8)).sort()).toEqual([...listed].sort());
   const missing = listed.filter((id) => !(id in durations));
   expect(missing.length <= listed.length * 0.1, `no duration for: ${missing.join(', ')}`).toBe(true);
+});
+
+type Filters = { testFilter: (test: object) => boolean };
+const { suiteUtils } = createRequire(import.meta.url)('playwright/lib/common') as {
+  suiteUtils: { createFiltersFromArguments: (args: string[]) => Filters };
+};
+
+test('under Playwright’s own argument filter, each test is selected by exactly one shard', async () => {
+  const { planShards } = await load();
+  // game.spec.ts is a prefix of game.spec.tsx, and game.spec.ts:20 matches the describe line in game.spec.tsx.
+  const list = listOf([
+    fileSuite('game.spec.ts', [spec('game.spec.ts', 10, 'ts10'), spec('game.spec.ts', 20, 'ts20')]),
+    fileSuite('game.spec.tsx', [spec('game.spec.tsx', 10, 'tsx10')], [
+      { title: 'g', file: 'game.spec.tsx', line: 20, specs: [spec('game.spec.tsx', 21, 'tsx21'), spec('game.spec.tsx', 22, 'tsx22')] },
+    ]),
+  ]);
+  const at = (file: string, line: number, parent?: object) => ({ location: { file: `/repo/tests/smoke/${file}`, line, column: 1 }, parent });
+  const fileOf = (file: string) => ({ parent: undefined, location: undefined, title: file });
+  const group = at('game.spec.tsx', 20, fileOf('game.spec.tsx'));
+  const tests = [
+    at('game.spec.ts', 10, fileOf('game.spec.ts')),
+    at('game.spec.ts', 20, fileOf('game.spec.ts')),
+    at('game.spec.tsx', 10, fileOf('game.spec.tsx')),
+    at('game.spec.tsx', 21, group),
+    at('game.spec.tsx', 22, group),
+  ];
+  const plan = planShards(list, {}, 5);
+  const filters = plan.map((s) => suiteUtils.createFiltersFromArguments(s.tests.map((t) => t.arg)));
+  expect(tests.map((t) => filters.filter((f) => f.testFilter(t)).length)).toEqual([1, 1, 1, 1, 1]);
 });

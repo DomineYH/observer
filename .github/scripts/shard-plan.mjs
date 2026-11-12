@@ -5,16 +5,19 @@ import { dirname, relative } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-// One entry per spec: id = file › describe titles › title (no line, no project); arg = <testDir>/<file>:<line>.
+// Playwright reads the file part of file:line as a regex; /…/ keeps it case-sensitive, escaped and anchored to one path.
+const exactFile = (path) => `/(^|\\/)${path.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$/`;
+
+// One entry per spec: id = file › describe titles › title (no line, no project); arg = exactFile(<testDir>/<file>):<line>.
 // Throws when an arg would select more than its spec: two specs on one line, or a spec on a describe line (selects the whole group).
 function specsOf(list) {
   const prefix = relative(dirname(list.config.configFile), list.config.rootDir);
   const specs = [];
   const describeLines = new Set();
   const walk = (suite, titles) => {
-    for (const s of suite.specs) specs.push({ id: [s.file, ...titles, s.title].join(' › '), arg: `${prefix}/${s.file}:${s.line}` });
+    for (const s of suite.specs) specs.push({ id: [s.file, ...titles, s.title].join(' › '), arg: `${exactFile(`${prefix}/${s.file}`)}:${s.line}` });
     for (const child of suite.suites ?? []) {
-      describeLines.add(`${prefix}/${child.file}:${child.line}`);
+      describeLines.add(`${exactFile(`${prefix}/${child.file}`)}:${child.line}`);
       walk(child, [...titles, child.title]);
     }
   };
