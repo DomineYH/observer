@@ -14,11 +14,34 @@ const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]>
 const COLOURS = COVER.map((c) => PALETTE[c]);
 const CONTOUR = 20;
 const INK = [90, 60, 30] as const;
+const WATER = COVER.indexOf('water');
+// A water cell with fewer than 9 water cells in its 5×5 is a thin line (a one-cell river has about 5), widened on the map.
+// Not 10: a block's convex corner, and a wide river where the window is clipped at the map edge, have 9.
+const THIN = 9;
+
+/** Cells drawn in the water colour: water, and every cell within 2 of a thin water cell (#102). */
+function waterMask(t: TerrainData): Uint8Array {
+  const { n, cover } = t;
+  const m = new Uint8Array(n * n);
+  const box = (i: number, j: number, f: (k: number) => void) => {
+    for (let b = Math.max(0, j - 2); b <= Math.min(n - 1, j + 2); b++) for (let a = Math.max(0, i - 2); a <= Math.min(n - 1, i + 2); a++) f(b * n + a);
+  };
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      if (cover[j * n + i] !== WATER) continue;
+      m[j * n + i] = 1;
+      let w = 0;
+      box(i, j, (k) => void (w += cover[k] === WATER ? 1 : 0));
+      if (w < THIN) box(i, j, (k) => void (m[k] = 1));
+    }
+  return m;
+}
 
 /** RGBA pixels, one per cell, north up. */
 export function mapBase(t: TerrainData): Uint8ClampedArray {
   const { n, ground: g } = t;
   const px = new Uint8ClampedArray(n * n * 4);
+  const water = waterMask(t);
   for (let j = 0; j < n; j++)
     for (let i = 0; i < n; i++) {
       const k = j * n + i;
@@ -29,7 +52,7 @@ export function mapBase(t: TerrainData): Uint8ClampedArray {
       const cn = j < n - 1 ? Math.floor(g[k + n]! / CONTOUR) : c0;
       // The contour crossed here is the upper band's floor; every fifth one (100 m) is the index contour.
       const a = c0 === ce && c0 === cn ? 0 : Math.max(c0, ce, cn) % 5 === 0 ? 0.6 : 0.35;
-      const rgb = COLOURS[t.cover[k]!]!;
+      const rgb = water[k] ? PALETTE.water : COLOURS[t.cover[k]!]!;
       const o = ((n - 1 - j) * n + i) * 4;
       for (let ch = 0; ch < 3; ch++) px[o + ch] = rgb[ch]! * hs * (1 - a) + INK[ch]! * a;
       px[o + 3] = 255;
@@ -165,6 +188,17 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     boxes.push(box);
     return true;
   };
+  // 지도 기호 drawn later by drawMarks take their place first, so a 이름표 on them is skipped like one (#102):
+  // a symbol's box, and its text from x + 8 on the baseline y + 4 (10 px, as wide as fits() reckons).
+  const reserve = (x: number, y: number, dx: number, up: number, down: number, text = '') => {
+    boxes.push([x - dx, y - up, x + dx, y + down]);
+    if (text) boxes.push([x + 8, y + 4 - 10, x + 8 + text.length * 10, y + 4]);
+  };
+  if (marks) {
+    for (const f of marks.scenario.friends) reserve(mx(f.x), my(f.y), 7, 4, 4);
+    reserve(mx(marks.op.x), my(marks.op.y), 6, 7, 5, 'OP');
+    (marks.scenario.reserveOps ?? []).forEach((p, i) => reserve(mx(p.x), my(p.y), 6, 7, 5, `예비 ${i + 1}`));
+  }
   const label = (text: string, x: number, y: number) => {
     c.strokeText(text, x, y);
     c.fillText(text, x, y);
