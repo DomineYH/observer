@@ -151,6 +151,21 @@ describe('골든', () => {
     expect(sim.record().compromised).toBe(false); // no 발각 on this seed (scripts.ts): a regenerated golden must keep it
   }, 30000);
 
+  test('골든: ⑥ 실제 지형의 사람 플레이', async () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('6-real-play.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0); // every recorded input was taken
+    expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
+    expect(data.scenario).toEqual({ id: MUNGYEONG_PLACEMENT.scenario.id, version: 2 });
+    const { terrain, scenario } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
+    expect(terrainHash(terrain)).toBe(header);
+    const result = replay(data, terrain, scenario);
+    expect(result).toEqual(expected);
+    // The game is what scripts.ts says: standard mode, three missions, ended by the 40분 한도.
+    expect(result.record).toMatchObject({ ticks: 48000, missions: 3, mode: 'standard' });
+    expect(result.checkpoints.at(-1)!.tick).toBe(48000);
+  }, 60000); // one replay hashing every tick (~10 s alone)
+
   test('골든: 다시 만드는 조건', () => {
     const v = (simVersion: number, terrain: number, scenario: number, ids = { terrain: 'mock', scenario: 'base' }): Versions => ({
       simVersion,
