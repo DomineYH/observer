@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { goldenFiles, readGolden } from '../golden/golden';
 
 // 결정성 관문: the page replays every golden record in this browser; the result must match the file exactly.
-// ③ and ④ run 48 000 ticks with a state hash each: minutes, not seconds, in the slower engines.
+// ③, ④ and ⑥ run 48 000 ticks with a state hash each: minutes, not seconds, in the slower engines.
 const LONG = { test: 240_000, page: 200_000 };
 for (const [file, name, long] of [
   ['0-empty.json', '골든: 0번 빈 판 (실행 환경)', false],
@@ -11,6 +11,7 @@ for (const [file, name, long] of [
   ['3-time-limit.json', '골든: ③ 사격 없이 시간 한도까지 (실행 환경)', true],
   ['4-desktop-play.json', '골든: ④ 데스크톱 한 판 (실행 환경)', true],
   ['5-real-laser-move.json', '골든: ⑤ 실제 지형의 레이저·효력사·이동 (실행 환경)', false],
+  ['6-real-play.json', '골든: ⑥ 실제 지형의 사람 플레이 (실행 환경)', true],
 ] as const) {
   test(name, async ({ page }) => {
     if (long) test.setTimeout(LONG.test);
@@ -28,7 +29,7 @@ for (const [file, name, long] of [
 
 // Every golden file has its test above.
 test('골든: 모든 골든 기록이 실행 환경 검사에 걸린다', () => {
-  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json']);
+  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json']);
 });
 
 // The page generates each mock golden record's terrain in this browser; its hash must equal the golden header. The seed
