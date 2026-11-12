@@ -68,7 +68,7 @@ describe('문경 배치', () => {
     expect(ref).toEqual({ id: header.id, version: header.version });
     expect(ref).toEqual({ id: expected.id, version: expected.version });
     expect(ref.version).toBe(config.version);
-    expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 1 });
+    expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 2 });
     expect(sc.id).not.toBe(MOCK_PLACEMENT.scenario.id);
   });
 
@@ -151,6 +151,38 @@ describe('문경 배치', () => {
       expect(hidden, `${k} (${stop.x}, ${stop.y})`).toEqual([]);
     }
   }, 30_000);
+
+  test('배치: 장갑차 정지 자리', async () => {
+    const t = await loaded;
+    const apcSeen = (x: number, y: number) => lineOfSight(t, eyeOf(t, op), { x, y, z: heightAt(t, x, y) + 2.3 * 0.85 });
+    /** Where the APC halts on route `k` with no jitter: the simulation's own walk (enemy.ts moveAlong, the halt under
+     * APC_HALT_M and the move on the switching tick) with its platoon's path set to the scenario's points. */
+    const haltOf = (k: 'B' | 'C') => {
+      const sim = createSim({ seed: 1, seedKind: 'practice', scenario: sc, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'standard', terrain: t });
+      const apc = sim.state.platoons.find((p) => p.type === 'apc')!;
+      const path = sc.routes[k].map((p) => ({ ...p }));
+      Object.assign(apc, { route: k, path, x: path[0]!.x, y: path[0]!.y, wp: 1, t0: 0 });
+      sim.step([{ a: 'start', v: [op.x, op.y] }]);
+      while (apc.state === 'wait' || apc.state === 'approach') {
+        expect(sim.state.phase, k).toBe('live');
+        sim.step([]);
+      }
+      expect(apc.state, k).toBe('support');
+      return { x: apc.x, y: apc.y };
+    };
+    // A nominal robustness measure, not a promise for every seed: deploy jitters each route point by a Gaussian of σ 30 m
+    // per coordinate. The halt is seen, and so are 90 % of the 1 m grid points within 30 m of it (user decision on #100).
+    const disc: Point[] = [];
+    for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) disc.push({ x: u, y: v });
+    // the APC walks 중앙 or 동측
+    expect(sc.units.find((u) => u.type === 'apc')).toMatchObject({ route: { first: 'B', second: 'C' } });
+    for (const k of ['B', 'C'] as const) {
+      const stop = haltOf(k);
+      const at = `${k} (${stop.x.toFixed(1)}, ${stop.y.toFixed(1)})`;
+      expect(apcSeen(stop.x, stop.y), at).toBe(true);
+      expect(share(disc, (d) => apcSeen(stop.x + d.x, stop.y + d.y)), at).toBeGreaterThanOrEqual(90);
+    }
+  }, 60_000);
 
   test('배치: NAI와 박격포 자리', async () => {
     const t = await loaded;
