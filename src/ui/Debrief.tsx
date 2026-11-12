@@ -1,7 +1,7 @@
 // 사후강평 (demo lines 1354–1366, 1531–1550): drawn once the game has ended, from its state and its 판 기록.
 import type { GameRecord, GridRef, ReadonlySimState, ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
-import { BRIEFING } from '@content/scenario';
+import type { Briefing } from '@content/placement';
 import { gridOf } from '@render/mapView';
 import { clock } from './clock';
 import { missionRow, unitName, unitRow } from './debrief';
@@ -41,12 +41,13 @@ interface Props {
   callsign: string;
   saved: StoredRun | 'pending' | 'failed';
   replay: ReplayData;
+  briefing: Briefing; // the chosen 배치's 작전 준비 글: names the 접근로
 }
 
-export function Debrief({ state: s, record: r, grid, callsign, saved, replay }: Props) {
+export function Debrief({ state: s, record: r, grid, callsign, saved, replay, briefing }: Props) {
   const fired = s.missions.filter((m) => m.impacts.length + m.flights.length > 0);
   const where = s.platoons
-    .map((p, pid) => `${unitName(s.platoons, pid)} ${p.route ? BRIEFING.routes[p.route] : gridLabel(grid.letters, gridOf(grid, p))}`)
+    .map((p, pid) => `${unitName(s.platoons, pid)} ${p.route ? briefing.routes[p.route] : gridLabel(grid.letters, gridOf(grid, p))}`)
     .join(' · ');
   const positions = s.shelledUntil.map((_, pos) => `아군 ${pos + 1}소대 ${s.friendlies.filter((q) => q.pos === pos && q.alive).length}/${MEN}`);
   const avg = (x: number | null, unit: string) => (x === null ? '—' : `${x}${unit}`);

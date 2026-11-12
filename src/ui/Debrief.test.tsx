@@ -10,6 +10,7 @@ import { aimedAt, untilLanded } from '../../tests/acceptance/strike';
 import { NO_ENEMY, oneMission } from '../../tests/acceptance/session';
 import { init } from '../../tests/acceptance/init';
 import { flatTerrain } from '../../tests/acceptance/terrain';
+import { MOCK_PLACEMENT } from '@content/placement';
 import { clock } from './clock';
 import { Debrief } from './Debrief';
 import { bracket } from './debrief';
@@ -27,7 +28,7 @@ const text = (el: ReactElement) =>
     .filter(Boolean);
 /** The debrief as the app draws it: no saved run yet, the 재생 자료 of a game played without the session. */
 const view = (sim: Sim, saved: StoredRun | 'pending' | 'failed' = 'pending', data: ReplayData = replayOf(init(0), [], sim.state.tick)) => (
-  <Debrief state={sim.state} record={sim.record()} grid={flatTerrain().grid} callsign="참새12" saved={saved} replay={data} />
+  <Debrief state={sim.state} record={sim.record()} grid={flatTerrain().grid} callsign="참새12" saved={saved} replay={data} briefing={MOCK_PLACEMENT.briefing} />
 );
 const debrief = (sim: Sim) => text(view(sim));
 const ENTITIES: Record<string, string> = { '&quot;': '"', '&#x27;': "'", '&lt;': '<', '&gt;': '>', '&amp;': '&' };

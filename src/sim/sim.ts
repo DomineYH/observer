@@ -42,7 +42,7 @@ export function createSim(init: SimInit): Sim {
     endAt: -1,
     platoons: deploy(init.scenario, init.terrain, rng.scn),
     friendlies: [],
-    truck: makeTruck(init.terrain.roads[init.scenario.supplyRoad]),
+    truck: makeTruck(init.terrain.roads[init.scenario.supplyRoad]?.line),
     shells: [],
     shelledUntil: init.scenario.friends.map(() => 0),
     effects: [],

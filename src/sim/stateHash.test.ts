@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { CALL_ADJUST, CALL_FFE, LOC_CLEAR, MOVE, POLAR, SHIFT, answered, ended, openRadio, send, started } from '../../tests/acceptance/mission';
 import { oneUnit, started as startedWith } from '../../tests/acceptance/enemy';
-import { flatTerrain } from '../../tests/acceptance/terrain';
+import { flatTerrain, mainRoad } from '../../tests/acceptance/terrain';
 import { hashState } from './stateHash';
 import type { SimState } from './types';
 
@@ -115,7 +115,7 @@ test('상태 해시: 발각·보복·관측반 손실이 해시에 든다', () =
 
 test('상태 해시: 아군 병사·보급 트럭·아군 섬광이 해시에 든다', () => {
   const FRIEND = { x: 1280, y: 1200 };
-  const terrain = { ...flatTerrain({ n: 256 }), roads: [[], [{ x: 400, y: 400 }, { x: 400, y: 1400 }]] };
+  const terrain = { ...flatTerrain({ n: 256 }), roads: [mainRoad([]), mainRoad([{ x: 400, y: 400 }, { x: 400, y: 1400 }])] };
   const route = [{ x: 1280, y: 2700 }, { x: 1280, y: 1800 }, FRIEND];
   const sim = startedWith({ ...oneUnit({ type: 'inf', route: 'B', t0: 0 }, route), friends: [FRIEND], supplyRoad: 1 }, { seed: 7, terrain });
   while (!sim.state.effects.some((e) => e.tiny)) sim.step([]); // the enemy within 750 m: the men fire, the truck drives

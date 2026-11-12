@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { COVER, fromGrid, heightAt, lineOfSight, surfaceAt, toGrid, type Cover, type TerrainData } from '@sim';
+import { COVER, fromGrid, heightAt, lineOfSight, surfaceAt, toGrid, underCanopy, type Cover, type TerrainData } from '@sim';
 import { flatTerrain } from './terrain';
 
 const CH = { letters: 'CH', e0: 40000, n0: 30000 };
@@ -63,5 +63,23 @@ describe('F-15', () => {
     expect(lineOfSight(wall(flatTerrain(), { ground: 0, surface: 8 }, 'building', 8), a, b)).toBe(false);
     // a low hedge under the sight line does not block
     expect(lineOfSight(wall(flatTerrain(), { ground: 0, surface: 1 }, 'forest'), a, b)).toBe(true);
+  });
+
+  test('F-15: 숲 속 판정 3 m', () => {
+    // 숲 속 is the surface more than 3 m above the ground (demo).
+    const t = flatTerrain();
+    t.surface.fill(103);
+    expect(underCanopy(t, 320, 320)).toBe(false);
+    t.surface.fill(103.5);
+    expect(underCanopy(t, 320, 320)).toBe(true);
+  });
+
+  test('F-15: 가시선 표본', () => {
+    // At most 400 samples: over 8 km they fall every 20 m, at 4000 and 4020 m, so a lone raised point at 4010 m (above
+    // the line from 4000.5 to 4019.5 m) lies between two of them and does not block. 399 or 401 samples would meet it.
+    const t = flatTerrain({ n: 1024 });
+    t.surface[401] = 110; // the point x = 4010, y = 0
+    expect(lineOfSight(t, { x: 0, y: 0, z: 100.5 }, { x: 8000, y: 0, z: 100.5 })).toBe(true);
+    expect(lineOfSight(t, { x: 0, y: 0, z: 100.5 }, { x: 7980, y: 0, z: 100.5 })).toBe(false); // 19.95 m apart: one meets it
   });
 });

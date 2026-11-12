@@ -1,0 +1,73 @@
+{
+  "id": "mungyeong",
+  "version": 2,
+  "hash": "b1ce12cc49b22d43",
+  "rules": 2,
+  "ground": {
+    "name": "GEDTM30",
+    "version": "v1.2",
+    "kind": "DTM",
+    "vertical": "EGM2008",
+    "subtracted": "none",
+    "scale": 1
+  },
+  "cover": {
+    "name": "ESA WorldCover 10 m 2021",
+    "version": "v200"
+  },
+  "vectors": {
+    "name": "OpenStreetMap",
+    "osmBase": "2026-11-11T08:58:20Z"
+  },
+  "forest": {
+    "min": 12,
+    "max": 17,
+    "salt": 0
+  },
+  "coverCounts": {
+    "open": 56832,
+    "field": 96693,
+    "forest": 849045,
+    "water": 5755,
+    "road": 15042,
+    "village": 24843,
+    "building": 366
+  },
+  "frame": {
+    "proj": "+proj=utm +zone=52 +datum=WGS84 +units=m +no_defs",
+    "x0": 417230,
+    "y0": 4063490,
+    "n": 1024,
+    "cell": 10
+  },
+  "clearings": [
+    {
+      "x": 6340,
+      "y": 660,
+      "r": 100,
+      "kind": "planned"
+    },
+    {
+      "x": 5400,
+      "y": 1380,
+      "r": 100,
+      "kind": "reserve"
+    },
+    {
+      "x": 8010,
+      "y": 870,
+      "r": 100,
+      "kind": "reserve"
+    }
+  ],
+  "credits": [
+    "GEDTM30 v1.2, OpenGeoHub Foundation",
+    "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+    "© OpenStreetMap contributors"
+  ],
+  "snapshot": {
+    "ground.bin": "e886a17891f12f078d84b7c1cc136216ad35a090c23632516a62e7a4b441ff09",
+    "cover.bin": "cc1b7fdd7a9bb5de02f293851ce7a0021a36e7ac2f243ff1e299737209dd8422",
+    "osm.json": "59493dec402750050117213125d9b29db97612fddbfe8acc64055e9e595c66c4"
+  }
+}

@@ -1,7 +1,17 @@
+import { globSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { ESLint } from 'eslint';
 
-const eslint = new ESLint({ cwd: new URL('../..', import.meta.url).pathname });
+const ROOT = new URL('../..', import.meta.url).pathname;
+const eslint = new ESLint({ cwd: ROOT });
+
+/** What `source` reads from the build environment that is not VITE_OBSERVER_BACKEND: other VITE_ names, and any
+ * import.meta.env not followed by `.VITE_OBSERVER_BACKEND` (computed, aliased or spread reads hide the name). */
+function otherEnvReads(source: string): string[] {
+  const names = (source.match(/\bVITE_\w+/g) ?? []).filter((n) => n !== 'VITE_OBSERVER_BACKEND');
+  const reads = (source.match(/import\.meta\.env\b(?!\.VITE_OBSERVER_BACKEND\b).{0,20}/g) ?? []).map((r) => `읽기: ${r}`);
+  return [...names, ...reads];
+}
 
 /** Rule ids reported for `code` as if it lived at `filePath`. */
 async function rulesFor(filePath: string, code: string): Promise<(string | null)[]> {
@@ -53,6 +63,8 @@ describe('린트', () => {
       expect(await rulesFor('src/sim/__probe__.ts', `export {}; ${code};`), code).toContain(rule);
       // The mock terrain generator follows the same bans.
       expect(await rulesFor('src/adapters/mock/terrain/__probe__.ts', `export {}; ${code};`), code).toContain(rule);
+      // So does the 지형 파일 code it shares the cell hash with.
+      expect(await rulesFor('src/adapters/terrainFile/__probe__.ts', `export {}; ${code};`), code).toContain(rule);
       // Outside the simulation the same code is allowed.
       expect(await rulesFor('src/app/__probe__.ts', `export {}; ${code};`), code).not.toContain(rule);
     }
@@ -113,6 +125,64 @@ describe('린트', () => {
     for (const [file, code] of allowed) expect(await rulesFor(file, code), `${file}: ${code}`).toEqual([]);
   });
 
+  test('린트: 앱 소스는 지형 가공 폴더를 가져오지 않는다', async () => {
+    const PACK = 'terrain/pipeline/rules/pack';
+    const forbidden: [string, string][] = [
+      ...['sim', 'content', 'adapters', 'render', 'ui', 'app'].map((m): [string, string] => [`src/${m}/__probe__.ts`, `import { packTerrain } from '../../${PACK}';`]),
+      ['src/ui/__probe__.ts', `import type { X } from '../../${PACK}';`],
+      ...['app', 'ui'].flatMap((m) =>
+        [PACK, `@${PACK}`, `/${PACK}`].map((path): [string, string] => [`src/${m}/__probe__.ts`, `import { packTerrain } from '${path}';`]),
+      ),
+    ];
+    for (const [file, code] of forbidden) {
+      expect(await rulesFor(file, code), `${file}: ${code}`).toContain('@typescript-eslint/no-restricted-imports');
+    }
+    // Every file under src and every import form: dynamic import(), the entry beside the modules, unit tests.
+    const bypasses: [string, string][] = [
+      ['src/app/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/app/a.ts', `const x = import(\`../../${PACK}\`); export { x };`],
+      ['src/app/a.ts', `const x = import('${PACK}'); export { x };`],
+      ['src/sim/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/render/a.ts', `const x = import('../../${PACK}'); export { x };`],
+      ['src/main.ts', `import { packTerrain } from '../${PACK}'; export { packTerrain };`],
+      ['src/main.ts', `export { packTerrain } from '../${PACK}';`],
+      ['src/app/check.test.ts', `import { packTerrain } from '../../${PACK}'; export { packTerrain };`],
+      ['src/ui/radio/check.test.ts', `export { packTerrain } from '../../../${PACK}';`],
+    ];
+    for (const [file, code] of bypasses) expect(await rulesFor(file, code), `${file}: ${code}`).not.toEqual([]);
+    // Unit tests still reach their fixtures under tests/, and a dynamic import inside a module still works.
+    expect(await rulesFor('src/app/check.test.ts', "import { x } from '../../tests/acceptance/init'; export { x };")).toEqual([]);
+    expect(await rulesFor('src/app/a.ts', "const x = import('./b'); export { x };")).toEqual([]);
+    // The processing side reuses the app's 풀기, 지형 해시 and 피복 목록 instead of a second copy.
+    const reuse = "import { COVER, terrainHash } from '@sim'; import { unpackTerrain } from '@adapters/terrainFile/unpack'; export { COVER, terrainHash, unpackTerrain };";
+    expect(await rulesFor('terrain/pipeline/rules/__probe__.ts', reuse)).toEqual([]);
+  });
+
+  test('린트: 가공 규칙 코드의 결정성 묶음', async () => {
+    for (const [code, rule] of BANNED) {
+      expect(await rulesFor('terrain/pipeline/rules/__probe__.ts', `export {}; ${code};`), code).toContain(rule);
+      expect(await rulesFor('terrain/pipeline/rules/sub/__probe__.ts', `export {}; ${code};`), code).toContain(rule);
+      // The fetch stage beside the rules needs network, clocks and trigonometry.
+      expect(await rulesFor('terrain/pipeline/__probe__.ts', `export {}; ${code};`), code).not.toContain(rule);
+    }
+  }, 30000);
+
+  test('린트: 지형 가공 폴더는 시나리오를 가져오지 않는다', async () => {
+    const forbidden: [string, string][] = [
+      ['terrain/pipeline/rules/__probe__.ts', "import { BASE_SCENARIO } from '@content/scenario';"],
+      ['terrain/pipeline/rules/__probe__.ts', "import { BASE_SCENARIO } from '../../../src/content/scenario';"],
+      ['terrain/pipeline/__probe__.ts', "import type { X } from '../../src/content/scenario';"],
+      ['terrain/__probe__.ts', "import { BASE_SCENARIO } from '@content';"],
+    ];
+    for (const [file, code] of forbidden) {
+      expect(await rulesFor(file, code), `${file}: ${code}`).toContain('@typescript-eslint/no-restricted-imports');
+    }
+    for (const [file, code] of [
+      ['terrain/pipeline/rules/a.ts', "const x = import('../../../src/content/scenario'); export { x };"],
+      ['terrain/pipeline/a.ts', "const x = import('@content/scenario'); export { x };"],
+    ]) expect(await rulesFor(file!, code!), `${file}: ${code}`).not.toEqual([]);
+  });
+
   test('F-31: 저장된 문자열은 글자로 보인다 — 화면에 HTML을 직접 넣지 않는다', async () => {
     const raw = [
       'export const X = () => <div dangerouslySetInnerHTML={{ __html: "x" }} />;',
@@ -123,5 +193,16 @@ describe('린트', () => {
     for (const code of raw)
       for (const file of ['src/ui/__probe__.tsx', 'src/app/__probe__.tsx']) expect(await rulesFor(file, code), `${file}: ${code}`).toContain('no-restricted-syntax');
     expect(await rulesFor('src/ui/__probe__.tsx', 'export const X = ({ s }: { s: string }) => <b>{s}</b>;')).toEqual([]);
+  });
+
+  test('린트: VITE_ 변수는 하나', () => {
+    // The matcher itself.
+    expect(otherEnvReads('selectBackend(import.meta.env.VITE_OBSERVER_BACKEND); // VITE_OBSERVER_BACKEND')).toEqual([]);
+    for (const code of ['import.meta.env.VITE_API_KEY', 'import.meta.env[k]', 'const e = import.meta.env;', "const k = 'VITE_TOKEN';", 'import.meta.env.MODE'])
+      expect(otherEnvReads(code), code).not.toEqual([]);
+    // The app and the engines pages read the one switch only.
+    const files = globSync('{src/**/*.{ts,tsx},tests/engines/*.ts}', { cwd: ROOT });
+    expect(files.length).toBeGreaterThan(50);
+    for (const file of files) expect(otherEnvReads(readFileSync(ROOT + file, 'utf8')), file).toEqual([]);
   });
 });

@@ -1,12 +1,13 @@
 import { expect, test } from 'vitest';
-import { createSim, replay, validateReplay } from '@sim';
+import { COVER, createSim, replay, validateReplay } from '@sim';
 import type { Input } from '@sim';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
+import { mockTerrain } from '@adapters/mock/terrain';
 import { createSession } from '@app/session';
 import { fovOf, pxToMil, QUALITIES } from '@render/projection';
 import { createAimControl } from '@ui/aim';
 import { startInput } from '@ui/prep';
-import { terrainColours } from '@render/shade';
+import { atmosphere, terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, replayData, START } from './init';
@@ -146,3 +147,82 @@ test('F-01: 화질은 결과를 바꾸지 않는다', () => {
   expect(high).toEqual(medium);
   expect(max).toEqual(medium);
 }, 30000);
+
+// 안개 띠 (#76): with `edge: 'veil'` the ground outside the square fades to the fog colour over 600 m.
+const fnv = (a: Uint32Array) => {
+  let h = 0x811c9dc5;
+  for (const v of a) h = Math.imul(h ^ v, 0x01000193) >>> 0;
+  return h.toString(16);
+};
+
+test('안개 띠: mirror인 mock 화면은 그대로', async () => {
+  const mock = await mockTerrain.load(20261106);
+  expect(mock.edge).toBe('mirror');
+  const mockColours = terrainColours(mock, CLEAR_WEATHER);
+  // From 600 m inside the south edge, looking south across it (육안 and 쌍안경): the mirrored ground fills the view.
+  const eye = { x: 5120, y: 600, z: 0 };
+  eye.z = mock.ground[60 * mock.n + 512]! + 3.5;
+  const frames = [false, true].map((bino) => {
+    const buf = createViewBuffers(480);
+    renderView(buf, mock, mockColours, eye, { h: 3200, p: -15 }, bino, CLEAR_WEATHER);
+    return fnv(buf.pix32);
+  });
+  // Taken from the renderer before the 안개 띠 existed.
+  expect(frames).toEqual(['486aed15', '119cf875']);
+}, 30000);
+
+test('안개 띠: veil이면 정사각 밖 600 m부터 안개색', () => {
+  // A flat 1 280 m square; the drawn ground ends at its last cell row, y = 1 270 m. From (640, 1000) looking due north
+  // through 쌍안경, the centre column reads the ground at y = 1000 + distance.
+  const veiled = { ...flatTerrain({ n: 128 }), edge: 'veil' as const };
+  const fog = atmosphere(CLEAR_WEATHER).fog;
+  const centre = (t: typeof veiled | ReturnType<typeof flatTerrain>) => {
+    const buf = createViewBuffers(480);
+    renderView(buf, t, terrainColours(t, CLEAR_WEATHER), { x: 640, y: 1000, z: 103.5 }, { h: 0, p: -30 }, true, CLEAR_WEATHER);
+    const rows: { out: number; fogged: boolean }[] = [];
+    for (let y = 0; y < buf.h; y++) {
+      const i = y * buf.w + buf.w / 2;
+      if (buf.dbuf[i] === Infinity) continue;
+      const o = i * 4;
+      // Within the dot look's dither of the fog colour.
+      const fogged = [0, 1, 2].every((ch) => Math.abs(buf.pix[o + ch]! - fog[ch]!) <= 16);
+      rows.push({ out: 1000 + buf.dbuf[i]! - 1270, fogged });
+    }
+    return rows;
+  };
+  const rows = centre(veiled);
+  const far = rows.filter((r) => r.out >= 600);
+  const inside = rows.filter((r) => r.out < 0);
+  expect(far.length).toBeGreaterThan(5);
+  expect(inside.length).toBeGreaterThan(5);
+  expect(far.every((r) => r.fogged)).toBe(true);
+  expect(inside.some((r) => r.fogged)).toBe(false);
+  // The same ground mirrored is not fog.
+  expect(centre(flatTerrain({ n: 128 })).some((r) => r.out >= 600 && r.fogged)).toBe(false);
+});
+
+test('관측 화면: 11월 팔레트 7종', () => {
+  // The demo's cover colours (genTerrain): every cell is one of its class's colours times the light it got, and each
+  // colour shows somewhere. Flat ground in seven bands of 36 columns, wide enough for the forest and field patterns.
+  const palette: Record<(typeof COVER)[number], number[][]> = {
+    open: [[152, 138, 84]],
+    field: [[182, 162, 104], [164, 150, 92], [148, 126, 78]],
+    forest: [[56, 76, 44], [126, 90, 46], [152, 108, 48]],
+    water: [[78, 104, 122]],
+    road: [[160, 150, 128]],
+    village: [[176, 164, 128], [152, 138, 84]],
+    building: [[150, 72, 56], [72, 92, 132], [122, 122, 116], [82, 112, 92], [172, 104, 62], [196, 190, 178]],
+  };
+  const t = flatTerrain({ n: 256 });
+  for (let k = 0; k < t.cover.length; k++) t.cover[k] = Math.min(6, Math.floor((k % 256) / 36));
+  const { r, g, b, light } = terrainColours(t, CLEAR_WEATHER);
+  const seen = new Set<string>();
+  for (let k = 0; k < t.cover.length; k++) {
+    const c = COVER[t.cover[k]!]!;
+    // The channel is the colour × light truncated (light is kept as float32, hence the slack).
+    const fit = palette[c].find((rgb) => [r[k]!, g[k]!, b[k]!].every((v, ch) => Math.abs(v + 0.5 - rgb[ch]! * light[k]!) <= 0.5001));
+    if (!fit) throw new Error(`${c} cell ${k}: ${[r[k], g[k], b[k]]} at light ${light[k]}`);
+    seen.add(`${c} ${fit}`);
+  }
+  expect(seen.size).toBe(Object.values(palette).flat().length);
+});

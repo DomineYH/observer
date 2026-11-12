@@ -34,6 +34,7 @@ export interface Scenario extends Ref {
   nais: readonly { x: number; y: number; r: number; conf: Confidence }[]; // 주요 감시 지역
   intelRoutes: readonly { route: RouteKey; conf: Confidence }[]; // 예상 접근로
   units: readonly UnitDef[];
+  reserveOps?: readonly Point[]; // 예비 관측소: the simulation does not read it
 }
 
 /** One soldier, vehicle or tube: `u,v` line formation and `uc,vc` approach column offsets (m), `ph` animation phase. */
@@ -374,9 +375,11 @@ export interface RecordedInput extends Input {
   t: number;
 }
 
-/** 재생 자료, format 1. Terrain and grammar versions are not carried. */
+/** 재생 자료, format 1. `terrain` absent = the mock terrain made from the seed (never written for mock). Grammar versions
+ * and the 지형 해시 are not carried. */
 export interface ReplayData extends Omit<SimInit, 'terrain' | 'scenario'> {
   scenario: Ref;
+  terrain?: Ref;
   format: 1;
   simVersion: number;
   stepMs: 50;

@@ -6,7 +6,7 @@ import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
 import { angleTo, dist, mortarAt, oneUnit, started } from './enemy';
-import { flatTerrain } from './terrain';
+import { flatTerrain, mainRoad } from './terrain';
 
 // A 2.56 km flat field: the post at (320, 320), one friendly position, one enemy platoon walking onto it from 1.5 km.
 const FRIEND = { x: 1280, y: 1200 };
@@ -146,7 +146,7 @@ describe('F-27: 아군 직사화기', () => {
 
 // A straight 1 km road north from (400, 400); the truck's path wiggles 18·sin(u/260) m east of it (demo).
 const ROAD = [{ x: 400, y: 400 }, { x: 400, y: 1400 }];
-const roadField = () => ({ ...field(), roads: [[], ROAD] });
+const roadField = () => ({ ...field(), roads: [mainRoad([]), mainRoad(ROAD)] });
 const END = { x: 400 + 18 * Math.sin(1000 / 260), y: 1400 };
 type Frame = { x: number; y: number; moving: boolean; dust: boolean };
 /** Steps `n` ticks recording the truck and whether a dust cloud (no enemy unit's) appeared that tick. */
@@ -236,7 +236,7 @@ describe('F-27: 보급 트럭', () => {
     expect(started(scenario(), { terrain: field() }).state.truck).toBeNull();
     const terrain = await mockTerrain.load(20261106);
     const sim = started({ ...BASE_SCENARIO, units: [] }, { terrain });
-    expect(sim.state.truck).toMatchObject({ x: terrain.roads[1]![0]!.x, y: terrain.roads[1]![0]!.y });
+    expect(sim.state.truck).toMatchObject({ x: terrain.roads[1]!.line[0]!.x, y: terrain.roads[1]!.line[0]!.y });
   }, 30000); // generates the 1024² mock terrain
 });
 

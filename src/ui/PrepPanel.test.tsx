@@ -3,6 +3,9 @@ import { expect, test } from 'vitest';
 import type { Input, SeedKind, TerrainData } from '@sim';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE_SCENARIO } from '@content/scenario';
+import { MOCK_PLACEMENT } from '@content/placement';
+import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { TEST_PLACEMENT } from '../../tests/acceptance/placement';
 import { pressStart, PrepPanel, type PrepState } from './PrepPanel';
 
 const WEATHER = {
@@ -16,11 +19,12 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } })) =>
+const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } }), placement = MOCK_PLACEMENT) =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
-      scenario={BASE_SCENARIO}
+      scenario={placement.scenario}
+      briefing={placement.briefing}
       terrain={terrain}
       seed={seed}
       seedKind={seedKind}
@@ -31,7 +35,8 @@ const text = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', te
       preset={seedKind === 'practice' ? 'fog' : null}
       onPreset={() => {}}
     />,
-  ).replace(/<[^>]*>/g, '');
+  );
+const text = (...args: Parameters<typeof markup>) => markup(...args).replace(/<[^>]*>/g, '');
 
 test('F-30: 시드 종류 표시', () => {
   const practice = text(1234, 'practice');
@@ -92,3 +97,31 @@ test('F-22: 숲 속 후보는 시야가 가린다고 알린다', () => {
   expect(text(20261106, 'daily', picked)).not.toContain('숲 속');
 });
 
+
+test('F-22: 예비 관측소 줄', () => {
+  const flat = (letters: string) => flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } });
+  // At the end of the 주의 글, after the planned post: each 예비 관측소 by its map label and 방안좌표.
+  expect(text(20261106, 'daily', PREP, 'CH', flat('CH'), TEST_PLACEMENT)).toContain(
+    '시험 주의. 계획된 관측소 9번 마루 찰리호텔 4512 3180. 예비 관측소 예비 1 찰리호텔 4400 3100, 예비 2 찰리호텔 4600 3090.',
+  );
+  expect(text(20261106, 'daily', PREP, 'AB', flat('AB'), TEST_PLACEMENT)).toContain('예비 1 알파브라보 4400 3100, 예비 2 알파브라보 4600 3090.');
+  // No 예비 관측소, no line: the 주의 글 ends at the planned post.
+  const none = { ...TEST_PLACEMENT, scenario: { ...TEST_PLACEMENT.scenario, reserveOps: [] } };
+  for (const placement of [MOCK_PLACEMENT, none]) {
+    const prep = text(20261106, 'daily', PREP, 'CH', flat('CH'), placement);
+    expect(prep).not.toContain('예비');
+    expect(prep).toContain('찰리호텔 4512 3180.지도를 눌러');
+  }
+});
+
+test('F-22: 자료 출처 줄', () => {
+  const CREDITS = ['국토지리정보원 수치표고모델', 'OpenStreetMap 기여자 (ODbL)'];
+  const terrain = { ...flatTerrain(), credits: CREDITS };
+  const prep = markup(20261106, 'daily', PREP, 'CH', terrain, MUNGYEONG_PLACEMENT);
+  // At the very bottom, after 작전 개시, one small line each, in order.
+  expect(prep).toMatch(/<\/button><p><small>국토지리정보원 수치표고모델<\/small><\/p><p><small>OpenStreetMap 기여자 \(ODbL\)<\/small><\/p><\/section>$/);
+  // No credits (the mock land): nothing more is drawn.
+  for (const placement of [MOCK_PLACEMENT, MUNGYEONG_PLACEMENT]) expect(markup(20261106, 'daily', PREP, 'CH', flatTerrain(), placement)).toMatch(/<\/button><\/section>$/);
+  // Only on 작전 준비: the one-line panel after the start has none.
+  expect(text(20261106, 'daily', { ...PREP, phase: 'live' }, 'CH', terrain)).not.toContain('OpenStreetMap');
+});

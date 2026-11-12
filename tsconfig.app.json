@@ -5,6 +5,6 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"]
   },
-  "include": ["src", "tests/engines/main.ts"],
+  "include": ["src", "tests/engines/main.ts", "tests/engines/real.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "rules": 2,
+  "coverShare": {
+    "open": [3.42, 7.42],
+    "field": [7.22, 11.22],
+    "forest": [78.97, 82.97],
+    "water": [0, 2.55],
+    "road": [0, 3.43],
+    "village": [0.37, 4.37],
+    "building": [0, 2.03]
+  },
+  "grid": { "letters": "CH", "e0": 40230, "n0": 30490 },
+  "frame": {
+    "proj": "+proj=utm +zone=52 +datum=WGS84 +units=m +no_defs",
+    "x0": 417230,
+    "y0": 4063490,
+    "n": 1024,
+    "cell": 10
+  },
+  "clearings": [
+    { "x": 6340, "y": 660, "r": 100, "kind": "planned" },
+    { "x": 5400, "y": 1380, "r": 100, "kind": "reserve" },
+    { "x": 8010, "y": 870, "r": 100, "kind": "reserve" }
+  ],
+  "sources": {
+    "ground": {
+      "name": "GEDTM30",
+      "version": "v1.2",
+      "url": "https://s3.opengeohub.org/global/dtm/v1.2/gedtm_rf_m_30m_s_20060101_20151231_go_epsg.4326.3855_v1.2.tif",
+      "license": "CC BY 4.0",
+      "credit": "GEDTM30 v1.2, OpenGeoHub Foundation",
+      "scale": 1,
+      "kind": "DTM",
+      "vertical": "EGM2008",
+      "subtracted": "none"
+    },
+    "cover": {
+      "name": "ESA WorldCover 10 m 2021",
+      "version": "v200",
+      "url": "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_N36E126_Map.tif",
+      "license": "CC BY 4.0",
+      "credit": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium"
+    },
+    "osm": {
+      "name": "OpenStreetMap",
+      "url": "https://overpass-api.de/api/interpreter",
+      "query": "[out:json][timeout:90];(way[\"highway\"~\"^(motorway|trunk|primary|secondary|tertiary)(_link)?$|^(unclassified|residential)$\"]({{bbox}});way[\"building\"]({{bbox}});node[\"place\"~\"^(town|village|hamlet)$\"]({{bbox}});node[\"natural\"=\"peak\"]({{bbox}});node[\"mountain_pass\"=\"yes\"]({{bbox}});way[\"waterway\"=\"river\"]({{bbox}});nwr[\"natural\"=\"water\"]({{bbox}});nwr[\"military\"]({{bbox}});nwr[\"landuse\"=\"military\"]({{bbox}});nwr[\"building\"~\"^(military|bunker|barracks)$\"]({{bbox}}););out geom;",
+      "license": "ODbL 1.0",
+      "credit": "© OpenStreetMap contributors"
+    }
+  }
+}

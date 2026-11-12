@@ -2,7 +2,7 @@ import { Hasher } from './hash';
 import { validInput } from './inputs';
 import { createSim } from './sim';
 import type { TerrainData } from './terrain';
-import type { ReplayData, ReplayResult, Scenario } from './types';
+import type { ReplayData, ReplayResult, Ref, Scenario } from './types';
 import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
@@ -39,19 +39,23 @@ const keysExactly = (x: Record<string, unknown>, keys: readonly string[], what: 
 const ref = (x: unknown, what: string): void => {
   if (!isObject(x)) return fail(`${what}: object expected`);
   keysExactly(x, ['id', 'version'], what);
-  if (typeof x.id !== 'string' || !/^[a-z0-9_]+$/.test(x.id)) fail(`${what}.id: ASCII identifier expected`);
+  if (typeof x.id !== 'string' || !/^[a-z0-9_]+(-[a-z0-9_]+)*$/.test(x.id)) fail(`${what}.id: ASCII identifier expected`);
   int(x.version, 1, INT32_MAX, `${what}.version`);
 };
 
 function check(x: unknown): asserts x is ReplayData {
   if (!isObject(x)) return fail('replay data: object expected');
-  keysExactly(x, HEADER_KEYS, 'header');
+  keysExactly(x, HEADER_KEYS, 'header', ['terrain']);
   if (x.format !== 1) fail('format: 1 expected');
   int(x.simVersion, 1, INT32_MAX, 'simVersion');
   int(x.seed, 0, INT32_MAX, 'seed');
   if (x.seedKind !== 'daily' && x.seedKind !== 'practice') fail('seedKind: daily | practice expected');
   ref(x.scenario, 'scenario');
   ref(x.guns, 'guns');
+  if (Object.hasOwn(x, 'terrain')) {
+    ref(x.terrain, 'terrain');
+    if ((x.terrain as Ref).id === 'mock') fail('terrain: mock is never written');
+  }
   const w = x.weather;
   if (!isObject(w)) return fail('weather: object expected');
   keysExactly(w, WEATHER_KEYS, 'weather');
@@ -84,13 +88,16 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
   }
 }
 
-/** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller regenerates the terrain from the
- * seed and passes the scenario the header names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit
+/** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller passes the terrain the header names
+ * (none = mock@1 regenerated from the seed) and the scenario it names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit
  * at t 0, and a game that ends (its clock stops) ends the record at that tick. */
 export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
   if (scenario.id !== d.scenario.id || scenario.version !== d.scenario.version)
     throw new Error(`scenario ${scenario.id}@${scenario.version} is not the header's ${d.scenario.id}@${d.scenario.version}`);
+  const want = d.terrain ?? { id: 'mock', version: 1 };
+  if (terrain.id !== want.id || terrain.version !== want.version)
+    throw new Error(`terrain ${terrain.id}@${terrain.version} is not the header's ${want.id}@${want.version}`);
   const sim = createSim({ ...d, scenario, terrain });
   const chain = new Hasher();
   const checkpoints: ReplayResult['checkpoints'] = [];

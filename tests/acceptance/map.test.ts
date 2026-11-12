@@ -1,14 +1,17 @@
 // 지도 바탕: the map panel's drawing, observed through a recording 2D context.
 import { describe, expect, test } from 'vitest';
-import type { TerrainData } from '@sim';
+import { COVER, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
-import { drawMap, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
+import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
-import { flatTerrain } from './terrain';
-import { angleTo, idAt, oneUnit, started } from './enemy';
-import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, untilImpact } from './mission';
+import { flatTerrain, mainRoad } from './terrain';
+import { angleTo, idAt, mortarAt, oneUnit, started } from './enemy';
+import { CALL_ADJUST, DESC_UNKNOWN, LOC_NEAR, openRadio, radioEvents, started as emptyField, toReady, unstarted, untilImpact } from './mission';
+import { cleared } from './end';
+import { TEST_PLACEMENT } from './placement';
+import { watch } from './strike';
 
 type Path = [number, number][];
 
@@ -21,6 +24,13 @@ function recorder() {
   const arcs: [number, number][] = [];
   const texts: { text: string; x: number; y: number }[] = [];
   const rects: [number, number, number, number][] = [];
+  const closed = new Set<Path>(); // paths closed with closePath()
+  const filled = new Set<Path>(); // paths filled with fill()
+  // Every stroke and text in drawing order, with the style it was drawn in.
+  type Word = { op: 'fillText' | 'strokeText'; text: string; x: number; y: number; font: string; style: string; width: number };
+  const ops: ({ op: 'stroke'; path: Path; width: number; style: string } | Word)[] = [];
+  const words: Word[] = []; // the text ops alone
+  const word = (w: Word) => void (ops.push(w), words.push(w));
   const ctx: MapContext = {
     imageSmoothingEnabled: true,
     lineCap: 'butt',
@@ -37,19 +47,23 @@ function recorder() {
     moveTo: (x, y) => void path.push([x, y]),
     lineTo: (x, y) => void path.push([x, y]),
     stroke: () => {
+      ops.push({ op: 'stroke', path, width: ctx.lineWidth, style: String(ctx.strokeStyle) });
       strokes.push(path);
       if (dashed) dashes.push(path);
     },
-    fillText: (text, x, y) => void texts.push({ text, x, y }),
-    strokeText: () => {},
+    fillText: (text, x, y) => {
+      word({ op: 'fillText', text, x, y, font: ctx.font, style: String(ctx.fillStyle), width: ctx.lineWidth });
+      texts.push({ text, x, y });
+    },
+    strokeText: (text, x, y) => word({ op: 'strokeText', text, x, y, font: ctx.font, style: String(ctx.strokeStyle), width: ctx.lineWidth }),
     setLineDash: (d) => void (dashed = [...d].length > 0),
     arc: (x, y) => void arcs.push([x, y]),
-    fill: () => {},
-    closePath: () => {},
+    fill: () => void filled.add(path),
+    closePath: () => void closed.add(path),
     fillRect: () => {},
     strokeRect: (x, y, w, h) => void rects.push([x, y, w, h]),
   };
-  return { ctx, strokes, dashes, arcs, texts, rects };
+  return { ctx, strokes, dashes, arcs, texts, rects, ops, words, closed, filled };
 }
 
 const draw = (t: TerrainData, view?: MapView, marks?: MapMarks) => {
@@ -111,6 +125,26 @@ describe('F-06', () => {
     expect(plain).toBeLessThan(lum(15));
   }, 30000);
 
+  test('F-06: 지도 팔레트와 음영', () => {
+    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per column.
+    const palette = { open: [152, 138, 84], field: [182, 162, 104], forest: [56, 76, 44], water: [78, 104, 122], road: [160, 150, 128], village: [176, 164, 128], building: [150, 72, 56] };
+    const t = flatTerrain({ n: 8 });
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 7; i++) t.cover[j * 8 + i] = i;
+    const px = mapBase(t);
+    const at = (p: Uint8ClampedArray, i: number, j = 3, n = 8) => [...p.slice(((n - 1 - j) * n + i) * 4, ((n - 1 - j) * n + i) * 4 + 3)];
+    COVER.forEach((c, i) => expect(at(px, i), c).toEqual(palette[c]));
+    // Lit from the north-west: × (1 + 0.05 per m above that neighbour), between 0.7 and 1.25. Cell 1 of each slope sits
+    // inside one 20 m band, so no contour darkens it.
+    const slope = (base: number, rise: number) => {
+      const s = flatTerrain({ n: 8 });
+      for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) s.ground[j * 8 + i] = base + rise * i;
+      return at(mapBase(s), 1);
+    };
+    expect(slope(101, 1)).toEqual([160, 145, 88]); // 1 m: × 1.05
+    expect(slope(110, 10)).toEqual([190, 172, 105]); // 10 m: × 1.25 (172.5 rounds to even)
+    expect(slope(200, -10)).toEqual([106, 97, 59]); // −10 m: × 0.7
+  });
+
   test('F-06: 좌표자', () => {
     const t = flatTerrain({ n: 1024 }); // 10 240 m square, 방안 기준 동 40000·북 30000
     // The whole map: the panel's centre is the map's centre.
@@ -165,6 +199,39 @@ describe('F-06', () => {
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
+  });
+
+  test('F-06: 예비 관측소 표시', () => {
+    // 0.05 px/m: (4000, 1000) is drawn at (200, 462), (6000, 900) at (300, 467).
+    const t = flatTerrain({ n: 1024 });
+    const scenario = TEST_PLACEMENT.scenario;
+    const fixed: MapMarks = { scenario, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const fromSim = (sim: ReturnType<typeof unstarted>): MapMarks => ({ ...fixed, op: sim.state.op, knownOp: sim.state.op, platoons: sim.state.platoons, mode: sim.state.mode, missions: sim.state.missions, tick: sim.state.tick });
+    const prep = unstarted();
+    const live = emptyField();
+    const ended = cleared().sim;
+    expect([prep, live, ended].map((x) => x.state.phase)).toEqual(['prep', 'live', 'ended']);
+    // Both modes and every 국면: a hollow dashed triangle the OP's size and "예비 N" beside it, for each 예비 관측소.
+    for (const marks of [fixed, { ...fixed, mode: 'training' as const }, fromSim(prep), fromSim(live), fromSim(ended)]) {
+      const { dashes, texts, closed, filled } = draw(t, FULL_VIEW, marks);
+      expect(dashes).toContainEqual([[200, 455], [194, 467], [206, 467]]);
+      expect(dashes).toContainEqual([[300, 460], [294, 472], [306, 472]]);
+      const symbols = dashes.filter((p) => p.length === 3 && ['200,455', '300,460'].includes(String(p[0])));
+      expect(symbols).toHaveLength(2);
+      for (const p of symbols) {
+        expect(closed.has(p)).toBe(true);
+        expect(filled.has(p)).toBe(false);
+      }
+      expect(texts).toContainEqual({ text: '예비 1', x: 208, y: 466 });
+      expect(texts).toContainEqual({ text: '예비 2', x: 308, y: 471 });
+    }
+    // The mock scenario has none, and nothing else on the map moves or changes style.
+    const reserve = draw(t, FULL_VIEW, fixed).ops;
+    const base = draw(t, FULL_VIEW, { ...fixed, scenario: BASE_SCENARIO }).ops;
+    expect(base.some((o) => o.op !== 'stroke' && o.text.startsWith('예비'))).toBe(false);
+    const marks = new Set(['200,455', '300,460']);
+    expect(reserve.filter((o) => (o.op === 'stroke' ? !marks.has(String(o.path[0])) : !o.text.startsWith('예비')))).toEqual(base);
+    expect(reserve.length - base.length).toBe(4);
   });
 
   test('F-17: 바람 화살표', () => {
@@ -245,6 +312,27 @@ describe('F-06', () => {
     expect(r.dashes.filter(fromPost)).toEqual([]);
   });
 
+  test('F-06: 훈련 지도의 병종 표식 (보·장·박)', () => {
+    // Each unit 1–2 km north of the post, watched until its type is known: a box with 보, 장 or 박 where it really is.
+    const t = flatTerrain({ n: 1024 });
+    const route = [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 600 }];
+    const cases = [
+      ['보', oneUnit({ type: 'inf', route: 'A', t0: 0 }, route)],
+      ['장', oneUnit({ type: 'apc', route: 'A', t0: 0 }, route)],
+      ['박', mortarAt({ x: 320, y: 1320 })],
+    ] as const;
+    for (const [mark, scenario] of cases) {
+      const sim = started(scenario, { terrain: t, mode: 'training' });
+      watch(sim, 0, 2);
+      const { platoons, op, tick } = sim.state;
+      const r = draw(t, FULL_VIEW, { scenario: BASE_SCENARIO, op, knownOp: op, dest: null, az: 0, fovMil: 1066, pin: null, platoons, mode: 'training', missions: [], tick, weather: CLEAR_WEATHER, viewshed: null });
+      const [x, y] = [platoons[0]!.x * 0.05, 512 - platoons[0]!.y * 0.05];
+      expect(r.rects, mark).toContainEqual([x - 7, y - 5, 14, 10]);
+      expect(r.texts, mark).toEqual(expect.arrayContaining([{ text: mark, x: x - 5, y: y + 4 }, { text: 'T1', x: x + 9, y: y + 3 }]));
+      expect(r.texts.filter((w) => w.text === '?'), mark).toEqual([]);
+    }
+  });
+
   test('F-10: 지도에 탄착과 요구 좌표', () => {
     // The flat test terrain at 0.8 px/m: the grid sent, (505, 505), is drawn at (404, 108).
     const sim = emptyField();
@@ -283,3 +371,111 @@ describe('F-06', () => {
     expect(crossAt(draw(t, FULL_VIEW, marks()), ix, iy)).toBe(false);
   });
 });
+
+describe('지도', () => {
+  test('지도: 문경 방안 기준의 방안선 자리', () => {
+    const t = flatTerrain({ n: 1024, grid: { letters: 'CH', e0: 40230, n0: 30490 } });
+    const km = gridLines(t, 1000);
+    const at = (axis: 'e' | 'n') => km.filter((l) => l.axis === axis).map((l) => [Math.round(l.at * 1e6) / 1e6, l.label]);
+    expect(at('e')).toEqual([...Array(10).keys()].map((k) => [770 + 1000 * k, String(41 + k)]));
+    expect(at('n')).toEqual([...Array(10).keys()].map((k) => [510 + 1000 * k, String(31 + k)]));
+    // 100 m lines: every one 70 m (east) and 10 m (north) past the hundred; no line on the map's edges.
+    const fine = gridLines(t, 100);
+    const rem = (axis: 'e' | 'n') => new Set(fine.filter((l) => l.axis === axis).map((l) => Math.round(l.at) % 100));
+    expect(rem('e')).toEqual(new Set([70]));
+    expect(rem('n')).toEqual(new Set([10]));
+    expect(fine.filter((l) => l.axis === 'e')).toHaveLength(102);
+  });
+
+  test('지도: 도로 등급별 굵기와 긋는 순서', async () => {
+    const CASING = 'rgba(60,40,20,.75)';
+    const INNER = 'rgba(250,240,215,.95)';
+    const roadOps = (r: ReturnType<typeof draw>) =>
+      r.ops.flatMap((o) => (o.op === 'stroke' && (o.style === CASING || o.style === INNER) ? [[o.style === CASING ? 'casing' : 'inner', o.width, o.path] as const] : []));
+    // 0.8 px/m on the 640 m flat terrain.
+    const line = (y: number) => [{ x: 0, y }, { x: 640, y }];
+    const at = (y: number): Path => [[0, 512 - y * 0.8], [512, 512 - y * 0.8]];
+    const t: TerrainData = { ...flatTerrain(), roads: [{ class: 'trunk', line: line(100) }, { class: 'local', line: line(200) }, mainRoad(line(300))] };
+    expect(roadOps(draw(t))).toEqual([
+      ['casing', 4.4, at(100)],
+      ['casing', 2.0, at(200)],
+      ['casing', 3.2, at(300)],
+      ['inner', 0.9, at(200)],
+      ['inner', 1.6, at(300)],
+      ['inner', 2.8, at(100)],
+    ]);
+    // The mock's roads are all main: the demo line, casings first, both in data order.
+    const mock = await mockTerrain.load(20261106);
+    const k = 512 / 10240;
+    const path = (r: (typeof mock.roads)[number]): Path => r.line.map((p) => [p.x * k, 512 - p.y * k]);
+    expect(mock.roads.every((r) => r.class === 'main')).toBe(true);
+    expect(roadOps(draw(mock))).toEqual([...mock.roads.map((r) => ['casing', 3.2, path(r)]), ...mock.roads.map((r) => ['inner', 1.6, path(r)])]);
+  }, 30000);
+
+  test('지도: 방안 숫자의 흰 테두리', async () => {
+    // Every 방안 숫자, on the mock and zoomed in, has its white 3 px edge stroked just before it is filled.
+    const mock = await mockTerrain.load(20261106);
+    for (const view of [FULL_VIEW, { z: 3, x0: 100, y0: 200 }]) {
+      const { ops } = draw(mock, view);
+      const digits = ops.flatMap((o, i) => (o.op === 'fillText' && /^\d\d$/.test(o.text) ? [{ i, o }] : []));
+      expect(digits.length).toBeGreaterThan(5);
+      for (const { i, o } of digits) {
+        expect(ops[i - 1]).toMatchObject({ op: 'strokeText', text: o.text, x: o.x, y: o.y, width: 3, style: 'rgba(255,255,255,.8)', font: '9px monospace' });
+        expect(o).toMatchObject({ font: '9px monospace', style: 'rgba(20,25,40,.85)' });
+      }
+      // The 방안선 themselves stay 1 px.
+      expect(ops.filter((o) => o.op === 'stroke' && o.style.startsWith('rgba(20,30,60,')).every((o) => o.op === 'stroke' && o.width === 1)).toBe(true);
+    }
+  }, 30000);
+
+  test('지도: 이름표 건너뛰기', async () => {
+    // 0.05 px/m at ×1. Two villages 200 m apart (10 px): their labels overlap at ×1 but not at ×8 (80 px).
+    const t: TerrainData = {
+      ...flatTerrain({ n: 1024 }),
+      villages: [
+        { name: '작은마을', x: 5200, y: 5000, r: 110 },
+        { name: '큰마을', x: 5000, y: 5000, r: 330 },
+        // Same 반경: the one listed first wins.
+        { name: '앞마을', x: 2000, y: 2000, r: 170 },
+        { name: '뒷마을', x: 2100, y: 2000, r: 170 },
+      ],
+    };
+    const names = (view: MapView, only = /마을/) => draw(t, view).words.filter((o) => only.test(o.text)).map((o) => [o.op, o.text]);
+    // The bigger village is drawn first; the smaller one, overlapping it, is skipped (edge and letters both).
+    expect(names(FULL_VIEW)).toEqual([['strokeText', '큰마을'], ['fillText', '큰마을'], ['strokeText', '앞마을'], ['fillText', '앞마을']]);
+    // Zoomed in on them, both come back (painted in data order).
+    expect(names(centreOn(t, FULL_VIEW, { x: 5100, y: 5000 }, 8), /큰|작은/).map(([, n]) => n)).toEqual(['작은마을', '작은마을', '큰마을', '큰마을']);
+    expect(names(centreOn(t, FULL_VIEW, { x: 2050, y: 2000 }, 8), /앞|뒷/).map(([, n]) => n)).toEqual(['앞마을', '앞마을', '뒷마을', '뒷마을']);
+    // The mock skips none at ×1.
+    const mock = await mockTerrain.load(20261106);
+    const drawn = draw(mock).texts.map((x) => x.text);
+    for (const v of mock.villages) expect(drawn).toContain(v.name);
+  }, 30000);
+
+  test('지도: 지명', () => {
+    // 0.05 px/m at ×1: (5000, 5000) is drawn at (250, 262).
+    const bare: TerrainData = { ...flatTerrain({ n: 1024 }), villages: [{ name: '큰마을', x: 5000, y: 5000, r: 330 }] };
+    const t: TerrainData = {
+      ...bare,
+      names: [
+        { name: '남강', x: 2000, y: 3000, kind: 'water' },
+        { name: '큰산', x: 8000, y: 8000, kind: 'peak' },
+        { name: '겹친봉', x: 5000, y: 5300, kind: 'peak' }, // on top of the village's label: skipped like one
+        { name: '새고개', x: 3000, y: 8000, kind: 'pass' },
+      ],
+    };
+    const lettering = draw(t).words.filter((o) => !/^\d\d$/.test(o.text));
+    // After the village names, in data order, each on its white edge; only water in dark blue; no 표고 numbers.
+    expect(lettering.map((o) => [o.op, o.text])).toEqual(
+      ['큰마을', '남강', '큰산', '새고개'].flatMap((n) => [['strokeText', n], ['fillText', n]]),
+    );
+    const fills = lettering.filter((o) => o.op === 'fillText');
+    for (const o of lettering.slice(2)) expect(o).toMatchObject({ font: '9px monospace' });
+    for (const o of lettering.filter((o) => o.op === 'strokeText')) expect(o).toMatchObject({ width: 3, style: 'rgba(255,255,255,.8)' });
+    expect(fills.map((o) => o.style)).toEqual(['#2a2418', '#1a3c78', '#2a2418', '#2a2418']);
+    expect(fills[1]).toMatchObject({ x: 100, y: 365 }); // centred on its point
+    // No 지명: nothing more than the village name.
+    expect(draw(bare).words.filter((o) => !/^\d\d$/.test(o.text)).map((o) => o.text)).toEqual(['큰마을', '큰마을']);
+  });
+});
+

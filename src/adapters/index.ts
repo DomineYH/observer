@@ -6,6 +6,21 @@ export interface TerrainSource {
   load(seed: number): Promise<TerrainData>;
 }
 
+/** Why a 지형 원천 refused: not received, not this game's data, or no gzip unpacking in this browser. */
+export const TERRAIN_FAILURES = ['fetch', 'mismatch', 'unsupported'] as const;
+export type TerrainFailure = (typeof TERRAIN_FAILURES)[number];
+
+/** The only rejection of the real 지형 원천: it never resolves to other data. */
+export class TerrainLoadError extends Error {
+  constructor(
+    readonly reason: TerrainFailure,
+    options?: ErrorOptions,
+  ) {
+    super(`지형 원천: ${reason}`, options);
+    this.name = 'TerrainLoadError';
+  }
+}
+
 export const WEATHER_PRESETS = ['clear', 'haze', 'rain', 'wind', 'fog'] as const;
 export type WeatherPreset = (typeof WEATHER_PRESETS)[number];
 
