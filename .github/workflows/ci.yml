@@ -95,7 +95,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8] } }
+    strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] } }
     steps:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
@@ -110,9 +110,9 @@ jobs:
         run: |
           set -euo pipefail
           npx playwright test -c playwright.e2e.config.ts --list --reporter=json > "$RUNNER_TEMP/e2e-list.json"
-          node .github/scripts/shard-plan.mjs "$RUNNER_TEMP/e2e-list.json" tests/smoke/durations.json ${{ matrix.shard }} 8 > "$RUNNER_TEMP/e2e-args.txt"
+          node .github/scripts/shard-plan.mjs "$RUNNER_TEMP/e2e-list.json" tests/smoke/durations.json ${{ matrix.shard }} 12 > "$RUNNER_TEMP/e2e-args.txt"
           mapfile -t args < "$RUNNER_TEMP/e2e-args.txt"
-          if [ "${#args[@]}" -eq 0 ]; then echo "shard ${{ matrix.shard }}/8: no tests planned"; exit 0; fi
+          if [ "${#args[@]}" -eq 0 ]; then echo "shard ${{ matrix.shard }}/12: no tests planned"; exit 0; fi
           npm run test:e2e -- "${args[@]}"
 
   # The required "e2e" check: green only when every shard succeeded (skipped, cancelled or failed is red).

@@ -521,3 +521,29 @@ test('스모크: 바로 효력사 뒤 수정 후 효력사에 방향을 함께 �
     await expect(log).toContainText('표적번호 알파브라보 하나공공둘', { timeout: 20_000 }); // 사격지휘통보 9–12 s
   });
 });
+
+test('시간 배율: timescale=4는 틱을 네 배로 흘린다', async ({ page }) => {
+  // The hidden test aid the game smoke switches on after the pick: none is normal pace (×1: 40 ticks in 2 s), and the
+  // loop reads the address each frame, so adding timescale=4 mid-game runs ×1 × 4.
+  await page.goto('/?seed=20261106');
+  await standardGame(page);
+  const map = page.getByRole('img', { name: '지도' });
+  const box = (await map.boundingBox())!;
+  await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
+  await expect(page.getByRole('region', { name: '작전 준비' })).toContainText('관측소 후보');
+  await page.getByRole('button', { name: '관측소 점령 · 작전 개시' }).click();
+  const tick = page.getByRole('status', { name: '틱' });
+  await expect.poll(async () => Number(await tick.textContent())).toBeGreaterThan(0);
+  const ticksIn2s = async () => {
+    const before = Number(await tick.textContent());
+    await page.waitForTimeout(2000);
+    return Number(await tick.textContent()) - before;
+  };
+  const normal = await ticksIn2s();
+  expect(normal).toBeGreaterThan(20);
+  expect(normal).toBeLessThan(60);
+  await page.evaluate(() => history.replaceState(null, '', `${location.search}&timescale=4`));
+  expect(await ticksIn2s()).toBeGreaterThan(normal * 2.5);
+  // No control, text or setting shows it.
+  await expect(page.getByText(/timescale|시간 배율/)).toHaveCount(0);
+});

@@ -1,14 +1,15 @@
 // 스모크 (spec 테스트하는 이음매 5, repo_checks critical flow): one 훈련 모드 game through the UI of the built app, from
-// 작전 준비 to the 사후강평, at ×8 except for the few seconds the pick needs.
+// 작전 준비 to the 사후강평, at ×8 × 4 (the hidden `timescale=4`) except for the few seconds the pick needs at ×1.
 import { expect, test, type Page } from '@playwright/test';
 import { everyControlNamed, lineSaid, speedTo, ticks } from './helpers';
 
 const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-/** Polls the 틱 until it reaches `t` (at ×8 the clock runs 160 ticks a second). */
+/** Polls the 틱 until it reaches `t` (at ×8 the clock runs 160 ticks a second, 640 with `timescale=4`). */
 const tickAtLeast = (page: Page, t: number, timeout: number) => expect.poll(() => ticks(page), { timeout }).toBeGreaterThanOrEqual(t);
 
 test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
-  // 40 simulated minutes at ×8 are 300 s; the pick runs ~25 s at ×1 (~50 s more if it needs the second volley).
+  // 40 simulated minutes at ×8 × 4 are 75 s; the pick runs ~25 s at ×1 (~50 s more if it needs the second volley).
+  // The timeout keeps the old ×8 room: a slow runner only loses pace, never ticks.
   test.setTimeout(480_000);
   await page.goto('/?seed=20261106');
   const prep = page.getByRole('region', { name: '작전 준비' });
@@ -107,6 +108,8 @@ test('스모크: 훈련 모드 한 판 완주', async ({ page }) => {
     expect((await tryVolley(4200)) || (await tryVolley(5219))).toBe(true);
     await expect(targets).toContainText('표적 1');
     await speedTo(page, 8);
+    // From here ×8 × 4: switched only after the pick, whose windows need ×1 (the loop reads the address each frame).
+    await page.evaluate(() => history.replaceState(null, '', `${location.search}&timescale=4`));
   });
 
   await test.step('사격 임무: 조정 → 좌표 → 성질 → 수정 + 효력사 → 임무끝', async () => {
