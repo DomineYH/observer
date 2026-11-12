@@ -33,7 +33,7 @@ import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame } from './game';
-import { startLoop } from './loop';
+import { startLoop, timescaleOf } from './loop';
 import { submissionOf } from './records';
 import { chooseSeed } from './seed';
 import './app.css';
@@ -144,7 +144,8 @@ startLoop(
     lastPublish = now;
     listeners.forEach((l) => l());
   },
-  () => (pace.paused ? 0 : pace.speed),
+  // test aid, read each frame so a test can switch it mid-game; never an input
+  () => (pace.paused ? 0 : pace.speed * timescaleOf(location.search)),
 );
 
 const TRAINING_WARNING = '표준 모드 작전 중에 훈련 모드를 켜면 이 판은 저장만 되고 랭킹에서 제외됩니다. 계속할까요?';

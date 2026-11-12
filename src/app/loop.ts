@@ -16,6 +16,12 @@ export function frameSteps(acc: { ms: number }, dtMs: number, speed = 1): number
   return n;
 }
 
+/** Hidden test aid: `?timescale=2|4` multiplies the 배속. Exact match only; anything else is 1. Never an input. */
+export function timescaleOf(search: string): 1 | 2 | 4 {
+  const v = new URLSearchParams(search).get('timescale');
+  return v === '4' ? 4 : v === '2' ? 2 : 1;
+}
+
 /** Fixed-step frame loop. `pace()` is the 배속, 0 while paused: pausing is simply not calling step. Neither is an input.
  * Returns a stop function. */
 export function startLoop(step: () => void, onFrame: (now: number) => void, pace: () => number): () => void {

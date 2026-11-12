@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { createSim, type Input } from '@sim';
 import { init, START } from '../../tests/acceptance/init';
-import { frameSteps } from './loop';
+import { frameSteps, timescaleOf } from './loop';
 import { createSession } from './session';
 
 const run = (frames: number[]) => {
@@ -43,6 +43,28 @@ test('수치표: 빠진 행 — 프레임당 최대 40스텝', () => {
   expect(frameSteps(acc, 100, 40)).toBe(40);
   expect(acc.ms).toBe(0);
   expect(frameSteps(acc, 50, 1)).toBe(1);
+});
+
+test('시간 배율: 주소의 timescale은 1, 2, 4만', () => {
+  expect(timescaleOf('')).toBe(1);
+  expect(timescaleOf('?timescale=1')).toBe(1);
+  expect(timescaleOf('?timescale=2')).toBe(2);
+  expect(timescaleOf('?seed=1&timescale=4')).toBe(4);
+  for (const v of ['8', '3', '0', '-4', '4x', '4.0', '%204', 'constructor', '']) expect(timescaleOf(`?timescale=${v}`)).toBe(1);
+});
+
+test('시간 배율: ×8의 네 배 — 프레임당 틱', () => {
+  const at = (speed: number, frames: number[]) => {
+    const acc = { ms: 0 };
+    return sum(frames.map((dt) => frameSteps(acc, dt, speed)));
+  };
+  // 100 frames of 16 ms: ×8 gives 256 ticks, ×8 × 4 = 32 gives 1024 (10 or 11 a frame, under the 40 cap).
+  expect(at(8, Array(100).fill(16))).toBe(256);
+  expect(at(32, Array(100).fill(16))).toBe(1024);
+  // One 0.1 s frame at 32 owes 64 ticks: 40 run, the rest is dropped.
+  const acc = { ms: 0 };
+  expect(frameSteps(acc, 100, 32)).toBe(40);
+  expect(acc.ms).toBe(0);
 });
 
 test('F-14: 배속과 일시정지는 기록되지 않는다', () => {

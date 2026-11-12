@@ -89,14 +89,14 @@ test('ambiguous run arguments throw', async () => {
   expect(() => planShards(onDescribe, {}, 2)).toThrow(/describe line/);
 });
 
-test('real --list: 8 shards cover every spec once, and durations.json knows nearly all of them', { timeout: 60_000 }, async () => {
+test('real --list: 12 shards cover every spec once, and durations.json knows nearly all of them', { timeout: 60_000 }, async () => {
   const { planShards } = await load();
   const out = execFileSync(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '-c', 'playwright.e2e.config.ts', '--list', '--reporter=json'], { cwd: ROOT, maxBuffer: 16 << 20 });
   const list = JSON.parse(out.toString()) as List;
   const durations = JSON.parse(readFileSync(`${ROOT}tests/smoke/durations.json`, 'utf8')) as Record<string, number>;
   const listed = planShards(list, durations, 1)[0]!.tests.map((t) => t.id);
   expect(listed.length).toBeGreaterThan(0);
-  expect(ids(planShards(list, durations, 8)).sort()).toEqual([...listed].sort());
+  expect(ids(planShards(list, durations, 12)).sort()).toEqual([...listed].sort());
   const missing = listed.filter((id) => !(id in durations));
   expect(missing.length <= listed.length * 0.1, `no duration for: ${missing.join(', ')}`).toBe(true);
 });
