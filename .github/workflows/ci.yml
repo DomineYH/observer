@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
 
+# A newer push cancels an older run of the same PR; every non-PR run gets its own group, so a main push is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # code=false only for a pull request whose every path is docs-only (.github/scripts/classify-changes.sh).
   # The five required jobs still run (!cancelled()) and skip only their steps, so a failed classifier never passes a check.
