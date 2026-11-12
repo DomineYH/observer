@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Every smoke runs on the mock build; real.spec.ts alone runs on the real build, served from its own folder and port.
 export default defineConfig({
   testDir: 'tests/smoke',
+  fullyParallel: true, // --shard then splits by test, not by file
   retries: 1,
   forbidOnly: !!process.env.CI,
   use: { baseURL: 'http://localhost:4173' },

@@ -1,4 +1,4 @@
-# 필수 검사 다섯 개. Job ids are the required status check names.
+# 필수 검사 다섯 개. Job ids are the required status check names; e2e is the aggregate of the e2e-shard matrix.
 name: ci
 
 on:
@@ -44,15 +44,25 @@ jobs:
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:engines
 
-  e2e:
+  e2e-shard:
     runs-on: ubuntu-latest
+    strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4] } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+
+  # The required "e2e" check: green only when every shard succeeded (skipped, cancelled or failed is red).
+  e2e:
+    needs: e2e-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "$RESULT" = success
+        env: { RESULT: "${{ needs.e2e-shard.result }}" }
 
   # Not a required status check. verify_routing.py is not run here: it checks the host machine's hook and router key.
   host-tools:
