@@ -1,5 +1,5 @@
 {
-  "game.spec.ts › 스모크: 훈련 모드 한 판 완주": 150,
+  "game.spec.ts › 스모크: 훈련 모드 한 판 완주": 120,
   "keyboard.spec.ts › B7: 단축키는 단추와 같은 입력": 138,
   "keyboard.spec.ts › B7: 조합 키에서는 단축키 무시": 132,
   "keyboard.spec.ts › B7: 초점에 따른 무시 조건": 138,
