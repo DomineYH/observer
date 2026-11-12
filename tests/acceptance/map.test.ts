@@ -508,4 +508,17 @@ describe('지도', () => {
     // sha256 of mapBase(mock) on main 762da78, before thin water was widened (#102).
     expect(createHash('sha256').update(mapBase(mock)).digest('hex')).toBe('a6355f2e2dfd354487b8a3f0951b035f123ee3e7cc600cdb58310d3d3578b122');
   }, 30000);
+
+  test('지도: 기호 자리의 이름표는 빠진다', () => {
+    // 0.05 px/m at ×1. 요성리's label sits on the middle 아군 진지 box (250.5–264.5, 335–343); 관측봉 on the OP (256, 422).
+    const t: TerrainData = {
+      ...flatTerrain({ n: 1024 }),
+      villages: [{ name: '요성리', x: 5150, y: 3200, r: 100 }],
+      names: [{ name: '관측봉', x: 5120, y: 1800, kind: 'peak' }],
+    };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const named = (m?: MapMarks) => draw(t, FULL_VIEW, m).words.filter((o) => o.op === 'fillText' && /요성리|관측봉/.test(o.text)).map((o) => o.text);
+    expect(named()).toEqual(['요성리', '관측봉']);
+    expect(named(marks)).toEqual([]);
+  });
 });

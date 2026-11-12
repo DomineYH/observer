@@ -188,6 +188,17 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
     boxes.push(box);
     return true;
   };
+  // 지도 기호 drawn later by drawMarks take their place first, so a 이름표 on them is skipped like one (#102):
+  // a symbol's box, and its text from x + 8 on the baseline y + 4 (10 px, as wide as fits() reckons).
+  const reserve = (x: number, y: number, dx: number, up: number, down: number, text = '') => {
+    boxes.push([x - dx, y - up, x + dx, y + down]);
+    if (text) boxes.push([x + 8, y + 4 - 10, x + 8 + text.length * 10, y + 4]);
+  };
+  if (marks) {
+    for (const f of marks.scenario.friends) reserve(mx(f.x), my(f.y), 7, 4, 4);
+    reserve(mx(marks.op.x), my(marks.op.y), 6, 7, 5, 'OP');
+    (marks.scenario.reserveOps ?? []).forEach((p, i) => reserve(mx(p.x), my(p.y), 6, 7, 5, `예비 ${i + 1}`));
+  }
   const label = (text: string, x: number, y: number) => {
     c.strokeText(text, x, y);
     c.fillText(text, x, y);
