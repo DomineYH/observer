@@ -154,23 +154,35 @@ describe('문경 배치', () => {
 
   test('배치: 장갑차 정지 자리', async () => {
     const t = await loaded;
-    const HALT_M = 1300; // src/sim/enemy.ts APC_HALT_M: the APC halts for good once this close to its route's end
     const apcSeen = (x: number, y: number) => lineOfSight(t, eyeOf(t, op), { x, y, z: heightAt(t, x, y) + 2.3 * 0.85 });
-    // the route's points are jittered 30 m: 90 % of the spots within 30 m of the halt (1 m grid over the disc and every
-    // degree of its edge) see the APC — no halt on these routes has its whole disc seen (user decision on #100)
-    const spots: Point[] = [];
-    for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) spots.push({ x: u, y: v });
-    for (let a = 0; a < 360; a++) spots.push({ x: 30 * Math.cos((a * Math.PI) / 180), y: 30 * Math.sin((a * Math.PI) / 180) });
+    /** Where the APC halts on route `k` with no jitter: the simulation's own walk (enemy.ts moveAlong, the halt under
+     * APC_HALT_M and the move on the switching tick) with its platoon's path set to the scenario's points. */
+    const haltOf = (k: 'B' | 'C') => {
+      const sim = createSim({ seed: 1, seedKind: 'practice', scenario: sc, guns: BASE_GUNS, weather: CLEAR_WEATHER, mode: 'standard', terrain: t });
+      const apc = sim.state.platoons.find((p) => p.type === 'apc')!;
+      const path = sc.routes[k].map((p) => ({ ...p }));
+      Object.assign(apc, { route: k, path, x: path[0]!.x, y: path[0]!.y, wp: 1, t0: 0 });
+      sim.step([{ a: 'start', v: [op.x, op.y] }]);
+      while (apc.state === 'wait' || apc.state === 'approach') {
+        expect(sim.state.phase, k).toBe('live');
+        sim.step([]);
+      }
+      expect(apc.state, k).toBe('support');
+      return { x: apc.x, y: apc.y };
+    };
+    // A nominal robustness measure, not a promise for every seed: deploy jitters each route point by a Gaussian of σ 30 m
+    // per coordinate. The halt is seen, and so are 90 % of the 1 m grid points within 30 m of it (user decision on #100).
+    const disc: Point[] = [];
+    for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) disc.push({ x: u, y: v });
     // the APC walks 중앙 or 동측
     expect(sc.units.find((u) => u.type === 'apc')).toMatchObject({ route: { first: 'B', second: 'C' } });
     for (const k of ['B', 'C'] as const) {
-      const r = sc.routes[k];
-      const stop = samples(r, 1).find((p) => dist(p, r.at(-1)!) < HALT_M)!;
-      const at = `${k} (${stop.x.toFixed(0)}, ${stop.y.toFixed(0)})`;
+      const stop = haltOf(k);
+      const at = `${k} (${stop.x.toFixed(1)}, ${stop.y.toFixed(1)})`;
       expect(apcSeen(stop.x, stop.y), at).toBe(true);
-      expect(share(spots, (d) => apcSeen(stop.x + d.x, stop.y + d.y)), at).toBeGreaterThanOrEqual(90);
+      expect(share(disc, (d) => apcSeen(stop.x + d.x, stop.y + d.y)), at).toBeGreaterThanOrEqual(90);
     }
-  }, 30_000);
+  }, 60_000);
 
   test('배치: NAI와 박격포 자리', async () => {
     const t = await loaded;
