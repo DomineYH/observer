@@ -7,6 +7,7 @@ export default defineConfig({
   // One worker per shard on CI: the smoke tests are real-time and lose their margin when tests share a CPU (smoke.spec.ts:409).
   workers: process.env.CI ? 1 : undefined,
   retries: 1,
+  reporter: process.env.CI ? 'list' : undefined, // per-test durations in the CI log, for shard balancing
   forbidOnly: !!process.env.CI,
   use: { baseURL: 'http://localhost:4173' },
   projects: [

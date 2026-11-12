@@ -94,7 +94,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
-    strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4] } }
+    strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8] } }
     steps:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npx playwright install --with-deps chromium
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/8
 
   # The required "e2e" check: green only when every shard succeeded (skipped, cancelled or failed is red).
   e2e:
