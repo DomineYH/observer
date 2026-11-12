@@ -68,7 +68,7 @@ describe('문경 배치', () => {
     expect(ref).toEqual({ id: header.id, version: header.version });
     expect(ref).toEqual({ id: expected.id, version: expected.version });
     expect(ref.version).toBe(config.version);
-    expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 1 });
+    expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 2 });
     expect(sc.id).not.toBe(MOCK_PLACEMENT.scenario.id);
   });
 
@@ -149,6 +149,26 @@ describe('문경 배치', () => {
       for (let a = 0; a < 360; a++) spots.push({ x: 30 * Math.cos((a * Math.PI) / 180), y: 30 * Math.sin((a * Math.PI) / 180) });
       const hidden = spots.filter((d) => !seen(t, stop.x + d.x, stop.y + d.y));
       expect(hidden, `${k} (${stop.x}, ${stop.y})`).toEqual([]);
+    }
+  }, 30_000);
+
+  test('배치: 장갑차 정지 자리', async () => {
+    const t = await loaded;
+    const HALT_M = 1300; // src/sim/enemy.ts APC_HALT_M: the APC halts for good once this close to its route's end
+    const apcSeen = (x: number, y: number) => lineOfSight(t, eyeOf(t, op), { x, y, z: heightAt(t, x, y) + 2.3 * 0.85 });
+    // the route's points are jittered 30 m: 90 % of the spots within 30 m of the halt (1 m grid over the disc and every
+    // degree of its edge) see the APC — no halt on these routes has its whole disc seen (user decision on #100)
+    const spots: Point[] = [];
+    for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) spots.push({ x: u, y: v });
+    for (let a = 0; a < 360; a++) spots.push({ x: 30 * Math.cos((a * Math.PI) / 180), y: 30 * Math.sin((a * Math.PI) / 180) });
+    // the APC walks 중앙 or 동측
+    expect(sc.units.find((u) => u.type === 'apc')).toMatchObject({ route: { first: 'B', second: 'C' } });
+    for (const k of ['B', 'C'] as const) {
+      const r = sc.routes[k];
+      const stop = samples(r, 1).find((p) => dist(p, r.at(-1)!) < HALT_M)!;
+      const at = `${k} (${stop.x.toFixed(0)}, ${stop.y.toFixed(0)})`;
+      expect(apcSeen(stop.x, stop.y), at).toBe(true);
+      expect(share(spots, (d) => apcSeen(stop.x + d.x, stop.y + d.y)), at).toBeGreaterThanOrEqual(90);
     }
   }, 30_000);
 
