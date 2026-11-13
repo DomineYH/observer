@@ -211,6 +211,10 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   const box = (await map.boundingBox())!;
   await map.click({ position: { x: box.width / 2, y: box.height * 0.75 } });
   await expect(prep).toContainText('관측소 후보: 찰리호텔 4512 3256');
+  // The reference map is a fresh 안개 game with this post and the default sight: the map base follows the weather (#105).
+  const weather = page.getByRole('combobox', { name: '기상 바꾸기' });
+  await weather.selectOption({ label: '안개' });
+  await expect(prep).toContainText('기상 시정 2.5 km · 구름 100% · 바람 180° 0.7 m/s');
   const fresh = await settledMap(page, map);
   // 화질 is the player's, not the game's: 높음 chosen in prep stays through the weather change.
   await quality('높음').click();
@@ -223,9 +227,11 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page 
   await expect.poll(() => mapPixels(map)).not.toBe(fresh);
   await expect(bino).toHaveAttribute('aria-pressed', 'true');
 
-  // 안개: a fresh game under the new weather, the line of sight and the binoculars back where a new game has them, the
-  // chosen 관측소 후보 kept and the clock still at 0.
-  await page.getByRole('combobox', { name: '기상 바꾸기' }).selectOption({ label: '안개' });
+  // 비 and back to 안개: a fresh game under that weather again, the line of sight and the binoculars back where a new
+  // game has them, the chosen 관측소 후보 kept and the clock still at 0.
+  await weather.selectOption({ label: '비' });
+  await expect(prep).toContainText('기상 시정 8.0 km · 구름 100% · 바람 200° 5.2 m/s');
+  await weather.selectOption({ label: '안개' });
   await expect(prep).toContainText('기상 시정 2.5 km · 구름 100% · 바람 180° 0.7 m/s');
   await expect.poll(() => mapPixels(map)).toBe(fresh);
   await expect(bino).toHaveAttribute('aria-pressed', 'false');

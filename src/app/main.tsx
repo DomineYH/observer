@@ -293,6 +293,8 @@ function App() {
             send={send}
             onFrame={onFrame}
             weather={init.weather}
+            colours={colours}
+            callsign={callsign}
             pin={pin}
             onPin={setPin}
             mark={point}

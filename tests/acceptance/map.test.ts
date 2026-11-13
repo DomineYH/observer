@@ -5,6 +5,7 @@ import { COVER, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
+import { terrainColours, type TerrainColours } from '@render/shade';
 import { BASE_SCENARIO } from '@content/scenario';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain, mainRoad } from './terrain';
@@ -72,6 +73,12 @@ const draw = (t: TerrainData, view?: MapView, marks?: MapMarks) => {
   drawMap(r.ctx, t, {} as CanvasImageSource, view, marks);
   return r;
 };
+/** Hand-made lit colours: each cell's colour from `rgb`, all at one light, so a test does not hang on shade's noise. */
+const lit = (t: TerrainData, rgb: (k: number) => readonly [number, number, number], light = 1): TerrainColours => {
+  const c = { r: new Uint8Array(t.n * t.n), g: new Uint8Array(t.n * t.n), b: new Uint8Array(t.n * t.n), light: new Float32Array(t.n * t.n).fill(light) };
+  for (let k = 0; k < t.n * t.n; k++) [c.r[k], c.g[k], c.b[k]] = rgb(k);
+  return c;
+};
 const east = (p: number): Path => [[p, 0], [p, MAP_PX]];
 const north = (p: number): Path => [[0, p], [MAP_PX, p]];
 
@@ -111,37 +118,43 @@ describe('F-06', () => {
       { text: '31', x: 2, y: 159.5 },
     ]);
 
-    // Contours on a slope rising 1 m per cell eastwards from 90 m: every 100 m darker than every 20 m
+    // Contours on a slope rising 1 m per cell eastwards from 90 m: every 100 m darker than every 20 m. One lit colour
+    // everywhere, so only the shade and the ink differ.
     const t = flatTerrain();
     for (let j = 0; j < t.n; j++) for (let i = 0; i < t.n; i++) t.ground[j * t.n + i] = 90 + i;
-    const px = mapBase(t);
+    const px = mapBase(t, lit(t, () => [152, 138, 84]));
     expect(px).toHaveLength(t.n * t.n * 4);
     const lum = (i: number, j = 20) => {
       const o = ((t.n - 1 - j) * t.n + i) * 4; // north up
       return px[o]! + px[o + 1]! + px[o + 2]!;
     };
-    const index = lum(9); // 99 → 100 m
-    const plain = lum(29); // 119 → 120 m
+    const index = lum(29); // 119 m, in the band from 100 m, → 120 m (demo: the cell's own band)
+    const plain = lum(9); // 99 m → 100 m
     expect(index).toBeLessThan(plain);
     expect(plain).toBeLessThan(lum(15));
   }, 30000);
 
   test('F-06: 지도 팔레트와 음영', () => {
-    // The demo's seven cover colours on flat ground (no shade, no contour), one cover per terrain (a one-cell water
-    // column would be widened, #102).
-    const palette = { open: [152, 138, 84], field: [182, 162, 104], forest: [56, 76, 44], water: [78, 104, 122], road: [160, 150, 128], village: [176, 164, 128], building: [150, 72, 56] };
+    // On flat ground (no shade, no contour) every pixel is its cell's lit colour, one cover per terrain (a one-cell
+    // water column would be widened, #102); the seven covers' mean colours are each visibly apart.
     const at = (p: Uint8ClampedArray, i: number, j = 3, n = 8) => [...p.slice(((n - 1 - j) * n + i) * 4, ((n - 1 - j) * n + i) * 4 + 3)];
-    COVER.forEach((c, i) => {
-      const t = flatTerrain({ n: 8 });
+    const means = COVER.map((c, i) => {
+      const t = flatTerrain({ n: 32 });
       t.cover.fill(i);
-      expect(at(mapBase(t), 3), c).toEqual(palette[c]);
+      const colours = terrainColours(t, CLEAR_WEATHER);
+      const px = mapBase(t, colours);
+      for (const k of [0, 77, 528, 1023]) expect(at(px, k % 32, Math.floor(k / 32), 32), c).toEqual([colours.r[k], colours.g[k], colours.b[k]]);
+      const sum = [0, 0, 0];
+      for (let k = 0; k < 32 * 32; k++) for (let ch = 0; ch < 3; ch++) sum[ch]! += px[k * 4 + ch]!;
+      return sum.map((v) => v / (32 * 32));
     });
+    for (let a = 0; a < 7; a++) for (let b = a + 1; b < 7; b++) expect(Math.hypot(...means[a]!.map((v, ch) => v - means[b]![ch]!)), `${COVER[a]} ${COVER[b]}`).toBeGreaterThan(10);
     // Lit from the north-west: × (1 + 0.05 per m above that neighbour), between 0.7 and 1.25. Cell 1 of each slope sits
     // inside one 20 m band, so no contour darkens it.
     const slope = (base: number, rise: number) => {
       const s = flatTerrain({ n: 8 });
       for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) s.ground[j * 8 + i] = base + rise * i;
-      return at(mapBase(s), 1);
+      return at(mapBase(s, lit(s, () => [152, 138, 84])), 1);
     };
     expect(slope(101, 1)).toEqual([160, 145, 88]); // 1 m: × 1.05
     expect(slope(110, 10)).toEqual([190, 172, 105]); // 10 m: × 1.25 (172.5 rounds to even)
@@ -198,7 +211,7 @@ describe('F-06', () => {
     // 아군 진지 as boxes, the 아군 전선 (이동 한계선) across the map, the NAIs and the post labelled.
     expect(rects).toEqual(expect.arrayContaining([[210.5, 339, 14, 8], [250.5, 335, 14, 8], [290.5, 339, 14, 8]]));
     expect(strokes).toContainEqual([[0, 329.5], [512, 329.5]]);
-    for (const label of ['NAI 1', 'NAI 2', 'NAI 3', 'OP']) expect(texts.map((x) => x.text)).toContain(label);
+    for (const label of ['NAI 1', 'NAI 2', 'NAI 3', 'OP 갈매기']) expect(texts.map((x) => x.text)).toContain(label);
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
@@ -482,19 +495,21 @@ describe('지도', () => {
   });
 
   test('지도: 가는 수면은 지도에서 넓게', () => {
-    // Flat ground (no shade, no contour), so each pixel is its cell's base colour.
-    const WATER = [78, 104, 122];
-    const OPEN = [152, 138, 84];
+    // Flat ground (no shade, no contour), so each pixel is its cell's colour: a water cell its own lit colour, a cell
+    // widened into water the water colour × its light (here 0.9).
+    const WATER = [78, 104, 122] as const;
+    const WIDENED = [70, 94, 110];
+    const OPEN = [152, 138, 84] as const;
+    const water = COVER.indexOf('water');
     const rgb = (t: TerrainData, i: number, j: number) => {
       const o = ((t.n - 1 - j) * t.n + i) * 4;
-      return [...mapBase(t).slice(o, o + 3)];
+      return [...mapBase(t, lit(t, (k) => (t.cover[k] === water ? WATER : OPEN), 0.9)).slice(o, o + 3)];
     };
-    const water = COVER.indexOf('water');
     // A one-cell water line down column 8: drawn 5 cells wide, columns 6–10, the whole way.
     const line = flatTerrain({ n: 20 });
     for (let j = 0; j < 20; j++) line.cover[j * 20 + 8] = water;
     for (const j of [0, 10, 19]) {
-      for (let i = 6; i <= 10; i++) expect(rgb(line, i, j), `${i},${j}`).toEqual(WATER);
+      for (let i = 6; i <= 10; i++) expect(rgb(line, i, j), `${i},${j}`).toEqual(i === 8 ? WATER : WIDENED);
       for (const i of [5, 11]) expect(rgb(line, i, j), `${i},${j}`).toEqual(OPEN);
     }
     // A 6×6 water block, corners included (9 water cells in their 5×5), is drawn as it is.
@@ -505,9 +520,50 @@ describe('지도', () => {
 
   test('지도: mock 바탕 그대로', async () => {
     const mock = await mockTerrain.load(20261106);
-    // sha256 of mapBase(mock) on main 762da78, before thin water was widened (#102).
-    expect(createHash('sha256').update(mapBase(mock)).digest('hex')).toBe('a6355f2e2dfd354487b8a3f0951b035f123ee3e7cc600cdb58310d3d3578b122');
+    // sha256 after demo parity #105 (D1, D2); was a6355f2e… on 762da78
+    expect(createHash('sha256').update(mapBase(mock, terrainColours(mock, CLEAR_WEATHER))).digest('hex')).toBe('d189beb48273f58bd88a7ca5c5f90235cda3c5e4858eeb95cb5dbc2cb89ad6af');
   }, 30000);
+
+  test('지도: 바탕은 관측 화면 조명색', () => {
+    // Each cell's lit colour (demo buildMap 1265: CR/CG/CB × hs), here a different one per cell.
+    const t = flatTerrain({ n: 8 });
+    const colours = lit(t, (k) => [40 + k, 200 - k, 100 + (k % 5)] as const);
+    const px = mapBase(t, colours);
+    const at = (i: number, j: number) => [...px.slice(((7 - j) * 8 + i) * 4, ((7 - j) * 8 + i) * 4 + 3)];
+    for (const [i, j] of [[0, 0], [3, 3], [7, 7], [2, 6]] as const) expect(at(i, j), `${i},${j}`).toEqual([40 + j * 8 + i, 200 - j * 8 - i, 100 + ((j * 8 + i) % 5)]);
+    // Then the north-west shade: 1 m above that neighbour, × 1.05.
+    const s = flatTerrain({ n: 8 });
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) s.ground[j * 8 + i] = 101 + i;
+    expect([...mapBase(s, lit(s, () => [100, 120, 140])).slice((4 * 8 + 1) * 4, (4 * 8 + 1) * 4 + 3)]).toEqual([105, 126, 147]);
+  });
+
+  test('지도: 100 m 계곡선은 칸의 띠로', () => {
+    // Demo 1267: the index ink (0.6) goes on a cell whose own 20 m band is a multiple of 5, else 0.35. Ground along i + j,
+    // so the north-west neighbour is level (no shade) and east and north differ by 1 m.
+    const ink = (h: (s: number) => number, i: number, j: number) => {
+      const t = flatTerrain({ n: 16 });
+      for (let b = 0; b < 16; b++) for (let a = 0; a < 16; a++) t.ground[b * 16 + a] = h(a + b);
+      const o = ((15 - j) * 16 + i) * 4;
+      return [...mapBase(t, lit(t, () => [81, 81, 81])).slice(o, o + 3)];
+    };
+    // 81 × (1 − a) + (90, 60, 30) × a
+    expect(ink((s) => 110 - s, 5, 5)).toEqual([86, 68, 50]); // 100 m (band 5) above 99 m (band 4): 0.6
+    expect(ink((s) => 90 + s, 4, 5)).toEqual([84, 74, 63]); // 99 m (band 4) below 100 m (band 5): 0.35
+    expect(ink((s) => 90 + s, 5, 5)).toEqual([81, 81, 81]); // 100 m, 101 m around it: no contour
+  });
+
+  test('지도: OP 뒤에 호출부호', () => {
+    // Demo 1291: 'OP ' + the callsign, the placeholder 갈매기 when there is none. The post's text is reserved at its new
+    // width: 덮인말's label (x 295–325, y 408–418) is clear of a bare 'OP' (x 264–284) but under 'OP 갈매기' (264–324).
+    const t: TerrainData = { ...flatTerrain({ n: 1024 }), villages: [{ name: '덮인말', x: 6200, y: 1800, r: 0 }] };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const words = (m: MapMarks) => draw(t, FULL_VIEW, m).words.filter((o) => o.op === 'fillText').map((o) => o.text);
+    expect(words({ ...marks, callsign: '독수리' })).toContain('OP 독수리');
+    expect(words(marks)).toContain('OP 갈매기');
+    expect(words(marks)).not.toContain('OP');
+    expect(draw(t).words.map((o) => o.text)).toContain('덮인말');
+    expect(words(marks)).not.toContain('덮인말');
+  });
 
   test('지도: 기호 자리의 이름표는 빠진다', () => {
     // 0.05 px/m at ×1. 요성리's label sits on the middle 아군 진지 box (250.5–264.5, 335–343); 관측봉 on the OP (256, 422).

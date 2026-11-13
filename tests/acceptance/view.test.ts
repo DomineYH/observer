@@ -7,7 +7,7 @@ import { createSession } from '@app/session';
 import { fovOf, pxToMil, QUALITIES } from '@render/projection';
 import { createAimControl } from '@ui/aim';
 import { startInput } from '@ui/prep';
-import { atmosphere, terrainColours } from '@render/shade';
+import { atmosphere, fbm, terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, replayData, START } from './init';
@@ -210,7 +210,7 @@ test('관측 화면: 11월 팔레트 7종', () => {
     forest: [[56, 76, 44], [126, 90, 46], [152, 108, 48]],
     water: [[78, 104, 122]],
     road: [[160, 150, 128]],
-    village: [[176, 164, 128], [152, 138, 84]],
+    village: [[176, 164, 128], [152, 138, 84], [182, 162, 104], [164, 150, 92], [148, 126, 78]], // roofless: open or field (demo 283)
     building: [[150, 72, 56], [72, 92, 132], [122, 122, 116], [82, 112, 92], [172, 104, 62], [196, 190, 178]],
   };
   const t = flatTerrain({ n: 256 });
@@ -225,4 +225,42 @@ test('관측 화면: 11월 팔레트 7종', () => {
     seen.add(`${c} ${fit}`);
   }
   expect(seen.size).toBe(Object.values(palette).flat().length);
+});
+
+// The demo's own noise, copied verbatim from PRD/OBSERVER_demo_v0.2.html lines 213–215, as the reference.
+function demoHash(ix: number, iy: number, s: number) {let h=(Math.imul(ix,374761393)+Math.imul(iy,668265263)+Math.imul(s,982451653))|0;h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return(h>>>0)/4294967296}
+function demoVnoise(x: number, y: number, s: number) {const ix=Math.floor(x),iy=Math.floor(y);let fx=x-ix,fy=y-iy;fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);const a=demoHash(ix,iy,s),b=demoHash(ix+1,iy,s),c=demoHash(ix,iy+1,s),d=demoHash(ix+1,iy+1,s);return(a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy)*2-1}
+function demoFbm(x: number, y: number, s: number, o: number) {let v=0,a=.5,f=1;for(let i=0;i<o;i++){v+=a*demoVnoise(x*f,y*f,s+i*17);a*=.5;f*=2.03}return v}
+
+test('관측 화면: 데모 fbm', () => {
+  const points: [number, number, number, number][] = [[0, 0, 71, 2], [3.7, -1.2, 71, 2], [12.5, 8.25, 83, 3], [-4.4, 0.9, 91, 2], [25.6, 25.6, 83, 3]];
+  for (const [x, y, s, o] of points) expect(fbm(x, y, s, o), `${x},${y}`).toBe(demoFbm(x, y, s, o));
+});
+
+test('관측 화면: 지붕 없는 마을 칸', () => {
+  // A village cell whose roof hash is ≤ 0.35 (demo 280–284): below 175 m it is a field where the demo's 500 m fbm is
+  // above −0.15, else open ground; above 175 m always open.
+  const FIELD = [[182, 162, 104], [164, 150, 92], [148, 126, 78]];
+  const OPEN = [152, 138, 84];
+  const colourAt = (h: number, want: (x: number, y: number) => boolean) => {
+    const t = flatTerrain({ n: 128, h });
+    t.cover.fill(COVER.indexOf('village'));
+    const { r, g, b, light } = terrainColours(t, CLEAR_WEATHER);
+    for (let j = 0; j < t.n; j++)
+      for (let i = 0; i < t.n; i++) {
+        const x = i * t.cell;
+        const y = j * t.cell;
+        if (demoHash(i, j, 23) > 0.35 || !want(x, y)) continue;
+        const k = j * t.n + i;
+        return { x, y, rgb: [r[k]!, g[k]!, b[k]!], light: light[k]! };
+      }
+    throw new Error('no such cell');
+  };
+  const lit = (rgb: number[], c: { rgb: number[]; light: number }) => c.rgb.every((v, ch) => Math.abs(v + 0.5 - rgb[ch]! * c.light) <= 0.5001);
+  const fielded = (x: number, y: number) => demoFbm(x / 500, y / 500, 83, 3) > -0.15;
+  const low = colourAt(100, fielded);
+  const p = (((Math.floor(low.x / 160) + Math.floor(low.y / 120) * 2) % 3) + 3) % 3;
+  expect(lit(FIELD[p]!, low), `${low.rgb}`).toBe(true);
+  expect(lit(OPEN, colourAt(100, (x, y) => !fielded(x, y)))).toBe(true);
+  expect(lit(OPEN, colourAt(200, fielded))).toBe(true);
 });

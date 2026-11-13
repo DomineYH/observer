@@ -5,6 +5,7 @@ import type { Input, Point, ReadonlySimState, Scenario, TerrainData, Weather } f
 import { drawMap, MAP_PX, mapBase } from '@render/map';
 import { centreOn, FULL_VIEW, moveCheck, panBy, planMove, pointAt, underCanopy, zoomAt, type MapView, type Pin } from '@render/mapView';
 import { fovOf } from '@render/projection';
+import type { TerrainColours } from '@render/shade';
 import { viewshed } from '@render/viewshed';
 import { BLOCKED, moveLabel, reportOpen } from './post';
 import { gridLabel } from './radio/readings';
@@ -29,6 +30,10 @@ export interface MapPanelProps {
   send: (input: Input) => void;
   onFrame: (draw: (now: number) => void) => () => void;
   weather: Weather;
+  /** The observation view's lit colours: the map base is drawn from them, again when the weather changes them. */
+  colours: TerrainColours;
+  /** The player's 호출부호, written after the post's OP. */
+  callsign: string;
   /** The 좌표자: the point last pressed once started. */
   pin: Pin | null;
   onPin: (pin: Pin) => void;
@@ -38,7 +43,7 @@ export interface MapPanelProps {
   onTransfer: (grid: { e: number; n: number }) => void;
 }
 
-export function MapPanel({ terrain, scenario, state, send, onFrame, weather, pin, onPin, mark, onTransfer }: MapPanelProps) {
+export function MapPanel({ terrain, scenario, state, send, onFrame, weather, colours, callsign, pin, onPin, mark, onTransfer }: MapPanelProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<MapView>(FULL_VIEW);
   const [base, setBase] = useState<HTMLCanvasElement | null>(null);
@@ -56,15 +61,15 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather, pin
     const { n } = terrain;
     const b = document.createElement('canvas');
     b.width = b.height = n;
-    b.getContext('2d')!.putImageData(new ImageData(mapBase(terrain) as Uint8ClampedArray<ArrayBuffer>, n, n), 0, 0);
+    b.getContext('2d')!.putImageData(new ImageData(mapBase(terrain, colours) as Uint8ClampedArray<ArrayBuffer>, n, n), 0, 0);
     setBase(b);
-  }, [terrain]);
+  }, [terrain, colours]);
 
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin: mark, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs });
-  }, [terrain, base, view, scenario, state, mark, weather, vs]);
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin: mark, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs, callsign });
+  }, [terrain, base, view, scenario, state, mark, weather, vs, callsign]);
 
   useEffect(() => {
     draw();
