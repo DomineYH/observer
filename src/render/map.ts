@@ -1,17 +1,10 @@
-// 지도 바탕 (demo lines 1263–1280): shaded cover colours, 20 m contours (every 100 m darker) and the 1 km 방안선.
+// 지도 (demo lines 1263–1320): the base is the observation view's lit colours with a north-west shade and 20 m contours
+// (every 100 m darker), then roads, 방안선, 지명 and the marks.
 import { COVER, fromGrid, toGrid, type Mode, type Point, type ReadonlySimState, type RoadClass, type Scenario, type TerrainData, type UnitType, type Weather } from '@sim';
 import { FULL_VIEW, projector, type MapView } from './mapView';
+import type { TerrainColours } from './shade';
 
-const PALETTE: Record<(typeof COVER)[number], readonly [number, number, number]> = {
-  open: [152, 138, 84],
-  field: [182, 162, 104],
-  forest: [56, 76, 44],
-  water: [78, 104, 122],
-  road: [160, 150, 128],
-  village: [176, 164, 128],
-  building: [150, 72, 56],
-};
-const COLOURS = COVER.map((c) => PALETTE[c]);
+const WATER_RGB = [78, 104, 122] as const; // the view's water colour, for cells widened into water (#102)
 const CONTOUR = 20;
 const INK = [90, 60, 30] as const;
 const WATER = COVER.indexOf('water');
@@ -37,8 +30,8 @@ function waterMask(t: TerrainData): Uint8Array {
   return m;
 }
 
-/** RGBA pixels, one per cell, north up. */
-export function mapBase(t: TerrainData): Uint8ClampedArray {
+/** RGBA pixels, one per cell, north up, from the lit colours the observation view uses (demo buildMap). */
+export function mapBase(t: TerrainData, colours: TerrainColours): Uint8ClampedArray {
   const { n, ground: g } = t;
   const px = new Uint8ClampedArray(n * n * 4);
   const water = waterMask(t);
@@ -50,9 +43,10 @@ export function mapBase(t: TerrainData): Uint8ClampedArray {
       const c0 = Math.floor(g[k]! / CONTOUR);
       const ce = i < n - 1 ? Math.floor(g[k + 1]! / CONTOUR) : c0;
       const cn = j < n - 1 ? Math.floor(g[k + n]! / CONTOUR) : c0;
-      // The contour crossed here is the upper band's floor; every fifth one (100 m) is the index contour.
-      const a = c0 === ce && c0 === cn ? 0 : Math.max(c0, ce, cn) % 5 === 0 ? 0.6 : 0.35;
-      const rgb = water[k] ? PALETTE.water : COLOURS[t.cover[k]!]!;
+      // A contour where the 20 m band changes east or north; darker (the index contour) when the cell's own band starts
+      // on a 100 m multiple (demo 1267).
+      const a = c0 === ce && c0 === cn ? 0 : c0 % 5 === 0 ? 0.6 : 0.35;
+      const rgb = water[k] && t.cover[k] !== WATER ? WATER_RGB.map((v) => v * colours.light[k]!) : [colours.r[k]!, colours.g[k]!, colours.b[k]!];
       const o = ((n - 1 - j) * n + i) * 4;
       for (let ch = 0; ch < 3; ch++) px[o + ch] = rgb[ch]! * hs * (1 - a) + INK[ch]! * a;
       px[o + 3] = 255;
