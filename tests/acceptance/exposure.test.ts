@@ -151,6 +151,26 @@ describe('F-21', () => {
     expect(far).toBeGreaterThan(10);
   }, 30_000);
 
+  test('F-21: 적 관측 높이 1.7 m', () => {
+    // The enemy looks at the post from 1.7 m above its own ground (demo `sampleH(...)+1.7`). A wall in the surface only
+    // (the ground and the walk stay flat), rows y 460–480 midway between the post (eye 103.5 m) and the recon team, which
+    // holds 310–415 m north depending on the seed. Measured over seeds 1–20 on this band: from 1.7 m the team finds the
+    // post up to a 2.80 m wall and never from 2.85 m; from 1.2 m never from 2.65 m; from 2.2 m still at 2.95 m (9 seeds).
+    // So 2.75 m and 2.95 m: 0.1 m inside each "never", and 1.2 m or 2.2 m fails one of the two.
+    const wall = (h: number) => {
+      const t = flatTerrain();
+      for (let j = 46; j <= 48; j++) for (let i = 0; i < t.n; i++) t.surface[j * t.n + i] = 100 + h;
+      return t;
+    };
+    const finds = (h: number) => {
+      const seeds: number[] = [];
+      for (let seed = 1; seed <= 20; seed++) if (first(watch(started(near('recon'), { seed, terrain: wall(h) }), 3000), 'compromised')) seeds.push(seed);
+      return seeds;
+    };
+    expect(finds(2.75), 'wall below the sight line').not.toEqual([]);
+    expect(finds(2.95), 'wall above the sight line').toEqual([]);
+  });
+
   test('F-21: 아군 포탄의 관측소 오사', () => {
     // A mission on the post's own grid (위험근접: one adjusting round first): a round within 45 m puts the 관측반 out of
     // action 60 % of the time, drawn from the 탄도 stream only then (an empty field: nothing else draws at an impact).
