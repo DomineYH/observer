@@ -3,6 +3,7 @@ import { exp } from './math';
 import { next, type Stream } from './rng';
 import type { Fuze } from './radio';
 import type { Member, Platoon, SimState } from './types';
+import { protoGun } from './protoGun';
 
 const REACH_M = 110; // members farther from the burst are not hit
 const VT_HEIGHT_M = 7; // 접근신관 파열고
@@ -20,9 +21,11 @@ export function killChance(kind: Member['kind'], prone: boolean, r: number, fuze
   const vt = fuze === 'vt';
   const re = vt ? Math.sqrt(r * r + VT_HEIGHT_M * VT_HEIGHT_M) : r;
   const gauss = (d: number, R: number) => exp(-((d / R) * (d / R)));
-  if (kind === 'veh') return (vt ? 0.22 : 0.9) * gauss(r, 7);
-  if (kind === 'tube') return 0.9 * gauss(re, vt ? 7 : 10);
-  return 0.92 * gauss(re, prone ? (vt ? 24 : 15) : vt ? 28 : 26);
+  const R = protoGun.lethalRadiusM;
+  if (kind === 'veh') return (vt ? 0.22 : 0.9) * gauss(r, R.vehicle);
+  if (kind === 'tube') return 0.9 * gauss(re, vt ? R.tube.vt : R.tube.quick);
+  const man = vt ? R.man.vt : R.man.quick;
+  return 0.92 * gauss(re, prone ? man.prone : man.stand);
 }
 
 type Target = Pick<Member, 'kind' | 'x' | 'y' | 'prone' | 'alive'>;

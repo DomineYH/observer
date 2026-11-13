@@ -4,16 +4,17 @@ import { cos, sin } from './math';
 import { gauss, next, type Stream } from './rng';
 import type { Point } from './terrain';
 import type { Weather } from './types';
+import { protoGun } from './protoGun';
 
 export const MIL = 3200 / Math.PI; // mils per radian
 const TAU = Math.PI * 2;
 const PE_TO_SD = 0.6745; // 공산오차 = 0.6745 standard deviations
 
 /** 포대 6문 W자 방열 (demo line 670): each gun's offset across (right +) and along (beyond +) the line of fire, m. */
-export const SHEAF: readonly (readonly [lat: number, rng: number])[] = [[-60, 22], [-36, -22], [-12, 22], [12, -22], [36, 22], [60, -22]];
+export const SHEAF: readonly (readonly [lat: number, rng: number])[] = protoGun.sheaf; // PROTOTYPE #118: the default bundle's
 
 /** 비과시간, s, for a range of `d` m. */
-export const tofSec = (d: number) => 3 + (d / 1000) * 2.6;
+export const tofSec = (d: number) => protoGun.tof.baseS + (d / 1000) * protoGun.tof.sPerKm;
 
 const WIND_M_PER_MS = 6; // 기상 잔차 (demo line 698): downwind, per m/s
 const TEMP_M_PER_C = 1.2; // and along the battery → 고정점 line, per °C off the standard 15 °C (cold falls short)
@@ -45,8 +46,8 @@ export function fall(aim: Point, battery: Point, bias: Point, bal: Stream, sheaf
   const gd = Math.sqrt(gx * gx + gy * gy);
   const ux = gx / gd;
   const uy = gy / gd;
-  const er = (gauss(bal) * ((1.5 * gd) / 1000 + 2)) / PE_TO_SD + sheaf[1];
-  const ed = (gauss(bal) * ((0.5 * gd) / 1000 + 1)) / PE_TO_SD + sheaf[0];
+  const er = (gauss(bal) * ((protoGun.peRange.mPerKm * gd) / 1000 + protoGun.peRange.baseM)) / PE_TO_SD + sheaf[1];
+  const ed = (gauss(bal) * ((protoGun.peDeflection.mPerKm * gd) / 1000 + protoGun.peDeflection.baseM)) / PE_TO_SD + sheaf[0];
   return { x: aim.x + bias.x + ux * er + uy * ed, y: aim.y + bias.y + uy * er - ux * ed };
 }
 
