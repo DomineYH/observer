@@ -15,8 +15,8 @@ export function hash(ix: number, iy: number, s: number): number {
   return (h >>> 0) / 4294967296;
 }
 
-// Smooth value noise in [-0.5, 0.5): stands in for the demo's fbm in the colour speckle.
-function noise(x: number, y: number, s: number): number {
+// Smooth value noise in [-1, 1) and its octaves (demo vnoise and fbm, lines 214–215).
+function vnoise(x: number, y: number, s: number): number {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const fx = (x - ix) * (x - ix) * (3 - 2 * (x - ix));
@@ -25,10 +25,24 @@ function noise(x: number, y: number, s: number): number {
   const b = hash(ix + 1, iy, s);
   const c = hash(ix, iy + 1, s);
   const d = hash(ix + 1, iy + 1, s);
-  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy - 0.5;
+  return (a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy) * 2 - 1;
+}
+
+export function fbm(x: number, y: number, s: number, o: number): number {
+  let v = 0;
+  let a = 0.5;
+  let f = 1;
+  for (let i = 0; i < o; i++) {
+    v += a * vnoise(x * f, y * f, s + i * 17);
+    a *= 0.5;
+    f *= 2.03;
+  }
+  return v;
 }
 
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+
+const field = (x: number, y: number) => FIELDS[(((Math.floor(x / 160) + Math.floor(y / 120) * 2) % 3) + 3) % 3]!;
 
 function baseColour(t: TerrainData, i: number, j: number): RGB {
   const k = j * t.n + i;
@@ -38,11 +52,14 @@ function baseColour(t: TerrainData, i: number, j: number): RGB {
     case C.building: return ROOFS[Math.floor(hash(i, j, 21) * 6)]!;
     case C.road: return [160, 150, 128];
     case C.water: return [78, 104, 122];
-    case C.village: return hash(i, j, 23) > 0.35 ? [176, 164, 128] : [152, 138, 84];
+    case C.village:
+      if (hash(i, j, 23) > 0.35) return [176, 164, 128];
+      // A roofless village cell falls through to the demo's field-or-open test (demo 283).
+      return t.ground[k]! < 175 && fbm(x / 500, y / 500, 83, 3) > -0.15 ? field(x, y) : [152, 138, 84];
     case C.forest:
       if (hash(i, j, 13) > 0.86) return [152, 108, 48];
-      return noise(x / 400, y / 400, 71) > 0 ? [56, 76, 44] : [126, 90, 46];
-    case C.field: return FIELDS[(((Math.floor(x / 160) + Math.floor(y / 120) * 2) % 3) + 3) % 3]!;
+      return fbm(x / 400, y / 400, 71, 2) > 0 ? [56, 76, 44] : [126, 90, 46];
+    case C.field: return field(x, y);
     default: return [152, 138, 84];
   }
 }
@@ -83,7 +100,7 @@ export function terrainColours(t: TerrainData, weather: Weather): TerrainColours
       const c = cover[k];
       const solid = c === C.forest || c === C.building;
       if (!solid && c !== C.road && 1 - nz > 0.22) lit *= 0.93;
-      const m = lit * (1 + hash(i, j, 9) * 0.12 - 0.06 + (solid ? 0 : 0.32 * noise(i * 0.23, j * 0.23, 91)));
+      const m = lit * (1 + hash(i, j, 9) * 0.12 - 0.06 + (solid ? 0 : 0.16 * fbm(i * 0.23, j * 0.23, 91, 2)));
       const [r, g, b] = baseColour(t, i, j);
       out.r[k] = clamp(r * m, 0, 255);
       out.g[k] = clamp(g * m, 0, 255);
