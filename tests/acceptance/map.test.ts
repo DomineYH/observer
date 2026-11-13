@@ -211,7 +211,7 @@ describe('F-06', () => {
     // 아군 진지 as boxes, the 아군 전선 (이동 한계선) across the map, the NAIs and the post labelled.
     expect(rects).toEqual(expect.arrayContaining([[210.5, 339, 14, 8], [250.5, 335, 14, 8], [290.5, 339, 14, 8]]));
     expect(strokes).toContainEqual([[0, 329.5], [512, 329.5]]);
-    for (const label of ['NAI 1', 'NAI 2', 'NAI 3', 'OP']) expect(texts.map((x) => x.text)).toContain(label);
+    for (const label of ['NAI 1', 'NAI 2', 'NAI 3', 'OP 갈매기']) expect(texts.map((x) => x.text)).toContain(label);
     // Aiming east turns the line of sight east.
     const e = draw(t, FULL_VIEW, { ...marks, az: 16000 });
     expect(e.strokes.some((p) => p.length === 2 && p[0]![0] === 256 && p[0]![1] === 422 && Math.abs(p[1]![0] - 606) < 1e-9 && Math.abs(p[1]![1] - 422) < 1e-9)).toBe(true);
@@ -550,6 +550,19 @@ describe('지도', () => {
     expect(ink((s) => 110 - s, 5, 5)).toEqual([86, 68, 50]); // 100 m (band 5) above 99 m (band 4): 0.6
     expect(ink((s) => 90 + s, 4, 5)).toEqual([84, 74, 63]); // 99 m (band 4) below 100 m (band 5): 0.35
     expect(ink((s) => 90 + s, 5, 5)).toEqual([81, 81, 81]); // 100 m, 101 m around it: no contour
+  });
+
+  test('지도: OP 뒤에 호출부호', () => {
+    // Demo 1291: 'OP ' + the callsign, the placeholder 갈매기 when there is none. The post's text is reserved at its new
+    // width: 덮인말's label (x 295–325, y 408–418) is clear of a bare 'OP' (x 264–284) but under 'OP 갈매기' (264–324).
+    const t: TerrainData = { ...flatTerrain({ n: 1024 }), villages: [{ name: '덮인말', x: 6200, y: 1800, r: 0 }] };
+    const marks: MapMarks = { scenario: BASE_SCENARIO, op: { x: 5120, y: 1800 }, knownOp: { x: 5120, y: 1800 }, dest: null, az: 0, fovMil: 1066, pin: null, platoons: [], mode: 'standard', missions: [], tick: 0, weather: CLEAR_WEATHER, viewshed: null };
+    const words = (m: MapMarks) => draw(t, FULL_VIEW, m).words.filter((o) => o.op === 'fillText').map((o) => o.text);
+    expect(words({ ...marks, callsign: '독수리' })).toContain('OP 독수리');
+    expect(words(marks)).toContain('OP 갈매기');
+    expect(words(marks)).not.toContain('OP');
+    expect(draw(t).words.map((o) => o.text)).toContain('덮인말');
+    expect(words(marks)).not.toContain('덮인말');
   });
 
   test('지도: 기호 자리의 이름표는 빠진다', () => {

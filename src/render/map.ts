@@ -106,9 +106,12 @@ export interface MapMarks {
   missions: ReadonlySimState['missions'];
   tick: number;
   weather: Weather; // its wind is drawn as an arrow
+  callsign?: string; // the post's label is 'OP ' + it; none is the placeholder 갈매기 (demo default)
   /** 훈련 가시권 표시: `viewshed()` pixels as an image `g` cells across, or null. */
   viewshed: { image: CanvasImageSource; g: number } | null;
 }
+
+const opLabel = (m: MapMarks) => `OP ${m.callsign ?? '갈매기'}`; // demo 1291
 
 const SIGHT_M = 7000; // the 관측 시야 wedge's reach
 const BEARING_M = 7500; // a target's bearing line, and where along it its label sits
@@ -190,7 +193,7 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
   };
   if (marks) {
     for (const f of marks.scenario.friends) reserve(mx(f.x), my(f.y), 7, 4, 4);
-    reserve(mx(marks.op.x), my(marks.op.y), 6, 7, 5, 'OP');
+    reserve(mx(marks.op.x), my(marks.op.y), 6, 7, 5, opLabel(marks));
     (marks.scenario.reserveOps ?? []).forEach((p, i) => reserve(mx(p.x), my(p.y), 6, 7, 5, `예비 ${i + 1}`));
   }
   const label = (text: string, x: number, y: number) => {
@@ -370,7 +373,7 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
   c.fill();
   c.stroke();
   c.fillStyle = '#0c1a2a';
-  c.fillText('OP', ox + 8, oy + 4);
+  c.fillText(opLabel(m), ox + 8, oy + 4);
   // 예비 관측소: hollow dashed triangles the OP's size, in its ink. Start values; M2-H1 judges them on screen.
   (sc.reserveOps ?? []).forEach((p, i) => {
     const x = mx(p.x);

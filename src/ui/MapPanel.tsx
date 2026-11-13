@@ -32,6 +32,8 @@ export interface MapPanelProps {
   weather: Weather;
   /** The observation view's lit colours: the map base is drawn from them, again when the weather changes them. */
   colours: TerrainColours;
+  /** The player's 호출부호, written after the post's OP. */
+  callsign: string;
   /** The 좌표자: the point last pressed once started. */
   pin: Pin | null;
   onPin: (pin: Pin) => void;
@@ -41,7 +43,7 @@ export interface MapPanelProps {
   onTransfer: (grid: { e: number; n: number }) => void;
 }
 
-export function MapPanel({ terrain, scenario, state, send, onFrame, weather, colours, pin, onPin, mark, onTransfer }: MapPanelProps) {
+export function MapPanel({ terrain, scenario, state, send, onFrame, weather, colours, callsign, pin, onPin, mark, onTransfer }: MapPanelProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<MapView>(FULL_VIEW);
   const [base, setBase] = useState<HTMLCanvasElement | null>(null);
@@ -66,8 +68,8 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather, col
   const draw = useCallback(() => {
     const c = ref.current?.getContext('2d');
     if (!c || !base) return;
-    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin: mark, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs });
-  }, [terrain, base, view, scenario, state, mark, weather, vs]);
+    drawMap(c, terrain, base, view, { scenario, op: state.op, knownOp: state.knownOp, dest: state.post.move?.to ?? null, az: state.aim.az, fovMil: fovOf(state.bino), pin: mark, platoons: state.platoons, mode: state.mode, missions: state.missions, tick: state.tick, weather, viewshed: vs, callsign });
+  }, [terrain, base, view, scenario, state, mark, weather, vs, callsign]);
 
   useEffect(() => {
     draw();
