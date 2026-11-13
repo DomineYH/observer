@@ -26,13 +26,13 @@
     },
     "inspector": {
       "harness": "agy",
-      "model": "gemini-4-argon",
-      "effort": "high"
+      "model": "gemini-4-hydrogen",
+      "effort": "xhigh"
     },
     "researcher": {
       "harness": "agy",
-      "model": "gemini-4-argon",
-      "effort": "high"
+      "model": "gemini-4-hydrogen",
+      "effort": "xhigh"
     },
     "tester": {
       "harness": "opencode",
@@ -92,9 +92,10 @@
       "efforts": [
         "low",
         "medium",
-        "high"
+        "high",
+        "xhigh"
       ],
-      "notes": "verify against the installed agy adapter",
+      "notes": "agy checks effort per model (checked 2026-11-13 with agy -p): gemini-4-hydrogen takes low|medium|high|xhigh (not max); gemini-4-argon only low|medium|high",
       "launch_channels": [
         "herdr_pane"
       ]
