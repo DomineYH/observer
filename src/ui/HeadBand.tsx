@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Mode, Phase } from '@sim';
 import { QUALITIES, type Quality } from '@render/projection';
 import { clock } from './clock';
+import { PROTO } from './prototype/readback/store'; // PROTOTYPE #120: no pause, as in 실전
 
 export const SPEEDS = [1, 2, 4, 8] as const;
 export type Speed = (typeof SPEEDS)[number];
@@ -63,7 +64,7 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
           <span className="hb-label">사용 탄 </span>
           <output aria-live="off" aria-label="사용 탄">{rounds}발</output>
         </span>
-        <button type="button" aria-pressed={paused} disabled={phase !== 'live'} onClick={onPause}>
+        <button type="button" aria-pressed={paused} disabled={phase !== 'live' || !!PROTO} onClick={onPause}>
           {paused ? '재개' : '일시정지'}
         </button>
         <output aria-live="off" aria-label="모드" className="tag">

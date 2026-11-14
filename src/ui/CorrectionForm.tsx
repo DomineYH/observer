@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Effect, Input, Mode } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
+import { PROTO } from './prototype/readback/store'; // PROTOTYPE #120: 보낼 문장 hidden, as in 실전
 import type { Draft } from './radio/drafts';
 import type { RadioNames } from './radio/sentence';
 import { corrDraft, suggestion, type Amount, type CorrForm } from './correction';
@@ -21,7 +22,7 @@ export interface PreviewProps {
 export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
   return (
     <>
-      <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
+      {!PROTO && <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>}
       <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
         송신
       </button>

@@ -1,6 +1,7 @@
 import type { Mode, RadioEvent, RadioUtterance } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { clock } from './clock';
+import { PROTO, protoLog } from './prototype/readback/store'; // PROTOTYPE #120
 import { radioSentence, type RadioNames } from './radio/sentence';
 
 /** 훈련 모드의 숫자 병기 is drawn dim beside the words. */
@@ -38,7 +39,7 @@ export function RadioLog({ lines, callsign, gridLetters, mode }: Props) {
   return (
     <section aria-label="무전 기록">
       <ol>
-        {lines.map((l, i) => {
+        {(PROTO ? protoLog(lines) : lines).map((l, i) => {
           const speaker = l.type === 'system' ? 'system' : l.utterance.speaker;
           return (
             <li key={i} data-speaker={speaker} style={{ color: COLOUR[speaker] }}>

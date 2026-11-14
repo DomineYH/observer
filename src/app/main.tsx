@@ -36,6 +36,9 @@ import { newGame } from './game';
 import { startLoop, timescaleOf } from './loop';
 import { submissionOf } from './records';
 import { chooseSeed } from './seed';
+import * as readback from '@ui/prototype/readback/store'; // PROTOTYPE #120
+import { DebugStrip, ReadbackPanel } from '@ui/prototype/readback/ReadbackPanel'; // PROTOTYPE #120
+import { PrototypeSwitcher } from '@ui/prototype/readback/PrototypeSwitcher'; // PROTOTYPE #120
 import './app.css';
 
 const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
@@ -55,7 +58,7 @@ let game = newGame({
   scenario,
   guns: BASE_GUNS,
   weather: await mockWeather.load(seed, seedKind, preset ?? undefined),
-  mode: 'training', // a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
+  mode: readback.PROTO ? 'standard' : 'training', // PROTOTYPE #120: 표준 as 실전 would; else a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
   terrain,
 });
 
@@ -106,6 +109,7 @@ const step = () => {
   submitOnEnd();
   const s = game.sim.state;
   sound.hear(events, s);
+  if (readback.PROTO) readback.hear(events, s.tick, NAMES); // PROTOTYPE #120
   const lines: LogLine[] = [];
   const say = (texts: readonly (string | null)[]) => {
     for (const text of texts) if (text) lines.push({ type: 'system', tick: s.tick, text });
@@ -284,6 +288,7 @@ function App() {
           ) : (
             <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} />
           )}
+          <ReadbackPanel />
         </div>
         <div data-panel="map" hidden={covered}>
           <MapPanel
@@ -311,6 +316,8 @@ function App() {
           <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
         </div>
       </div>
+      <DebugStrip />
+      <PrototypeSwitcher />
     </>
   );
 }
