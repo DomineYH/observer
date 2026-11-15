@@ -1,0 +1,74 @@
+[
+ {
+  "name": "mock-main-daily-narrow",
+  "start": 230,
+  "combat": null,
+  "scenario": null,
+  "panelH": 515,
+  "contentH": 751,
+  "barH": 0
+ },
+ {
+  "name": "mock-main-practice-narrow",
+  "start": 252,
+  "combat": null,
+  "scenario": 42,
+  "panelH": 515,
+  "contentH": 773,
+  "barH": 0
+ },
+ {
+  "name": "mock-A-daily-narrow",
+  "start": 443,
+  "combat": 145,
+  "scenario": 45,
+  "panelH": 515,
+  "contentH": 964,
+  "barH": 0
+ },
+ {
+  "name": "mock-A-practice-narrow",
+  "start": 473,
+  "combat": 153,
+  "scenario": 45,
+  "panelH": 515,
+  "contentH": 994,
+  "barH": 0
+ },
+ {
+  "name": "mock-B-daily-narrow",
+  "start": 388,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 909,
+  "barH": 0
+ },
+ {
+  "name": "mock-B-practice-narrow",
+  "start": 388,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 909,
+  "barH": 0
+ },
+ {
+  "name": "mock-C-daily-narrow",
+  "start": 0,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 909,
+  "barH": 117
+ },
+ {
+  "name": "mock-C-practice-narrow",
+  "start": 0,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 1035,
+  "barH": 117
+ }
+]

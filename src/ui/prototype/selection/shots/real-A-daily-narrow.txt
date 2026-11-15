@@ -1,0 +1,1 @@
+seedKind=daily seed=20261115 scenario=base-mungyeong gun=base mode=training phase=prep 남은=— n=2마지막 누름: —

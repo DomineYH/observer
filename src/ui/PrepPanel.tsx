@@ -1,6 +1,7 @@
 // 작전 준비 (F-22, demo lines 922–936): the briefing, the seed and weather, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
 // The 지형 자료's 자료 출처 lines close the prep screen; the mock land has none, so its screen is unchanged.
+import type { ReactNode } from 'react';
 import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
 import type { Briefing } from '@content/placement';
@@ -26,6 +27,8 @@ export interface PrepPanelProps {
   /** The practice seed's preset in use (null for a daily seed), and choosing another one (F-30). */
   preset: WeatherPreset | null;
   onPreset: (p: WeatherPreset) => void;
+  /** PROTOTYPE #130: a variant's slots (top of the panel, the 시드 rows, the 작전 개시 wrapper). */
+  proto?: { top?: ReactNode; seed?: ReactNode; start?: (button: ReactNode) => ReactNode };
 }
 
 const PRESET_NAMES: Record<WeatherPreset, string> = { clear: '맑음', haze: '박무', rain: '비', wind: '강한 북서풍', fog: '안개' };
@@ -53,12 +56,13 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, proto }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
     return (
       <section aria-label="작전 준비">
+        {proto?.top}
         <p>
           작전 개시 — {at(state.op)} 점령.{state.reportDue && ' 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.'}
         </p>
@@ -66,6 +70,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
     );
   return (
     <section aria-label="작전 준비">
+      {proto?.top}
       <h2>작전 준비 — 관측소 선정</h2>
       <p>
         <b>적정(첩보)</b> {briefing.enemy}
@@ -90,23 +95,29 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
       <p>
         <b>기상</b> {weatherText(weather)}
       </p>
-      <p>
-        <b>시드</b>{' '}
-        {seedKind === 'daily' ? `일일 ${seed} — 오늘은 모두 같은 배치·기상·편차로 경쟁` : `연습 ${seed} — 랭킹 제외`}
-      </p>
-      {seedKind === 'practice' && preset && (
-        <p>
-          <label>
-            기상 바꾸기{' '}
-            <select value={preset} onChange={(e) => onPreset(e.target.value as WeatherPreset)}>
-              {WEATHER_PRESETS.map((p) => (
-                <option key={p} value={p}>
-                  {PRESET_NAMES[p]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </p>
+      {proto && 'seed' in proto ? (
+        proto.seed
+      ) : (
+        <>
+          <p>
+            <b>시드</b>{' '}
+            {seedKind === 'daily' ? `일일 ${seed} — 오늘은 모두 같은 배치·기상·편차로 경쟁` : `연습 ${seed} — 랭킹 제외`}
+          </p>
+          {seedKind === 'practice' && preset && (
+            <p>
+              <label>
+                기상 바꾸기{' '}
+                <select value={preset} onChange={(e) => onPreset(e.target.value as WeatherPreset)}>
+                  {WEATHER_PRESETS.map((p) => (
+                    <option key={p} value={p}>
+                      {PRESET_NAMES[p]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </p>
+          )}
+        </>
       )}
       <p>
         <b>주의</b> {briefing.caution} 계획된 관측소 {briefing.plannedOp} {at(scenario.plannedOp)}.
@@ -118,9 +129,11 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
           : // ponytail: the particle is fixed as 를; both M2 배치 name the post "1번 고지". Pick by 받침 when a name ends in a consonant.
             `지도를 눌러 관측소 후보를 고르십시오. 고르지 않으면 계획된 ${briefing.plannedOp}를 점령합니다.`}
       </p>
-      <button type="button" onClick={() => pressStart({ state, live, queued, send })}>
-        관측소 점령 · 작전 개시
-      </button>
+      {(proto?.start ?? ((b: ReactNode) => b))(
+        <button type="button" onClick={() => pressStart({ state, live, queued, send })}>
+          관측소 점령 · 작전 개시
+        </button>,
+      )}
       {terrain.credits.map((c) => (
         <p key={c}>
           <small>{c}</small>

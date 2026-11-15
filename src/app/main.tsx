@@ -36,12 +36,16 @@ import { newGame } from './game';
 import { startLoop, timescaleOf } from './loop';
 import { submissionOf } from './records';
 import { chooseSeed } from './seed';
+import { startInput } from '@ui/prep';
+import * as sel from '@ui/prototype/selection/store'; // PROTOTYPE #130
+import { protoSlots } from '@ui/prototype/selection/Variants'; // PROTOTYPE #130
+import { PrototypeSwitcher } from '@ui/prototype/selection/PrototypeSwitcher'; // PROTOTYPE #130
 import './app.css';
 
 const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
 // The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
-const { seed, seedKind } = chooseSeed(location.search, Date.now());
+const { seed, seedKind } = chooseSeed(sel.protoSearch(location.search), Date.now()) /* PROTOTYPE #130 */;
 // On real: the 받는 중 line until the 지형 자료 is in; a refusal shows the 오류 화면 and stops here (no game, no mock land).
 const terrain = await loadTerrain(backend, seed, bootScreen(document.getElementById('root')!));
 const { scenario, briefing } = placementOf(backend);
@@ -55,9 +59,10 @@ let game = newGame({
   scenario,
   guns: BASE_GUNS,
   weather: await mockWeather.load(seed, seedKind, preset ?? undefined),
-  mode: 'training', // a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
+  mode: sel.PROTO ? sel.REAL_MODE : 'training', // PROTOTYPE #130 (실전 runs as 표준). Else a new game opens in 훈련 at ×2 (demo 399), so a daily game is ranked only if 표준 is pressed first
   terrain,
 });
+if (sel.AUTOSTART) game.session.send(startInput(game.sim.state, [])); // PROTOTYPE #130: the locked states start at once
 
 const PUBLISH_MS = 100; // panels read state at a low rate
 const listeners = new Set<() => void>();
@@ -194,6 +199,8 @@ function App() {
   const ended = useSyncExternalStore(subscribe, () => result);
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
+  useSyncExternalStore(sel.subscribe, sel.get); // PROTOTYPE #130
+  const slots = sel.PROTO ? protoSlots({ seed, seedKind, preset, onPreset: (p) => void changeWeather(p), phase, switchMode, weather: weatherChip(init.weather) }) : null;
   // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
   const covered = paused && mode === 'standard' && phase === 'live';
   const names = { callsign, gridLetters: terrain.grid.letters };
@@ -227,8 +234,10 @@ function App() {
           phase={phase}
           onSpeed={(s) => setPace({ speed: s })}
           onPause={() => setPace({ paused: !paused })}
+          modeName={slots?.modeName}
+          extra={slots?.headExtra}
         >
-          <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={switchMode} />
+          {slots ? slots.menuModes : <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={switchMode} />}
           <QualityPicker quality={quality} onQuality={setQuality} />
           <SoundToggles sound={sound} />
           <div>
@@ -276,6 +285,7 @@ function App() {
             live={sim.state}
             preset={preset}
             onPreset={(p) => void changeWeather(p)}
+            proto={slots ?? undefined}
           />
           {covered ? (
             <section aria-label="입력기">
@@ -311,6 +321,7 @@ function App() {
           <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
         </div>
       </div>
+      <PrototypeSwitcher seed={seed} seedKind={seedKind} phase={phase} realMode={mode} />
     </>
   );
 }

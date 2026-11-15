@@ -1,0 +1,1 @@
+seedKind=daily seed=20261115 scenario=base gun=base mode=training phase=prep 남은=— n=1마지막 누름: —

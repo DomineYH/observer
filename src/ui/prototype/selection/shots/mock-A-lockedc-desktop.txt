@@ -1,0 +1,1 @@
+seedKind=daily seed=20261115 scenario=base gun=base mode=combat(real standard) phase=live 남은=4:56 n=1마지막 누름: —

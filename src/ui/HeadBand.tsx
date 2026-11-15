@@ -21,6 +21,9 @@ interface Props {
   onPause: () => void;
   /** The 머리띠 메뉴 items, in the spec's order. */
   children?: ReactNode;
+  /** PROTOTYPE #130: the 모드 딱지's text (실전 is faked) and one more item after 경과 (the countdown). */
+  modeName?: string;
+  extra?: ReactNode;
 }
 
 /**
@@ -28,7 +31,7 @@ interface Props {
  * spreads the menu inline on a wide screen and makes it a sheet over the lower tabs on a narrow one. Pause and speed
  * are not inputs, and opening the menu does not pause.
  */
-export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children }: Props) {
+export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children, modeName, extra }: Props) {
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLElement>(null);
@@ -55,6 +58,7 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
           <span className="hb-label">경과 </span>
           <output aria-live="off" aria-label="경과">{clock(tick)}</output>
         </span>
+        {extra}
         <span className="stat">
           <span className="hb-label">점수 </span>
           <output aria-live="off" aria-label="점수">{score}</output>
@@ -67,7 +71,7 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
           {paused ? '재개' : '일시정지'}
         </button>
         <output aria-live="off" aria-label="모드" className="tag">
-          {MODE_NAMES[mode]}
+          {modeName ?? MODE_NAMES[mode]}
         </output>
         <button type="button" aria-label={`배속 ×${speed}`} onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>
           ×{speed}

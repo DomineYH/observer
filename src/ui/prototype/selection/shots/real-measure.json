@@ -1,0 +1,56 @@
+[
+ {
+  "name": "real-A-daily-narrow",
+  "start": 467,
+  "combat": 145,
+  "scenario": 45,
+  "panelH": 515,
+  "contentH": 1124,
+  "barH": 0
+ },
+ {
+  "name": "real-A-practice-narrow",
+  "start": 497,
+  "combat": 153,
+  "scenario": 45,
+  "panelH": 515,
+  "contentH": 1154,
+  "barH": 0
+ },
+ {
+  "name": "real-B-daily-narrow",
+  "start": 412,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 1069,
+  "barH": 0
+ },
+ {
+  "name": "real-B-practice-narrow",
+  "start": 412,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 1069,
+  "barH": 0
+ },
+ {
+  "name": "real-C-daily-narrow",
+  "start": 0,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 1121,
+  "barH": 117
+ },
+ {
+  "name": "real-C-practice-narrow",
+  "start": 0,
+  "combat": 0,
+  "scenario": 0,
+  "panelH": 515,
+  "contentH": 1247,
+  "barH": 117
+ }
+]
