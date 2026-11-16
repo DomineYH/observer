@@ -1,11 +1,13 @@
 // 포 프로파일 (ADR 0014): base@1 holds the numbers the simulation code held before M3-2.
 import { describe, expect, test } from 'vitest';
-import type { GunProfile } from '@sim';
+import { fromGrid, type GunProfile } from '@sim';
 import { killChance } from '@sim/lethality';
 import { BASE_GUNS } from '@content/guns';
+import { BASE_SCENARIO } from '@content/scenario';
 import { init } from './init';
 import { NO_ENEMY, oneMission } from './session';
 import { isImpact } from './strike';
+import { flatTerrain } from './terrain';
 
 test('포 프로파일: base의 숫자는 지금 코드의 값이다', () => {
   // A second copy on purpose: a changed number goes red here by name, not only in the 기대값 표.
@@ -29,6 +31,14 @@ const volley = (guns: GunProfile) => {
   return { shot: shot.tick, impacts: g.events.filter(isImpact) };
 };
 
+// The line of fire of LOC_CLEAR (grid 4080 3080 on the flat terrain) from the battery: its length and unit vector.
+const AIM = fromGrid(4080, 3080, flatTerrain().grid);
+const LINE = { x: AIM.x - BASE_SCENARIO.battery.x, y: AIM.y - BASE_SCENARIO.battery.y };
+const D = Math.sqrt(LINE.x * LINE.x + LINE.y * LINE.y);
+const U = { x: LINE.x / D, y: LINE.y / D };
+/** One gun on the line of fire, no jitter. */
+const STILL: GunProfile = { ...BASE_GUNS, sheaf: [[0, 0]], ffe: { intervalS: 9, jitterS: 0 } };
+
 describe('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수를 읽는다', () => {
   test('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수를 읽는다 — 방렬·비과시간·효력사 간격·공산오차', () => {
     const base = volley(BASE_GUNS);
@@ -36,12 +46,30 @@ describe('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수�
     expect(volley({ ...BASE_GUNS, sheaf: BASE_GUNS.sheaf.slice(0, 2) }).impacts).toHaveLength(6); // the sheaf's length is the gun count
     const slow = volley({ ...BASE_GUNS, tof: { baseS: 30, sPerKm: 2.6 } });
     expect(slow.impacts[0]!.tick - slow.shot - (base.impacts[0]!.tick - base.shot)).toBe(540); // 27 s more 비과시간
+    // One gun without jitter: its first round lands exactly the profile's 비과시간 after 하나발 떳다, for each coefficient.
+    for (const tof of [BASE_GUNS.tof, { baseS: 30, sPerKm: 2.6 }, { baseS: 3, sPerKm: 5 }]) {
+      const v = volley({ ...STILL, tof });
+      expect(v.impacts[0]!.tick - v.shot, JSON.stringify(tof)).toBe(Math.ceil((tof.baseS + (D / 1000) * tof.sPerKm) * 20));
+    }
     const one = { ...BASE_GUNS, sheaf: [[0, 0]] as const };
     const paced = volley({ ...one, ffe: { intervalS: 20, jitterS: 0 } }).impacts.map((e) => e.tick);
     expect(paced.slice(1).map((t, k) => t - paced[k]!)).toEqual([400, 400]); // one gun, 20 s apart, no jitter
     const exact = volley({ ...one, peRange: { baseM: 0, mPerKm: 0 }, peDeflection: { baseM: 0, mPerKm: 0 } }).impacts;
     expect(new Set(exact.map((e) => `${e.x},${e.y}`)).size).toBe(1); // no 공산오차: every round on the same point
     expect(new Set(volley(one).impacts.map((e) => `${e.x},${e.y}`)).size).toBe(3);
+  });
+
+  test('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수를 읽는다 — 방렬 좌표', () => {
+    // Two runs that differ only in the one gun's offset draw the same numbers, so their impacts differ by the offset alone.
+    const centre = volley(STILL).impacts;
+    const moved = volley({ ...STILL, sheaf: [[40, 30]] }).impacts;
+    expect(moved).toHaveLength(3);
+    moved.forEach((e, k) => {
+      const dx = e.x - centre[k]!.x;
+      const dy = e.y - centre[k]!.y;
+      expect(dx * U.y - dy * U.x, `round ${k} across`).toBeCloseTo(40, 6); // sheaf[0]: right of the line of fire
+      expect(dx * U.x + dy * U.y, `round ${k} along`).toBeCloseTo(30, 6); // sheaf[1]: beyond
+    });
   });
 
   test('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수를 읽는다 — 살상 반경 일곱 값', () => {
