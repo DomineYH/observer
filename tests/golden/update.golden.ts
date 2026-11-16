@@ -23,6 +23,7 @@ test('golden:update', async () => {
       simVersion: SIM_VERSION,
       terrain: { id: terrain.id, version: terrain.version },
       scenario: { id: scenario.id, version: scenario.version },
+      guns: { id: guns.id, version: guns.version },
     };
     const old = existsSync(url) ? headerVersions(readGolden(file).replay) : null;
     if (!shouldWrite(old, now)) {
