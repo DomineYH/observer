@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { contentOf } from '@content/lookup';
 import { MOCK_PLACEMENT } from '@content/placement';
 import { BASE_SCENARIO } from '@content/scenario';
 import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
@@ -12,7 +14,24 @@ import { SCRIPTS } from './scripts';
 
 const FIVE = '5-real-laser-move.json';
 
+// M3 keeps these seven as they are (#126): name → SHA-256 of the file parsed and written again (values count, line
+// endings and indentation do not). A SIM_VERSION rise after the M3 gate rewrites this table in the same PR.
+const LOCKED: Record<string, string> = {
+  '0-empty.json': '38039a20051b389b2461ffbbc309b5e0faf0e2be0d181ea30a4c8eb5cac2a0f3',
+  '1-grid-eom.json': '7b233b36cd280d2812e29dfe4e91137266ee1f703473fcf3c30a3887ca4c5b06',
+  '2-polar-move.json': '6f4923dced5be4acf04a0228502c2120dbdac97e86aeac2bbbc842e5a3ff7ef7',
+  '3-time-limit.json': '3236599cd8d8d816a5ca5b5c1a5a5b4101f9151e163c9a2ba66f52cfd48a9c0c',
+  '4-desktop-play.json': 'df01781ffa925cdef8a8382fc10f5de2dac4d0e320634260cddae444b40a247a',
+  '5-real-laser-move.json': '4203b07992ed75b7ab01c0c20377bf0c29e9f00ccb6b609219f683351870fa88',
+  '6-real-play.json': '3d40b282ccc41ef176d123c2284de5dd82183f4debb15cba1582f862bcc213a9',
+};
+
 describe('골든', () => {
+  test('골든: 일곱 골든은 그대로다', () => {
+    const sha = (f: string) => createHash('sha256').update(JSON.stringify(readGolden(f))).digest('hex');
+    expect(Object.fromEntries(Object.keys(LOCKED).map((f) => [f, sha(f)]))).toEqual(LOCKED);
+  });
+
   // Checks all three header versions (simVersion, 지형 판, 시나리오 버전) against the code and the land's data.
   test('골든: simVersion이 코드와 같다', async () => {
     const files = goldenFiles();
@@ -22,7 +41,7 @@ describe('골든', () => {
     const ref = (r: { id: string; version: number }) => ({ id: r.id, version: r.version });
     for (const f of files) {
       const d = readGolden(f).replay;
-      const [terrain, scenario] = d.terrain ? [ref(real), ref(MUNGYEONG_PLACEMENT.scenario)] : [MOCK_PLACEMENT.terrain, ref(BASE_SCENARIO)];
+      const [terrain, scenario] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(contentOf(d).scenario)];
       expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario });
     }
   }, 30000); // reads every golden file

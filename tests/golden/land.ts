@@ -5,13 +5,15 @@ import { readFileSync } from 'node:fs';
 import type { ReplayData, Scenario, TerrainData } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { contentOf } from '@content/lookup';
 
 export const REAL_TERRAIN_FILE = 'src/adapters/realTerrain/mungyeong/terrain.bin';
 
-/** Another id or 판 than the file's is refused by the replayer, so the one real land needs no lookup. */
+/** The land a header names. Another id or 판 than the file's is refused by the replayer, so the one real land needs no lookup. */
+export const terrainOf = async (d: ReplayData): Promise<TerrainData> =>
+  d.terrain ? unpackTerrain(new Uint8Array(readFileSync(REAL_TERRAIN_FILE))) : generateTerrain(d.seed);
+
+/** The land and the scenario a golden header names (찾기 함수: an unknown id or another version throws). */
 export async function landOf(d: ReplayData): Promise<{ terrain: TerrainData; scenario: Scenario }> {
-  if (!d.terrain) return { terrain: generateTerrain(d.seed), scenario: BASE_SCENARIO };
-  return { terrain: await unpackTerrain(new Uint8Array(readFileSync(REAL_TERRAIN_FILE))), scenario: MUNGYEONG_PLACEMENT.scenario };
+  return { terrain: await terrainOf(d), scenario: contentOf(d).scenario };
 }
