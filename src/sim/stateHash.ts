@@ -7,7 +7,7 @@ import { MODES, type Cue, type FieldEffect, type Member, type Phase, type Platoo
 
 const PHASES: readonly Phase[] = ['prep', 'live', 'ended'];
 const POST_STATES: readonly PostState[] = ['ready', 'moving', 'setup'];
-const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
+export const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 /** 접근로 번호: the key letter's place in the alphabet (A = 1 … Z = 26), 0 without a route. */
 export const routeNumber = (route: RouteKey | null): number => (route === null ? 0 : route.charCodeAt(0) - 64);
@@ -26,6 +26,15 @@ function target(h: Hasher, t: Target): void {
   h.u32(opt(ACTIVITIES, 'activity' in t ? t.activity : undefined));
   h.u32(opt(UNITS, 'unit' in t ? t.unit : undefined));
   h.u32('count' in t ? t.count : 0);
+}
+
+/** 실전 덩이 (ADR 0016): everything a combat game adds to the state is hashed here, in this order, and nowhere above. */
+function combatChunk(h: Hasher, c: NonNullable<SimState['combat']>): void {
+  h.u32(c.lasesUsed); // 쓴 레이저 횟수
+  // 노출: 셈과 자리 (M3-18)
+  // 적 포병 사격: 예약의 상태 (M3-18)
+  // 포대: 첫 발 시각, 진지 변환이 끝나는 시각 (M3-20)
+  // 임무마다의 밀린 복창, 임무 차례 (M3-14)
 }
 
 export function hashState(state: SimState): string {
@@ -303,5 +312,6 @@ export function hashState(state: SimState): string {
     h.u32(state.rng[name].count);
   }
   h.i32(state.score);
+  if (state.mode === 'combat') combatChunk(h, state.combat!); // last, and in a combat game only
   return h.hex();
 }

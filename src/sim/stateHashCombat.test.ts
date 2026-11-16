@@ -1,0 +1,36 @@
+import { expect, test } from 'vitest';
+import { combatInit, init, START } from '../../tests/acceptance/init';
+import { ACTS } from './queue';
+import { STREAMS } from './rng';
+import { createSim } from './sim';
+import { hashState, SHOOTERS } from './stateHash';
+import { MODES, type SimState } from './types';
+
+test('상태 해시: 실전의 상태는 실전에서만 든다', () => {
+  const standard = createSim(init(7));
+  standard.step([START]);
+  const state = structuredClone(standard.state) as SimState;
+  const base = hashState(state);
+  expect(state.combat).toBeNull();
+  // 표준 판의 상태에 실전 값을 채워도 해시가 같다.
+  for (const lasesUsed of [0, 3]) expect(hashState({ ...structuredClone(state), combat: { lasesUsed } }), String(lasesUsed)).toBe(base);
+  const training = { ...structuredClone(state), mode: 'training' as const };
+  expect(hashState({ ...training, combat: { lasesUsed: 3 } })).toBe(hashState(training));
+  // The chunk is there in a combat game: the same state as combat hashes apart from the mode alone.
+  const combat = createSim(combatInit(7));
+  combat.step([START]);
+  expect(combat.state.combat).toEqual({ lasesUsed: 0 });
+  expect(combat.hash()).not.toBe(base);
+  // M3-11 · 14 · 18 · 20 add here: each value of the chunk, changed alone in a combat state, changes the hash.
+});
+
+test('상태 해시: 번호로 읽는 목록은 끝에만 더한다', () => {
+  expect(MODES.slice(0, 2)).toEqual(['training', 'standard']);
+  expect(MODES.indexOf('combat')).toBe(2);
+  expect(ACTS.slice(0, 25)).toEqual(['radio_check', 'check_reply', 'call_ack', 'loc_readback', 'desc_readback', 'mto', 'ready',
+    'shot', 'shot_readback', 'impact', 'adjust_open', 'corr_readback', 'rounds_complete', 'rounds_complete_readback',
+    'effect_open', 'repeat_ack', 'dc_resend', 'shift_readback', 'move_readback', 'pos_readback',
+    'retaliation', 'retaliation_muzzle', 'end', 'shell', 'shelling_note']);
+  expect(SHOOTERS.slice(0, 2)).toEqual(['mortar', 'direct']);
+  expect(STREAMS).toEqual(['scn', 'bal', 'fdc', 'exp', 'ai', 'las']);
+});
