@@ -56,3 +56,11 @@ test('자료: 내용과 버전이 어긋나지 않는다', () => {
   for (const g of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });
+
+test('시나리오: 배치 목록과 폴더의 파일이 같다', () => {
+  expect(PLACEMENTS.slice(0, 2).map((p) => p.scenario.id)).toEqual(['base', 'base-mungyeong']); // a new 배치 goes at the end
+  // 배치 하나 = 파일 하나: every file of the folder holds the one 배치 it is named after, and the list holds no other.
+  const files = import.meta.glob<Record<string, unknown>>('/src/content/scenarios/*', { eager: true });
+  const held = Object.entries(files).map(([path, file]) => `${path}: ${PLACEMENTS.filter((p) => Object.values(file).includes(p)).map((p) => p.scenario.id).join(' ')}`);
+  expect(held.sort()).toEqual(PLACEMENTS.map((p) => `/src/content/scenarios/${p.scenario.id}.ts: ${p.scenario.id}`).sort());
+});
