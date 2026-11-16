@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { contentOf } from '@content/lookup';
 import { MOCK_PLACEMENT } from '@content/placement';
 import { BASE_SCENARIO } from '@content/scenario';
 import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
@@ -40,7 +41,7 @@ describe('골든', () => {
     const ref = (r: { id: string; version: number }) => ({ id: r.id, version: r.version });
     for (const f of files) {
       const d = readGolden(f).replay;
-      const [terrain, scenario] = d.terrain ? [ref(real), ref(MUNGYEONG_PLACEMENT.scenario)] : [MOCK_PLACEMENT.terrain, ref(BASE_SCENARIO)];
+      const [terrain, scenario] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(contentOf(d).scenario)];
       expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario });
     }
   }, 30000); // reads every golden file
