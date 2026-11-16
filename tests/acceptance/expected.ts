@@ -1,15 +1,17 @@
 // 기대값 표 (ADR 0009): one row per piece of content, key → SHA-256 of the piece written as key-sorted JSON. Test-only.
 import { createHash } from 'node:crypto';
 
-const sorted = (x: unknown): unknown =>
-  Array.isArray(x)
-    ? x.map(sorted)
-    : typeof x === 'object' && x !== null
-      ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, sorted((x as Record<string, unknown>)[k])]))
-      : x;
+// Written directly, not rebuilt as objects: JSON.stringify always puts integer-like keys ("2", "10") first.
+const sortedJson = (x: unknown): string => {
+  if (Array.isArray(x)) return `[${x.map(sortedJson).join(',')}]`;
+  if (typeof x !== 'object' || x === null) return JSON.stringify(x);
+  const o = x as Record<string, unknown>;
+  const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort(); // JSON.stringify drops undefined entries too
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${sortedJson(o[k])}`).join(',')}}`;
+};
 
 /** SHA-256 of the value written as key-sorted JSON: array order counts, object key order does not. */
-export const valueHash = (value: unknown): string => createHash('sha256').update(JSON.stringify(sorted(value))).digest('hex');
+export const valueHash = (value: unknown): string => createHash('sha256').update(sortedJson(value)).digest('hex');
 
 export type Mismatch = { key: string; problem: 'changed' | 'missing' | 'extra'; row?: string; actual?: string };
 

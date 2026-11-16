@@ -11,6 +11,8 @@ const rows = { 'guns x@1': valueHash(piece) };
 test('자료: 기대값 표 — 값을 바꾼 자료가 걸린다', () => {
   // SHA-256 of {"a":[2,1],"b":1}: the measure itself, so it cannot drift under the rows.
   expect(valueHash({ b: 1, a: [2, 1] })).toBe('96cdeb5c78442219cb2cce1e0c5803b330d6a126f5e3eb79b1c9f3eb7e00e911');
+  // SHA-256 of {"10":"ten","2":"two","n":{"10":2,"2":1}}: integer-like keys sort as text too, at every depth.
+  expect(valueHash({ '2': 'two', '10': 'ten', n: { '2': 1, '10': 2 } })).toBe('f4b5976bd43eff10063fd7060db6222565c4ad1ae453dc2afc1876c42e9dc821');
   expect(mismatches(rows, { 'guns x@1': piece })).toEqual([]);
   expect(mismatches(rows, { 'guns x@1': { nested: { b: 2, a: 1 }, list: [1, 2], version: 1, id: 'x' } })).toEqual([]); // key order is not a value
   const changed = { ...piece, nested: { a: 1.5, b: 2 } };
