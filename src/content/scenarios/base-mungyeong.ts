@@ -44,6 +44,8 @@ export const BASE_MUNGYEONG: Placement & { scenario: BaseScenario } = {
   },
   // Only the NAI 세 줄 and the 박격포 구절 differ from `base`'s, named by villages on the map (no 산·고개 이름).
   briefing: {
+    name: '보병 중대',
+    blurb: '세 접근로. 보병 중대(-)와 장갑차, 박격포. 40분.',
     plannedOp: '1번 고지',
     enemy:
       '적 보병 1개 중대(-) 규모가 아군 1~3소대 진지 방향으로 공격할 것으로 판단됨. 장갑차 일부 동반 가능. 82mm 박격포 1개 반이 당포리 서쪽 일대에서 지원할 것으로 추정.',

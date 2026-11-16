@@ -1,8 +1,10 @@
 import type { Confidence, Point, Ref, RouteKey, Scenario } from '@sim';
 
-/** 글: the 작전 준비 글 (demo lines 925–933, in the scenario's
+/** 글: the 배치's name and 한 줄 소개 (on the screen from M3-13), the 작전 준비 글 (demo lines 925–933, in the scenario's
  * order) and the planned post's place name. Outside the scenario version. */
 export interface Briefing {
+  name: string;
+  blurb: string;
   plannedOp: string;
   enemy: string;
   nais: string[];

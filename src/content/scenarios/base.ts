@@ -39,9 +39,11 @@ export const BASE_SCENARIO: BaseScenario = {
   ],
 };
 
-/** 글 of `base` but the planned post's place name: the 작전 준비 글 (demo lines 925–933), in
+/** 글 of `base` but the planned post's place name: the name, the 한 줄 소개 and the 작전 준비 글 (demo lines 925–933), in
  * the scenario's order. */
 export const BRIEFING: Omit<Briefing, 'plannedOp'> = {
+  name: '보병 중대',
+  blurb: '세 접근로. 보병 중대(-)와 장갑차, 박격포. 40분.',
   enemy:
     '적 보병 1개 중대(-) 규모가 아군 1~3소대 진지 방향으로 공격할 것으로 판단됨. 장갑차 일부 동반 가능. 82mm 박격포 1개 반이 북쪽 능선 일대에서 지원할 것으로 추정.',
   nais: ['서측 고개 — 적 정찰조 활동 첩보', '중앙 안부 — 적 주 접근로로 판단', '북쪽 능선 일대 — 적 박격포 진지 추정'],
