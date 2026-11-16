@@ -16,7 +16,7 @@ const NONE = { moving: false, canopy: false, forward: false, recon: false };
 /** A unit standing about 300 m north of the flat-terrain post (320, 320), in plain sight. */
 const near = (type: 'inf' | 'recon') => oneUnit({ type, route: 'A', t0: 0 }, [{ x: 320, y: 700 }, { x: 320, y: 650 }, { x: 320, y: 620 }]);
 /** The same with the enemy mortar section dug in 5 km north (off the small map: it only fires). */
-const withMortar: Scenario = { ...near('inf'), units: [near('inf').units[0]!, { type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }], nais: [{ x: 320, y: 5000, r: 100, conf: 'low' }] };
+const withMortar: Scenario = { ...near('inf'), units: [near('inf').units[0]!, { type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0, fireFromS: 210 }], nais: [{ x: 320, y: 5000, r: 100, conf: 'low' }] };
 
 const post = (events: readonly SimEvent[]) => events.filter((e): e is PostEvent => e.type === 'post');
 type Run = { notes: PostEvent[]; bursts: (FieldEffect & { at: number })[]; scores: Map<number, number> };

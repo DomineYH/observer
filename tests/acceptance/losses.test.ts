@@ -18,7 +18,7 @@ const ONTO = [{ x: 1280, y: 2700 }, { x: 1280, y: 1800 }, FRIEND];
 const assault = (): Scenario => ({ ...oneUnit({ type: 'inf', route: 'B', t0: 0 }, ONTO), friends: [FRIEND] });
 /** The mortar section dug in at `at`, firing on our position from 210 s. */
 const shelling = (at: Point = MORTAR): Scenario => ({
-  ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }),
+  ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0, fireFromS: 210 }),
   nais: [{ ...at, r: 100, conf: 'low' }],
   friends: [FRIEND],
 });

@@ -54,7 +54,7 @@ export function deploy(sc: Scenario, t: TerrainData, s: Stream): Platoon[] {
   return sc.units.map((u, i) => {
     const ms = members(s, u.type);
     const route = routes[i] ?? null;
-    const path = route ? sc.routes[route].map((p) => ({ x: p.x + gauss(s) * 30, y: p.y + gauss(s) * 30 })) : [];
+    const path = route ? sc.routes[route]!.map((p) => ({ x: p.x + gauss(s) * 30, y: p.y + gauss(s) * 30 })) : [];
     const at = path[0] ?? spots[i]!;
     const p: Platoon = {
       type: u.type,

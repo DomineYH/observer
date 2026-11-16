@@ -14,7 +14,6 @@ const DEPLOY_M = 1500; // infantry deploys from column into line inside this dis
 const DEPLOY_S = 20; // … converging with this time constant
 const ASSAULT_M = 900; // 돌격선
 const APC_HALT_M = 1300;
-const MORTAR_FIRST_TICK = 210 * TICKS_PER_S;
 const DUST_TICKS = 30; // a moving vehicle raises dust every 1.5 s
 const LIFE = { dust: 9 * TICKS_PER_S, apcMuzzle: 3 * TICKS_PER_S, mortarMuzzle: 11 * TICKS_PER_S };
 const WAYPOINT_M = 25;
@@ -118,7 +117,7 @@ export function updatePlatoon(st: SimState, ctx: Ctx, pid: number): void {
       p.lastFire = tick;
       emit(st, t, p, pid, 'muzzle', 'veh', 1.5, LIFE.apcMuzzle, true);
     }
-  } else if (p.type === 'mortar' && p.state === 'emplaced' && tick >= MORTAR_FIRST_TICK && tick >= p.nextFire && !pinned && canFire(p)) {
+  } else if (p.type === 'mortar' && p.state === 'emplaced' && tick >= ctx.mortarFrom[pid]! && tick >= p.nextFire && !pinned && canFire(p)) {
     p.nextFire = tick + ticks(45 + next(ai) * 25);
     const first = p.lastFire < 0;
     p.lastFire = tick;

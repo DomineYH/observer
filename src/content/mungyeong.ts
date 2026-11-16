@@ -1,13 +1,13 @@
 import type { Point } from '@sim';
 import type { Placement } from './placement';
-import { BASE_SCENARIO, BRIEFING } from './scenario';
+import { BASE_SCENARIO, BRIEFING, type BaseScenario } from './scenario';
 
 const line = (...xy: [number, number][]): Point[] => xy.map(([x, y]) => ({ x, y }));
 
 /** 문경 배치 on 문경 지형 2판 (국지 m, 동·북). The 데모 값 (units, 예상 접근로, 신뢰도, 박격포 상자, names) are the
  * mock's. The three posts are copied into `terrain/mungyeong/config.json` as 벌채 원: move a post → change that copy,
  * raise the 지형 판 and rebuild (terrain/README.md). Any coordinate change raises `version`. */
-export const MUNGYEONG_PLACEMENT: Placement = {
+export const MUNGYEONG_PLACEMENT: Placement & { scenario: BaseScenario } = {
   scenario: {
     ...BASE_SCENARIO,
     id: 'base-mungyeong',

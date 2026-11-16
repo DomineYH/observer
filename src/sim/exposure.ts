@@ -58,10 +58,10 @@ function compromise(s: SimState, ctx: Ctx, pid: number): void {
   s.compromised = s.tick;
   const at = { ...s.op };
   const p = s.platoons[pid]!;
-  const mi = s.platoons.findIndex((q) => q.type === 'mortar');
-  const mo = s.platoons[mi];
+  // 보복: the first mortar section in list order that can fire
+  const mi = s.platoons.findIndex((q) => q.type === 'mortar' && q.state !== 'destroyed' && q.state !== 'broken' && q.members.some((m) => m.kind === 'tube' && m.alive));
   let shooter: Shooter | null = null;
-  if (mo && mo.state !== 'destroyed' && mo.state !== 'broken' && mo.members.some((q) => q.kind === 'tube' && q.alive)) shooter = 'mortar';
+  if (mi >= 0) shooter = 'mortar';
   else if ((p.type === 'inf' || p.type === 'apc') && far(p, at) < DIRECT_M) shooter = 'direct';
   ctx.note({ what: 'compromised', pid, fire: shooter });
   if (!shooter) return;

@@ -28,6 +28,7 @@ export interface Ctx {
   exp: Stream; // 발각 and the retaliation
   ai: Stream; // 적/아군 행동: the enemy mortar's rounds on our positions too (B6)
   frontY: number; // 아군 전선, north m
+  mortarFrom: readonly number[]; // per unit, in unit order: the tick its 박격포 사격 개시 (0 for the other kinds)
   terrain: TerrainData;
   battery: Point;
   guns: GunProfile; // 포 프로파일: 탄도, 방렬, 효력사 간격, 살상 반경

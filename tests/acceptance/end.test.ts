@@ -79,7 +79,7 @@ describe('F-13: 종료', () => {
     const route = [{ x: 320, y: 2320 }, { x: 320, y: 1500 }, { x: 320, y: 920 }];
     const two: Scenario = {
       ...oneUnit({ type: 'inf', route: 'A', t0: 0 }, route),
-      units: [{ type: 'inf', route: 'A', t0: 0 }, { type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }],
+      units: [{ type: 'inf', route: 'A', t0: 0 }, { type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0, fireFromS: 210 }],
       nais: [{ x: 320, y: 5320, r: 100, conf: 'low' }],
     };
     const sim = started(two, { weather: CALM }); // no 기상 잔차: the 효력사 below lands on the unit as the seed was chosen

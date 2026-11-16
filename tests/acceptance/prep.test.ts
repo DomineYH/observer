@@ -153,7 +153,7 @@ describe('F-22', () => {
       seen.apc.add(p[3]!.route!);
       // Units on a route start at its (jittered) first point, within a few gauss·30 m of the scenario's.
       for (const u of p.slice(0, 4)) {
-        const first = BASE_SCENARIO.routes[u.route!][0]!;
+        const first = BASE_SCENARIO.routes[u.route!]![0]!;
         expect(u.path).toHaveLength(3);
         expect({ x: u.x, y: u.y }).toEqual(u.path[0]);
         expect(Math.abs(u.x - first.x)).toBeLessThan(200);

@@ -21,7 +21,7 @@ export const oneUnit = (unit: UnitDef, route?: readonly Point[]): Scenario => ({
 
 /** The mortar section dug in exactly at `at` (a zero spread puts it on the NAI's centre). */
 export const mortarAt = (at: Point): Scenario => ({
-  ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }),
+  ...oneUnit({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0, fireFromS: 210 }),
   nais: [{ ...at, r: 100, conf: 'low' }],
 });
 

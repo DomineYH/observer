@@ -27,14 +27,15 @@ export interface GunProfile extends Ref {
   };
 }
 
-export type RouteKey = 'A' | 'B' | 'C';
+/** 접근로 열쇠: one uppercase letter. */
+export type RouteKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z';
 export type Confidence = 'high' | 'medium' | 'low';
 export type UnitType = 'recon' | 'inf' | 'apc' | 'mortar';
 /** A fixed route, or `first` when the scenario stream draws below `p`, else `second`. */
 export type RoutePick = RouteKey | { first: RouteKey; second: RouteKey; p: number };
 export type UnitDef =
   | { type: Exclude<UnitType, 'mortar'>; route: RoutePick; t0: number } // t0: seconds after start it sets off
-  | { type: 'mortar'; nai: number; spread: Point; t0: number }; // somewhere in the box `spread` wide around NAI `nai`
+  | { type: 'mortar'; nai: number; spread: Point; t0: number; fireFromS: number }; // somewhere in the box `spread` wide around NAI `nai`; fireFromS: 사격 개시, seconds after 작전 개시
 
 /** 시나리오: the briefing's map data and the enemy order of battle. Texts live with the ui, not here. */
 export interface Scenario extends Ref {
@@ -44,9 +45,10 @@ export interface Scenario extends Ref {
   frontY: number; // 아군 전선 (이동 한계선), north meters
   friends: readonly Point[]; // 아군 진지
   supplyRoad: number; // index into the terrain's roads the 보급 트럭 drives; no truck when the terrain has no such road
-  routes: { readonly [K in RouteKey]: readonly Point[] }; // 접근로, start to objective
+  routes: { readonly [K in RouteKey]?: readonly Point[] }; // 접근로 (one or more: a content rule, not the type), start to objective
   nais: readonly { x: number; y: number; r: number; conf: Confidence }[]; // 주요 감시 지역
   intelRoutes: readonly { route: RouteKey; conf: Confidence }[]; // 예상 접근로
+  timeLimitS: number; // 작전 시간 한도, seconds
   units: readonly UnitDef[];
   reserveOps?: readonly Point[]; // 예비 관측소: the simulation does not read it
 }
@@ -128,7 +130,7 @@ export interface FieldEffect {
   vis: boolean;
 }
 
-/** ended (종료): every combat unit down (8 s after nothing is owed or in the air), the 40분 한도, or 관측반 손실: the clock
+/** ended (종료): every combat unit down (8 s after nothing is owed or in the air), the 작전 시간 한도, or 관측반 손실: the clock
  * stops and every input is ignored. */
 export type Phase = 'prep' | 'live' | 'ended';
 

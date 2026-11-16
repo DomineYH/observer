@@ -1,8 +1,10 @@
-import type { Confidence, RouteKey, Scenario } from '@sim';
+import type { Confidence, Point, RouteKey, Scenario } from '@sim';
 
 /** 기본 시나리오 (demo lines 207–209, 406–433). Keep `plannedOp` and `friends` equal to the mock terrain's `OP_HILL` and
  * `FRIEND_HILLS`. */
-export const BASE_SCENARIO: Scenario = {
+/** The two base scenarios always have routes A, B and C. M3-6 and M3-9 drop this when the 배치 tests loop over every 배치. */
+export type BaseScenario = Scenario & { routes: Readonly<Record<'A' | 'B' | 'C', readonly Point[]>> };
+export const BASE_SCENARIO: BaseScenario = {
   id: 'base',
   version: 1,
   plannedOp: { x: 5120, y: 1800 }, // 1번 고지
@@ -29,12 +31,13 @@ export const BASE_SCENARIO: Scenario = {
     { route: 'B', conf: 'high' },
     { route: 'A', conf: 'medium' },
   ],
+  timeLimitS: 2400, // 40분
   units: [
     { type: 'recon', route: { first: 'A', second: 'B', p: 0.6 }, t0: 0 }, // 적 정찰조
     { type: 'inf', route: 'B', t0: 90 }, // 적 1소대
     { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 200 }, // 적 2소대
     { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 260 }, // 적 장갑차 2대
-    { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0 }, // 적 82mm 박격포반
+    { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0, fireFromS: 210 }, // 적 82mm 박격포반
   ],
 };
 
@@ -43,7 +46,7 @@ export const BRIEFING = {
   enemy:
     '적 보병 1개 중대(-) 규모가 아군 1~3소대 진지 방향으로 공격할 것으로 판단됨. 장갑차 일부 동반 가능. 82mm 박격포 1개 반이 북쪽 능선 일대에서 지원할 것으로 추정.',
   nais: ['서측 고개 — 적 정찰조 활동 첩보', '중앙 안부 — 적 주 접근로로 판단', '북쪽 능선 일대 — 적 박격포 진지 추정'],
-  routes: { A: '서측 접근로', B: '중앙 접근로', C: '동측 접근로' } satisfies Record<RouteKey, string>,
+  routes: { A: '서측 접근로', B: '중앙 접근로', C: '동측 접근로' } satisfies Partial<Record<RouteKey, string>>,
   conf: { high: '높음', medium: '보통', low: '낮음' } satisfies Record<Confidence, string>,
   mission: '관측소를 선정·점령하여 NAI와 접근로를 감시하고, 적 발견 시 화력을 유도한다.',
   caution:

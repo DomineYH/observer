@@ -26,6 +26,7 @@ const INITIAL_AIM = { az: 204, el: -220 };
 
 export function createSim(init: SimInit): Sim {
   const rng = createStreams(init.seed);
+  const limitTicks = Math.round(init.scenario.timeLimitS * 20); // 작전 시간 한도
   const state: SimState = {
     tick: 0,
     phase: 'prep',
@@ -68,6 +69,7 @@ export function createSim(init: SimInit): Sim {
     exp: rng.exp,
     ai: rng.ai,
     frontY: init.scenario.frontY,
+    mortarFrom: init.scenario.units.map((u) => (u.type === 'mortar' ? Math.round(u.fireFromS * 20) : 0)), // M3-16: reinforcements appended to the platoons need an entry here
     terrain: init.terrain,
     battery: init.scenario.battery,
     guns: init.guns,
@@ -132,7 +134,7 @@ export function createSim(init: SimInit): Sim {
         updateIntel(state, init.weather);
         exposureTick(state, ctx); // every 5 s: does the enemy see the post?
         for (const p of state.platoons) p.activity = activityOf(p, state.tick);
-        checkEnd(state); // last (demo order)
+        checkEnd(state, limitTicks); // last (demo order)
       }
       return { events: out.map((e) => ({ ...e, tick: state.tick })), accepted };
     },
