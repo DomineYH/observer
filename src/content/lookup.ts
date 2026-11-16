@@ -1,4 +1,5 @@
-import type { GunProfile, Ref, Scenario } from '@sim';
+import type { CombatData, GunProfile, ReplayData, Ref, Scenario } from '@sim';
+import { COMBAT } from './combat';
 import { BASE_GUNS } from './guns';
 import { MUNGYEONG_PLACEMENT } from './mungyeong';
 import { MOCK_PLACEMENT, type Placement } from './placement';
@@ -15,10 +16,17 @@ function find<T extends Ref>(kind: string, list: readonly T[], want: Ref): T {
   return found;
 }
 
-/** 찾기 함수: 재생 자료 머리 → the content it names. Throws naming what is unknown. */
-export function contentOf(header: { scenario: Ref; guns: Ref }): { scenario: Scenario; guns: GunProfile } {
+/** 찾기 함수: 재생 자료 머리 → the content it names, and for a combat header the 실전 자료. Throws naming what is unknown. */
+export function contentOf(header: Pick<ReplayData, 'scenario' | 'guns'> & Partial<Pick<ReplayData, 'mode' | 'combatDataVersion'>>): {
+  scenario: Scenario;
+  guns: GunProfile;
+  combat?: CombatData;
+} {
+  if (header.mode === 'combat' && header.combatDataVersion !== COMBAT.version)
+    throw new Error(`combat@${header.combatDataVersion}: unknown version (this build has combat@${COMBAT.version})`);
   return {
     scenario: find('scenario', PLACEMENTS.map((p) => p.scenario), header.scenario),
     guns: find('guns', GUNS, header.guns),
+    ...(header.mode === 'combat' ? { combat: COMBAT } : {}),
   };
 }

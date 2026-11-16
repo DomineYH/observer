@@ -66,6 +66,13 @@ describe('F-31', () => {
     expect(replay(onK9, mock, BASE_SCENARIO, { ...BASE_GUNS, id: 'k9' }).record).toEqual(replay(data(), mock, BASE_SCENARIO, BASE_GUNS).record);
     // A header that carries the numbers is refused by the format check.
     expect(validateReplay({ ...data(), guns: BASE_GUNS })).toEqual({ ok: false, error: 'guns: unknown key' });
+    // 실전 자료 판: a combat header is replayed with the 실전 자료 of its 판 only.
+    expect(replay(combat(), mock, BASE_SCENARIO, BASE_GUNS, COMBAT).record.mode).toBe('combat');
+    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS, { ...COMBAT, version: 2 })).toThrow("combat data version 2 is not the header's 1");
+    expect(() => replay({ ...combat(), combatDataVersion: 2 }, mock, BASE_SCENARIO, BASE_GUNS, COMBAT)).toThrow("combat data version 1 is not the header's 2");
+    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS)).toThrow("combat data version none is not the header's 1");
+    // A training or standard header has none to compare: what is handed over is left out of the game.
+    expect(replay(data(), mock, BASE_SCENARIO, BASE_GUNS, { ...COMBAT, version: 2 })).toEqual(replay(data(), mock, BASE_SCENARIO, BASE_GUNS));
   });
 
   test('F-31: 실전의 머리', () => {
@@ -86,6 +93,7 @@ describe('F-31', () => {
     // a mode input in a combat game passes the format check; replayed, it is an ignored input (ADR 0003)
     const switched = { ...combat(), inputs: [{ t: 0, ...START }, { t: 1, a: 'mode', v: ['standard'] }] };
     expect(validateReplay(switched).ok).toBe(true);
+    expect(replay(switched, flatTerrain(), BASE_SCENARIO, BASE_GUNS, COMBAT).ignored).toBe(1);
     // guns stay an id and a version in a combat header too
     expect(validateReplay({ ...combat(), guns: BASE_GUNS })).toEqual({ ok: false, error: 'guns: unknown key' });
   });
