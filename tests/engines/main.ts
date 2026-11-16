@@ -30,7 +30,7 @@ try {
     hashes[file] = terrainHash(t);
     if (file === only) {
       const c = contentOf(golden.replay);
-      results[file] = replay(golden.replay, t, c.scenario, c.guns);
+      results[file] = replay(golden.replay, t, c.scenario, c.guns, c.combat);
     }
   }
   math.textContent = JSON.stringify(evaluate({ exp, log, sin, cos, tan, atan2 }));
