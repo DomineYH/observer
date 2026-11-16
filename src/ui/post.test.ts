@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest';
-import { createSim, type MovePlan, type ReadonlySimState } from '@sim';
+import { createSim, type MovePlan, type PostNote, type ReadonlySimState } from '@sim';
 import { init } from '../../tests/acceptance/init';
-import { moveLabel, moveStarted, postNote, postStatus, reportError } from './post';
+import { moveLabel, moveStarted, postNote as note, postStatus, reportError } from './post';
+
+/** `postNote` on the base scenario: only the 진지 돌파 note reads it. */
+const postNote = (...a: [PostNote, ReadonlySimState['platoons'], boolean]) => note(...a, init(7).scenario);
 
 const plan = (forest: number, y = 1800): MovePlan => ({ to: { x: 5200, y }, pts: [], total: 78.4, dist: 1234.4, forest });
 

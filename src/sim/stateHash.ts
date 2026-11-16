@@ -9,7 +9,8 @@ const PHASES: readonly Phase[] = ['prep', 'live', 'ended'];
 const POST_STATES: readonly PostState[] = ['ready', 'moving', 'setup'];
 const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
-const ROUTE_KEYS: readonly RouteKey[] = ['A', 'B', 'C'];
+/** 접근로 번호: the key letter's place in the alphabet (A = 1 … Z = 26), 0 without a route. */
+export const routeNumber = (route: RouteKey | null): number => (route === null ? 0 : route.charCodeAt(0) - 64);
 const MEMBER_KINDS: readonly Member['kind'][] = ['man', 'veh', 'tube'];
 const PLATOON_STATES: readonly PlatoonState[] = ['wait', 'approach', 'assault', 'hold', 'support', 'emplaced', 'broken', 'destroyed', 'overran'];
 const EFFECT_KINDS: readonly FieldEffect['kind'][] = ['dust', 'muzzle', 'burst'];
@@ -76,7 +77,7 @@ export function hashState(state: SimState): string {
   h.i32(state.endAt);
   for (const p of state.platoons) {
     h.u32(UNIT_TYPES.indexOf(p.type));
-    h.u32(p.route === null ? 0 : ROUTE_KEYS.indexOf(p.route) + 1);
+    h.u32(routeNumber(p.route));
     h.f64(p.x);
     h.f64(p.y);
     h.u32(p.path.length);

@@ -116,7 +116,7 @@ const step = () => {
   }
   let readBack = false;
   for (const e of events) {
-    if (e.type === 'post') say(postNote(e, s.platoons, underCanopy(terrain, s.op.x, s.op.y)));
+    if (e.type === 'post') say(postNote(e, s.platoons, underCanopy(terrain, s.op.x, s.op.y), scenario));
     if (e.type !== 'radio') continue;
     lines.push(e);
     const u = e.utterance;

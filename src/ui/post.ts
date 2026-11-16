@@ -1,6 +1,6 @@
 // 관측소 이동·위치 보고·발각 (demo lines 849–904, 609–637, 1416–1420): the ui's words for the simulation's post state and
 // notes. Pure.
-import type { MoveBlock, MovePlan, Mode, Point, PostNote, RadioStage, ReadonlySimState, UnitType } from '@sim';
+import type { MoveBlock, MovePlan, Mode, Point, PostNote, RadioStage, ReadonlySimState, Scenario, UnitType } from '@sim';
 import { clock } from './clock';
 import { unitName } from './debrief';
 
@@ -55,8 +55,8 @@ export const postStatus = (s: Pick<ReadonlySimState, 'post' | 'tick'>): string |
 const KIND: Record<UnitType, string> = { inf: '보병', recon: '정찰조', apc: '장갑차', mortar: '박격포' };
 const FIRE = { mortar: '박격포', direct: '직사' } as const;
 
-/** A post note as log lines; `canopy`: the post stands in forest. */
-export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], canopy: boolean): string[] {
+/** A post note as log lines; `canopy`: the post stands in forest; `sc`: the scenario, for the position a route ends on. */
+export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], canopy: boolean, sc: Pick<Scenario, 'routes' | 'friends'>): string[] {
   switch (n.what) {
     case 'arrived':
       return ['관측소 도착. 관측 장비 설치 중(약 30초).'];
@@ -79,7 +79,9 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
       return [`탄착이 아군 ${n.pos + 1}소대 진지 70 m 이내! 아군 피해 발생${n.k ? ` — ${n.k}명 손실` : ''}.`];
     case 'overrun': {
       const route = platoons[n.pid]!.route;
-      return [`${unitName(platoons, n.pid)}이(가) ${route ? `아군 ${'ABC'.indexOf(route) + 1}소대` : '아군'} 진지를 돌파했습니다.`]; // demo: route A/B/C ends on our 1/2/3소대
+      const goal = route && sc.routes[route]?.at(-1); // a route ends on one of our positions
+      const pos = goal ? sc.friends.findIndex((f) => f.x === goal.x && f.y === goal.y) : -1;
+      return [`${unitName(platoons, n.pid)}이(가) ${pos >= 0 ? `아군 ${pos + 1}소대` : '아군'} 진지를 돌파했습니다.`];
     }
     case 'lost':
       return [`${n.cause === 'friendly' ? '아군 포탄이 관측소에 떨어졌습니다.' : `적 ${FIRE[n.cause]} 사격에 관측반이 피격됐습니다.`} 관측반 전투 불능 — 임무 종료.`];

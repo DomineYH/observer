@@ -43,7 +43,7 @@ describe('F-29: 아군 손실의 확률', () => {
     // next ones within 40 s lying down. No enemy comes near, so a man lies down only for the rounds.
     const friends: Point[] = [];
     for (let i = 0; i < 8; i++) for (let j = 0; j < 5; j++) friends.push({ x: 500 + i * 250, y: 900 + j * 180 });
-    const units: UnitDef[] = Array.from({ length: 24 }, () => ({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0 }));
+    const units: UnitDef[] = Array.from({ length: 24 }, () => ({ type: 'mortar', nai: 0, spread: { x: 0, y: 0 }, t0: 0, fireFromS: 210 }));
     const scenario: Scenario = { ...BASE_SCENARIO, units, nais: [{ x: 1700, y: 2400, r: 100, conf: 'low' }], friends };
     const sim = started(scenario, { seed: 1, terrain: flatTerrain({ n: 256 }) });
     const standing = pool();

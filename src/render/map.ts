@@ -308,7 +308,7 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
   });
   // 예상 접근로, the likelier one bolder, with an arrowhead at the objective
   for (const ir of sc.intelRoutes) {
-    const pts = sc.routes[ir.route];
+    const pts = sc.routes[ir.route]!;
     c.strokeStyle = c.fillStyle = ir.conf === 'high' ? 'rgba(200,40,30,.8)' : 'rgba(200,40,30,.45)';
     c.lineWidth = ir.conf === 'high' ? 2 : 1.4;
     c.setLineDash([7, 4]);

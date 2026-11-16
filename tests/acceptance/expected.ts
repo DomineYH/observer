@@ -33,4 +33,6 @@ export function mismatches(rows: Readonly<Record<string, string>>, pieces: Reado
 /** 기대값 표: guns written by M3-2; scenario M3-4, combat M3-5 (each row written once, by its slice). */
 export const EXPECTED: Readonly<Record<string, string>> = {
   'guns base@1': 'f37f565942e40de42e63b3e03cc318876e8339664291a4b4d6d7c5b452960bc0',
+  'scenario base@1': '75b04621cb342f68cc4da7b201db61651e31307b756a014461a64a83e0260eab',
+  'scenario base-mungyeong@2': '19607bdd4ed25f61e614f04ac10fb8bb30bbc74e88afbf56d30271b52f5cdee3',
 };
