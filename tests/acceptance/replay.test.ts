@@ -1,6 +1,7 @@
 // 재생 자료의 terrain: the validator and the replayer through the public sim interface.
 import { describe, expect, test } from 'vitest';
 import { replay, validateReplay, type ReplayData, type TerrainData } from '@sim';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
 import { readGolden } from '../golden/golden';
@@ -46,11 +47,23 @@ describe('F-31', () => {
   test('F-31: 재생 자료의 지형이 다르면 재생하지 않는다', () => {
     const mock = flatTerrain();
     const x2: TerrainData = { ...mock, id: 'x', version: 2 };
-    expect(() => replay(data(), { ...mock, id: 'x' }, BASE_SCENARIO)).toThrow(/terrain/);
-    expect(() => replay(data(), { ...mock, version: 2 }, BASE_SCENARIO)).toThrow(/terrain/);
+    expect(() => replay(data(), { ...mock, id: 'x' }, BASE_SCENARIO, BASE_GUNS)).toThrow(/terrain/);
+    expect(() => replay(data(), { ...mock, version: 2 }, BASE_SCENARIO, BASE_GUNS)).toThrow(/terrain/);
     const onX2 = { ...data(), terrain: { id: 'x', version: 2 } };
-    expect(() => replay(onX2, mock, BASE_SCENARIO)).toThrow(/terrain/);
-    expect(replay(onX2, x2, BASE_SCENARIO).record).toEqual(replay(data(), mock, BASE_SCENARIO).record);
+    expect(() => replay(onX2, mock, BASE_SCENARIO, BASE_GUNS)).toThrow(/terrain/);
+    expect(replay(onX2, x2, BASE_SCENARIO, BASE_GUNS).record).toEqual(replay(data(), mock, BASE_SCENARIO, BASE_GUNS).record);
+  });
+
+  test('F-31: 포 프로파일이나 실전 자료 판이 다르면 재생하지 않는다', () => {
+    const mock = flatTerrain();
+    expect(() => replay(data(), mock, BASE_SCENARIO, { ...BASE_GUNS, id: 'k9' })).toThrow("guns k9@1 is not the header's base@1");
+    expect(() => replay(data(), mock, BASE_SCENARIO, { ...BASE_GUNS, version: 2 })).toThrow("guns base@2 is not the header's base@1");
+    const onK9 = { ...data(), guns: { id: 'k9', version: 1 } };
+    expect(() => replay(onK9, mock, BASE_SCENARIO, BASE_GUNS)).toThrow("guns base@1 is not the header's k9@1");
+    // The check is by id and version: the same numbers under the header's name replay to the same game.
+    expect(replay(onK9, mock, BASE_SCENARIO, { ...BASE_GUNS, id: 'k9' }).record).toEqual(replay(data(), mock, BASE_SCENARIO, BASE_GUNS).record);
+    // A header that carries the numbers is refused by the format check.
+    expect(validateReplay({ ...data(), guns: BASE_GUNS })).toEqual({ ok: false, error: 'guns: unknown key' });
   });
 
   // The terrain check comes before the simulation starts, so no real land is loaded here.
@@ -59,7 +72,7 @@ describe('F-31', () => {
     expect(validateReplay(five).ok).toBe(true);
     expect(five.terrain).toEqual({ id: 'mungyeong', version: 2 });
     const scenario = MUNGYEONG_PLACEMENT.scenario;
-    expect(() => replay(five, { ...flatTerrain(), id: 'mungyeong', version: 3 }, scenario)).toThrow(/terrain/); // another 판
-    expect(() => replay(five, flatTerrain(), scenario)).toThrow(/terrain/); // mock@1
+    expect(() => replay(five, { ...flatTerrain(), id: 'mungyeong', version: 3 }, scenario, BASE_GUNS)).toThrow(/terrain/); // another 판
+    expect(() => replay(five, flatTerrain(), scenario, BASE_GUNS)).toThrow(/terrain/); // mock@1
   });
 });

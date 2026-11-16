@@ -171,7 +171,7 @@ describe('실제 지형 원천', () => {
     const { replay: data } = finished(g);
     expect(data.terrain).toEqual({ id: 'mungyeong', version: 2 });
     expect(validateReplay(JSON.parse(JSON.stringify(data))).ok).toBe(true);
-    const again = replay(data, await mungyeong, scenario);
+    const again = replay(data, await mungyeong, scenario, BASE_GUNS);
     expect(again.record).toEqual(g.sim.record());
     // A finished game on the mock land carries no terrain key at all.
     const mock = finished(newGame({ ...g.init, terrain: await mockTerrain.load(1) }));

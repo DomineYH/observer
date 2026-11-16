@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { BASE_GUNS } from '@content/guns';
 import { contentOf } from '@content/lookup';
 import { MOCK_PLACEMENT } from '@content/placement';
 import { BASE_SCENARIO } from '@content/scenario';
@@ -64,7 +65,7 @@ describe('골든', () => {
     expect(expected.checkpoints.map((c) => c.tick)).toEqual([200, 400]);
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
   }, 30000); // terrain generation and a replay (~2 s alone): vitest's 5 s default is hit under load
 
   test('골든: ① 좌표법 조정에서 임무끝까지', () => {
@@ -73,9 +74,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every scripted transmission was taken
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
     // The script does what it says: a 접근신관 효력사 lands and the mission ends with 임무끝.
-    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, guns: BASE_GUNS, terrain });
     const events: SimEvent[] = [];
     for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
     expect(events.some((e) => e.type === 'impact' && e.fuze === 'vt')).toBe(true);
@@ -89,9 +90,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0);
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
     // The script does what it says.
-    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, guns: BASE_GUNS, terrain });
     const events: SimEvent[] = [];
     for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
     const said = (speaker: string, kind: string) => events.some((e) => e.type === 'radio' && e.utterance.speaker === speaker && e.utterance.kind === kind);
@@ -114,7 +115,7 @@ describe('골든', () => {
     expect(data.totalTicks).toBe(48000); // the 40분 한도 is the terminal tick (#33: no padding past it)
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, BASE_SCENARIO);
+    const result = replay(data, terrain, BASE_SCENARIO, BASE_GUNS);
     expect(result).toEqual(expected);
     // The script does what it says, read off its record: the limit ended it, no round was fired, the post was never found
     // and the 관측반 lived.
@@ -128,7 +129,7 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every recorded input was taken
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, BASE_SCENARIO);
+    const result = replay(data, terrain, BASE_SCENARIO, BASE_GUNS);
     expect(result).toEqual(expected);
     // The game is what scripts.ts says: standard mode, three missions, ended by the 40분 한도.
     expect(result.record).toMatchObject({ ticks: 48000, missions: 3, mode: 'standard' });
@@ -142,11 +143,11 @@ describe('골든', () => {
     expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
     expect(data.mode).toBe('standard');
     expect(data.totalTicks).toBeLessThanOrEqual(12000);
-    const { terrain, scenario } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
+    const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, scenario)).toEqual(expected);
+    expect(replay(data, terrain, scenario, guns)).toEqual(expected);
     // The script does what it says: a lase answers, the 효력사 lands, the post moves and 기러기 is told where.
-    const sim = createSim({ ...data, scenario, terrain });
+    const sim = createSim({ ...data, scenario, guns, terrain });
     const events: SimEvent[] = [];
     const impacts: number[] = [];
     for (let t = 0; t < data.totalTicks; t++)
@@ -176,9 +177,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every recorded input was taken
     expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
     expect(data.scenario).toEqual({ id: MUNGYEONG_PLACEMENT.scenario.id, version: 2 });
-    const { terrain, scenario } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
+    const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, scenario);
+    const result = replay(data, terrain, scenario, guns);
     expect(result).toEqual(expected);
     // The game is what scripts.ts says: standard mode, three missions, over before the 40분 한도 (48 000 ticks). The
     // 관측반 lived, so every combat unit was down (end.ts); one by 진지 돌파, which withholds 섬멸 (not cleared).

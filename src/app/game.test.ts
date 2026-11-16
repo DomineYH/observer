@@ -98,7 +98,7 @@ test('F-30: 기상 변경은 고른 모드를 남긴다', async () => {
   expect(e.session.log.map((i) => i.a)).toEqual(['pick', 'mode', 'start']);
 
   // Its 입력 기록 replays to the same game: nothing ignored, the same 판 기록 in training, the same state hash.
-  const again = replay(replayOf(init, e.session.log, e.sim.state.tick), init.terrain, BASE_SCENARIO);
+  const again = replay(replayOf(init, e.session.log, e.sim.state.tick), init.terrain, BASE_SCENARIO, init.guns);
   expect(again.ignored).toBe(0);
   expect(again.record).toEqual(e.sim.record());
   expect(again.record.mode).toBe('training');

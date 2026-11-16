@@ -121,7 +121,7 @@ test('F-31: 미리보기는 재생 자료 형식 그대로', () => {
   const checked = validateReplay(parsed);
   expect(checked.ok).toBe(true);
   expect(parsed).toEqual(data); // the replay data itself, no wrapper
-  const again = replay(checked.ok ? checked.data : data, at.terrain, at.scenario);
+  const again = replay(checked.ok ? checked.data : data, at.terrain, at.scenario, at.guns);
   expect(again.ignored).toBe(0);
   expect(again.record).toEqual(g.sim.record());
   expect(again.record.missions).toBe(1);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, type Input } from '@sim';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, replayData, START } from './init';
 
@@ -37,7 +38,7 @@ describe('F-14: 모드 전환은 입력이다', () => {
       { t: 1, ...TRAINING },
       { t: 2, ...STANDARD },
     ];
-    const r = replay(replayData(inputs, sim.state.tick), init(20261106).terrain, BASE_SCENARIO);
+    const r = replay(replayData(inputs, sim.state.tick), init(20261106).terrain, BASE_SCENARIO, BASE_GUNS);
     expect(r.ignored).toBe(0);
     expect(r.record).toEqual(sim.record());
   });
@@ -84,7 +85,7 @@ describe('F-14: 모드 전환은 입력이다', () => {
     free.step([TRAINING, STANDARD, START]);
     expect(free.record().mode).toBe('standard');
     // The replay gives the same mode.
-    const r = replay(replayData([{ t: 0, ...START }, { t: 1, ...TRAINING }, { t: 1, ...STANDARD }], sim.state.tick), init(20261106).terrain, BASE_SCENARIO);
+    const r = replay(replayData([{ t: 0, ...START }, { t: 1, ...TRAINING }, { t: 1, ...STANDARD }], sim.state.tick), init(20261106).terrain, BASE_SCENARIO, BASE_GUNS);
     expect(r.ignored).toBe(0);
     expect(r.record.mode).toBe('training');
     expect(r.record).toEqual(sim.record());

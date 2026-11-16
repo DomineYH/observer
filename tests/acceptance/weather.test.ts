@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest';
 import { CHECKPOINT_TICKS, createSim, replay, validateReplay, type RecordedInput, type Sim, type Weather } from '@sim';
 import { CLEAR_WEATHER, presetWeather } from '@adapters/mock/weather';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { atmosphere } from '@render/shade';
 import { mortarAt, started } from './enemy';
@@ -95,10 +96,10 @@ test('F-26: 재생 자료의 기상 값', () => {
   expect(validateReplay({ ...data, weather: { ...rain, precipTenthMmH: 2.4 } }).ok).toBe(false);
 
   // That header alone replays the same game: same 판 기록, no ignored input, the live state hash at the last checkpoint.
-  const again = replay(data, flatTerrain(), NO_TROOPS);
+  const again = replay(data, flatTerrain(), NO_TROOPS, BASE_GUNS);
   expect(again.ignored).toBe(0);
   expect(again.record).toEqual(live.sim.record());
   expect(again.checkpoints.at(-1)).toEqual({ tick: ticks, hash: live.sim.hash() });
   // The header's weather is what the replay uses: the same inputs under another weather give another game.
-  expect(replay(replayData(live.inputs, ticks, seed, presetWeather('wind')), flatTerrain(), NO_TROOPS).chain).not.toBe(again.chain);
+  expect(replay(replayData(live.inputs, ticks, seed, presetWeather('wind')), flatTerrain(), NO_TROOPS, BASE_GUNS).chain).not.toBe(again.chain);
 });

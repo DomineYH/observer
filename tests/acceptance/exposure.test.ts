@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import type { FieldEffect, PostEvent, Scenario, Sim, SimEvent } from '@sim';
 import { replay } from '@sim';
 import { exposureChance } from '@sim/exposure';
+import { BASE_GUNS } from '@content/guns';
 import { replayData, START } from './init';
 import { flatTerrain } from './terrain';
 import { dist, oneUnit, started } from './enemy';
@@ -140,10 +141,10 @@ describe('F-21', () => {
       // Replay: the game's record ends at its terminal tick. Exactly that many ticks replay, one hash each; any tick past
       // the end does not exist, so a longer totalTicks is a format error.
       if (lost === 1) {
-        const exact = replay(replayData([{ t: 0, ...START }], tick, seed), flatTerrain(), withMortar);
+        const exact = replay(replayData([{ t: 0, ...START }], tick, seed), flatTerrain(), withMortar, BASE_GUNS);
         expect(exact.record.ticks).toBe(tick);
         expect(exact.checkpoints.at(-1)!.tick).toBe(Math.floor(tick / 200) * 200);
-        expect(() => replay(replayData([{ t: 0, ...START }], tick + 1, seed), flatTerrain(), withMortar)).toThrow(`replay: the game ended at tick ${tick}, before totalTicks ${tick + 1}`);
+        expect(() => replay(replayData([{ t: 0, ...START }], tick + 1, seed), flatTerrain(), withMortar, BASE_GUNS)).toThrow(`replay: the game ended at tick ${tick}, before totalTicks ${tick + 1}`);
       }
     }
     expect(lost).toBeGreaterThan(0);

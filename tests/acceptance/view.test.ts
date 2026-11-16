@@ -9,6 +9,7 @@ import { createAimControl } from '@ui/aim';
 import { startInput } from '@ui/prep';
 import { atmosphere, fbm, terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, replayData, START } from './init';
 import { flatTerrain } from './terrain';
@@ -94,7 +95,7 @@ test('입력 기록: 받아들인 입력만 남긴다', () => {
   const data = replayData([...session.log], 5, 9);
   const checked = validateReplay(data);
   if (!checked.ok) throw new Error(checked.error);
-  const r = replay(checked.data, t, BASE_SCENARIO);
+  const r = replay(checked.data, t, BASE_SCENARIO, BASE_GUNS);
   expect(r.ignored).toBe(0);
   const twin = createSim({ ...rest, terrain: t });
   for (let i = 0; i < 5; i++) twin.step(data.inputs.filter((x) => x.t === i));

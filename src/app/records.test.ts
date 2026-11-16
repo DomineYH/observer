@@ -22,7 +22,7 @@ test('F-31: 받아들인 입력만 기록된다', () => {
   expect(g.session.log.map((i) => i.a)).toEqual(['start', 'pos_skip', 'call', 'loc', 'desc', 'eom']);
   expect(g.session.log[0]).toEqual({ t: 0, ...START });
   const data = replayOf(at, g.session.log, g.sim.state.tick);
-  const again = replay(data, at.terrain, at.scenario);
+  const again = replay(data, at.terrain, at.scenario, at.guns);
   expect(again.ignored).toBe(0);
   expect(again.record).toEqual(g.sim.record());
   expect(again.record.missions).toBe(1);
@@ -95,7 +95,7 @@ test('F-30: 랭킹 자격 — 한 틱 안에 훈련으로 바꿨다 돌아온 �
   ]);
   for (const input of MISSION) g.take(input);
   const sub = submissionOf('참새56', g.sim, at, g.session.log);
-  expect(replay(sub.replay, at.terrain, at.scenario).record.mode).toBe('training');
+  expect(replay(sub.replay, at.terrain, at.scenario, at.guns).record.mode).toBe('training');
   const stored = await archive.submit(sub);
   expect([stored.record.mode, stored.ranked]).toEqual(['training', false]);
   expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새56');
