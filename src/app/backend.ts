@@ -2,8 +2,8 @@ import { terrainHash, type TerrainData } from '@sim';
 import { TerrainLoadError, type TerrainFailure, type TerrainSource } from '@adapters/index';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { MUNGYEONG, realTerrain } from '@adapters/realTerrain';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
-import { MOCK_PLACEMENT, type Placement } from '@content/placement';
+import { PLACEMENTS } from '@content/lookup';
+import type { Placement } from '@content/placement';
 
 export type Backend = 'mock' | 'real';
 
@@ -21,7 +21,7 @@ export function selectBackend(value: string | undefined): Backend {
 // | ----------- | ------------------------------------------ | ----------------------------------------------------- |
 // | 지형 원천   | mockTerrain: the seed makes the land       | realTerrain(MUNGYEONG): the 문경 지형 파일, any seed, |
 // |             |                                            | checked by the sim's 지형 해시                        |
-// | 배치        | MOCK_PLACEMENT (base@1)                    | MUNGYEONG_PLACEMENT (base-mungyeong@1)                |
+// | 배치        | 배치 목록의 첫 mock 배치 (base@1)          | 배치 목록의 첫 mungyeong 배치 (base-mungyeong@2)      |
 // | 기상        | mockWeather                                | mockWeather                                           |
 // | 계정        | mockAccount (this browser's localStorage)  | mockAccount (this browser's localStorage)             |
 // | 기록 보관소 | mockArchive (this browser's localStorage)  | mockArchive (this browser's localStorage)             |
@@ -50,7 +50,7 @@ export async function loadTerrain(backend: Backend, seed: number, screen: BootSc
   }
 }
 
-// 배치, paired with the 지형 원천 by the same key.
-const PLACEMENT: Record<Backend, Placement> = { mock: MOCK_PLACEMENT, real: MUNGYEONG_PLACEMENT };
+// 배치, paired with the 지형 원천 by the same key: the 기본 시나리오 of the backend's 전장, the 배치 목록's first 배치 on it.
+const BATTLEFIELD: Record<Backend, string> = { mock: 'mock', real: 'mungyeong' };
 
-export const placementOf = (backend: Backend): Placement => PLACEMENT[backend];
+export const placementOf = (backend: Backend): Placement => PLACEMENTS.find((p) => p.terrain.id === BATTLEFIELD[backend])!;

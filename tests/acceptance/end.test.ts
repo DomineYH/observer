@@ -9,7 +9,7 @@ import { CALM, aimedAt, gridAt, isImpact, toEffect, untilLanded } from './strike
 import { flatTerrain } from './terrain';
 import { CALL_ADJUST, CALL_FFE, corr, desc, EOM, openRadio, REPEAT, toReady, untilSaid, untilTaken } from './mission';
 import type { Point, PostEvent, Scenario, SimEvent } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 
 const posts = (events: readonly SimEvent[]) => events.filter((e): e is PostEvent => e.type === 'post');
 /** The platoon as the scenario's only unit (no RESERVE). */

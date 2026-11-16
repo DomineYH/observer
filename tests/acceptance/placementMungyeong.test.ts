@@ -7,16 +7,16 @@ import { COVER, createSim, EYE_HEIGHT, heightAt, lineOfSight, surfaceAt, underCa
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { BASE_GUNS } from '@content/guns';
-import { MOCK_PLACEMENT } from '@content/placement';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE } from '@content/scenarios/base';
+import { BASE_SCENARIO } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 
 const loaded = unpackTerrain(new Uint8Array(readFileSync('src/adapters/realTerrain/mungyeong/terrain.bin')));
 const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 const header = json('terrain/mungyeong/header.json');
 const config = json('terrain/mungyeong/config.json');
 const expected = json('src/adapters/realTerrain/mungyeong/expected.json');
-const { scenario: sc, terrain: ref } = MUNGYEONG_PLACEMENT;
+const { scenario: sc, terrain: ref } = BASE_MUNGYEONG;
 const op = sc.plannedOp;
 const posts = [op, ...(sc.reserveOps ?? [])];
 const ROUTE_FRIEND = { A: 0, B: 1, C: 2 } as const; // 서 → 1소대, 중 → 2소대, 동 → 3소대
@@ -69,7 +69,7 @@ describe('문경 배치', () => {
     expect(ref).toEqual({ id: expected.id, version: expected.version });
     expect(ref.version).toBe(config.version);
     expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 2 });
-    expect(sc.id).not.toBe(MOCK_PLACEMENT.scenario.id);
+    expect(sc.id).not.toBe(BASE.scenario.id);
   });
 
   test('배치: 관측소', async () => {
@@ -246,7 +246,7 @@ describe('문경 배치', () => {
     const demo = ({ units, intelRoutes, nais }: typeof sc) => ({ units, intelRoutes, conf: nais.map((n) => n.conf) });
     expect(demo(sc)).toEqual(demo(BASE_SCENARIO));
     expect(mortar).toMatchObject({ spread: { x: 700, y: 500 } });
-    expect(MUNGYEONG_PLACEMENT.briefing.routes).toEqual(MOCK_PLACEMENT.briefing.routes);
+    expect(BASE_MUNGYEONG.briefing.routes).toEqual(BASE.briefing.routes);
     expect(Object.keys(sc.routes)).toEqual(Object.keys(BASE_SCENARIO.routes));
     expect(sc.nais).toHaveLength(3);
   });

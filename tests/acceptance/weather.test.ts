@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { CHECKPOINT_TICKS, createSim, replay, validateReplay, type RecordedInput, type Sim, type Weather } from '@sim';
 import { CLEAR_WEATHER, presetWeather } from '@adapters/mock/weather';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { atmosphere } from '@render/shade';
 import { mortarAt, started } from './enemy';
 import { init, replayData, START } from './init';

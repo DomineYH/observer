@@ -1,6 +1,6 @@
 // A 배치 whose names, texts and 예비 관측소 all differ from the mock's, to see what reads the chosen 배치.
 import type { Placement } from '@content/placement';
-import { BASE_SCENARIO, BRIEFING } from '@content/scenario';
+import { BASE_SCENARIO, BRIEFING } from '@content/scenarios/base';
 
 /** On `flatTerrain()`'s grid (CH, 40000, 30000) the reserve posts read 4400 3100 and 4600 3090. */
 export const TEST_PLACEMENT: Placement = {

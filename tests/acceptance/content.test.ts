@@ -2,8 +2,8 @@ import { expect, test } from 'vitest';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, GUNS, PLACEMENTS } from '@content/lookup';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { EXPECTED, mismatches, valueHash } from './expected';
 
 const piece = { id: 'x', version: 1, list: [1, 2], nested: { a: 1, b: 2 } };
@@ -35,7 +35,7 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   const found = contentOf({ scenario: base, guns: base });
   expect(found.scenario).toBe(BASE_SCENARIO);
   expect(found.guns).toBe(BASE_GUNS);
-  expect(contentOf({ scenario: { id: 'base-mungyeong', version: 2 }, guns: base }).scenario).toBe(MUNGYEONG_PLACEMENT.scenario);
+  expect(contentOf({ scenario: { id: 'base-mungyeong', version: 2 }, guns: base }).scenario).toBe(BASE_MUNGYEONG.scenario);
   // Ids no later slice adds: a real one (apc-mungyeong, k9) would turn this red when it arrives.
   expect(() => contentOf({ scenario: { id: 'nowhere', version: 1 }, guns: base })).toThrow('scenario nowhere: unknown id');
   expect(() => contentOf({ scenario: { id: 'base', version: 2 }, guns: base })).toThrow('scenario base@2: unknown version (this build has base@1)');

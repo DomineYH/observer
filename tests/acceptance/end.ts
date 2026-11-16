@@ -1,6 +1,6 @@
 // Fixtures for the end-of-game tests (#36): games played through to their end.
 import type { Scenario, Sim } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CALL_FFE, desc } from './mission';
 import { aimedAt, isImpact } from './strike';
 

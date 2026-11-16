@@ -1,9 +1,7 @@
-import type { Confidence, Point, RouteKey, Scenario } from '@sim';
+import type { BaseScenario, Briefing, Placement } from '../placement';
 
-/** 기본 시나리오 (demo lines 207–209, 406–433). Keep `plannedOp` and `friends` equal to the mock terrain's `OP_HILL` and
- * `FRIEND_HILLS`. */
-/** The two base scenarios always have routes A, B and C. M3-6 and M3-9 drop this when the 배치 tests loop over every 배치. */
-export type BaseScenario = Scenario & { routes: Readonly<Record<'A' | 'B' | 'C', readonly Point[]>> };
+/** 시나리오 자료 of `base`, 기본 시나리오 on the mock 전장 (demo lines 207–209, 406–433). Keep `plannedOp` and `friends` equal
+ * to the mock terrain's `OP_HILL` and `FRIEND_HILLS`. Any change here raises `version`. */
 export const BASE_SCENARIO: BaseScenario = {
   id: 'base',
   version: 1,
@@ -41,14 +39,22 @@ export const BASE_SCENARIO: BaseScenario = {
   ],
 };
 
-/** 작전 준비 화면의 글 (demo lines 925–933), in the scenario's order. */
-export const BRIEFING = {
+/** 글 of `base` but the planned post's place name: the 작전 준비 글 (demo lines 925–933), in
+ * the scenario's order. */
+export const BRIEFING: Omit<Briefing, 'plannedOp'> = {
   enemy:
     '적 보병 1개 중대(-) 규모가 아군 1~3소대 진지 방향으로 공격할 것으로 판단됨. 장갑차 일부 동반 가능. 82mm 박격포 1개 반이 북쪽 능선 일대에서 지원할 것으로 추정.',
   nais: ['서측 고개 — 적 정찰조 활동 첩보', '중앙 안부 — 적 주 접근로로 판단', '북쪽 능선 일대 — 적 박격포 진지 추정'],
-  routes: { A: '서측 접근로', B: '중앙 접근로', C: '동측 접근로' } satisfies Partial<Record<RouteKey, string>>,
-  conf: { high: '높음', medium: '보통', low: '낮음' } satisfies Record<Confidence, string>,
+  routes: { A: '서측 접근로', B: '중앙 접근로', C: '동측 접근로' },
+  conf: { high: '높음', medium: '보통', low: '낮음' },
   mission: '관측소를 선정·점령하여 NAI와 접근로를 감시하고, 적 발견 시 화력을 유도한다.',
   caution:
     '파란 점선은 아군 전선(이동 한계선). 그 앞으로도 나갈 수 있지만 적에게 발각되면 관측소가 사격을 받는다. 작전 개시 후 이동은 도보. 다른 곳을 점령하면 기러기에게 위치를 보고해야 함.',
+};
+
+/** 배치 `base`: the scenario, its 글 (outside the scenario version) and the 지형 it is laid on. */
+export const BASE: Placement = {
+  scenario: BASE_SCENARIO,
+  briefing: { ...BRIEFING, plannedOp: '1번 고지' },
+  terrain: { id: 'mock', version: 1 },
 };

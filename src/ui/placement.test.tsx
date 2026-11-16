@@ -4,8 +4,8 @@ import { expect, test } from 'vitest';
 import { createSim } from '@sim';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { replayOf } from '@app/records';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
-import { MOCK_PLACEMENT } from '@content/placement';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
+import { BASE } from '@content/scenarios/base';
 import { INF_RECON } from '../../tests/acceptance/end';
 import { init } from '../../tests/acceptance/init';
 import { TEST_PLACEMENT } from '../../tests/acceptance/placement';
@@ -61,8 +61,8 @@ test('배치: 패널과 강평은 고른 배치에서 읽는다', () => {
 
 test('배치: 문경 작전 준비 글', async () => {
   const terrain = await unpackTerrain(new Uint8Array(readFileSync('src/adapters/realTerrain/mungyeong/terrain.bin')));
-  const { scenario, briefing } = MUNGYEONG_PLACEMENT;
-  const mock = MOCK_PLACEMENT.briefing;
+  const { scenario, briefing } = BASE_MUNGYEONG;
+  const mock = BASE.briefing;
   const { enemy, nais, ...same } = briefing;
   const { enemy: mockEnemy, nais: mockNais, ...mockSame } = mock;
   expect(same).toEqual(mockSame); // 접근로 이름, 신뢰도, 임무, 주의 글, "1번 고지"

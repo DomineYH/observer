@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { directFireChance, EYE_HEIGHT, signalAt, type ReadonlySimState, type Scenario, type Sim } from '@sim';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { mockTerrain } from '@adapters/mock/terrain';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { angleTo, dist, mortarAt, oneUnit, started } from './enemy';
 import { flatTerrain, mainRoad } from './terrain';
 

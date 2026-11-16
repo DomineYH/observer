@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { createSim, heightAt, signalAt, type Sim } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { dist, mortarAt, oneUnit, run, started, until } from './enemy';
 import { init, START } from './init';

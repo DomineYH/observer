@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import type { Input, SeedKind, TerrainData } from '@sim';
 import { flatTerrain } from '../../tests/acceptance/terrain';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MOCK_PLACEMENT } from '@content/placement';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE_SCENARIO } from '@content/scenarios/base';
+import { BASE } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { TEST_PLACEMENT } from '../../tests/acceptance/placement';
 import { pressStart, PrepPanel, type PrepState } from './PrepPanel';
 
@@ -19,7 +19,7 @@ const WEATHER = {
   humidityPct: 48,
 };
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
-const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } }), placement = MOCK_PLACEMENT) =>
+const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } }), placement = BASE) =>
   renderToStaticMarkup(
     <PrepPanel
       state={state}
@@ -129,7 +129,7 @@ test('F-22: 예비 관측소 줄', () => {
   expect(text(20261106, 'daily', PREP, 'AB', flat('AB'), TEST_PLACEMENT)).toContain('예비 1 알파브라보 4400 3100, 예비 2 알파브라보 4600 3090.');
   // No 예비 관측소, no line: the 주의 글 ends at the planned post.
   const none = { ...TEST_PLACEMENT, scenario: { ...TEST_PLACEMENT.scenario, reserveOps: [] } };
-  for (const placement of [MOCK_PLACEMENT, none]) {
+  for (const placement of [BASE, none]) {
     const prep = text(20261106, 'daily', PREP, 'CH', flat('CH'), placement);
     expect(prep).not.toContain('예비');
     expect(prep).toContain('찰리호텔 4512 3180.지도를 눌러');
@@ -139,11 +139,11 @@ test('F-22: 예비 관측소 줄', () => {
 test('F-22: 자료 출처 줄', () => {
   const CREDITS = ['국토지리정보원 수치표고모델', 'OpenStreetMap 기여자 (ODbL)'];
   const terrain = { ...flatTerrain(), credits: CREDITS };
-  const prep = markup(20261106, 'daily', PREP, 'CH', terrain, MUNGYEONG_PLACEMENT);
+  const prep = markup(20261106, 'daily', PREP, 'CH', terrain, BASE_MUNGYEONG);
   // At the very bottom, after 작전 개시, one small line each, in order.
   expect(prep).toMatch(/<\/button><p><small>국토지리정보원 수치표고모델<\/small><\/p><p><small>OpenStreetMap 기여자 \(ODbL\)<\/small><\/p><\/section>$/);
   // No credits (the mock land): nothing more is drawn.
-  for (const placement of [MOCK_PLACEMENT, MUNGYEONG_PLACEMENT]) expect(markup(20261106, 'daily', PREP, 'CH', flatTerrain(), placement)).toMatch(/<\/button><\/section>$/);
+  for (const placement of [BASE, BASE_MUNGYEONG]) expect(markup(20261106, 'daily', PREP, 'CH', flatTerrain(), placement)).toMatch(/<\/button><\/section>$/);
   // Only on 작전 준비: the one-line panel after the start has none.
   expect(text(20261106, 'daily', { ...PREP, phase: 'live' }, 'CH', terrain)).not.toContain('OpenStreetMap');
 });

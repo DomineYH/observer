@@ -1,11 +1,12 @@
 import type { CombatData, GunProfile, ReplayData, Ref, Scenario } from '@sim';
 import { COMBAT } from './combat';
 import { BASE_GUNS } from './guns';
-import { MUNGYEONG_PLACEMENT } from './mungyeong';
-import { MOCK_PLACEMENT, type Placement } from './placement';
+import type { Placement } from './placement';
+import { BASE } from './scenarios/base';
+import { BASE_MUNGYEONG } from './scenarios/base-mungyeong';
 
-/** The two 배치 in order. M3-6 turns this into the 배치 목록. */
-export const PLACEMENTS: readonly Placement[] = [MOCK_PLACEMENT, MUNGYEONG_PLACEMENT];
+/** 배치 목록: every 배치 of this build, in order. A new 배치 goes at the end; a 전장's first 배치 is its 기본 시나리오. */
+export const PLACEMENTS: readonly Placement[] = [BASE, BASE_MUNGYEONG];
 export const GUNS: readonly GunProfile[] = [BASE_GUNS];
 
 function find<T extends Ref>(kind: string, list: readonly T[], want: Ref): T {

@@ -6,7 +6,7 @@ import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
 import { terrainColours, type TerrainColours } from '@render/shade';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { centreOn, FULL_VIEW, panBy, pointAt, zoomAt, type MapView } from '@render/mapView';
 import { flatTerrain, mainRoad } from './terrain';
 import { angleTo, idAt, mortarAt, oneUnit, started } from './enemy';

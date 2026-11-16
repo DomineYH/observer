@@ -3,7 +3,7 @@
 import { expect, test } from 'vitest';
 import { createSim, type Scenario, type UnitDef } from '@sim';
 import { routeNumber } from '@sim/stateHash';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { unitName } from '@ui/debrief';
 import { mortarAt, RESERVE, started } from './enemy';
 import { init, START } from './init';

@@ -3,8 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { replay, validateReplay, type ReplayData, type TerrainData } from '@sim';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE_SCENARIO } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { readGolden } from '../golden/golden';
 import { replayData, START } from './init';
 import { flatTerrain } from './terrain';
@@ -103,7 +103,7 @@ describe('F-31', () => {
     const five = readGolden('5-real-laser-move.json').replay;
     expect(validateReplay(five).ok).toBe(true);
     expect(five.terrain).toEqual({ id: 'mungyeong', version: 2 });
-    const scenario = MUNGYEONG_PLACEMENT.scenario;
+    const scenario = BASE_MUNGYEONG.scenario;
     expect(() => replay(five, { ...flatTerrain(), id: 'mungyeong', version: 3 }, scenario, BASE_GUNS)).toThrow(/terrain/); // another 판
     expect(() => replay(five, flatTerrain(), scenario, BASE_GUNS)).toThrow(/terrain/); // mock@1
   });

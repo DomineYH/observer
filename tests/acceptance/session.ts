@@ -1,6 +1,6 @@
 // A game played through the assembly point's session, so its 입력 기록 is the app's own.
 import { createSim, type Input, type SimEvent, type SimInit } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { createSession } from '@app/session';
 import { init, START } from './init';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, POS_SKIP } from './mission';
