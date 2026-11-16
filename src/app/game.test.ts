@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { mockWeather } from '@adapters/mock/weather';
-import { replay, type SimInit } from '@sim';
+import { replay, validateReplay, type SimInit } from '@sim';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { newGame } from './game';
 import { replayOf } from './records';
@@ -103,4 +104,37 @@ test('F-30: 기상 변경은 고른 모드를 남긴다', async () => {
   expect(again.record).toEqual(e.sim.record());
   expect(again.record.mode).toBe('training');
   expect(again.checkpoints.at(-1)).toEqual({ tick: 200, hash: e.sim.hash() });
+});
+
+test('실전: 판을 새로 만들 때 실전은 만드는 값으로 넘어가고 재생 자료 머리에 실전 자료 판이 실린다', async () => {
+  const combat = async (preset: 'clear' | 'fog'): Promise<SimInit> => ({ ...(await practice(preset)), mode: 'combat', combat: COMBAT });
+  // Into combat: the mode the old game was in is not put in again as an input.
+  const training = newGame({ ...(await practice('clear')), mode: 'training' });
+  training.session.send({ a: 'pick', v: [300, 340] });
+  training.session.step();
+  const a = newGame(await combat('clear'), training);
+  a.session.step();
+  expect(a.sim.state.mode).toBe('combat');
+  expect(a.session.log).toEqual([{ t: 0, a: 'pick', v: [300, 340] }]); // the 관측소 후보 only
+  // A weather change in combat: the new game is combat by its 생성 인자, with no mode input.
+  const b = newGame({ ...a.init, weather: (await practice('fog')).weather }, a);
+  b.session.send({ a: 'start', v: [300, 340] });
+  b.session.step();
+  b.session.step();
+  expect(b.sim.state.mode).toBe('combat');
+  expect(b.session.log.some((i) => i.a === 'mode')).toBe(false);
+  // Its 재생 자료 carries the 실전 자료 판, passes the format check and replays with nothing ignored.
+  const data = replayOf(b.init, b.session.log, b.sim.state.tick);
+  expect(data.mode).toBe('combat');
+  expect(data.combatDataVersion).toBe(COMBAT.version);
+  expect(validateReplay(data).ok).toBe(true);
+  const replayed = replay(data, b.init.terrain, BASE_SCENARIO, BASE_GUNS, COMBAT);
+  expect([replayed.ignored, replayed.record]).toEqual([0, b.sim.record()]);
+  // Out of combat: a combat game's mode is not put into the new game either.
+  const c = newGame(await practice('clear'), b);
+  c.session.step();
+  expect(c.sim.state.mode).toBe('standard');
+  expect(c.session.log.some((i) => i.a === 'mode')).toBe(false);
+  // A training or standard game's 재생 자료 has no such key.
+  expect(Object.hasOwn(replayOf(c.init, c.session.log, 0), 'combatDataVersion')).toBe(false);
 });

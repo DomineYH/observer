@@ -6,7 +6,7 @@ import { clock } from './clock';
 export const SPEEDS = [1, 2, 4, 8] as const;
 export type Speed = (typeof SPEEDS)[number];
 
-const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준' };
+const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준', combat: '실전' };
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 interface Props {

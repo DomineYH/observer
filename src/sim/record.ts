@@ -38,6 +38,6 @@ export function recordOf(s: SimState, init: Pick<SimInit, 'seed' | 'seedKind'> &
     postMoves: s.post.moves,
     compromised: s.compromised >= 0,
     score: s.score,
-    mode: s.trainingUsed || s.mode === 'training' ? 'training' : 'standard',
+    mode: s.mode === 'combat' ? 'combat' : s.trainingUsed || s.mode === 'training' ? 'training' : 'standard',
   };
 }

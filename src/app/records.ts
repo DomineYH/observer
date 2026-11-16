@@ -5,7 +5,7 @@ import type { MissionSummary, Submission } from '@adapters/index';
 /** 재생 자료 of a game: its 생성 인자 (scenario and terrain by identity, mock terrain left out) and its 입력 기록 up to
  * `totalTicks`. */
 export function replayOf(init: SimInit, log: readonly RecordedInput[], totalTicks: number): ReplayData {
-  const { seed, seedKind, scenario, guns, weather, mode, terrain } = init;
+  const { seed, seedKind, scenario, guns, weather, mode, terrain, combat } = init;
   return {
     format: 1,
     simVersion: SIM_VERSION,
@@ -18,6 +18,7 @@ export function replayOf(init: SimInit, log: readonly RecordedInput[], totalTick
     stepMs: 50,
     inputs: [...log],
     totalTicks,
+    ...(combat ? { combatDataVersion: combat.version } : {}),
     ...(terrain.id === 'mock' ? {} : { terrain: { id: terrain.id, version: terrain.version } }), // never `terrain: undefined`
   };
 }

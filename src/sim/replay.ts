@@ -2,7 +2,8 @@ import { Hasher } from './hash';
 import { validInput } from './inputs';
 import { createSim } from './sim';
 import type { TerrainData } from './terrain';
-import type { GunProfile, ReplayData, ReplayResult, Ref, Scenario } from './types';
+import type { CombatData, GunProfile, ReplayData, ReplayResult, Ref, Scenario } from './types';
+import { MODES } from './types';
 import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
@@ -45,7 +46,7 @@ const ref = (x: unknown, what: string): void => {
 
 function check(x: unknown): asserts x is ReplayData {
   if (!isObject(x)) return fail('replay data: object expected');
-  keysExactly(x, HEADER_KEYS, 'header', ['terrain']);
+  keysExactly(x, HEADER_KEYS, 'header', ['terrain', 'combatDataVersion']);
   if (x.format !== 1) fail('format: 1 expected');
   int(x.simVersion, 1, INT32_MAX, 'simVersion');
   int(x.seed, 0, INT32_MAX, 'seed');
@@ -60,7 +61,9 @@ function check(x: unknown): asserts x is ReplayData {
   if (!isObject(w)) return fail('weather: object expected');
   keysExactly(w, WEATHER_KEYS, 'weather');
   for (const [k, min, max] of WEATHER_RANGES) int(w[k], min, max, `weather.${k}`);
-  if (x.mode !== 'training' && x.mode !== 'standard') fail('mode: training | standard expected');
+  if (!(MODES as readonly unknown[]).includes(x.mode)) fail('mode: training | standard | combat expected');
+  if (x.mode === 'combat') int(x.combatDataVersion, 1, INT32_MAX, 'combatDataVersion');
+  else if (Object.hasOwn(x, 'combatDataVersion')) fail('combatDataVersion: only with mode combat');
   if (x.stepMs !== 50) fail('stepMs: 50 expected');
   int(x.totalTicks, 0, INT32_MAX, 'totalTicks');
   if (!Array.isArray(x.inputs)) return fail('inputs: array expected');
@@ -89,9 +92,10 @@ export function validateReplay(x: unknown): { ok: true; data: ReplayData } | { o
 }
 
 /** 재생기: a pure test tool. Records of another simVersion are not replayed. The caller passes the terrain the header names
- * (none = mock@1 regenerated from the seed), the scenario and the 포 프로파일 it names. Every replayed tick must advance: all 작전 준비 inputs and `start` sit
+ * (none = mock@1 regenerated from the seed), the scenario and the 포 프로파일 it names, and for a combat header the
+ * 실전 자료 of its 판. Every replayed tick must advance: all 작전 준비 inputs and `start` sit
  * at t 0, and a game that ends (its clock stops) ends the record at that tick. */
-export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario, guns: GunProfile): ReplayResult {
+export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario, guns: GunProfile, combat?: CombatData): ReplayResult {
   if (d.simVersion !== SIM_VERSION) throw new Error(`simVersion ${d.simVersion} is not this code's ${SIM_VERSION}`);
   if (scenario.id !== d.scenario.id || scenario.version !== d.scenario.version)
     throw new Error(`scenario ${scenario.id}@${scenario.version} is not the header's ${d.scenario.id}@${d.scenario.version}`);
@@ -100,7 +104,9 @@ export function replay(d: ReplayData, terrain: TerrainData, scenario: Scenario, 
   const want = d.terrain ?? { id: 'mock', version: 1 };
   if (terrain.id !== want.id || terrain.version !== want.version)
     throw new Error(`terrain ${terrain.id}@${terrain.version} is not the header's ${want.id}@${want.version}`);
-  const sim = createSim({ ...d, scenario, guns, terrain });
+  if (d.mode === 'combat' && combat?.version !== d.combatDataVersion)
+    throw new Error(`combat data version ${combat?.version ?? 'none'} is not the header's ${d.combatDataVersion}`);
+  const sim = createSim({ ...d, scenario, guns, terrain, combat: d.mode === 'combat' ? combat : undefined });
   const chain = new Hasher();
   const checkpoints: ReplayResult['checkpoints'] = [];
   let ignored = 0;

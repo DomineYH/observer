@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type SimEvent } from '@sim';
+import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type ReplayData, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { BASE_GUNS } from '@content/guns';
@@ -33,7 +33,7 @@ describe('골든', () => {
     expect(Object.fromEntries(Object.keys(LOCKED).map((f) => [f, sha(f)]))).toEqual(LOCKED);
   });
 
-  // Checks all four header versions (simVersion, 지형 판, 시나리오 버전, 포 프로파일 버전) against the code and the land's data.
+  // Checks all five header versions (simVersion, 지형 판, 시나리오 버전, 포 프로파일 버전, 실전 자료 판 in a combat golden) against the code and the land's data.
   test('골든: simVersion이 코드와 같다', async () => {
     const files = goldenFiles();
     expect(files).toContain('0-empty.json');
@@ -44,7 +44,7 @@ describe('골든', () => {
       const d = readGolden(f).replay;
       const found = contentOf(d);
       const [terrain, scenario, guns] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(found.scenario), ref(found.guns)];
-      expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario, guns });
+      expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario, guns, combat: found.combat?.version });
     }
   }, 30000); // reads every golden file
 
@@ -214,6 +214,15 @@ describe('골든', () => {
     expect(shouldWrite(g, v(17, 3, 1, { terrain: 'mungyeong', scenario: 'base-mungyeong' }))).toBe(true);
     expect(() => shouldWrite(g, v(17, 1, 1, { terrain: 'mungyeong', scenario: 'base-mungyeong' }))).toThrow(/newer/);
     expect(() => shouldWrite(g, v(17, 2, 1, { terrain: 'mock', scenario: 'base-mungyeong' }))).toThrow(/terrain/);
+    // 실전 자료 판: a combat golden carries it; a higher one rewrites, a lower one throws, on one side only throws.
+    const c = (combat: number, simVersion = 17): Versions => ({ ...v(simVersion, 1, 3), combat });
+    expect(shouldWrite(c(1), c(1))).toBe(false);
+    expect(shouldWrite(c(1), c(2))).toBe(true);
+    expect(shouldWrite(c(1), c(2, 18))).toBe(true);
+    expect(() => shouldWrite(c(2), c(1))).toThrow(/newer/);
+    expect(() => shouldWrite(c(2), c(1, 18))).toThrow(/newer/); // one higher, one lower
+    expect(() => shouldWrite(golden, c(1))).toThrow(/combat/);
+    expect(() => shouldWrite(c(1), golden)).toThrow(/combat/);
     const header = readGolden('0-empty.json').replay;
     expect(headerVersions(header)).toEqual({ simVersion: header.simVersion, terrain: { id: 'mock', version: 1 }, scenario: header.scenario, guns: header.guns });
   });
@@ -238,6 +247,13 @@ describe('골든', () => {
     // The gun profile: the code's version is written, another id is refused.
     expect(currentHeader(SCRIPTS[0]!.replay, { ...now, guns: { id: 'base', version: 2 } }).guns).toEqual({ id: 'base', version: 2 });
     expect(() => currentHeader(SCRIPTS[0]!.replay, { ...now, guns: { id: 'k9', version: 1 } })).toThrow(/guns/);
+    // A combat script: the code's 실전 자료 판 is written; a script and versions that disagree on combat are refused.
+    const fight: ReplayData = { ...SCRIPTS[0]!.replay, mode: 'combat', combatDataVersion: 1 };
+    expect(headerVersions(fight).combat).toBe(1);
+    expect(currentHeader(fight, { ...now, combat: 2 }).combatDataVersion).toBe(2);
+    expect(validateReplay(currentHeader(fight, { ...now, combat: 2 })).ok).toBe(true);
+    expect(() => currentHeader(fight, now)).toThrow(/combat/);
+    expect(() => currentHeader(SCRIPTS[0]!.replay, { ...now, combat: 1 })).toThrow(/combat/);
     // Ids are not rewritten.
     expect(() => currentHeader(d, now)).toThrow(/terrain/);
     expect(() => currentHeader(SCRIPTS[4]!.replay, { ...now, scenario: { id: 'other', version: 1 } })).toThrow(/scenario/);

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, GUNS, PLACEMENTS } from '@content/lookup';
 import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
@@ -40,11 +41,18 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   expect(() => contentOf({ scenario: { id: 'base', version: 2 }, guns: base })).toThrow('scenario base@2: unknown version (this build has base@1)');
   expect(() => contentOf({ scenario: base, guns: { id: 'nogun', version: 1 } })).toThrow('guns nogun: unknown id');
   expect(() => contentOf({ scenario: base, guns: { id: 'base', version: 2 } })).toThrow('guns base@2: unknown version (this build has base@1)');
+  // 실전 판의 머리: the 실전 자료 comes with it, and only with it.
+  expect(found.combat).toBeUndefined();
+  expect(contentOf({ scenario: base, guns: base, mode: 'standard' }).combat).toBeUndefined();
+  expect(contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 1 }).combat).toBe(COMBAT);
+  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 2 })).toThrow('combat@2: unknown version (this build has combat@1)');
+  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat' })).toThrow('combat@undefined: unknown version (this build has combat@1)');
 });
 
 test('자료: 내용과 버전이 어긋나지 않는다', () => {
   const pieces: Record<string, unknown> = {};
   for (const { scenario: s } of PLACEMENTS) pieces[`scenario ${s.id}@${s.version}`] = s; // 증원 (M3-16) will be left out here
+  pieces[`combat@${COMBAT.version} numbers`] = COMBAT.numbers;
   for (const g of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });

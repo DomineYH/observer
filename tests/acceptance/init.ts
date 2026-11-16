@@ -1,4 +1,5 @@
 import { SIM_VERSION, type Input, type ReplayData, type SimInit, type TerrainData, type Weather } from '@sim';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
@@ -14,6 +15,9 @@ export const init = (seed: number, terrain: TerrainData = flatTerrain()): SimIni
   mode: 'standard',
   terrain,
 });
+
+/** `init` as a combat game: the mode and the 실전 자료 are 생성 인자. */
+export const combatInit = (seed: number, terrain?: TerrainData): SimInit => ({ ...init(seed, terrain), mode: 'combat', combat: COMBAT });
 
 /** 작전 개시 at the middle of the flat test terrain. */
 export const START: Input = { a: 'start', v: [320, 320] };
