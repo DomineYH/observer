@@ -2,12 +2,13 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import type { Input, Mode, RadioEvent, Sim } from '@sim';
+import type { Input, Mode, Phase, RadioEvent, Sim } from '@sim';
 import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, ended, LOC_NEAR, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
 import { aimedAt, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer } from './Composer';
 import { Preview } from './CorrectionForm';
+import { HeadBand, nextSpeed, pauseCovers, SPEEDS, type Speed } from './HeadBand';
 import { PositionForm } from './PositionForm';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, locDraft, type Draft } from './radio/drafts';
@@ -115,4 +116,24 @@ test('실전: 교신 문장 미리보기 없음 — 양식은 표준과 같고 �
     if (a === 'loc') expect(text(log('training', said))).toContain('(4050)');
     answered(sim, a);
   }
+});
+
+test('실전: 일시정지 없음 — 작전 중에 일시정지 단추가 눌리지 않고 배속은 넷 그대로', () => {
+  const band = (mode: Mode, speed: Speed = 1, phase: Phase = 'live') =>
+    renderToStaticMarkup(<HeadBand tick={0} score={0} rounds={0} mode={mode} speed={speed} paused={false} phase={phase} onSpeed={() => {}} onPause={() => {}} />);
+  const PAUSE = /<button type="button" aria-pressed="false"( disabled="")?>일시정지<\/button>/;
+  // 실전 작전 중: the button is there and cannot be pressed; 훈련·표준 can pause as before; nobody can before 작전 개시.
+  expect(band('combat').match(PAUSE)![1]).toBe(' disabled=""');
+  for (const m of ['standard', 'training'] as const) expect(band(m).match(PAUSE)![1], m).toBeUndefined();
+  for (const m of ['combat', 'standard', 'training'] as const) expect(band(m, 1, 'prep').match(PAUSE)![1], m).toBe(' disabled=""');
+  // 배속: the four in a ring, the button pressable in 실전.
+  expect(SPEEDS).toEqual([1, 2, 4, 8]);
+  expect(SPEEDS.map(nextSpeed)).toEqual([2, 4, 8, 1]);
+  for (const s of SPEEDS) expect(band('combat', s)).toContain(`<button type="button" aria-label="배속 ×${s}">×${s}</button>`);
+  // Nothing is covered: only 표준's pause hides the view, the map and the 입력기.
+  expect(pauseCovers(true, 'combat', 'live')).toBe(false);
+  expect(pauseCovers(true, 'standard', 'live')).toBe(true);
+  expect(pauseCovers(true, 'training', 'live')).toBe(false);
+  expect(pauseCovers(false, 'standard', 'live')).toBe(false);
+  expect(band('combat')).toContain('aria-label="모드" class="tag">실전<');
 });

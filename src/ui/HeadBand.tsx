@@ -5,6 +5,11 @@ import { clock } from './clock';
 
 export const SPEEDS = [1, 2, 4, 8] as const;
 export type Speed = (typeof SPEEDS)[number];
+/** 배속 단추: the next of the four, in a ring. The same in every mode. */
+export const nextSpeed = (s: Speed): Speed => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length]!;
+/** 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918). 표준 only: 훈련
+ * pauses freely and 실전 cannot pause. */
+export const pauseCovers = (paused: boolean, mode: Mode, phase: Phase) => paused && mode === 'standard' && phase === 'live';
 
 const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준', combat: '실전' };
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
@@ -26,7 +31,7 @@ interface Props {
 /**
  * 머리띠, one set for every width: 경과 · 점수 · 사용 탄 · 일시정지 · 모드 딱지 · 배속 · 메뉴, then the 머리띠 메뉴. The page's CSS
  * spreads the menu inline on a wide screen and makes it a sheet over the lower tabs on a narrow one. Pause and speed
- * are not inputs, and opening the menu does not pause.
+ * are not inputs, and opening the menu does not pause. 실전 has no pause (#115 Q2).
  */
 export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children }: Props) {
   const [open, setOpen] = useState(false);
@@ -63,13 +68,13 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
           <span className="hb-label">사용 탄 </span>
           <output aria-live="off" aria-label="사용 탄">{rounds}발</output>
         </span>
-        <button type="button" aria-pressed={paused} disabled={phase !== 'live'} onClick={onPause}>
+        <button type="button" aria-pressed={paused} disabled={phase !== 'live' || mode === 'combat'} onClick={onPause}>
           {paused ? '재개' : '일시정지'}
         </button>
         <output aria-live="off" aria-label="모드" className="tag">
           {MODE_NAMES[mode]}
         </output>
-        <button type="button" aria-label={`배속 ×${speed}`} onClick={() => onSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>
+        <button type="button" aria-label={`배속 ×${speed}`} onClick={() => onSpeed(nextSpeed(speed))}>
           ×{speed}
         </button>
         <button ref={toggle} type="button" className="hb-toggle" aria-pressed={open} aria-controls="hb-menu" onClick={() => setOpen(!open)}>
