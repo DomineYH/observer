@@ -2,19 +2,31 @@
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import type { Input, Mode, Phase, RadioEvent, Sim } from '@sim';
+import { createSim, type Input, type Lase, type Mode, type Phase, type RadioEvent, type Sim } from '@sim';
+import { terrainColours } from '@render/shade';
 import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, ended, LOC_NEAR, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
+import { angleTo, idAt, mortarAt, oneUnit, run, started as startedWith } from '../../tests/acceptance/enemy';
+import { combatInit, START } from '../../tests/acceptance/init';
 import { aimedAt, NEAR, toEffect, watch } from '../../tests/acceptance/strike';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { Composer } from './Composer';
+import { deviation, prefillDirection, suggestion } from './correction';
 import { Preview } from './CorrectionForm';
 import { HeadBand, nextSpeed, pauseCovers, SPEEDS, type Speed } from './HeadBand';
+import { LaseReadout } from './Laser';
+import { MapPanel } from './MapPanel';
+import { darkInPrep, namesFriends } from './ObservationView';
 import { PositionForm } from './PositionForm';
+import { reportError } from './post';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, locDraft, type Draft } from './radio/drafts';
+import { TargetList } from './TargetList';
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const GRID = flatTerrain().grid;
+/** A set-up post 기러기 knows: the composer offers a call at idle. */
+const POST = { post: { state: 'ready', move: null, departed: 0, until: 0, moves: 0 }, reportDue: false, tick: 0, knownOp: { x: 0, y: 0 } } as const;
+const EMPTY = { missions: [], platoons: [], op: { x: 0, y: 0 }, aim: { az: 0, el: 0 }, ...POST };
 const text = (html: string) => html.replace(/<[^>]*>/g, '');
 type Stage = Parameters<typeof Composer>[0]['stage'];
 type State = Parameters<typeof Composer>[0]['state'];
@@ -136,4 +148,129 @@ test('실전: 일시정지 없음 — 작전 중에 일시정지 단추가 눌�
   expect(pauseCovers(true, 'training', 'live')).toBe(false);
   expect(pauseCovers(false, 'standard', 'live')).toBe(false);
   expect(band('combat')).toContain('aria-label="모드" class="tag">실전<');
+});
+
+test('실전: 레이저 측정점 좌표 자동 계산 — 실전에서도 표준과 같다', () => {
+  // The readout: a lase at the crew of a mortar section 700 m north. 실전 shows no grid of the point, as 표준.
+  const sim = startedWith(mortarAt({ x: 320, y: 1020 }));
+  const man = sim.state.platoons[0]!.members.find((m) => m.kind === 'man' && m.vis)!;
+  const at = angleTo(sim, man);
+  expect(sim.step([{ a: 'lase', v: [Math.round(at.az), Math.round(at.el)] }]).accepted).toEqual([true]);
+  const shown = (mode: Mode) =>
+    renderToStaticMarkup(<LaseReadout lases={sim.state.lases} mode={mode} grid={GRID} />)
+      .replace(/<\/(li|p)>/g, '\n')
+      .replace(/<[^>]*>/g, '')
+      .trim();
+  expect(shown('combat')).toBe(shown('standard'));
+  expect(shown('combat').split('\n')[0]).toMatch(/· 표적 반사$/);
+  expect(shown('combat')).not.toContain('CH ');
+  expect(shown('training').split('\n')[0]).toMatch(/ · CH \d{4} \d{4}$/);
+  // 표적위치: the lase does not fill the grid; the 좌표자 does, or nothing.
+  const hit: Lase = { tick: 9, az: 8003, el: -20, range: { dist: 1004, vm: -2, x: 805, y: 805, target: true } };
+  const fields = (html: string) => [...html.matchAll(/<input inputMode="numeric" maxLength="4" size="4" value="(\d*)"\/>/g)].map((m) => m[1]);
+  expect(fields(composer('combat', 'loc', EMPTY, { lastHit: hit }))).toEqual(['', '']);
+  expect(fields(composer('combat', 'loc', EMPTY, { lastHit: hit, pin: { e: 12, n: 3456 } }))).toEqual(['0012', '3456']);
+  expect(fields(composer('standard', 'loc', EMPTY, { lastHit: hit }))).toEqual(['', '']);
+  expect(fields(composer('training', 'loc', EMPTY, { lastHit: hit }))).toEqual(['4080', '3080']);
+});
+
+test('실전: 방향 입력 — 실전에서도 표준과 같다', () => {
+  // Aimed at 4720 mils: 훈련 would put it in the 방향 field of the 수정 and the 전이사격 forms.
+  const aim = { az: 47204, el: 0 };
+  expect(prefillDirection({ mode: 'combat', aim })).toBe('');
+  expect(prefillDirection({ mode: 'training', aim })).toBe('4720');
+  const direction = (html: string) => [...html.matchAll(/방향 <input[^>]*value="(\d*)"\/> 밀/g)].map((m) => m[1]);
+  const adjust = atAdjust();
+  const eom = afterEom();
+  for (const [stage, sim] of [['adjust', adjust], ['idle', eom]] as const) {
+    const at = (mode: Mode) => composer(mode, stage, { ...sim.state, aim });
+    expect(direction(at('combat')), stage).toEqual(['']);
+    expect(direction(at('training')), stage).toEqual(['4720']);
+    expect(forms(at('combat')), stage).toBe(forms(at('standard')));
+  }
+  // Nothing to send until a 방향 is typed: the 수정, and the 전이사격 beside the call.
+  expect(composer('combat', 'adjust', { ...adjust.state, aim })).toMatch(/<button type="button" disabled="">송신/);
+  expect([...composer('combat', 'idle', { ...eom.state, aim }).matchAll(/<button type="button"( disabled="")?>송신/g)].map((m) => !m[1])).toEqual([true, false]);
+});
+
+test('실전: 탄착 편의와 수정값 제안 — 실전에서도 표준과 같다', () => {
+  // The last round 30 m right and 120 m over a platoon 1 km north: 훈련 shows it and fills 좌로 30, 줄이기 100.
+  const help = suggestion(deviation({ op: { x: 0, y: 0 }, platoons: [{ x: 0, y: 1000, state: 'approach' }], missions: [{ impacts: [{ x: 500, y: 500 }, { x: 30, y: 1120 }] }] }));
+  const sim = atAdjust();
+  const at = (mode: Mode) => composer(mode, 'adjust', sim.state, { help });
+  const metres = (html: string) => [...html.matchAll(/aria-label="(좌우|사거리) 거리" inputMode="numeric" size="4" value="(\d*)"/g)].map((m) => m[2]);
+  expect(at('combat')).not.toContain('탄착 편의');
+  expect(metres(at('combat'))).toEqual(['0', '0']);
+  expect(forms(at('combat'))).toBe(forms(at('standard')));
+  expect(text(at('training'))).toContain('탄착 편의 우 30 m');
+  expect(metres(at('training'))).toEqual(['30', '100']);
+});
+
+test('실전: 실제 사상자 수 — 실전에서도 표준과 같다', () => {
+  // A 효력사 on one platoon, run until 효과 관측: 훈련 shows its real casualties.
+  const sim = aimedAt(oneUnit({ type: 'inf', route: 'B', t0: 0 }), 2, 0, CALL_FFE, desc(3, 'quick', 'ready', 0, 'unknown'));
+  run(sim, 2000);
+  const dead = sim.state.platoons[0]!.members.filter((m) => !m.alive).length;
+  expect(dead).toBeGreaterThan(0);
+  const at = (mode: Mode) => composer(mode, 'effect', sim.state, { platoons: sim.state.platoons });
+  expect(text(at('combat'))).toContain('효과를 관측하십시오.');
+  expect(text(at('combat'))).not.toContain('실제 사상');
+  expect(forms(at('combat'))).toBe(forms(at('standard')));
+  expect(text(at('training'))).toContain(`(훈련) 적 보병 실제 사상 ${dead}/30`);
+});
+
+test('실전: 관측소 후보 미리보기·가시권 — 실전에서도 표준과 같다', () => {
+  // A combat game in 작전 준비: the view stays dark as in 표준, and the map offers no 가시권.
+  const t = flatTerrain();
+  const at = combatInit(7, t);
+  const sim = createSim(at);
+  expect([sim.state.phase, sim.state.mode]).toEqual(['prep', 'combat']);
+  expect(darkInPrep(sim.state)).toBe(true);
+  expect(darkInPrep({ phase: 'prep', mode: 'standard' })).toBe(true);
+  expect(darkInPrep({ phase: 'prep', mode: 'training' })).toBe(false); // 훈련 previews from the 관측소 후보
+  const panel = (state: Sim['state']) =>
+    renderToStaticMarkup(
+      <MapPanel terrain={t} scenario={at.scenario} state={state} send={() => {}} onFrame={() => () => {}} weather={at.weather} colours={terrainColours(t, at.weather)} callsign="갈매기" pin={null} onPin={() => {}} mark={null} onTransfer={() => {}} />,
+    );
+  expect(panel(sim.state)).not.toContain('가시권');
+  expect(panel(sim.state)).toBe(panel({ ...sim.state, mode: 'standard' }));
+  expect(panel({ ...sim.state, mode: 'training' })).toContain('가시권 표시');
+  sim.step([START]);
+  expect(darkInPrep(sim.state)).toBe(false);
+  expect(panel(sim.state)).not.toContain('가시권');
+});
+
+test('실전: 전투력 — 실전에서도 표준과 같다', () => {
+  // A mortar section 1 km north, found and watched until its type is known: 훈련 adds its 전투력.
+  const sim = startedWith(mortarAt({ x: 320, y: 1320 }));
+  run(sim, 39);
+  sim.step([idAt(angleTo(sim, sim.state.platoons[0]!.members[1]!))]);
+  sim.step([{ a: 'bino', v: [1] }, { a: 'cam', v: [0, -26] }]);
+  run(sim, 110);
+  expect(sim.state.platoons[0]!.intel.stage).toBe(2);
+  const list = (mode: Mode) => renderToStaticMarkup(<TargetList platoons={sim.state.platoons} mode={mode} op={sim.state.op} />);
+  expect(list('combat')).toBe(list('standard'));
+  expect(list('combat')).not.toContain('전투력');
+  expect(text(list('training'))).toContain('(훈련: 전투력 100%)');
+});
+
+test('실전: 훈련 전용 표시 없음 — 기러기가 아는 위치·보고 위치 오차·아군 소대 이름·위치 보고 미리 채움', () => {
+  // 기러기가 아는 위치 on the map: in `실전: 지도 — …`, whose combat map is the standard one apart from the four.
+  // 보고 위치 오차: 훈련 tells it after every 위치 보고; the warning past 60 m is for every mode.
+  expect(reportError({ x: 0, y: 0 }, { x: 40, y: 0 }, 'combat')).toBeNull();
+  expect(reportError({ x: 0, y: 0 }, { x: 40, y: 0 }, 'training')).toBe('↳ (훈련) 보고 위치 오차 40 m.');
+  expect(reportError({ x: 0, y: 0 }, { x: 100, y: 0 }, 'combat')).toBe(reportError({ x: 0, y: 0 }, { x: 100, y: 0 }, 'standard'));
+  expect(reportError({ x: 0, y: 0 }, { x: 100, y: 0 }, 'combat')).toContain('약 100 m 다릅니다');
+  // 아군 소대 이름 on the view.
+  expect([namesFriends('combat'), namesFriends('standard'), namesFriends('training')]).toEqual([false, false, true]);
+  // 위치 보고: not filled in from the post; from the 좌표자 as in 표준.
+  const form = (mode: Mode, pin?: { e: number; n: number }) =>
+    renderToStaticMarkup(<PositionForm op={{ x: 400, y: 320 }} grid={GRID} names={NAMES} mode={mode} send={() => {}} pin={pin} />);
+  expect(form('combat')).not.toContain('value="4040"');
+  expect(form('combat', { e: 12, n: 3456 })).toContain('value="0012"');
+  expect(form('combat', { e: 12, n: 3456 })).toContain('value="3456"');
+  expect(text(form('combat'))).toContain('지도를 눌러 자기 위치를 좌표자로 읽어 넣으십시오');
+  expect(forms(form('combat'))).toBe(forms(form('standard')));
+  expect(form('training')).toContain('value="4040"');
+  expect(form('training')).toContain('value="3032"');
 });
