@@ -1,4 +1,14 @@
-import type { GunData } from '@sim';
+import type { GunProfile } from '@sim';
 
-// Identity only for now; the fire-mission slices add the gun data values.
-export const BASE_GUNS: GunData = { id: 'base', version: 1 };
+// base@1: the numbers the simulation code held until M3-2. Changing one raises `version` and needs a new 기대값 줄.
+export const BASE_GUNS: GunProfile = {
+  id: 'base',
+  version: 1,
+  maxRangeM: 24000,
+  tof: { baseS: 3, sPerKm: 2.6 },
+  peRange: { baseM: 2, mPerKm: 1.5 },
+  peDeflection: { baseM: 1, mPerKm: 0.5 },
+  sheaf: [[-60, 22], [-36, -22], [-12, 22], [12, -22], [36, 22], [60, -22]],
+  ffe: { intervalS: 9, jitterS: 2.2 },
+  lethalRadiusM: { man: { quick: { stand: 26, prone: 15 }, vt: { stand: 28, prone: 24 } }, vehicle: 7, tube: { quick: 10, vt: 7 } },
+};
