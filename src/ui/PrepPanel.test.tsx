@@ -50,6 +50,28 @@ test('F-30: 시드 종류 표시', () => {
   expect(daily).toContain('바람 285° 2.6 m/s');
 });
 
+test('F-22: 판 정보 카드 — 시드 줄과 기상 바꾸기를 담는다', () => {
+  const card = (html: string) => html.match(/<section aria-label="판 정보"[^>]*>(.*?)<\/section>/)?.[1] ?? '';
+  const outside = (html: string) => html.replace(card(html), '');
+  // At the very top of 작전 준비, before its title and the briefing.
+  const practice = markup(1234, 'practice');
+  expect(practice).toMatch(/^<section aria-label="작전 준비"><section aria-label="판 정보"/);
+  // Practice: the seed line, the weather and the 기상 바꾸기 select, all in the card.
+  expect(card(practice)).toContain('<b>시드</b> 연습 1234 — 랭킹 제외');
+  expect(card(practice)).toContain('<b>기상</b> 시정 24.0 km');
+  expect(card(practice)).toMatch(/<label>기상 바꾸기 <select>/);
+  expect(practice).not.toContain('일일 · 읽기만');
+  // Daily: no select, and the weather carries the dotted tag.
+  const daily = markup(20261106, 'daily');
+  expect(card(daily)).toContain('<b>시드</b> 일일 20261106 — 오늘은 모두 같은 배치·기상·편차로 경쟁');
+  expect(card(daily)).toMatch(/<b>기상<\/b> 시정 24\.0 km[^<]*<span class="info-tag">일일 · 읽기만<\/span>/);
+  expect(daily).not.toContain('<select');
+  // Nothing of them is left in the briefing.
+  for (const html of [practice, daily]) for (const word of ['시드', '기상</b>', '기상 바꾸기']) expect(outside(html)).not.toContain(word);
+  // Only before the start: the one-line panel after it has no card.
+  expect(markup(20261106, 'daily', { ...PREP, phase: 'live' })).not.toContain('판 정보');
+});
+
 test('F-22: 작전 준비 화면', () => {
   const prep = text(20261106, 'daily');
   // 적정 첫보, three NAIs with their 신뢰도, the two expected routes, the planned post and the 이동 한계선.

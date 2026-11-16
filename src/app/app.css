@@ -164,6 +164,18 @@ input {
 [data-panel='log'] {
   grid-area: log;
 }
+.info-card {
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  padding: 0 8px;
+}
+.info-tag {
+  border: 1px dotted var(--dim);
+  color: var(--dim);
+  font-size: 11px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
 .hb-toggle,
 .lower-tabs {
   display: none;
