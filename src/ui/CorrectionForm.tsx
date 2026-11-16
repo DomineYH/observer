@@ -1,4 +1,4 @@
-// 수정 form and the send preview shared by the composer's forms (demo lines 986–993).
+// 수정 form and the send preview shared by the composer's forms (demo lines 986–993); 실전 shows only its hint.
 import { useState } from 'react';
 import type { Effect, Input, Mode } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
@@ -12,7 +12,7 @@ const keys = <K extends string>(o: Record<K, unknown>) => Object.keys(o) as K[];
 
 export interface PreviewProps {
   draft: Draft | null;
-  empty: string; // shown while there is nothing to send
+  empty: string; // shown while there is nothing to send (in 실전 the only thing shown)
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
@@ -21,7 +21,12 @@ export interface PreviewProps {
 export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
   return (
     <>
-      <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
+      {mode === 'combat' ? (
+        // 실전: the sentence is not shown (#115 Q5); what is still missing is.
+        !draft && empty && <p role="status" aria-live="off">{empty}</p>
+      ) : (
+        <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
+      )}
       <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
         송신
       </button>
