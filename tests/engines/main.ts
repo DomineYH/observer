@@ -5,8 +5,8 @@
 import { replay, terrainHash, type ReplayData } from '@sim';
 import { atan2, cos, exp, log, sin, tan } from '@sim/math';
 import { generateTerrain } from '@adapters/mock/terrain';
-import { BASE_SCENARIO } from '@content/scenario';
-import { placementOf, terrainSourceOf } from '@app/backend';
+import { contentOf } from '@content/lookup';
+import { terrainSourceOf } from '@app/backend';
 import { evaluate } from '../math/bits';
 
 const goldens = import.meta.glob<{ replay: ReplayData }>('../golden/*.json', { eager: true, import: 'default' });
@@ -28,7 +28,7 @@ try {
     if (!real && !terrains.has(seed)) terrains.set(seed, generateTerrain(seed));
     const t = real ? await terrainSourceOf('real').load(seed) : terrains.get(seed)!;
     hashes[file] = terrainHash(t);
-    if (file === only) results[file] = replay(golden.replay, t, real ? placementOf('real').scenario : BASE_SCENARIO);
+    if (file === only) results[file] = replay(golden.replay, t, contentOf(golden.replay).scenario);
   }
   math.textContent = JSON.stringify(evaluate({ exp, log, sin, cos, tan, atan2 }));
   terrain.textContent = JSON.stringify(hashes);

@@ -3,8 +3,9 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { test } from 'vitest';
 import { replay, SIM_VERSION, terrainHash } from '@sim';
+import { PLACEMENTS } from '@content/lookup';
 import { currentHeader, GOLDEN_DIR, headerVersions, readGolden, shouldWrite, type Golden, type Versions } from './golden';
-import { landOf } from './land';
+import { terrainOf } from './land';
 import { SCRIPTS } from './scripts';
 
 // Every golden is decided and built before any is written, so a throw leaves all files as they were.
@@ -12,7 +13,10 @@ test('golden:update', async () => {
   const writes: [URL, string][] = [];
   for (const { file, replay: script } of SCRIPTS) {
     const url = new URL(file, GOLDEN_DIR);
-    const { terrain, scenario } = await landOf(script); // terrain version from the land's data, scenario's from code
+    // By id at the code's version, not the script's: ④ and ⑥ pin theirs and currentHeader rewrites them (ADR 0009).
+    const scenario = PLACEMENTS.map((p) => p.scenario).find((s) => s.id === script.scenario.id);
+    if (!scenario) throw new Error(`${file}: scenario ${script.scenario.id}: unknown id`);
+    const terrain = await terrainOf(script); // terrain version from the land's data
     const now: Versions = {
       simVersion: SIM_VERSION,
       terrain: { id: terrain.id, version: terrain.version },
