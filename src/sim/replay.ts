@@ -3,6 +3,7 @@ import { validInput } from './inputs';
 import { createSim } from './sim';
 import type { TerrainData } from './terrain';
 import type { GunProfile, ReplayData, ReplayResult, Ref, Scenario } from './types';
+import { MODES } from './types';
 import { SIM_VERSION } from './version';
 
 export const CHECKPOINT_TICKS = 200;
@@ -45,7 +46,7 @@ const ref = (x: unknown, what: string): void => {
 
 function check(x: unknown): asserts x is ReplayData {
   if (!isObject(x)) return fail('replay data: object expected');
-  keysExactly(x, HEADER_KEYS, 'header', ['terrain']);
+  keysExactly(x, HEADER_KEYS, 'header', ['terrain', 'combatDataVersion']);
   if (x.format !== 1) fail('format: 1 expected');
   int(x.simVersion, 1, INT32_MAX, 'simVersion');
   int(x.seed, 0, INT32_MAX, 'seed');
@@ -60,7 +61,9 @@ function check(x: unknown): asserts x is ReplayData {
   if (!isObject(w)) return fail('weather: object expected');
   keysExactly(w, WEATHER_KEYS, 'weather');
   for (const [k, min, max] of WEATHER_RANGES) int(w[k], min, max, `weather.${k}`);
-  if (x.mode !== 'training' && x.mode !== 'standard') fail('mode: training | standard expected');
+  if (!(MODES as readonly unknown[]).includes(x.mode)) fail('mode: training | standard | combat expected');
+  if (x.mode === 'combat') int(x.combatDataVersion, 1, INT32_MAX, 'combatDataVersion');
+  else if (Object.hasOwn(x, 'combatDataVersion')) fail('combatDataVersion: only with mode combat');
   if (x.stepMs !== 50) fail('stepMs: 50 expected');
   int(x.totalTicks, 0, INT32_MAX, 'totalTicks');
   if (!Array.isArray(x.inputs)) return fail('inputs: array expected');

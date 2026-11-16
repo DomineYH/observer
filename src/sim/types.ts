@@ -4,7 +4,7 @@ import type { StreamName } from './rng';
 import type { Point, TerrainData } from './terrain';
 
 export type SeedKind = 'daily' | 'practice';
-export const MODES = ['training', 'standard'] as const;
+export const MODES = ['training', 'standard', 'combat'] as const;
 export type Mode = (typeof MODES)[number];
 
 export interface Ref {
@@ -198,6 +198,32 @@ export interface Weather {
   humidityPct: number;
 }
 
+/** 실전 수치 (ADR 0019): the thirteen numbers the combat rules read. Decimal literals as written; rule slices only read them. */
+export interface CombatNumbers {
+  radioExposure: number; // 교신 한 마디의 노출, points
+  laserExposure: number; // 레이저 한 번의 노출, points
+  exposureLimit: number; // 노출 한도, points
+  samePlaceM: number; // 같은 자리
+  rangingDelayS: number; // 노출 → 시사탄
+  rangingOffsetM: number; // 시사탄의 거리
+  barrageDelayS: number; // 시사탄 → 본사격
+  barrage: { rounds: number; intervalS: number }; // 본사격
+  hitRadiusM: number; // 피격 반경
+  stayLimitS: number; // 체류 한도
+  displacementFactor: number; // 진지 변환 배율
+  correctionDelayS: number; // 복창의 정정 지연
+  laserLimit: number; // 레이저 한도
+}
+/** 실전 자료: the 실전 수치 under the 실전 자료 판 they are written at. Given to a combat game and only to it. */
+export interface CombatData {
+  version: number;
+  numbers: CombatNumbers;
+}
+/** 실전의 상태: what a combat game adds to the state; hashed in the 실전 덩이 only (stateHash.ts). */
+export interface CombatState {
+  lasesUsed: number; // 쓴 레이저 횟수 (M3-11 counts)
+}
+
 /** 생성 인자: complete values only. */
 export interface SimInit {
   seed: number;
@@ -207,6 +233,7 @@ export interface SimInit {
   weather: Weather;
   mode: Mode;
   terrain: TerrainData;
+  combat?: CombatData; // with mode combat, and only then
 }
 
 /** 입력. The kinds and their values are listed in inputs.ts; anything else is ignored. */
@@ -334,6 +361,7 @@ export interface SimState {
   effects: FieldEffect[]; // oldest first
   targets: number; // units found so far: the last 표적 번호 given
   mode: Mode;
+  combat: CombatState | null; // null outside a combat game
   /** In training at some tick from 작전 개시 on: the 판 기록 is a training one (switching in 작전 준비 is free). */
   trainingUsed: boolean;
   score: number;
@@ -393,10 +421,11 @@ export interface RecordedInput extends Input {
 
 /** 재생 자료, format 1. `terrain` absent = the mock terrain made from the seed (never written for mock). Grammar versions
  * and the 지형 해시 are not carried. */
-export interface ReplayData extends Omit<SimInit, 'terrain' | 'scenario' | 'guns'> {
+export interface ReplayData extends Omit<SimInit, 'terrain' | 'scenario' | 'guns' | 'combat'> {
   scenario: Ref;
   guns: Ref;
   terrain?: Ref;
+  combatDataVersion?: number; // 실전 자료 판: with mode combat, and only then
   format: 1;
   simVersion: number;
   stepMs: 50;

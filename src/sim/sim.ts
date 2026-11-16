@@ -25,6 +25,7 @@ const VIS_TICKS = 6;
 const INITIAL_AIM = { az: 204, el: -220 };
 
 export function createSim(init: SimInit): Sim {
+  if ((init.mode === 'combat') !== (init.combat !== undefined)) throw new Error('combat data goes with mode combat, and only with it');
   const rng = createStreams(init.seed);
   const limitTicks = Math.round(init.scenario.timeLimitS * 20); // 작전 시간 한도
   const state: SimState = {
@@ -49,6 +50,7 @@ export function createSim(init: SimInit): Sim {
     effects: [],
     targets: 0,
     mode: init.mode,
+    combat: init.mode === 'combat' ? { lasesUsed: 0 } : null,
     trainingUsed: false, // set by a training switch after 작전 개시, or 작전 개시 in training
     score: 0,
     aim: { ...INITIAL_AIM },
@@ -90,7 +92,7 @@ export function createSim(init: SimInit): Sim {
         const a = input.a;
         if (a === 'mode') {
           const m = input.v![0] as Mode;
-          if (m === state.mode) return false; // already in it
+          if (m === state.mode || state.mode === 'combat') return false; // already in it, or 실전: no way in or out by input
           state.mode = m;
           if (m === 'training' && state.phase !== 'prep') state.trainingUsed = true; // sticky from 작전 개시 on
           return true;
