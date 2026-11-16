@@ -3,6 +3,7 @@
 // Public interface only: create, step, events, read-only state, record.
 import { describe, expect, test } from 'vitest';
 import { replay, type Input, type RadioEvent, type RecordedInput, type RadioUtterance, type Sim, type SimEvent } from '@sim';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { CALL_ADJUST, CALL_FFE, DESC_UNKNOWN, LOC, LOC_CLEAR, LOC_NEAR, POLAR, answered, corr, desc, openRadio, radioEvents, send, started, toAdjust, unstarted, untilImpact } from './mission';
 import { START, replayData } from './init';
@@ -188,7 +189,7 @@ describe('F-07: 위험근접 100 m 상한', () => {
     expect(kinds(watch(sim, 100).u)).toEqual(['fdc danger_close_resend']);
 
     // Replayed, the record has no ignored input and the same result.
-    const r = replay(replayData(inputs, sim.state.tick, 7), flatTerrain(), { ...BASE_SCENARIO, units: [] });
+    const r = replay(replayData(inputs, sim.state.tick, 7), flatTerrain(), { ...BASE_SCENARIO, units: [] }, BASE_GUNS);
     expect(r.ignored).toBe(0);
     expect(r.record).toEqual(sim.record());
   });

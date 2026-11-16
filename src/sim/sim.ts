@@ -70,6 +70,7 @@ export function createSim(init: SimInit): Sim {
     frontY: init.scenario.frontY,
     terrain: init.terrain,
     battery: init.scenario.battery,
+    guns: init.guns,
     residual: weatherResidual(init.weather, init.scenario.battery, init.scenario.fixedPoint),
     say: (utterance) => out.push({ type: 'radio', utterance }),
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),

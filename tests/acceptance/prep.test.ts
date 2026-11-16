@@ -1,6 +1,7 @@
 // 작전 준비와 개시 (F-22): through the simulation's public interface only.
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, validateReplay } from '@sim';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { createSession } from '@app/session';
 import { startInput } from '@ui/prep';
@@ -91,7 +92,7 @@ describe('F-22', () => {
     // The replay feeds every t = 0 input in one step and reaches the same state.
     const data = replayData([...session.log], sim.state.tick, 6);
     expect(validateReplay(data).ok).toBe(true);
-    const r = replay(data, terrain, BASE_SCENARIO);
+    const r = replay(data, terrain, BASE_SCENARIO, BASE_GUNS);
     expect(r.ignored).toBe(0);
     expect(r.record).toEqual(sim.record());
     expect(r.record.ticks).toBe(11);
@@ -100,9 +101,9 @@ describe('F-22', () => {
     expect(twin.hash()).toBe(sim.hash());
 
     // A replay that never starts has no ticks to replay.
-    expect(() => replay(replayData([{ t: 0, a: 'pick', v: [300, 300] }], 5, 6), terrain, BASE_SCENARIO)).toThrow(/not started/);
+    expect(() => replay(replayData([{ t: 0, a: 'pick', v: [300, 300] }], 5, 6), terrain, BASE_SCENARIO, BASE_GUNS)).toThrow(/not started/);
     // The scenario passed in must be the one the header names.
-    expect(() => replay(data, terrain, { ...BASE_SCENARIO, version: 2 })).toThrow(/scenario/);
+    expect(() => replay(data, terrain, { ...BASE_SCENARIO, version: 2 }, BASE_GUNS)).toThrow(/scenario/);
   });
 
   test('F-22: 계획과 다른 관측소', () => {

@@ -12,7 +12,7 @@ export function replayOf(init: SimInit, log: readonly RecordedInput[], totalTick
     seed,
     seedKind,
     scenario: { id: scenario.id, version: scenario.version },
-    guns,
+    guns: { id: guns.id, version: guns.version },
     weather,
     mode,
     stepMs: 50,

@@ -2,11 +2,16 @@
 // to. Equivalence tests, Node only: they call the pure lethality and ballistics modules directly (spec 동등성 테스트).
 import { describe, expect, test } from 'vitest';
 import { createSim, type Fuze, type Member } from '@sim';
-import { fall, SHEAF } from '@sim/ballistics';
-import { killChance, killMembers } from '@sim/lethality';
+import { fall } from '@sim/ballistics';
+import { killChance as chance, killMembers } from '@sim/lethality';
 import { createStreams, next } from '@sim/rng';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init } from './init';
+
+// The base gun bound once, so the model's checks below read as before.
+const SHEAF = BASE_GUNS.sheaf;
+const killChance = (kind: Member['kind'], prone: boolean, r: number, fuze: Fuze) => chance(kind, prone, r, fuze, BASE_GUNS);
 
 const E1 = 0.92 / Math.E; // 0.92 · exp(−1): the chance at r = R
 const V1 = 0.9 / Math.E;
@@ -75,8 +80,8 @@ function casualties(posture: 'standing' | 'prone', fuze: Fuze, aimErrorM: number
     for (let k = 0; k < 3; k++) {
       if (k > 0) for (const m of men) m.prone = true;
       for (const g of SHEAF) {
-        const p = fall(aim, BASE_SCENARIO.battery, { x: 0, y: 0 }, bal, g);
-        killMembers(men, p.x, p.y, fuze, bal);
+        const p = fall(aim, BASE_SCENARIO.battery, { x: 0, y: 0 }, bal, BASE_GUNS, g);
+        killMembers(men, p.x, p.y, fuze, bal, BASE_GUNS);
       }
     }
     dead += men.filter((m) => !m.alive).length;

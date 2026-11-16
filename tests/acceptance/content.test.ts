@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { BASE_GUNS } from '@content/guns';
-import { contentOf } from '@content/lookup';
+import { contentOf, GUNS } from '@content/lookup';
 import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
 import { BASE_SCENARIO } from '@content/scenario';
-import { mismatches, valueHash } from './expected';
+import { EXPECTED, mismatches, valueHash } from './expected';
 
 const piece = { id: 'x', version: 1, list: [1, 2], nested: { a: 1, b: 2 } };
 const rows = { 'guns x@1': valueHash(piece) };
@@ -40,4 +40,10 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   expect(() => contentOf({ scenario: { id: 'base', version: 2 }, guns: base })).toThrow('scenario base@2: unknown version (this build has base@1)');
   expect(() => contentOf({ scenario: base, guns: { id: 'nogun', version: 1 } })).toThrow('guns nogun: unknown id');
   expect(() => contentOf({ scenario: base, guns: { id: 'base', version: 2 } })).toThrow('guns base@2: unknown version (this build has base@1)');
+});
+
+test('자료: 내용과 버전이 어긋나지 않는다', () => {
+  const pieces: Record<string, unknown> = {};
+  for (const g of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
+  expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });

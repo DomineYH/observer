@@ -28,7 +28,10 @@ try {
     if (!real && !terrains.has(seed)) terrains.set(seed, generateTerrain(seed));
     const t = real ? await terrainSourceOf('real').load(seed) : terrains.get(seed)!;
     hashes[file] = terrainHash(t);
-    if (file === only) results[file] = replay(golden.replay, t, contentOf(golden.replay).scenario);
+    if (file === only) {
+      const c = contentOf(golden.replay);
+      results[file] = replay(golden.replay, t, c.scenario, c.guns);
+    }
   }
   math.textContent = JSON.stringify(evaluate({ exp, log, sin, cos, tan, atan2 }));
   terrain.textContent = JSON.stringify(hashes);

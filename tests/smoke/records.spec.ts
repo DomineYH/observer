@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
+import { BASE_GUNS } from '../../src/content/guns';
 import { BASE_SCENARIO } from '../../src/content/scenario';
 import { fireOnOwnPost, mapPixels, settledMap, speedTo, standardGame } from './helpers';
 
@@ -149,7 +150,7 @@ test('F-31: 미리보기는 재생 자료 형식 그대로 — 실제 화면', a
   const checked = validateReplay(JSON.parse((await preview.textContent())!));
   expect(checked.ok && checked.data.seed).toBe(20261106);
   if (!checked.ok) return;
-  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO);
+  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO, BASE_GUNS);
   expect(again.ignored).toBe(0);
   expect(again.record.observerLost).toBe(true);
   expect([again.record.roundsTotal, again.record.score]).toEqual([Number(rounds), Number(score)]);
@@ -254,7 +255,7 @@ test('F-30: 기상 변경은 판을 새로 만든다 — 전송 데이터', asyn
   expect(acts).not.toContain('cam');
   expect(acts).not.toContain('bino');
   // And it is this game: replayed, it ends as the screen says, nothing ignored.
-  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO);
+  const again = replay(checked.data, await mockTerrain.load(checked.data.seed), BASE_SCENARIO, BASE_GUNS);
   expect(again.ignored).toBe(0);
   expect(again.record.observerLost).toBe(true);
 });

@@ -5,7 +5,7 @@
 // gives each mission its bias at the call (2 draws) and each round its 공산오차 at the shot (2 gaussians), the 효력사
 // rounds gun by gun and round by round within a gun; a 전이 keeps the last mission's bias (no draw). Both draw orders
 // are part of the golden records.
-import { drawBias, fall, SHEAF, shifted, snap, tofSec } from './ballistics';
+import { drawBias, fall, shifted, snap, tofSec } from './ballistics';
 import { announceDanger, markDanger, overCap } from './danger';
 import { lose } from './exposure';
 import { fromGrid } from './grid';
@@ -17,7 +17,7 @@ import { EFFECTS, type Corrections, type CorrectionSlots, type DescriptionSlots,
 import { next, type Stream } from './rng';
 import { corrections, corrSlots, descSlots, targetSlots } from './slots';
 import { heightAt, type Point, type TerrainData } from './terrain';
-import type { Flight, Mission, PostNote, SimState } from './types';
+import type { Flight, GunProfile, Mission, PostNote, SimState } from './types';
 
 export type Say = (u: RadioUtterance) => void;
 
@@ -30,6 +30,7 @@ export interface Ctx {
   frontY: number; // 아군 전선, north m
   terrain: TerrainData;
   battery: Point;
+  guns: GunProfile; // 포 프로파일: 탄도, 방렬, 효력사 간격, 살상 반경
   residual: Point; // 기상 잔차, part of every mission's bias
   say: Say;
   landed: (x: number, y: number, fuze: Fuze) => void;
@@ -41,8 +42,6 @@ const TICKS_PER_S = 20;
 /** A delay in seconds as whole ticks, rounded up: the demo runs an event in the first step at or past its time. */
 export const secTicks = (sec: number) => Math.ceil(sec * TICKS_PER_S);
 const BURST_TICKS = 320; // 탄착 섬광 and its smoke last 16 s
-const GUN_INTERVAL_S = 9; // 효력사: each gun fires a round every 9 s …
-const GUN_JITTER_S = 2.2; // … each round up to 2.2 s late
 const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + secTicks(sec), act);
 const POST_HIT_M = 45;
 const dist = (x: number, y: number, p: Point) => Math.sqrt((x - p.x) * (x - p.x) + (y - p.y) * (y - p.y));
@@ -245,23 +244,23 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       const aim = m.aim!;
       const dx = aim.x - ctx.battery.x;
       const dy = aim.y - ctx.battery.y;
-      const tof = tofSec(Math.sqrt(dx * dx + dy * dy));
+      const tof = tofSec(ctx.guns, Math.sqrt(dx * dx + dy * dy));
       say({ speaker: 'fdc', ending: 'over', kind: 'shot' });
       s.radio.stage = 'flight';
       after(s, 1.2, 'shot_readback');
       if (m.phase === 'adjust') { // 수정탄: the centre gun, one round, quick fuze
         const at = s.tick + secTicks(tof);
-        m.flights = [{ ...fall(aim, ctx.battery, m.bias, ctx.bal), at, fuze: 'quick' }];
+        m.flights = [{ ...fall(aim, ctx.battery, m.bias, ctx.bal, ctx.guns), at, fuze: 'quick' }];
         schedule(s, at, 'impact');
         break;
       }
-      // 효력사: six guns, `rounds` each, 9 s apart with a jitter; every round laid now (fdc jitter, then bal 공산오차).
+      // 효력사: every gun of the sheaf, `rounds` each, `ffe.intervalS` apart with a jitter; every round laid now (fdc jitter, then bal 공산오차).
       let last = 0;
-      for (const sheaf of SHEAF)
+      for (const sheaf of ctx.guns.sheaf)
         for (let k = 0; k < m.mto!.rounds; k++) {
-          const dt = k * GUN_INTERVAL_S + next(fdc) * GUN_JITTER_S;
+          const dt = k * ctx.guns.ffe.intervalS + next(fdc) * ctx.guns.ffe.jitterS;
           last = Math.max(last, dt);
-          const f: Flight = { ...fall(aim, ctx.battery, m.bias, ctx.bal, sheaf), at: s.tick + secTicks(dt + tof), fuze: m.mto!.fuze };
+          const f: Flight = { ...fall(aim, ctx.battery, m.bias, ctx.bal, ctx.guns, sheaf), at: s.tick + secTicks(dt + tof), fuze: m.mto!.fuze };
           let i = m.flights.length;
           while (i > 0 && m.flights[i - 1]!.at > f.at) i--;
           m.flights.splice(i, 0, f);
@@ -280,7 +279,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       const { x, y, fuze } = m.flights.shift()!;
       s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: false, vt: fuze === 'vt', tiny: false, vis: false });
       m.impacts.push({ x, y, tick: s.tick });
-      strike(s, x, y, fuze, ctx.bal, m.kills);
+      strike(s, x, y, fuze, ctx.bal, m.kills, ctx.guns);
       // 아군 포탄 오사 (demo 659): within 45 m of the post, 60 % (a 탄도 draw only then)
       if (dist(x, y, s.op) < POST_HIT_M && next(ctx.bal) < 0.6) lose(s, ctx, 'friendly');
       friendlyRound(s, ctx, x, y);

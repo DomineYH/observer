@@ -15,7 +15,7 @@ const HEAD = {
   seed: 20261106,
   seedKind: 'daily',
   scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version },
-  guns: BASE_GUNS,
+  guns: { id: BASE_GUNS.id, version: BASE_GUNS.version },
   weather: CLEAR_WEATHER,
   mode: 'standard',
   stepMs: 50,

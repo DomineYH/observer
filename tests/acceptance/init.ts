@@ -27,7 +27,7 @@ export const replayData = (inputs: ReplayData['inputs'], totalTicks = 10, seed =
     seed,
     seedKind,
     scenario: { id: scenario.id, version: scenario.version },
-    guns,
+    guns: { id: guns.id, version: guns.version },
     weather,
     mode,
     stepMs: 50,

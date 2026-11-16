@@ -3,7 +3,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { test } from 'vitest';
 import { replay, SIM_VERSION, terrainHash } from '@sim';
-import { PLACEMENTS } from '@content/lookup';
+import { GUNS, PLACEMENTS } from '@content/lookup';
 import { currentHeader, GOLDEN_DIR, headerVersions, readGolden, shouldWrite, type Golden, type Versions } from './golden';
 import { terrainOf } from './land';
 import { SCRIPTS } from './scripts';
@@ -16,11 +16,14 @@ test('golden:update', async () => {
     // By id at the code's version, not the script's: ④ and ⑥ pin theirs and currentHeader rewrites them (ADR 0009).
     const scenario = PLACEMENTS.map((p) => p.scenario).find((s) => s.id === script.scenario.id);
     if (!scenario) throw new Error(`${file}: scenario ${script.scenario.id}: unknown id`);
+    const guns = GUNS.find((g) => g.id === script.guns.id);
+    if (!guns) throw new Error(`${file}: guns ${script.guns.id}: unknown id`);
     const terrain = await terrainOf(script); // terrain version from the land's data
     const now: Versions = {
       simVersion: SIM_VERSION,
       terrain: { id: terrain.id, version: terrain.version },
       scenario: { id: scenario.id, version: scenario.version },
+      guns: { id: guns.id, version: guns.version },
     };
     const old = existsSync(url) ? headerVersions(readGolden(file).replay) : null;
     if (!shouldWrite(old, now)) {
@@ -28,7 +31,7 @@ test('golden:update', async () => {
       continue;
     }
     const data = currentHeader(script, now);
-    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, scenario) };
+    const golden: Golden = { terrainHash: terrainHash(terrain), replay: data, ...replay(data, terrain, scenario, guns) };
     writes.push([url, JSON.stringify(golden, null, 2) + '\n']);
   }
   for (const [url, text] of writes) {

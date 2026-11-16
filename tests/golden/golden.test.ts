@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { BASE_GUNS } from '@content/guns';
 import { contentOf } from '@content/lookup';
 import { MOCK_PLACEMENT } from '@content/placement';
 import { BASE_SCENARIO } from '@content/scenario';
@@ -32,7 +33,7 @@ describe('골든', () => {
     expect(Object.fromEntries(Object.keys(LOCKED).map((f) => [f, sha(f)]))).toEqual(LOCKED);
   });
 
-  // Checks all three header versions (simVersion, 지형 판, 시나리오 버전) against the code and the land's data.
+  // Checks all four header versions (simVersion, 지형 판, 시나리오 버전, 포 프로파일 버전) against the code and the land's data.
   test('골든: simVersion이 코드와 같다', async () => {
     const files = goldenFiles();
     expect(files).toContain('0-empty.json');
@@ -41,8 +42,9 @@ describe('골든', () => {
     const ref = (r: { id: string; version: number }) => ({ id: r.id, version: r.version });
     for (const f of files) {
       const d = readGolden(f).replay;
-      const [terrain, scenario] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(contentOf(d).scenario)];
-      expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario });
+      const found = contentOf(d);
+      const [terrain, scenario, guns] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(found.scenario), ref(found.guns)];
+      expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario, guns });
     }
   }, 30000); // reads every golden file
 
@@ -64,7 +66,7 @@ describe('골든', () => {
     expect(expected.checkpoints.map((c) => c.tick)).toEqual([200, 400]);
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
   }, 30000); // terrain generation and a replay (~2 s alone): vitest's 5 s default is hit under load
 
   test('골든: ① 좌표법 조정에서 임무끝까지', () => {
@@ -73,9 +75,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every scripted transmission was taken
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
     // The script does what it says: a 접근신관 효력사 lands and the mission ends with 임무끝.
-    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, guns: BASE_GUNS, terrain });
     const events: SimEvent[] = [];
     for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
     expect(events.some((e) => e.type === 'impact' && e.fuze === 'vt')).toBe(true);
@@ -89,9 +91,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0);
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, BASE_SCENARIO)).toEqual(expected);
+    expect(replay(data, terrain, BASE_SCENARIO, BASE_GUNS)).toEqual(expected);
     // The script does what it says.
-    const sim = createSim({ ...data, scenario: BASE_SCENARIO, terrain });
+    const sim = createSim({ ...data, scenario: BASE_SCENARIO, guns: BASE_GUNS, terrain });
     const events: SimEvent[] = [];
     for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
     const said = (speaker: string, kind: string) => events.some((e) => e.type === 'radio' && e.utterance.speaker === speaker && e.utterance.kind === kind);
@@ -114,7 +116,7 @@ describe('골든', () => {
     expect(data.totalTicks).toBe(48000); // the 40분 한도 is the terminal tick (#33: no padding past it)
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, BASE_SCENARIO);
+    const result = replay(data, terrain, BASE_SCENARIO, BASE_GUNS);
     expect(result).toEqual(expected);
     // The script does what it says, read off its record: the limit ended it, no round was fired, the post was never found
     // and the 관측반 lived.
@@ -128,7 +130,7 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every recorded input was taken
     const terrain = generateTerrain(data.seed);
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, BASE_SCENARIO);
+    const result = replay(data, terrain, BASE_SCENARIO, BASE_GUNS);
     expect(result).toEqual(expected);
     // The game is what scripts.ts says: standard mode, three missions, ended by the 40분 한도.
     expect(result.record).toMatchObject({ ticks: 48000, missions: 3, mode: 'standard' });
@@ -142,11 +144,11 @@ describe('골든', () => {
     expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
     expect(data.mode).toBe('standard');
     expect(data.totalTicks).toBeLessThanOrEqual(12000);
-    const { terrain, scenario } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
+    const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
     expect(terrainHash(terrain)).toBe(header);
-    expect(replay(data, terrain, scenario)).toEqual(expected);
+    expect(replay(data, terrain, scenario, guns)).toEqual(expected);
     // The script does what it says: a lase answers, the 효력사 lands, the post moves and 기러기 is told where.
-    const sim = createSim({ ...data, scenario, terrain });
+    const sim = createSim({ ...data, scenario, guns, terrain });
     const events: SimEvent[] = [];
     const impacts: number[] = [];
     for (let t = 0; t < data.totalTicks; t++)
@@ -176,9 +178,9 @@ describe('골든', () => {
     expect(expected.ignored).toBe(0); // every recorded input was taken
     expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
     expect(data.scenario).toEqual({ id: MUNGYEONG_PLACEMENT.scenario.id, version: 2 });
-    const { terrain, scenario } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
+    const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
     expect(terrainHash(terrain)).toBe(header);
-    const result = replay(data, terrain, scenario);
+    const result = replay(data, terrain, scenario, guns);
     expect(result).toEqual(expected);
     // The game is what scripts.ts says: standard mode, three missions, over before the 40분 한도 (48 000 ticks). The
     // 관측반 lived, so every combat unit was down (end.ts); one by 진지 돌파, which withholds 섬멸 (not cleared).
@@ -187,10 +189,11 @@ describe('골든', () => {
   }, 60000); // one replay hashing every tick (~6 s alone)
 
   test('골든: 다시 만드는 조건', () => {
-    const v = (simVersion: number, terrain: number, scenario: number, ids = { terrain: 'mock', scenario: 'base' }): Versions => ({
+    const v = (simVersion: number, terrain: number, scenario: number, ids: { terrain: string; scenario: string; guns?: string } = { terrain: 'mock', scenario: 'base' }, guns = 1): Versions => ({
       simVersion,
       terrain: { id: ids.terrain, version: terrain },
       scenario: { id: ids.scenario, version: scenario },
+      guns: { id: ids.guns ?? 'base', version: guns },
     });
     const golden = v(17, 1, 3);
     expect(shouldWrite(null, golden)).toBe(true); // no file
@@ -199,6 +202,12 @@ describe('골든', () => {
     for (const now of [v(16, 1, 3), v(17, 1, 2), v(18, 1, 2), v(16, 2, 3)]) expect(() => shouldWrite(golden, now), JSON.stringify(now)).toThrow(/newer/);
     expect(() => shouldWrite(golden, v(17, 1, 3, { terrain: 'mungyeong', scenario: 'base' }))).toThrow(/terrain/);
     expect(() => shouldWrite(golden, v(17, 1, 3, { terrain: 'mock', scenario: 'other' }))).toThrow(/scenario/);
+    // 포 프로파일 버전: a higher one rewrites, a lower one throws, another id throws.
+    expect(shouldWrite(golden, v(17, 1, 3, undefined, 2))).toBe(true);
+    expect(shouldWrite(golden, v(18, 1, 3, undefined, 2))).toBe(true);
+    expect(() => shouldWrite(v(17, 1, 3, undefined, 2), golden)).toThrow(/newer/);
+    expect(() => shouldWrite(v(17, 1, 3, undefined, 2), v(18, 1, 3))).toThrow(/newer/); // one higher, one lower
+    expect(() => shouldWrite(golden, v(17, 1, 3, { terrain: 'mock', scenario: 'base', guns: 'k9' }))).toThrow(/guns/);
     // The real land: data changed under the same 판 is not rewritten (⑤ goes red instead); only a higher 판 rewrites.
     const g = v(17, 2, 1, { terrain: 'mungyeong', scenario: 'base-mungyeong' });
     expect(shouldWrite(g, v(17, 2, 1, { terrain: 'mungyeong', scenario: 'base-mungyeong' }))).toBe(false);
@@ -206,16 +215,16 @@ describe('골든', () => {
     expect(() => shouldWrite(g, v(17, 1, 1, { terrain: 'mungyeong', scenario: 'base-mungyeong' }))).toThrow(/newer/);
     expect(() => shouldWrite(g, v(17, 2, 1, { terrain: 'mock', scenario: 'base-mungyeong' }))).toThrow(/terrain/);
     const header = readGolden('0-empty.json').replay;
-    expect(headerVersions(header)).toEqual({ simVersion: header.simVersion, terrain: { id: 'mock', version: 1 }, scenario: header.scenario });
+    expect(headerVersions(header)).toEqual({ simVersion: header.simVersion, terrain: { id: 'mock', version: 1 }, scenario: header.scenario, guns: header.guns });
   });
 
   test('골든: 다시 만드는 조건 — 재생하고 쓰는 머리는 코드의 버전이다', () => {
     const mock = { id: 'mock', version: 1 };
-    const now: Versions = { simVersion: SIM_VERSION, terrain: mock, scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version } };
+    const now: Versions = { simVersion: SIM_VERSION, terrain: mock, scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version }, guns: { id: 'base', version: 1 } };
     const mocks = SCRIPTS.filter((s) => !s.replay.terrain);
     for (const { file, replay: d } of mocks) expect(currentHeader(d, now), file).toEqual(d); // versions unchanged: as is
     // A version rise: ④ pins simVersion 17 and base@1, every mock script leaves terrain out (mock).
-    const risen: Versions = { simVersion: 99, terrain: mock, scenario: { id: 'base', version: 9 } };
+    const risen: Versions = { simVersion: 99, terrain: mock, scenario: { id: 'base', version: 9 }, guns: { id: 'base', version: 1 } };
     for (const { file, replay: d } of mocks) {
       const h = currentHeader(d, risen);
       expect(h, file).toEqual({ ...d, simVersion: 99, scenario: { id: 'base', version: 9 } });
@@ -226,6 +235,9 @@ describe('골든', () => {
     // A non-mock terrain carries the code's terrain version.
     const d = { ...SCRIPTS[0]!.replay, terrain: { id: 'mungyeong', version: 1 } };
     expect(currentHeader(d, { ...now, terrain: { id: 'mungyeong', version: 2 } }).terrain).toEqual({ id: 'mungyeong', version: 2 });
+    // The gun profile: the code's version is written, another id is refused.
+    expect(currentHeader(SCRIPTS[0]!.replay, { ...now, guns: { id: 'base', version: 2 } }).guns).toEqual({ id: 'base', version: 2 });
+    expect(() => currentHeader(SCRIPTS[0]!.replay, { ...now, guns: { id: 'k9', version: 1 } })).toThrow(/guns/);
     // Ids are not rewritten.
     expect(() => currentHeader(d, now)).toThrow(/terrain/);
     expect(() => currentHeader(SCRIPTS[4]!.replay, { ...now, scenario: { id: 'other', version: 1 } })).toThrow(/scenario/);

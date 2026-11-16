@@ -11,7 +11,21 @@ export interface Ref {
   id: string;
   version: number;
 }
-export type GunData = Ref;
+/** 포 프로파일 (ADR 0014): the numbers the gun and its shell set. Decimal literals as written; the formulas' order is the code's. */
+export interface GunProfile extends Ref {
+  maxRangeM: number; // 최대 사거리: the simulation never reads it (판 전 사거리 검사)
+  tof: { baseS: number; sPerKm: number }; // 비과시간
+  peRange: { baseM: number; mPerKm: number }; // 사거리 공산오차
+  peDeflection: { baseM: number; mPerKm: number }; // 편의 공산오차
+  /** 방렬: each gun's offset across (right +) and along (beyond +) the line of fire, m. Length = guns, order = draw order. */
+  sheaf: readonly (readonly [lat: number, rng: number])[];
+  ffe: { intervalS: number; jitterS: number }; // 효력사: seconds between a gun's rounds, and each round's largest delay
+  lethalRadiusM: {
+    man: { quick: { stand: number; prone: number }; vt: { stand: number; prone: number } };
+    vehicle: number;
+    tube: { quick: number; vt: number };
+  };
+}
 
 export type RouteKey = 'A' | 'B' | 'C';
 export type Confidence = 'high' | 'medium' | 'low';
@@ -187,7 +201,7 @@ export interface SimInit {
   seed: number;
   seedKind: SeedKind;
   scenario: Scenario;
-  guns: GunData;
+  guns: GunProfile;
   weather: Weather;
   mode: Mode;
   terrain: TerrainData;
@@ -377,8 +391,9 @@ export interface RecordedInput extends Input {
 
 /** 재생 자료, format 1. `terrain` absent = the mock terrain made from the seed (never written for mock). Grammar versions
  * and the 지형 해시 are not carried. */
-export interface ReplayData extends Omit<SimInit, 'terrain' | 'scenario'> {
+export interface ReplayData extends Omit<SimInit, 'terrain' | 'scenario' | 'guns'> {
   scenario: Ref;
+  guns: Ref;
   terrain?: Ref;
   format: 1;
   simVersion: number;

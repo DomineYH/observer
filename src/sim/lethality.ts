@@ -2,7 +2,7 @@
 import { exp } from './math';
 import { next, type Stream } from './rng';
 import type { Fuze } from './radio';
-import type { Member, Platoon, SimState } from './types';
+import type { GunProfile, Member, Platoon, SimState } from './types';
 
 const REACH_M = 110; // members farther from the burst are not hit
 const VT_HEIGHT_M = 7; // 접근신관 파열고
@@ -13,29 +13,30 @@ export const NEUTRALIZED = 0.3;
 export const DESTROYED = 0.6;
 const POINTS = { broken: 100, destroyed: 150, early: 50 };
 
-/** 0.92 · exp(−(r/R)²) for men, the burst `r` m away (a VT burst `VT_HEIGHT_M` above the ground). Vehicles take only a
- * near direct hit and almost nothing from VT; tubes take the burst height too. */
-export function killChance(kind: Member['kind'], prone: boolean, r: number, fuze: Fuze): number {
+/** 0.92 · exp(−(r/R)²) for men, the burst `r` m away (a VT burst `VT_HEIGHT_M` above the ground), R from the 포 프로파일.
+ * Vehicles take only a near direct hit and almost nothing from VT; tubes take the burst height too. */
+export function killChance(kind: Member['kind'], prone: boolean, r: number, fuze: Fuze, guns: GunProfile): number {
   if (r > REACH_M) return 0;
+  const R = guns.lethalRadiusM;
   const vt = fuze === 'vt';
   const re = vt ? Math.sqrt(r * r + VT_HEIGHT_M * VT_HEIGHT_M) : r;
   const gauss = (d: number, R: number) => exp(-((d / R) * (d / R)));
-  if (kind === 'veh') return (vt ? 0.22 : 0.9) * gauss(r, 7);
-  if (kind === 'tube') return 0.9 * gauss(re, vt ? 7 : 10);
-  return 0.92 * gauss(re, prone ? (vt ? 24 : 15) : vt ? 28 : 26);
+  if (kind === 'veh') return (vt ? 0.22 : 0.9) * gauss(r, R.vehicle);
+  if (kind === 'tube') return 0.9 * gauss(re, vt ? R.tube.vt : R.tube.quick);
+  return 0.92 * gauss(re, prone ? (vt ? R.man.vt.prone : R.man.quick.prone) : vt ? R.man.vt.stand : R.man.quick.stand);
 }
 
 type Target = Pick<Member, 'kind' | 'x' | 'y' | 'prone' | 'alive'>;
 
 /** One burst at (x, y) on a unit's members: each live member within reach draws once from the ballistics stream, in
  * member order. Returns how many it killed. */
-export function killMembers(members: Target[], x: number, y: number, fuze: Fuze, bal: Stream): number {
+export function killMembers(members: Target[], x: number, y: number, fuze: Fuze, bal: Stream, guns: GunProfile): number {
   let k = 0;
   for (const q of members) {
     if (!q.alive) continue;
     const r = Math.sqrt((q.x - x) * (q.x - x) + (q.y - y) * (q.y - y));
     if (r > REACH_M) continue;
-    if (next(bal) < killChance(q.kind, q.prone, r, fuze)) {
+    if (next(bal) < killChance(q.kind, q.prone, r, fuze, guns)) {
       q.alive = false;
       k++;
     }
@@ -46,11 +47,11 @@ export function killMembers(members: Target[], x: number, y: number, fuze: Fuze,
 /** What one round landing at (x, y) does (demo impact): every unit that has set off and whose centre is within 220 m
  * loses members to it (counted in `kills`, by unit: struck, even if nobody fell) and, unless it is the APCs, goes to ground for 35–65 s from the
  * next tick. Draws from the ballistics stream unit by unit: the kill draws, then the pinning draw. */
-export function strike(s: SimState, x: number, y: number, fuze: Fuze, bal: Stream, kills: (number | null)[]): void {
+export function strike(s: SimState, x: number, y: number, fuze: Fuze, bal: Stream, kills: (number | null)[], guns: GunProfile): void {
   s.platoons.forEach((p, pid) => {
     if (p.state === 'wait') return;
     if ((p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) > PIN_M * PIN_M) return;
-    kills[pid] = (kills[pid] ?? 0) + killMembers(p.members, x, y, fuze, bal);
+    kills[pid] = (kills[pid] ?? 0) + killMembers(p.members, x, y, fuze, bal, guns);
     if (p.type !== 'apc') p.pinnedUntil = Math.max(p.pinnedUntil, s.tick + Math.ceil((PIN_S.min + next(bal) * PIN_S.spread) * 20));
     judge(s, p);
   });

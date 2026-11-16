@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, SIM_VERSION, validateReplay } from '@sim';
+import { BASE_GUNS } from '@content/guns';
 import { BASE_SCENARIO } from '@content/scenario';
 import { init, replayData, START } from './init';
 
@@ -65,9 +66,9 @@ describe('뼈대', () => {
     expect(errorOf(null)).not.toBeNull();
 
     // Replaying data that holds an input the simulation ignores counts it.
-    const r = replay(replayData([{ t: 0, ...START }, { t: 2, a: 'zz' }]), terrain, BASE_SCENARIO);
+    const r = replay(replayData([{ t: 0, ...START }, { t: 2, a: 'zz' }]), terrain, BASE_SCENARIO, BASE_GUNS);
     expect(r.ignored).toBe(1);
     expect(r.record.ticks).toBe(10);
-    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 }, terrain, BASE_SCENARIO)).toThrow(/simVersion/);
+    expect(() => replay({ ...valid, simVersion: SIM_VERSION + 1 }, terrain, BASE_SCENARIO, BASE_GUNS)).toThrow(/simVersion/);
   });
 });
