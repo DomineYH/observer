@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { MODES, type Mode, type Phase } from '@sim';
+import type { Mode, Phase } from '@sim';
 import { QUALITIES, type Quality } from '@render/projection';
 import { clock } from './clock';
 
@@ -17,6 +17,8 @@ const prepClock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 export const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준', combat: '실전' };
+/** The three modes in the sim's order (훈련 · 표준 · 실전); the ui reads only the sim's types. */
+export const MODE_ORDER = Object.keys(MODE_NAMES) as Mode[];
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 interface Props {
@@ -109,7 +111,7 @@ export function ModeSwitch({ mode, paused, phase, onMode }: { mode: Mode; paused
   const off = paused || phase === 'ended';
   return (
     <span role="group" aria-label="모드 전환">
-      {MODES.map((m) => (
+      {MODE_ORDER.map((m) => (
         <button key={m} type="button" aria-pressed={mode === m} disabled={off || (phase !== 'prep' && (m === 'combat' || mode === 'combat'))} onClick={() => onMode(m)}>
           {MODE_NAMES[m]}
         </button>

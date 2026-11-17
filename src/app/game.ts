@@ -29,6 +29,7 @@ export function newGame(init: SimInit, carry?: Game): Game {
 export function remade(game: Game, m: Mode, combat: CombatData): Game | null {
   const s = game.sim.state;
   if (s.phase !== 'prep' || m === s.mode || (m !== 'combat' && s.mode !== 'combat')) return null;
-  const { combat: _, ...init } = game.init;
-  return newGame(m === 'combat' ? { ...init, mode: m, combat } : { ...init, mode: m }, game);
+  const init: SimInit = { ...game.init, mode: m, combat };
+  if (m !== 'combat') delete init.combat; // 실전 자료 goes with mode combat only
+  return newGame(init, game);
 }

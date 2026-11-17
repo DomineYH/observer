@@ -1,9 +1,9 @@
 // 판 정보 카드 (#135, #130 Q1–Q3): on top of 작전 준비, the game's choices in one card. Its head is the 시드 line and its
 // 기상 row the weather with 기상 바꾸기 (practice) or the "일일 · 읽기만" tag (daily). Above 기상 the 모드 row (#142); the
 // 시나리오 → 포 rows come above it in later slices.
-import { MODES, type Mode, type SeedKind, type Weather } from '@sim';
+import type { Mode, SeedKind, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
-import { MODE_NAMES } from './HeadBand';
+import { MODE_NAMES, MODE_ORDER } from './HeadBand';
 
 export interface InfoCardProps {
   seed: number;
@@ -44,7 +44,7 @@ export function InfoCard({ seed, seedKind, weather, preset, onPreset, mode, onMo
       {/* Radios, not buttons: the 머리띠 메뉴's 훈련·표준·실전 stay the only buttons of those names. */}
       <p role="radiogroup" aria-label="모드">
         <b>모드</b>
-        {MODES.map((m) => (
+        {MODE_ORDER.map((m) => (
           <label key={m}>
             {' '}
             <input type="radio" name="mode" checked={mode === m} onChange={() => onMode(m)} /> {MODE_NAMES[m]}
