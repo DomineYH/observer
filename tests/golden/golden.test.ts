@@ -211,6 +211,32 @@ describe('골든', () => {
     expect(result.record.ticks).toBeLessThan(48000);
   }, 60000); // one replay hashing every tick (~6 s alone)
 
+  test('골든: 장갑차 선두', async () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden('7-apc-grid-eom.json');
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0); // every scripted transmission was taken
+    expect(data).toMatchObject({ scenario: { id: 'apc-mungyeong', version: 1 }, terrain: { id: 'mungyeong', version: 2 }, guns: { id: 'base', version: 1 } });
+    expect(data).toMatchObject({ mode: 'standard', seedKind: 'practice', seed: 20261106 });
+    expect(data.totalTicks).toBeLessThanOrEqual(8000);
+    const { terrain, scenario, guns } = await landOf(data);
+    expect(terrainHash(terrain)).toBe(header);
+    expect(replay(data, terrain, scenario, guns)).toEqual(expected);
+    // The script does what it says: a 효력사 lands after the one correction and the mission ends with 임무끝.
+    const sim = createSim({ ...data, scenario, guns, terrain });
+    const events: SimEvent[] = [];
+    const impacts: number[] = [];
+    for (let t = 0; t < data.totalTicks; t++)
+      for (const e of sim.step(data.inputs.filter((i) => i.t === t)).events) {
+        events.push(e);
+        if (e.type === 'impact') impacts.push(t);
+      }
+    const corr = data.inputs.find((i) => i.a === 'corr')!;
+    expect(corr.v?.at(-1)).toBe('ffe');
+    expect(impacts.some((t) => t > corr.t)).toBe(true);
+    expect(events.some((e) => e.type === 'radio' && e.utterance.kind === 'end_of_mission')).toBe(true);
+    expect(sim.record()).toMatchObject({ missions: 1, mode: 'standard' });
+  }, 60000); // two runs of under 8 000 ticks on the 문경 land
+
   test('골든: 포 넷의 같은 각본', async () => {
     const files = ['guns-kh178.json', 'guns-kh179.json', 'guns-k55.json', 'guns-k9.json'];
     const goldens = files.map(readGolden);
