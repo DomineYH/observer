@@ -4,11 +4,11 @@ import type { GunProfile, Point, Scenario } from '@sim';
 export const RANGE_MARGIN_M = 500;
 
 /** The 싸움터's farthest point from the battery, m: every point of every route, each NAI circle's edge, the four corners
- * of each mortar box, every friendly position. The map square is not looked at. */
+ * of each mortar box (units and 증원), every friendly position. The map square is not looked at. */
 export function farthestM(s: Scenario): number {
   const d = (p: Point) => Math.sqrt((p.x - s.battery.x) ** 2 + (p.y - s.battery.y) ** 2);
   const points: Point[] = [...Object.values(s.routes).flatMap((r) => r ?? []), ...s.friends];
-  for (const u of s.units) {
+  for (const u of [...s.units, ...s.reinforcements]) {
     const nai = u.type === 'mortar' ? s.nais[u.nai] : undefined;
     if (u.type !== 'mortar' || !nai) continue;
     for (const [sx, sy] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) points.push({ x: nai.x + (sx * u.spread.x) / 2, y: nai.y + (sy * u.spread.y) / 2 });
