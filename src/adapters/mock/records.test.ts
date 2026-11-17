@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
-import { validateReplay, type GameRecord } from '@sim';
+import { createSim, validateReplay, type GameRecord, type ReplayData } from '@sim';
 import { submissionOf } from '@app/records';
-import type { Board, Submission } from '../index';
+import type { Board, RankedMode, Submission } from '../index';
 import { replayData } from '../../../tests/acceptance/init';
 import { memoryStorage } from '../../../tests/acceptance/storage';
 import { NO_ENEMY, oneMission } from '../../../tests/acceptance/session';
-import { init } from '../../../tests/acceptance/init';
+import { combatInit, init, START } from '../../../tests/acceptance/init';
 import { RESERVED } from './account';
 import { mockArchive } from './records';
 
@@ -31,7 +31,7 @@ const seeded = (runs: unknown[]) => {
   storage.setItem('observer.runs', JSON.stringify(runs));
   return mockArchive(storage, isReplay);
 };
-const callsigns = async (archive: ReturnType<typeof mockArchive>, b: Board) => (await archive.board(b)).map((r) => r.callsign);
+const callsigns = async (archive: ReturnType<typeof mockArchive>, b: Board) => (await archive.board('standard', 'base', b)).map((r) => r.callsign);
 
 test('B5: 송골매는 예약어 — mock 랭킹에 없다', async () => {
   const archive = mockArchive(memoryStorage(), isReplay);
@@ -51,7 +51,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다', async () => {
   const after = new Date().toISOString();
   expect(stored.ranked).toBe(true);
   expect(stored.createdAt >= before && stored.createdAt <= after).toBe(true);
-  const total = await archive.board('total');
+  const total = await archive.board('standard', 'base', 'total');
   expect(total[0]).toMatchObject({ callsign: '참새12', fake: false, createdAt: stored.createdAt, record: { score: 2000 } });
   expect(total.filter((r) => r.fake).length).toBe(total.length - 1);
   for (const b of BOARDS) expect(await callsigns(archive, b)).toContain('참새12');
@@ -64,14 +64,14 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 호출부호당 최고 �
   const archive = mockArchive(memoryStorage(), isReplay);
   await archive.submit(run('참새12', { score: 1500, clearTick: 19000, roundsTotal: 40, firstErrorAvg: 30 }));
   await archive.submit(run('참새12', { score: 1900, clearTick: 25000, roundsTotal: 20, firstErrorAvg: 10 }));
-  const mine = async (b: Board) => (await archive.board(b)).filter((r) => r.callsign === '참새12').map((r) => r.record);
+  const mine = async (b: Board) => (await archive.board('standard', 'base', b)).filter((r) => r.callsign === '참새12').map((r) => r.record);
   expect(await mine('total')).toEqual([expect.objectContaining({ score: 1900 })]);
   expect(await mine('time')).toEqual([expect.objectContaining({ clearTick: 19000 })]);
   expect(await mine('rounds')).toEqual([expect.objectContaining({ roundsTotal: 20 })]);
   expect(await mine('accuracy')).toEqual([expect.objectContaining({ firstErrorAvg: 10 })]);
   // Sorted best first: score high to low, the others low to high.
   const keys = async (b: Board, k: (r: Awaited<ReturnType<typeof archive.board>>[number]['record']) => number | null) =>
-    (await archive.board(b)).map((r) => k(r.record));
+    (await archive.board('standard', 'base', b)).map((r) => k(r.record));
   const sorted = (xs: (number | null)[], dir: number) => xs.every((x, i) => i === 0 || (x! - xs[i - 1]!) * dir >= 0);
   expect(sorted(await keys('total', (r) => r.score), -1)).toBe(true);
   expect(sorted(await keys('time', (r) => r.clearTick), 1)).toBe(true);
@@ -85,7 +85,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 호출부호당 최고 �
   const first = await archive.submit(run('참새56', { score: 1700 }));
   await new Promise((r) => setTimeout(r, 2));
   await archive.submit(run('참새56', { score: 1700 }));
-  expect((await archive.board('total')).find((r) => r.callsign === '참새56')!.createdAt).toBe(first.createdAt);
+  expect((await archive.board('standard', 'base', 'total')).find((r) => r.callsign === '참새56')!.createdAt).toBe(first.createdAt);
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 보드별 자격', async () => {
@@ -100,7 +100,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 보드별 자격', async
   expect(await callsigns(archive, 'time')).toContain('무사격');
   // At most 20 rows a board.
   for (let i = 0; i < 20; i++) await archive.submit(run(`대원${i}`));
-  expect((await archive.board('total')).length).toBe(20);
+  expect((await archive.board('standard', 'base', 'total')).length).toBe(20);
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 저장 공간이 차면 오래된 기록부터 지운다', async () => {
@@ -144,7 +144,7 @@ test('F-30: 랭킹 자격', async () => {
     stored('연습생', { seedKind: 'practice' }, '2026-11-01T00:00:00.000Z', true),
     stored('표준병', {}, '2026-11-01T00:00:00.000Z', false),
   ]);
-  for (const b of BOARDS) expect((await edited.board(b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['표준병']);
+  for (const b of BOARDS) expect((await edited.board('standard', 'base', b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['표준병']);
 });
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 동점은 그 기록을 먼저 낸 쪽이 위', async () => {
@@ -211,7 +211,7 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 기록의 모�
   ];
   const archive = seeded([...bad, good]);
   expect(await archive.mine()).toEqual([good]);
-  for (const b of BOARDS) expect((await archive.board(b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['<b>x</b>']);
+  for (const b of BOARDS) expect((await archive.board('standard', 'base', b)).filter((r) => !r.fake).map((r) => r.callsign)).toEqual(['<b>x</b>']);
   // A new submission keeps the valid runs and drops the rest from storage.
   await archive.submit(run('참새12'));
   expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새12', '<b>x</b>']);
@@ -259,4 +259,75 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 검사 중에 던지는 
   expect(await archive.mine()).toEqual([good]);
   await archive.submit(run('참새12'));
   expect((JSON.parse(storage.getItem('observer.runs')!) as { callsign: string }[]).map((r) => r.callsign)).toEqual(['참새56', '참새12']);
+});
+
+/** Real (not fake) callsigns on one board. */
+const players = async (archive: ReturnType<typeof mockArchive>, mode: RankedMode, scenario: string, b: Board) =>
+  (await archive.board(mode, scenario, b)).filter((r) => !r.fake).map((r) => r.callsign);
+
+test('랭킹: 실전으로 끝낸 일일 판은 실전 보드에만 오른다', async () => {
+  const archive = mockArchive(memoryStorage(), isReplay);
+  const combat = await archive.submit(run('실전병', { mode: 'combat' }));
+  const uncleared = await archive.submit(run('실전미섬멸', { mode: 'combat', cleared: false, clearTick: null }));
+  await archive.submit(run('표준병'));
+  const practice = await archive.submit(run('실전연습', { mode: 'combat', seedKind: 'practice' }));
+  await archive.submit(run('훈련병', { mode: 'training' }));
+  expect([combat.ranked, uncleared.ranked, practice.ranked]).toEqual([true, true, false]);
+  // 기준별 자격 as on the standard boards: time and rounds only for a cleared game.
+  expect(await players(archive, 'combat', 'base', 'total')).toEqual(['실전병', '실전미섬멸']);
+  expect(await players(archive, 'combat', 'base', 'time')).toEqual(['실전병']);
+  expect(await players(archive, 'combat', 'base', 'rounds')).toEqual(['실전병']);
+  expect(await players(archive, 'combat', 'base', 'accuracy')).toEqual(['실전병', '실전미섬멸']);
+  for (const b of BOARDS) expect(await players(archive, 'standard', 'base', b)).toEqual(['표준병']);
+  // Kept in this browser: the combat runs read back from storage (the 모드 check takes combat).
+  expect((await archive.mine()).map((r) => r.callsign)).toEqual(['훈련병', '실전연습', '표준병', '실전미섬멸', '실전병']);
+  // Nor a stored flag: the board reads the record's 모드 and 시드 종류.
+  const edited = seeded([
+    stored('실전병', { mode: 'combat' }, '2026-11-01T00:00:00.000Z', false),
+    stored('실전연습', { mode: 'combat', seedKind: 'practice' }, '2026-11-01T00:00:00.000Z', true),
+    stored('훈련병', { mode: 'training' }, '2026-11-01T00:00:00.000Z', true),
+  ]);
+  for (const b of BOARDS) {
+    expect(await players(edited, 'combat', 'base', b)).toEqual(['실전병']);
+    expect(await players(edited, 'standard', 'base', b)).toEqual([]);
+  }
+});
+
+test('랭킹: 보드는 재생 자료 머리의 시나리오 식별자로 갈린다', async () => {
+  const header = (scenario: { id: string; version: number }, more: Partial<ReplayData> = {}): ReplayData => ({ ...replayData([]), scenario, ...more });
+  const archive = mockArchive(memoryStorage(), isReplay);
+  await archive.submit(run('엑스', { mode: 'combat' }));
+  await archive.submit({ ...run('와이'), replay: header({ id: 'base-mungyeong', version: 2 }) });
+  await archive.submit({ ...run('와이실전', { mode: 'combat' }), replay: header({ id: 'base-mungyeong', version: 2 }) });
+  // Another scenario version and simVersion: the same board, versions are not looked at.
+  await archive.submit({ ...run('옛판'), replay: header({ id: 'base', version: 9 }, { simVersion: 15 }) });
+  // Not the 기본 포 on a daily game: kept on the board (the check is M6's).
+  await archive.submit({ ...run('다른포'), replay: header({ id: 'base', version: 1 }, { guns: { id: 'k9', version: 1 } }) });
+  for (const b of BOARDS) {
+    expect(await players(archive, 'standard', 'base', b)).toEqual(['옛판', '다른포']);
+    expect(await players(archive, 'combat', 'base', b)).toEqual(['엑스']);
+    expect(await players(archive, 'standard', 'base-mungyeong', b)).toEqual(['와이']);
+    expect(await players(archive, 'combat', 'base-mungyeong', b)).toEqual(['와이실전']);
+  }
+});
+
+test('랭킹: 판 기록은 23개 항목이고 시나리오와 포가 없다', async () => {
+  const KEYS = [
+    'ticks', 'seed', 'seedKind', 'cleared', 'clearTick', 'roundsTotal', 'missions', 'adjustRounds', 'firstErrorAvg',
+    'directionErrorAvg', 'reportAccuracyPct', 'roundsPerUnit', 'neutralized', 'combatUnits', 'earlyDefeats', 'friendlyHits',
+    'friendlyLosses', 'dangerCloseMissed', 'observerLost', 'postMoves', 'compromised', 'score', 'mode',
+  ];
+  expect(KEYS.length).toBe(23);
+  const storage = memoryStorage();
+  const archive = mockArchive(storage, isReplay);
+  for (const sim of [createSim(init(20261106)), createSim(combatInit(20261106))]) {
+    sim.step([START]);
+    const record = sim.record();
+    expect(Object.keys(record).sort()).toEqual([...KEYS].sort());
+    await archive.submit({ ...run('참새12'), record });
+  }
+  expect((await archive.mine()).map((r) => r.record.mode)).toEqual(['combat', 'standard']);
+  const ROW = ['callsign', 'record', 'missions', 'replay', 'createdAt', 'ranked'];
+  for (const r of await archive.mine()) expect(Object.keys(r).sort()).toEqual([...ROW].sort());
+  for (const r of JSON.parse(storage.getItem('observer.runs')!) as object[]) expect(Object.keys(r).sort()).toEqual([...ROW].sort());
 });

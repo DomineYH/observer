@@ -20,7 +20,7 @@ const text = (el: ReactElement) =>
     .map((l) => l.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 const shown = async (archive: RecordArchive, board: Board, callsign = '참새12') => (
-  <Ranking board={board} rows={await archive.board(board)} mine={await archive.mine()} callsign={callsign} onBoard={() => {}} />
+  <Ranking board={board} rows={await archive.board('standard', 'base', board)} mine={await archive.mine()} callsign={callsign} onBoard={() => {}} />
 );
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 랭킹 창', async () => {

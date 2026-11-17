@@ -45,7 +45,7 @@ test('F-30: 랭킹 자격 — 시뮬레이션에서 온 기록', async () => {
   ]);
   expect((await archive.submit(sub)).ranked).toBe(true);
   expect((await archive.submit(submissionOf('참새34', practice.sim, practiceInit, practice.session.log))).ranked).toBe(false);
-  const total = await archive.board('total');
+  const total = await archive.board('standard', 'base', 'total');
   expect(total.find((r) => r.callsign === '참새12')?.record.score).toBe(daily.sim.record().score);
   expect(total.map((r) => r.callsign)).not.toContain('참새34');
   expect((await archive.mine()).map((r) => [r.callsign, r.record.seedKind])).toEqual([
@@ -76,8 +76,8 @@ test('F-30: 랭킹 자격 — 작전 개시 뒤 훈련으로 바꾼 판은 저�
   const b = await archive.submit(submissionOf('참새34', free.sim, at, free.session.log));
   expect([a.record.mode, a.ranked]).toEqual(['training', false]);
   expect([b.record.mode, b.ranked]).toEqual(['standard', true]);
-  expect((await archive.board('total')).map((r) => r.callsign)).toContain('참새34');
-  expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새12');
+  expect((await archive.board('standard', 'base', 'total')).map((r) => r.callsign)).toContain('참새34');
+  expect((await archive.board('standard', 'base', 'total')).map((r) => r.callsign)).not.toContain('참새12');
   expect((await archive.mine()).map((r) => r.callsign)).toEqual(['참새34', '참새12']);
 });
 
@@ -98,7 +98,7 @@ test('F-30: 랭킹 자격 — 한 틱 안에 훈련으로 바꿨다 돌아온 �
   expect(replay(sub.replay, at.terrain, at.scenario, at.guns).record.mode).toBe('training');
   const stored = await archive.submit(sub);
   expect([stored.record.mode, stored.ranked]).toEqual(['training', false]);
-  expect((await archive.board('total')).map((r) => r.callsign)).not.toContain('참새56');
+  expect((await archive.board('standard', 'base', 'total')).map((r) => r.callsign)).not.toContain('참새56');
 });
 
 test('F-31: 재생 자료 — mock 판에는 terrain이 없다', () => {

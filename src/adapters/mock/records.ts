@@ -59,7 +59,7 @@ const RECORD: Record<keyof GameRecord, (x: unknown) => boolean> = {
   roundsTotal: count, missions: count, adjustRounds: count, firstErrorAvg: countOrNull, directionErrorAvg: countOrNull,
   reportAccuracyPct: countOrNull, roundsPerUnit: countOrNull, neutralized: count, combatUnits: count, earlyDefeats: count,
   friendlyHits: count, friendlyLosses: count, dangerCloseMissed: count, observerLost: flag, postMoves: count,
-  compromised: flag, score: count, mode: oneOf('training', 'standard'),
+  compromised: flag, score: count, mode: oneOf('training', 'standard', 'combat'),
 };
 const RECORD_KEYS = Object.keys(RECORD) as (keyof GameRecord)[];
 const EFFECTS: Record<Effect, true> = { destroyed: true, neutralized: true, ineffective: true }; // the compiler keeps it whole
@@ -84,8 +84,8 @@ const isRun = (r: unknown, isReplay: (x: unknown) => boolean): r is StoredRun =>
   r.missions.every((m) => fits(m, MISSION_KEYS, MISSION)) &&
   isReplay(r.replay) &&
   fits(r.record, RECORD_KEYS, RECORD);
-/** 랭킹 자격 (PRD 10.2): 표준 모드 and 일일 시드, read off the record itself. */
-const rankable = (r: GameRecord) => r.mode === 'standard' && r.seedKind === 'daily';
+/** 랭킹 자격 (PRD 10.2, ADR 0021): 일일 시드 ended in 표준 or 실전, read off the record itself. */
+const rankable = (r: GameRecord) => (r.mode === 'standard' || r.mode === 'combat') && r.seedKind === 'daily';
 const byTime = (a: RankRow, z: RankRow) => (a.createdAt < z.createdAt ? -1 : a.createdAt > z.createdAt ? 1 : 0);
 
 export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isReplay: (x: unknown) => boolean): RecordArchive {
@@ -131,10 +131,11 @@ export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isRep
       save([...load(), run].slice(-KEEP));
       return run;
     },
-    async board(b) {
+    async board(mode, scenario, b) {
       const { key, ok } = BOARDS[b];
       const mine = load()
-        .filter((r) => rankable(r.record)) // not the stored flag: storage can be edited
+        // Not the stored flag (storage can be edited); the mode from the 판 기록, the scenario from the 재생 자료 header.
+        .filter((r) => rankable(r.record) && r.record.mode === mode && r.replay.scenario.id === scenario)
         .map((r): RankRow => ({ callsign: r.callsign, fake: false, createdAt: r.createdAt, record: r.record }));
       // Each callsign's best run (the earlier of a tie), then best first and, on a tie, the earlier run first.
       const best = new Map<string, RankRow>();
