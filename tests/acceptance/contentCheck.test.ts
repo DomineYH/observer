@@ -38,6 +38,12 @@ test('시나리오: 내용 검증 — 규칙마다 어긴 자료가 걸린다', 
     [[broken((p) => ((p.scenario.routes.d = p.scenario.routes.A), (p.briefing.routes.d = '넷째 접근로')))], [at('시나리오 2', 'routes.d')]],
     // 3. 접근로마다 3점 이상
     [[broken((p) => p.scenario.routes.B.splice(1, 1))], [at('시나리오 3', 'routes.B')]],
+    // An empty or one-point route is listed, not thrown on, and the checking goes on (review of #140).
+    [[broken((p) => (p.scenario.routes.A = []))], [at('시나리오 3', 'routes.A')]],
+    [[broken((p) => ((p.scenario.routes.A = []), (p.briefing.name = '')))], [at('시나리오 3', 'routes.A'), at('시나리오 14', 'briefing.name')]],
+    [[broken((p) => (p.scenario.routes.A = [p.scenario.routes.A[0]]))], [at('시나리오 3', 'routes.A'), at('시나리오 4', 'routes.A')]],
+    [[broken((p) => (p.scenario.routes.A = [p.scenario.routes.A[2]]))], [at('시나리오 3', 'routes.A'), at('시나리오 5', 'routes.A')]],
+    [[broken((p) => p.scenario.routes.A.splice(1, 1))], [at('시나리오 3', 'routes.A')]],
     // 4. 아군 진지가 1개 이상, 접근로의 끝점은 아군 진지
     [[broken((p) => (p.scenario.routes.A[2] = { x: 4351, y: 3380 }))], [at('시나리오 4', 'routes.A')]],
     [[broken((p) => (p.scenario.friends = []))], [at('시나리오 4', 'friends'), at('시나리오 4', 'routes.A'), at('시나리오 4', 'routes.B'), at('시나리오 4', 'routes.C')]],
