@@ -25,6 +25,7 @@ export const RADIO_KINDS = [
   'shift',
   'move_notice',
   'position_report',
+  'mto_correction', // 실전: 기러기's 정정 of a wrong readback
 ] as const;
 
 export const WARNINGS = ['adjust', 'ffe'] as const;
@@ -72,6 +73,8 @@ export type TargetName = (typeof TARGET_NAMES)[number];
 export type Unit = (typeof UNITS)[number];
 export type Flag = 0 | 1;
 
+type Mto = { fuze: Fuze; rounds: number; control: Control; targetNumber: number };
+
 /** 표적성질: unknown has no activity or size; only men·vehicles·tubes carry a count. */
 export type Target =
   | { targetType: 'unknown' }
@@ -96,7 +99,8 @@ export type RadioBody =
       slots: { method: 'grid'; easting: number; northing: number } | { method: 'polar'; azimuth: number; distance: number };
     }
   | { kind: 'description'; slots: Target & { rounds: number; fuzeRequest: FuzeRequest; control: Control; dangerClose: Flag } }
-  | { kind: 'mto'; slots: { fuze: Fuze; rounds: number; control: Control; targetNumber: number } }
+  | { kind: 'mto'; slots: Mto }
+  | { kind: 'mto_correction'; slots: Mto }
   | { kind: 'ready'; slots: { fuze?: Fuze } }
   | { kind: 'correction'; slots: Corrections & { direction?: number; next: Next } }
   | { kind: 'repeat'; slots: TargetNameSlots & { effect: Effect; rounds: number } }

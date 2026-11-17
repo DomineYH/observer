@@ -12,6 +12,7 @@ import { applyMove, applyReport, runPostAct, updatePost } from './post';
 import { applyPrep } from './prep';
 import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
 import { takeDue } from './queue';
+import { applyReadback, runCorrection } from './readback';
 import { recordOf } from './record';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
@@ -80,6 +81,7 @@ export function createSim(init: SimInit): Sim {
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
     note: (n) => out.push({ type: 'post', ...n }),
     friends: init.scenario.friends,
+    ...(init.combat ? { combat: init.combat.numbers } : {}),
   };
 
   return {
@@ -98,6 +100,7 @@ export function createSim(init: SimInit): Sim {
           return true;
         }
         if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom' || a === 'shift') return applyRadio(state, ctx, a, input.v);
+        if (a === 'readback') return applyReadback(state, ctx, input.v!);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'move') return applyMove(state, ctx, v);
         if (a === 'pos' || a === 'pos_skip') return applyReport(state, ctx, a, input.v as readonly number[] | undefined);
@@ -128,6 +131,7 @@ export function createSim(init: SimInit): Sim {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
           else if (act === 'retaliation' || act === 'retaliation_muzzle' || act === 'end') runExposureAct(state, ctx, act);
           else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
+          else if (act === 'mto_correction') runCorrection(state, ctx);
           else runAct(state, ctx, act);
         }
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
