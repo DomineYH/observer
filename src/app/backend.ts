@@ -53,4 +53,6 @@ export async function loadTerrain(backend: Backend, seed: number, screen: BootSc
 // 배치, paired with the 지형 원천 by the same key: the 기본 시나리오 of the backend's 전장, the 배치 목록's first 배치 on it.
 const BATTLEFIELD: Record<Backend, string> = { mock: 'mock', real: 'mungyeong' };
 
+export const battlefieldOf = (backend: Backend): string => BATTLEFIELD[backend];
+
 export const placementOf = (backend: Backend): Placement => PLACEMENTS.find((p) => p.terrain.id === BATTLEFIELD[backend])!;

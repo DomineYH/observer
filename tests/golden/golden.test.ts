@@ -5,10 +5,11 @@ import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validate
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { BASE_GUNS } from '@content/guns';
-import { contentOf } from '@content/lookup';
+import { contentOf, PLACEMENTS } from '@content/lookup';
 import { BASE } from '@content/scenarios/base';
 import { BASE_SCENARIO } from '@content/scenarios/base';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
+import { dailyScenario } from '../../src/app/seed';
 import { currentHeader, goldenFiles, headerVersions, readGolden, shouldWrite, type Versions } from './golden';
 import { landOf, REAL_TERRAIN_FILE } from './land';
 import { SCRIPTS } from './scripts';
@@ -47,6 +48,28 @@ describe('골든', () => {
       expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario, guns, combat: found.combat?.version });
     }
   }, 30000); // reads every golden file
+
+  // What the server will check (#126 2 and 3) holds for every daily golden: no game our app makes breaks it.
+  test('골든: 일일 판의 머리는 그 날짜의 일일 시나리오다', () => {
+    const daily = goldenFiles().filter((f) => readGolden(f).replay.seedKind === 'daily');
+    expect(daily.length).toBeGreaterThanOrEqual(7);
+    for (const f of daily) {
+      const d = readGolden(f).replay;
+      const { scenario } = dailyScenario(d.seed, d.terrain?.id ?? 'mock', PLACEMENTS);
+      expect(d.scenario, f).toEqual({ id: scenario.id, version: scenario.version });
+    }
+  });
+
+  test('골든: 일일 판은 기본 포이고 머리의 모드와 판 기록의 모드가 맞는다', () => {
+    for (const f of goldenFiles().filter((f) => readGolden(f).replay.seedKind === 'daily')) {
+      const { replay: d, record } = readGolden(f);
+      expect(d.guns, f).toEqual({ id: BASE_GUNS.id, version: BASE_GUNS.version });
+      // 실전 on both sides or on neither; otherwise the record says training once training was used (record.ts).
+      expect(record.mode === 'combat', f).toBe(d.mode === 'combat');
+      if (d.mode !== 'combat') expect(['training', 'standard'], f).toContain(record.mode);
+      if (!d.inputs.some((i) => i.a === 'mode')) expect(record.mode, f).toBe(d.mode); // a game never switched keeps its first mode
+    }
+  });
 
   test('골든: 세 파일과 ⑤ 머리의 정체가 같다', async () => {
     const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
