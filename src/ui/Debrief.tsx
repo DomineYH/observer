@@ -30,7 +30,7 @@ function Table({ head, rows }: { head: string[]; rows: string[][] }) {
 function savedNote(saved: StoredRun | 'pending' | 'failed'): string {
   if (saved === 'pending') return '저장 중…';
   if (saved === 'failed') return '이 브라우저에 기록을 저장하지 못했습니다.';
-  if (saved.ranked) return '저장했습니다 · 표준 모드 · 일일 시드: 랭킹 집계';
+  if (saved.ranked) return `저장했습니다 · ${saved.record.mode === 'combat' ? '실전' : '표준'} 모드 · 일일 시드: 랭킹 집계`;
   return saved.record.mode === 'training' ? '저장했습니다 · 훈련 모드를 썼으므로 랭킹에서는 제외' : '저장했습니다 · 연습 시드: 랭킹에서는 제외';
 }
 

@@ -30,6 +30,8 @@ const DEFAULTS = { mortarUsable: 15 } as const;
 const EXCEPTIONS: readonly { placement: string; check: keyof typeof DEFAULTS; value: number; decision: string }[] = [
   // no box within 5.0 km reaches 15 % (best 13.94 %): user decision on #82 (2026-11-11)
   { placement: 'base-mungyeong', check: 'mortarUsable', value: 13.5, decision: 'https://github.com/DomineYH/observer/issues/82' },
+  // the same box on the same land, so the same 13.94 %: #82 extended to it by #127 (2026-11-15), no other box
+  { placement: 'apc-mungyeong', check: 'mortarUsable', value: 13.5, decision: 'https://github.com/DomineYH/observer/issues/127#issuecomment-6891917624' },
 ];
 const exceptionOf = (id: string, check: keyof typeof DEFAULTS) => EXCEPTIONS.find((e) => e.placement === id && e.check === check);
 
@@ -84,9 +86,9 @@ const disc = (c: Point, r: number) => cells(c.x - r, c.x + r, c.y - r, c.y + r).
 /** The 1 m grid points within 30 m of the origin. */
 const grid30: Point[] = [];
 for (let v = -30; v <= 30; v++) for (let u = -30; u <= 30; u++) if (u * u + v * v <= 900) grid30.push({ x: u, y: v });
-/** Every 접근로 a unit of this type can walk. */
+/** Every 접근로 a unit of this type can walk, 증원 included. */
 const routesOf = (p: Placement, type: UnitType): RouteKey[] => {
-  const picks = p.scenario.units.flatMap((u) => (u.type === type && 'route' in u ? [u.route] : []));
+  const picks = [...p.scenario.units, ...p.scenario.reinforcements].flatMap((u) => (u.type === type && 'route' in u ? [u.route] : []));
   return [...new Set(picks.flatMap((r) => (typeof r === 'string' ? [r] : [r.first, r.second])))];
 };
 /** The 벌채 원 a 전장's 지형 must carry: one per 관측소 (계획·예비) of every 배치 laid on it, `kind` left out. */
@@ -343,5 +345,14 @@ describe('배치 예외 표', () => {
       expect(e.decision).toMatch(/^https:\/\/github\.com\/DomineYH\/observer\/issues\/\d+/);
       expect(e.value).toBeLessThan(DEFAULTS[e.check]);
     }
+  });
+});
+
+describe('증원의 접근로', () => {
+  test('배치: 정찰조 자리와 장갑차 정지 자리는 증원이 갈 수 있는 접근로도 본다', () => {
+    const recon = { type: 'recon', route: 'C', t0: 0 } as const; // a 증원 recon on a route no recon of the 부대 목록 walks
+    const sc = { ...BASE_MUNGYEONG.scenario, reinforcements: [...BASE_MUNGYEONG.scenario.reinforcements, recon] };
+    expect(routesOf({ ...BASE_MUNGYEONG, scenario: sc }, 'recon')).toEqual(['A', 'B', 'C']);
+    expect(routesOf(BASE_MUNGYEONG, 'apc')).toEqual(['B', 'C']); // the 증원 장갑차 walks B / C, as the first one does
   });
 });

@@ -1,4 +1,4 @@
-import type { CombatData, GunProfile, Point } from '@sim';
+import type { CombatData, GunProfile, Point, UnitDef } from '@sim';
 import type { Gun } from './guns';
 import type { Placement } from './placement';
 import { inRange } from './range';
@@ -23,8 +23,8 @@ function realDay(d: number): boolean {
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === day;
 }
 
-/** 시나리오와 배치 rules 1–9 · 11–16 (#116, #124) of one 배치; `first` = the first 배치 of its 전장, `base` the 기본 포
- * (none when the 포 프로파일 목록 lacks it, which 포 프로파일 1 reports). */
+/** 시나리오와 배치 rules 1–16 (#116, #124) of one 배치; `first` = the first 배치 of its 전장, `base` the 기본 포 (none when
+ * the 포 프로파일 목록 lacks it, which 포 프로파일 1 reports). */
 function placementFindings(p: Placement, seen: Set<string>, first: boolean, base: GunProfile | undefined): Finding[] {
   const { scenario: s, briefing: b } = p;
   const out: Finding[] = [];
@@ -47,34 +47,38 @@ function placementFindings(p: Placement, seen: Set<string>, first: boolean, base
   s.friends.forEach((f, i) => f.y < s.frontY || bad(5, `friends[${i}]`));
   for (const [k, pts] of routes) if (!(pts[0]!.y > s.frontY)) bad(5, `routes.${k}`);
 
-  s.units.forEach((u, i) => {
+  const each = (f: (u: UnitDef, at: string) => void) =>
+    (['units', 'reinforcements'] as const).forEach((list) => s[list].forEach((u, i) => f(u, `${list}[${i}]`)));
+
+  each((u, at) => {
     if (u.type === 'mortar') return;
     const r = u.route;
-    if (typeof r === 'string') return has(r) || bad(6, `units[${i}].route`);
-    if (!has(r.first) || !has(r.second)) bad(6, `units[${i}].route`);
-    if (!(r.p > 0 && r.p < 1)) bad(6, `units[${i}].route.p`);
+    if (typeof r === 'string') return has(r) || bad(6, `${at}.route`);
+    if (!has(r.first) || !has(r.second)) bad(6, `${at}.route`);
+    if (!(r.p > 0 && r.p < 1)) bad(6, `${at}.route.p`);
   });
 
   s.intelRoutes.forEach(({ route }, i) => {
     if (!has(route) || s.intelRoutes.findIndex((x) => x.route === route) < i) bad(7, `intelRoutes[${i}].route`);
   });
 
-  s.units.forEach((u, i) => {
+  each((u, at) => {
     if (u.type !== 'mortar') return;
-    if (!Number.isInteger(u.nai) || u.nai < 0 || u.nai >= s.nais.length) bad(8, `units[${i}].nai`);
-    if (!(u.spread.x > 0 && u.spread.y > 0)) bad(8, `units[${i}].spread`);
+    if (!Number.isInteger(u.nai) || u.nai < 0 || u.nai >= s.nais.length) bad(8, `${at}.nai`);
+    if (!(u.spread.x > 0 && u.spread.y > 0)) bad(8, `${at}.spread`);
   });
   s.nais.forEach((n, i) => n.r > 0 || bad(8, `nais[${i}].r`));
 
   if (!s.units.some((u) => u.type !== 'recon')) bad(9, 'units');
+  if (!s.reinforcements.some((u) => u.type !== 'recon')) bad(10, 'reinforcements');
 
   if (base && !inRange(s, base)) bad(12, 'battery');
 
   if (!count(s.timeLimitS)) bad(11, 'timeLimitS');
   const second = (t: number) => Number.isInteger(t) && t >= 0 && t < s.timeLimitS;
-  s.units.forEach((u, i) => {
-    if (!second(u.t0)) bad(11, `units[${i}].t0`);
-    if (u.type === 'mortar' && !second(u.fireFromS)) bad(11, `units[${i}].fireFromS`);
+  each((u, at) => {
+    if (!second(u.t0)) bad(11, `${at}.t0`);
+    if (u.type === 'mortar' && !second(u.fireFromS)) bad(11, `${at}.fireFromS`);
   });
 
   if (b.nais.length !== s.nais.length) bad(13, 'briefing.nais');
@@ -134,7 +138,7 @@ function combatFindings(c: CombatData): Finding[] {
 }
 
 /** 내용 검증 (ADR 0017): the 어긋난 곳 of the 배치 목록, the 포 프로파일 목록 and the 실전 수치, none when all keep the
- * content rules. Run by the tests only; the app never checks its content. The 증원 rules (M3-16) arrive with their data. */
+ * content rules. Run by the tests only; the app never checks its content. */
 export function contentCheck(content: { placements: readonly Placement[]; guns: readonly Gun[]; combat: CombatData }): Finding[] {
   const base = content.guns.find((g) => g.profile.id === 'base')?.profile;
   const seen = new Set<string>();

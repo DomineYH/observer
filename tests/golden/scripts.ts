@@ -4,6 +4,7 @@ import { BASE_GUNS } from '@content/guns';
 import { MIL } from '@sim/ballistics';
 import { atan2 } from '@sim/math';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { APC_MUNGYEONG } from '@content/scenarios/apc-mungyeong';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
@@ -32,6 +33,16 @@ const MUNGYEONG = (() => {
   const moveTo = { x: op.x + 80, y: op.y };
   const pos = toGrid(moveTo.x, moveTo.y, grid);
   return { scenario, terrain, op, laseAz: Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL * 10), moveTo, pos: [pos.e, pos.n] };
+})();
+
+// 장갑차 선두's points (#127): its planned post, NAI 1's centre as a square on the committed 방안, and the 관측방위각 to it in
+// mils (the grid method's first correction carries it).
+const APC = (() => {
+  const { scenario, terrain } = APC_MUNGYEONG;
+  const op = scenario.plannedOp;
+  const nai = scenario.nais[0]!;
+  const at = toGrid(nai.x, nai.y, grid);
+  return { scenario, terrain, op, loc: ['grid', at.e, at.n], dir: (Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL) + 6400) % 6400 };
 })();
 
 // 포 넷 (#126): one script, the header's `guns` alone differs. ①'s 82 mm mortar section fired for effect straight from the
@@ -371,6 +382,27 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       ],
       totalTicks: 29366,
       terrain: { id: 'mungyeong', version: 2 },
+    },
+  },
+  {
+    // 장갑차 선두 (#127): ①'s form on the 문경 land, 연습 시드 — 좌표법 조정 at NAI 1's centre, 미상 표적 → 수정 0과 함께
+    // 효력사 → 임무끝. Each input about 200 ticks after its stage opens (probe, SIM_VERSION 17: call 110, loc 386, desc 641,
+    // adjust 2312, effect 4062). Past tick 3000 the five units have set off and the mortar has fired once.
+    file: '7-apc-grid-eom.json',
+    replay: {
+      ...HEAD,
+      seedKind: 'practice',
+      scenario: { id: APC.scenario.id, version: APC.scenario.version },
+      terrain: APC.terrain,
+      inputs: [
+        { t: 0, a: 'start', v: [APC.op.x, APC.op.y] },
+        { t: 310, a: 'call', v: ['adjust'] },
+        { t: 586, a: 'loc', v: APC.loc },
+        { t: 841, a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] },
+        { t: 2512, a: 'corr', v: [APC.dir, 'left', 0, 'drop', 0, 'ffe'] },
+        { t: 4262, a: 'eom', v: ['neutralized'] },
+      ],
+      totalTicks: 4662,
     },
   },
   ...['kh178', 'kh179', 'k55', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),

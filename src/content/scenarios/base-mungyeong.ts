@@ -41,6 +41,10 @@ export const BASE_MUNGYEONG: Placement = {
       { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 260 }, // 적 장갑차 2대
       { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0, fireFromS: 210 }, // 적 82mm 박격포반
     ],
+    reinforcements: [
+      { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 420 }, // 적 3소대
+      { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 480 }, // 적 장갑차 2대
+    ],
   },
   // Only the NAI 세 줄 and the 박격포 구절 differ from `base`'s, named by villages on the map (no 산·고개 이름).
   briefing: {
