@@ -89,7 +89,7 @@ function placementFindings(p: Placement, seen: Set<string>, first: boolean, base
   return out;
 }
 
-/** 포 프로파일 rules 1–5 (#116); 진지 변환 시간 joins rule 3 with M3-20. */
+/** 포 프로파일 rules 1–5 (#116); 진지 변환 시간 is in rule 3 (M3-20). */
 function gunFindings(guns: readonly Gun[]): Finding[] {
   const out: Finding[] = [];
   const seen = new Set<string>();
@@ -102,7 +102,7 @@ function gunFindings(guns: readonly Gun[]): Finding[] {
     const { man, vehicle, tube } = g.lethalRadiusM;
     const positive = { 'ffe.intervalS': g.ffe.intervalS, maxRangeM: g.maxRangeM, 'lethalRadiusM.man.quick.stand': man.quick.stand,
       'lethalRadiusM.man.quick.prone': man.quick.prone, 'lethalRadiusM.man.vt.stand': man.vt.stand, 'lethalRadiusM.man.vt.prone': man.vt.prone,
-      'lethalRadiusM.vehicle': vehicle, 'lethalRadiusM.tube.quick': tube.quick, 'lethalRadiusM.tube.vt': tube.vt };
+      'lethalRadiusM.vehicle': vehicle, 'lethalRadiusM.tube.quick': tube.quick, 'lethalRadiusM.tube.vt': tube.vt, displacementS: g.displacementS };
     for (const [at, v] of Object.entries(positive)) if (!(v > 0)) bad(3, at);
     const { tof, peRange: r, peDeflection: d } = g;
     const nonNegative = { 'tof.baseS': tof.baseS, 'tof.sPerKm': tof.sPerKm, 'peRange.baseM': r.baseM, 'peRange.mPerKm': r.mPerKm,

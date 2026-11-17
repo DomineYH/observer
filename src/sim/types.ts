@@ -25,6 +25,7 @@ export interface GunProfile extends Ref {
     vehicle: number;
     tube: { quick: number; vt: number };
   };
+  displacementS: number; // 진지 변환 시간: 실전 only, under the 실전 자료 판 and outside this profile's version
 }
 
 /** 접근로 열쇠: one uppercase letter. */

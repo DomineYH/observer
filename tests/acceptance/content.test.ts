@@ -4,7 +4,7 @@ import { BASE_GUNS } from '@content/guns';
 import { contentOf, GUNS, PLACEMENTS } from '@content/lookup';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { BASE_SCENARIO } from '@content/scenarios/base';
-import { EXPECTED, mismatches, valueHash } from './expected';
+import { EXPECTED, mismatches, valueHash, versioned } from './expected';
 
 const piece = { id: 'x', version: 1, list: [1, 2], nested: { a: 1, b: 2 } };
 const rows = { 'guns x@1': valueHash(piece) };
@@ -53,7 +53,10 @@ test('자료: 내용과 버전이 어긋나지 않는다', () => {
   const pieces: Record<string, unknown> = {};
   for (const { scenario: s } of PLACEMENTS) pieces[`scenario ${s.id}@${s.version}`] = s; // 증원 (M3-16) will be left out here
   pieces[`combat@${COMBAT.version} numbers`] = COMBAT.numbers;
-  for (const { profile: g } of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
+  for (const { profile: g } of GUNS) {
+    pieces[`guns ${g.id}@${g.version}`] = versioned(g); // 진지 변환 시간 is the 실전 자료 판's, below
+    pieces[`combat@${COMBAT.version} guns ${g.id}`] = g.displacementS;
+  }
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });
 

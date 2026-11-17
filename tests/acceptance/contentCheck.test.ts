@@ -168,6 +168,7 @@ test('포 프로파일: 내용 검증', () => {
       [bad(3, `lethalRadiusM.${path}`)],
     ]),
     [guns((l) => (l[k].profile.lethalRadiusM.vehicle = NaN)), [bad(3, 'lethalRadiusM.vehicle')]],
+    [guns((l) => (l[k].profile.displacementS = 0)), [bad(3, 'displacementS')]], // 진지 변환 시간 (M3-20)
     // 4. 비과시간·공산오차의 계수 여섯과 효력사 흔들림은 0 이상
     ...['tof.baseS', 'tof.sPerKm', 'peRange.baseM', 'peRange.mPerKm', 'peDeflection.baseM', 'peDeflection.mPerKm', 'ffe.jitterS'].map((path): [Gun[], Finding[]] => {
       const [a, b] = path.split('.') as [string, string];
