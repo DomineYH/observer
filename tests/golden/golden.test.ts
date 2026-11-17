@@ -313,7 +313,8 @@ describe('골든', () => {
     const lases = data.inputs.flatMap((i, k) => (i.a === 'lase' ? [k] : []));
     expect(lases).toHaveLength(combat!.numbers.laserLimit);
     expect(data.inputs.slice(lases.at(-1)! + 1).some((i) => i.a === 'loc' && i.v![0] === 'grid')).toBe(true);
-    expect(said('observer', 'location').some((e) => e.type === 'radio' && e.utterance.slots?.method === 'grid' && e.tick > data.inputs[lases.at(-1)!]!.t)).toBe(true);
+    const fifth = data.inputs[lases.at(-1)!]!.t;
+    expect(events.some((e) => e.type === 'radio' && e.utterance.speaker === 'observer' && e.utterance.kind === 'location' && e.utterance.slots.method === 'grid' && e.tick > fifth)).toBe(true);
   }, 60000); // two runs of 18 000 ticks on the mock land
 
   test('골든: 다시 만드는 조건', () => {
