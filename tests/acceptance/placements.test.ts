@@ -310,9 +310,14 @@ describe('base-mungyeong 배치에만', () => {
   const sc = BASE_MUNGYEONG.scenario;
   const mortar = sc.units.find((u) => u.type === 'mortar')!;
 
-  test('배치: 문경 배치의 식별자와 버전', () => {
+  test('배치: 문경 배치의 식별자와 버전, 관측소와 진지의 수, 정찰조와 장갑차의 접근로', () => {
     expect({ id: sc.id, version: sc.version }).toEqual({ id: 'base-mungyeong', version: 2 });
     expect(sc.id).not.toBe(BASE.scenario.id);
+    expect([sc.plannedOp, ...(sc.reserveOps ?? [])]).toHaveLength(3);
+    expect(sc.friends).toHaveLength(3);
+    // the 정찰조 walks 서측 or 중앙 only; the APC walks 중앙 or 동측
+    expect(sc.units.find((u) => u.type === 'recon')).toMatchObject({ route: { first: 'A', second: 'B' } });
+    expect(sc.units.find((u) => u.type === 'apc')).toMatchObject({ route: { first: 'B', second: 'C' } });
   });
 
   test('배치: 문경 보급 도로의 첫 점', async () => {
