@@ -1,6 +1,9 @@
 // One game: its 생성 인자, the simulation and the session that records its accepted inputs. A weather change in a
 // practice seed's 작전 준비 replaces the whole game (spec: 재생 자료 starts again), keeping the 관측소 후보 and the mode (실전 by its 생성 인자).
 import { createSim, type CombatData, type Input, type Mode, type Sim, type SimInit } from '@sim';
+import { BASE_GUNS } from '@content/guns';
+import { GUNS } from '@content/lookup';
+import { inRange } from '@content/range';
 import { createSession } from './session';
 
 export interface Game {
@@ -32,4 +35,13 @@ export function remade(game: Game, m: Mode, combat: CombatData): Game | null {
   const init: SimInit = { ...game.init, mode: m, combat };
   if (m !== 'combat') delete init.combat; // 실전 자료 goes with mode combat only
   return newGame(init, game);
+}
+
+/** 연습의 포 고르기 (#119 Q6, Q8): only a practice game in 작전 준비 changes its gun, as a weather change does. A gun out of
+ * range of the 배치, or unknown, is the 기본 포. null when nothing changes: a daily game, after 작전 개시, the gun in use. */
+export function regunned(game: Game, id: string): Game | null {
+  const { init } = game;
+  if (init.seedKind !== 'practice' || game.sim.state.phase !== 'prep') return null;
+  const guns = GUNS.find((g) => g.profile.id === id && inRange(init.scenario, g.profile))?.profile ?? BASE_GUNS;
+  return guns === init.guns ? null : newGame({ ...init, guns }, game);
 }

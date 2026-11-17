@@ -38,6 +38,8 @@ const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', 
       scenarios={SCENARIOS}
       mode="training"
       onMode={() => {}}
+      gun="base"
+      onGun={() => {}}
     />,
   );
 const text = (...args: Parameters<typeof markup>) => markup(...args).replace(/<[^>]*>/g, '');

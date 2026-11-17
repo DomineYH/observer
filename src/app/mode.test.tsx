@@ -96,7 +96,7 @@ test('실전: 모드 고르기 — 작전 준비에서 고르면 판을 새로 �
   // The 판 정보 카드's 모드 row: the three, the one in use checked, and 실전's 소개 글 under them.
   const card = (mode: Mode) =>
     renderToStaticMarkup(
-      <InfoCard seed={1234} seedKind="practice" weather={a.init.weather} preset="clear" onPreset={() => {}} scenario="보병 중대" scenarios={[]} mode={mode} onMode={() => {}} />,
+      <InfoCard seed={1234} seedKind="practice" weather={a.init.weather} preset="clear" onPreset={() => {}} scenario="보병 중대" scenarios={[]} mode={mode} onMode={() => {}} gun="base" guns={[]} onGun={() => {}} />,
     );
   const choices = (html: string) => [...html.matchAll(/<input type="radio" name="mode"( checked="")?\/> ?(.+?)<\/label>/g)].map((m) => [m[2], !!m[1]]);
   expect(choices(card('combat'))).toEqual([
