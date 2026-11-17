@@ -30,6 +30,8 @@ const DEFAULTS = { mortarUsable: 15 } as const;
 const EXCEPTIONS: readonly { placement: string; check: keyof typeof DEFAULTS; value: number; decision: string }[] = [
   // no box within 5.0 km reaches 15 % (best 13.94 %): user decision on #82 (2026-11-11)
   { placement: 'base-mungyeong', check: 'mortarUsable', value: 13.5, decision: 'https://github.com/DomineYH/observer/issues/82' },
+  // the same box on the same land, so the same 13.94 %: #82 extended to it by #127 (2026-11-15), no other box
+  { placement: 'apc-mungyeong', check: 'mortarUsable', value: 13.5, decision: 'https://github.com/DomineYH/observer/issues/127#issuecomment-6891917624' },
 ];
 const exceptionOf = (id: string, check: keyof typeof DEFAULTS) => EXCEPTIONS.find((e) => e.placement === id && e.check === check);
 
