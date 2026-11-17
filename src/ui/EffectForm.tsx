@@ -21,9 +21,10 @@ interface Props {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  held?: boolean; // 실전: owed readbacks hold 임무끝 · 재효력사 · 수정 후 효력사
 }
 
-export function EffectForm({ state, mission, prefill, names, mode, send }: Props) {
+export function EffectForm({ state, mission, prefill, names, mode, send, held }: Props) {
   const [effect, setEffect] = useState<Effect>('neutralized');
   const [action, setAction] = useState<Action>('eom');
   const [rounds, setRounds] = useState(2);
@@ -58,7 +59,7 @@ export function EffectForm({ state, mission, prefill, names, mode, send }: Props
       )}
       {action === 'corr' ? (
         // B1: a mission that never sent 방향 (바로 효력사) gets the 방향 field here.
-        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} />
+        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} held={held} />
       ) : (
         <Preview
           draft={action === 'eom' ? eomDraft(effect, name) : repeatDraft(effect, rounds, name)}
@@ -66,6 +67,7 @@ export function EffectForm({ state, mission, prefill, names, mode, send }: Props
           names={names}
           mode={mode}
           send={send}
+          held={held}
         />
       )}
     </>
