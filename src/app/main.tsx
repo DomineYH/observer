@@ -18,6 +18,8 @@ import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
+import { ReadbackBox } from '@ui/ReadbackBox';
+import { owedOf } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
@@ -123,7 +125,7 @@ const step = () => {
   for (const e of events) {
     if (e.type === 'post') say(postNote(e, s.platoons, underCanopy(terrain, s.op.x, s.op.y), scenario));
     if (e.type !== 'radio') continue;
-    lines.push(e);
+    lines.push({ ...e, at: performance.now() }); // 실전 covers a 교신 to read back after 4 s of real time
     const u = e.utterance;
     if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, scenario.frontY));
     if (u.kind === 'position_report' && u.speaker === 'fdc') {
@@ -217,6 +219,7 @@ function App() {
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
   const prepLeft = useSyncExternalStore(subscribe, () => prepShown);
   const covered = pauseCovers(paused, mode, phase);
+  const mission = sim.state.missions.at(-1);
   const names = { callsign, gridLetters: terrain.grid.letters };
   // 탄착 편의 and the 수정값 제안: worked out once for each round landed, as the demo keeps R.suggest (786–790).
   const impact = sim.state.missions.at(-1)?.impacts.at(-1);
@@ -284,7 +287,7 @@ function App() {
             laserLimit={init.combat?.numbers.laserLimit}
           />
         </div>
-        <LowerTabs tab={tab} onTab={setTab} />
+        <LowerTabs tab={tab} onTab={setTab} owed={owedOf(mission?.readback ?? null).length} />
         <div data-panel="input">
           <PrepPanel
             state={{ phase, op, picked, reportDue }}
@@ -302,6 +305,7 @@ function App() {
             mode={mode}
             onMode={chooseMode}
           />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} send={send} />
           {covered ? (
             <section aria-label="입력기">
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
@@ -333,7 +337,7 @@ function App() {
           <TargetList platoons={sim.state.platoons} mode={mode} op={op} /* re-rendered with the tick above */ />
         </div>
         <div data-panel="log">
-          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
+          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} />
         </div>
       </div>
     </>
