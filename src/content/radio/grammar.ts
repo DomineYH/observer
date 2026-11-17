@@ -178,5 +178,7 @@ export const RADIO_GRAMMAR = {
       true,
       '기러기의 정정(미군 Correction의 옮김). 기러기가 관측자의 틀린 복창에 쓰는 한국군 표현은 미확인',
     ),
+    displacing: p(false, [['진지 변환 중']], 'design', true, '포대 진지 변환(실전). 한국군 표현인지 미확인'),
+    displaced: p(false, [['진지 변환 끝']], 'design', true, '포대 진지 변환(실전). 한국군 표현인지 미확인'),
   },
 } satisfies Grammar;

@@ -3,6 +3,7 @@ import { deploy } from './deploy';
 import { checkEnd } from './end';
 import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
+import { displacementEnds, displacementStarts, holdReady } from './displacement';
 import { expose, exposureTick, runArtilleryAct, runExposureAct } from './exposure';
 import { makeFriendlies, makeTruck, updateFriendlies } from './friendly';
 import { applyLase } from './laser';
@@ -42,6 +43,7 @@ export function createSim(init: SimInit): Sim {
     fire: null,
     signature: init.mode === 'combat' ? { points: 0, place: null } : null,
     artillery: null,
+    battery: init.mode === 'combat' ? { firstShot: -1, until: -1 } : null,
     observerLost: false,
     clearTick: -1,
     endAt: -1,
@@ -143,6 +145,7 @@ export function createSim(init: SimInit): Sim {
         for (let i = 0; i < state.platoons.length; i++) updatePlatoon(state, ctx, i);
         updateFriendlies(state, init.terrain, rng.ai, init.scenario.friends);
         state.effects = state.effects.filter((e) => state.tick - e.tick <= e.life);
+        displacementEnds(state, ctx); // before the due acts: 진지 변환 끝 before the 사격준비 끝 it held
         // Due acts run before 보임 so a round landing now is seen now; no act reads this tick's 보임 or 적정.
         for (let act = takeDue(state); act; act = takeDue(state)) {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
@@ -150,8 +153,9 @@ export function createSim(init: SimInit): Sim {
           else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
           else if (act === 'ranging' || act === 'barrage') runArtilleryAct(state, ctx, act);
           else if (act === 'mto_correction') runCorrection(state, ctx);
-          else runAct(state, ctx, act);
+          else if (act !== 'ready' || !holdReady(state)) runAct(state, ctx, act);
         }
+        displacementStarts(state, ctx); // after them: a fire that just ended lets it start this tick
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
         const all = state.tick % VIS_TICKS === 0 || state.bino !== before.bino || before.phase === 'prep';
         updateVisibility(state, init.terrain, init.weather, all);

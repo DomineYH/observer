@@ -1,5 +1,6 @@
 // 기대값 표 (ADR 0009): one row per piece of content, key → SHA-256 of the piece written as key-sorted JSON. Test-only.
 import { createHash } from 'node:crypto';
+import type { GunProfile } from '@sim';
 
 // Written directly, not rebuilt as objects: JSON.stringify always puts integer-like keys ("2", "10") first.
 const sortedJson = (x: unknown): string => {
@@ -12,6 +13,10 @@ const sortedJson = (x: unknown): string => {
 
 /** SHA-256 of the value written as key-sorted JSON: array order counts, object key order does not. */
 export const valueHash = (value: unknown): string => createHash('sha256').update(sortedJson(value)).digest('hex');
+
+/** A 포 프로파일 without its 진지 변환 시간: the numbers its version names (#126 기대값 표). */
+export const versioned = (g: GunProfile): Omit<GunProfile, 'displacementS'> =>
+  Object.fromEntries(Object.entries(g).filter(([k]) => k !== 'displacementS')) as Omit<GunProfile, 'displacementS'>;
 
 export type Mismatch = { key: string; problem: 'changed' | 'missing' | 'extra'; row?: string; actual?: string };
 
@@ -30,9 +35,14 @@ export function mismatches(rows: Readonly<Record<string, string>>, pieces: Reado
   return out;
 }
 
-/** 기대값 표: guns base M3-2, the four guns M3-12; scenario M3-4, combat numbers M3-5, combat scenario M3-16, `apc-mungyeong` M3-22 (each row
- * written once, by its slice). */
+/** 기대값 표: guns base M3-2, the four guns M3-12; scenario M3-4, combat numbers M3-5, combat scenario M3-16, combat guns
+ * M3-20, `apc-mungyeong` M3-22 (each row written once, by its slice). */
 export const EXPECTED: Readonly<Record<string, string>> = {
+  'combat@1 guns base': 'a037a7dfaf26abe1265bd5d51447be3bb1fdaef7c4c7a14bcf0d819818fb80b0',
+  'combat@1 guns k55': '0604cd3138feed202ef293e062da2f4720f77a05d25ee036a7a01c9cfcdd1f0a',
+  'combat@1 guns k9': '38d66d9692ac590000a91b03a88da1c88d51fab2b78f63171f553ecc551a0c6f',
+  'combat@1 guns kh178': 'a0eaec5a55dc2f5b2ba523018adc485ff620b9d83509b9f37186a7716e438d21',
+  'combat@1 guns kh179': 'a037a7dfaf26abe1265bd5d51447be3bb1fdaef7c4c7a14bcf0d819818fb80b0',
   'combat@1 numbers': '753d3e0dff73ff9500a0e55246bb7cdab972c200053531735b1ce61ccc7a54d2',
   'combat@1 scenario apc-mungyeong': '2e367b6e7279f6e2b4f5941f682de29ff5b28d967690384a4f0793d847acd774',
   'combat@1 scenario base': '2e0d118233d772672e3daa3173bd61fcea1ac8ad4cfeac8c1fb14972094351fc',

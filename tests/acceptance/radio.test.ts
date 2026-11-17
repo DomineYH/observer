@@ -59,7 +59,7 @@ test('F-08: 출처 표시와 검수 필요', () => {
       Object.entries(words).map(([value, word]) => [`${table}.${value}`, word] as const),
     ),
   ];
-  expect(marked.length).toBe(22 + 32);
+  expect(marked.length).toBe(24 + 32);
   for (const [name, m] of marked) {
     expect(SOURCES, name).toContain(m.source);
     expect(typeof m.needsReview, name).toBe('boolean');
@@ -70,6 +70,8 @@ test('F-08: 출처 표시와 검수 필요', () => {
     'pattern.radio_check_reply',
     'pattern.move_notice',
     'pattern.position_report',
+    'pattern.displacing',
+    'pattern.displaced',
     'pattern.mto',
     'pattern.danger_close_applied',
     'pattern.danger_close_adjust_first',

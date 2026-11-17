@@ -7,6 +7,7 @@ import { createStreams, next } from '@sim/rng';
 import { BASE_GUNS } from '@content/guns';
 import { GUNS } from '@content/lookup';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { versioned } from './expected';
 import { init } from './init';
 import { NO_ENEMY, oneMission } from './session';
 import { isImpact } from './strike';
@@ -14,7 +15,7 @@ import { flatTerrain } from './terrain';
 
 test('포 프로파일: base의 숫자는 지금 코드의 값이다', () => {
   // A second copy on purpose: a changed number goes red here by name, not only in the 기대값 표.
-  expect(BASE_GUNS).toEqual({
+  expect(versioned(BASE_GUNS)).toEqual({
     id: 'base',
     version: 1,
     maxRangeM: 24000,
@@ -98,7 +99,7 @@ const p155 = { tof: { baseS: 3, sPerKm: 2.6 }, peRange: { baseM: 2, mPerKm: 1.5 
 test('포 프로파일: 다섯 프로파일의 숫자', () => {
   expect(GUNS.map((g) => g.profile.id)).toEqual(['base', 'kh178', 'kh179', 'k55', 'k9']); // base first
   expect(GUNS[0]!.profile).toBe(BASE_GUNS);
-  const [, kh178, kh179, k55, k9] = GUNS.map((g) => g.profile);
+  const [, kh178, kh179, k55, k9] = GUNS.map((g) => versioned(g.profile));
   expect(kh178).toEqual({
     id: 'kh178',
     version: 1,
@@ -116,6 +117,11 @@ test('포 프로파일: 다섯 프로파일의 숫자', () => {
   for (const g of GUNS) expect(g.profile.sheaf, g.profile.id).toHaveLength(6); // 문수 6 for all five
   expect(GUNS.map((g) => g.name)).toEqual(['155mm 견인포', 'KH178 105mm 견인포', 'KH179 155mm 견인포', 'K55 155mm 자주포', 'K9 155mm 자주포']);
   expect(GUNS[3]!.blurb).toContain('탄도는 KH179와 같다');
+});
+
+test('포 프로파일: 진지 변환 시간 다섯 값', () => {
+  // #123 규칙 3's middle values (조사 행 18의 추정; KH178 `설계`), under the 실전 자료 판, outside every profile version.
+  expect(Object.fromEntries(GUNS.map((g) => [g.profile.id, g.profile.displacementS]))).toEqual({ base: 1300, kh178: 230, kh179: 1300, k55: 500, k9: 130 });
 });
 
 // 포대 삼발 under #118's measure A: lethality.test.ts's harness (one rifle platoon in line 9.1 km from the battery,

@@ -26,6 +26,8 @@ export const RADIO_KINDS = [
   'move_notice',
   'position_report',
   'mto_correction', // 실전: 기러기's 정정 of a wrong readback
+  'displacing', // 실전: 기러기's 진지 변환, its start
+  'displaced', // and its end
 ] as const;
 
 export const WARNINGS = ['adjust', 'ffe'] as const;
@@ -93,6 +95,7 @@ export type TargetNameSlots =
 export type RadioBody =
   | { kind: 'radio_check' | 'radio_check_reply' | 'fire' | 'shot' | 'rounds_complete' | 'move_notice' }
   | { kind: 'danger_close_applied' | 'danger_close_adjust_first' | 'danger_close_resend' }
+  | { kind: 'displacing' | 'displaced' }
   | { kind: 'call' | 'call_ack'; slots: { warning: Warning } }
   | {
       kind: 'location';
