@@ -40,18 +40,24 @@ import { newGame, remade, type Game } from './game';
 import { startLoop, timescaleOf } from './loop';
 import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
-import { chooseSeed, placementFor } from './seed';
+import { chooseSeed, dailyCandidates, dailyScenario, dailySeed, kstDate, placementFor } from './seed';
 import './app.css';
 
 const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 
-// The only clock read: today's KST date picks the daily seed unless the address names a practice seed.
-const { seed, seedKind } = chooseSeed(location.search, Date.now());
+// The only clock read: today's KST date picks the daily seed unless the address names a practice seed, and the 랭킹 창's board.
+const now = Date.now();
+const { seed, seedKind } = chooseSeed(location.search, now);
+const kst = kstDate(now);
+const today = dailySeed(kst.y, kst.m, kst.d);
 // On real: the 받는 중 line until the 지형 자료 is in; a refusal shows the 오류 화면 and stops here (no game, no mock land).
 const terrain = await loadTerrain(backend, seed, bootScreen(document.getElementById('root')!));
 // The 배치: a daily seed's 일일 시나리오, or the practice seed's `?scenario=` (the 기본 시나리오 when it names none here).
 const field = battlefieldOf(backend);
 const { scenario, briefing } = placementFor(location.search, seed, seedKind, field, PLACEMENTS);
+// The 랭킹 창 opens on today's 일일 시나리오 and offers today's 일일 후보, whatever this game's seed.
+const candidates = dailyCandidates(today, field, PLACEMENTS);
+const todays = dailyScenario(today, field, PLACEMENTS).scenario.id;
 const scenarios = PLACEMENTS.filter((p) => p.terrain.id === field).map((p) => ({ id: p.scenario.id, name: p.briefing.name, blurb: p.briefing.blurb }));
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
@@ -270,7 +276,7 @@ function App() {
           <span>
             기상 <output aria-live="off" aria-label="기상">{weatherChip(init.weather)}</output>
           </span>
-          <RankingDialog archive={archive} callsign={callsign} scenario={scenario.id} />
+          <RankingDialog archive={archive} callsign={callsign} mode={mode} today={todays} scenarios={candidates} placements={PLACEMENTS} />
         </HeadBand>
         <div className="sr-only">
           <TickCounter tick={tick} />

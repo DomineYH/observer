@@ -141,3 +141,12 @@ test('F-30: 랭킹 자격 — 사후강평의 저장 알림', () => {
   expect(said(stored({ seedKind: 'practice' }, false))).toContain('저장했습니다 · 연습 시드: 랭킹에서는 제외');
   expect(said('failed')).toContain('이 브라우저에 기록을 저장하지 못했습니다.');
 });
+
+test('랭킹: 저장 알림 — 실전', () => {
+  const g = oneMission();
+  const s = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
+  const said = (seedKind: 'daily' | 'practice', ranked: boolean) =>
+    text(view(g.sim, { ...s, record: { ...s.record, mode: 'combat', seedKind }, createdAt: '2026-11-07T00:00:00.000Z', ranked }));
+  expect(said('daily', true)).toContain('저장했습니다 · 실전 모드 · 일일 시드: 랭킹 집계');
+  expect(said('practice', false)).toContain('저장했습니다 · 연습 시드: 랭킹에서는 제외');
+});

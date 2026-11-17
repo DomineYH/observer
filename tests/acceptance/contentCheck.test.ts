@@ -34,7 +34,7 @@ test('시나리오: 내용 검증 — 규칙마다 어긴 자료가 걸린다', 
     [[broken((p) => (p.scenario.version = 0))], [at('시나리오 1', 'version')]],
     [[broken((p) => (p.scenario.version = 1.5))], [at('시나리오 1', 'version')]],
     // 2. 접근로가 1개 이상, 열쇠는 대문자 한 글자
-    [[broken((p) => (Object.assign(p.scenario, { routes: {}, intelRoutes: [], units: [p.scenario.units[4]] }), (p.briefing.routes = {})))], [at('시나리오 2', 'routes')]],
+    [[broken((p) => (Object.assign(p.scenario, { routes: {}, intelRoutes: [], units: [p.scenario.units[4]], reinforcements: [p.scenario.units[4]] }), (p.briefing.routes = {})))], [at('시나리오 2', 'routes')]],
     [[broken((p) => ((p.scenario.routes.d = p.scenario.routes.A), (p.briefing.routes.d = '넷째 접근로')))], [at('시나리오 2', 'routes.d')]],
     // 3. 접근로마다 3점 이상
     [[broken((p) => p.scenario.routes.B.splice(1, 1))], [at('시나리오 3', 'routes.B')]],
@@ -72,6 +72,16 @@ test('시나리오: 내용 검증 — 규칙마다 어긴 자료가 걸린다', 
     ...(['name', 'blurb', 'enemy', 'mission', 'plannedOp'] as const).map((k): [Placement[], Finding[]] => [[broken((p) => (p.briefing[k] = ' '))], [at('시나리오 14', `briefing.${k}`)]]),
     [[broken((p) => (p.briefing.nais[1] = ''))], [at('시나리오 14', 'briefing.nais[1]')]],
     [[broken((p) => (p.briefing.routes.B = ''))], [at('시나리오 14', 'briefing.routes.B')]],
+    // 증원 (M3-16): 6 · 8 · 11 on its side, and 10. 증원 목록에 전투 부대가 1개 이상
+    [[broken((p) => (p.scenario.reinforcements[0].route.first = 'D'))], [at('시나리오 6', 'reinforcements[0].route')]],
+    [[broken((p) => (p.scenario.reinforcements[1].route = 'E'))], [at('시나리오 6', 'reinforcements[1].route')]],
+    [[broken((p) => (p.scenario.reinforcements[1].route.p = 1))], [at('시나리오 6', 'reinforcements[1].route.p')]],
+    [[broken((p) => p.scenario.reinforcements.push({ ...p.scenario.units[4], nai: 3, spread: { x: 0, y: 500 } }))], [at('시나리오 8', 'reinforcements[2].nai'), at('시나리오 8', 'reinforcements[2].spread')]],
+    [[broken((p) => (p.scenario.reinforcements[0].t0 = 2400))], [at('시나리오 11', 'reinforcements[0].t0')]],
+    [[broken((p) => (p.scenario.reinforcements[1].t0 = 479.5))], [at('시나리오 11', 'reinforcements[1].t0')]],
+    [[broken((p) => p.scenario.reinforcements.push({ ...p.scenario.units[4], fireFromS: -1 }))], [at('시나리오 11', 'reinforcements[2].fireFromS')]],
+    [[broken((p) => (p.scenario.reinforcements = []))], [at('시나리오 10', 'reinforcements')]],
+    [[broken((p) => (p.scenario.reinforcements = [p.scenario.units[0]]))], [at('시나리오 10', 'reinforcements')]],
   ];
   cases.forEach(([placements, findings], i) => expect(check(placements), `case ${i}`).toEqual(findings));
 });
@@ -196,6 +206,7 @@ test('포 프로파일: 사거리 검사 — 모든 시나리오는 기본 포�
     ['NAI edge', (p) => (p.scenario.nais[0] = { ...p.scenario.nais[0], x: far.x, y: far.y - 100, r: 100 })],
     ['mortar box corner', (p) => ((p.scenario.nais[2] = { ...p.scenario.nais[2], x: far.x, y: far.y - 1000, r: 10 }), (p.scenario.units[4].spread = { x: 10, y: 2000 }))],
     ['friendly position', (p) => (p.scenario.friends[0] = { x: far.x, y: battery.y - 23600 })],
+    ['증원 mortar box corner', (p) => ((p.scenario.nais[2] = { ...p.scenario.nais[2], x: far.x, y: far.y - 1000, r: 10 }), p.scenario.reinforcements.push({ ...p.scenario.units[4], spread: { x: 10, y: 2000 } }))],
   ];
   for (const [what, change] of cases) {
     const p = broken(change);

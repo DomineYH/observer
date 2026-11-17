@@ -67,6 +67,10 @@ export function createSim(init: SimInit): Sim {
     rng,
   };
   state.friendlies = makeFriendlies(init.scenario.friends, rng.scn); // after the enemy's draws (demo order)
+  // 증원: 실전 only, drawn second, so a seed's units and soldiers stand as in 훈련·표준
+  const extra = init.mode === 'combat' ? init.scenario.reinforcements : [];
+  state.platoons.push(...deploy({ ...init.scenario, units: extra }, init.terrain, rng.scn));
+  const units = [...init.scenario.units, ...extra];
 
   // This step's events, stamped with the tick the step ends at.
   let out: (Omit<RadioEvent, 'tick'> | Omit<ImpactEvent, 'tick'> | ({ type: 'post' } & PostNote))[] = [];
@@ -76,7 +80,7 @@ export function createSim(init: SimInit): Sim {
     exp: rng.exp,
     ai: rng.ai,
     frontY: init.scenario.frontY,
-    mortarFrom: init.scenario.units.map((u) => (u.type === 'mortar' ? Math.round(u.fireFromS * 20) : 0)), // M3-16: reinforcements appended to the platoons need an entry here
+    mortarFrom: units.map((u) => (u.type === 'mortar' ? Math.round(u.fireFromS * 20) : 0)),
     terrain: init.terrain,
     battery: init.scenario.battery,
     guns: init.guns,

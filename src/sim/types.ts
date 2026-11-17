@@ -51,6 +51,9 @@ export interface Scenario extends Ref {
   intelRoutes: readonly { route: RouteKey; conf: Confidence }[]; // 예상 접근로
   timeLimitS: number; // 작전 시간 한도, seconds
   units: readonly UnitDef[];
+  /** 증원 (ADR 0019): read and drawn in 실전 only, after the friendly soldiers, then appended to the units. Outside the
+   * scenario version: the 실전 자료 판 covers it. */
+  reinforcements: readonly UnitDef[];
   reserveOps?: readonly Point[]; // 예비 관측소: the simulation does not read it
 }
 

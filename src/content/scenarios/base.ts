@@ -38,6 +38,10 @@ export const BASE_SCENARIO: Scenario = {
     { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 260 }, // 적 장갑차 2대
     { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0, fireFromS: 210 }, // 적 82mm 박격포반
   ],
+  reinforcements: [
+    { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 420 }, // 적 3소대
+    { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 480 }, // 적 장갑차 2대
+  ],
 };
 
 /** 글 of `base` but the planned post's place name: the name, the 한 줄 소개 and the 작전 준비 글 (demo lines 925–933), in
