@@ -183,8 +183,8 @@ export interface Truck {
   vis: boolean;
 }
 
-/** Who fires at a compromised post: the enemy mortar section, or infantry/APC direct fire. */
-export type Shooter = 'mortar' | 'direct';
+/** Who fires at the post: the enemy mortar section or infantry/APC direct fire (보복), or the enemy artillery (F-20). */
+export type Shooter = 'mortar' | 'direct' | 'artillery';
 
 /** 기상 값, all integers in spec units. */
 export interface Weather {
@@ -255,7 +255,7 @@ export interface ImpactEvent {
  * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost.
  * And to our positions: the enemy mortar's rounds begin to fall (26 s after its first volley) · our round fell within
  * 70 m of position `pos` and `k` men fell to it · the first enemy APC burst of the game · unit `pid` overran its
- * objective (진지 돌파). */
+ * objective (진지 돌파). And in a combat game the enemy artillery's ranging round and each barrage round, where it fell. */
 export type PostNote =
   | { what: 'arrived' | 'set_up' }
   | { what: 'compromised'; pid: number; fire: Shooter | null }
@@ -264,7 +264,8 @@ export type PostNote =
   | { what: 'shelling' }
   | { what: 'apc_fire' }
   | { what: 'friendly_hit'; pos: number; k: number }
-  | { what: 'overrun'; pid: number };
+  | { what: 'overrun'; pid: number }
+  | { what: 'ranging' | 'barrage'; x: number; y: number };
 export type PostEvent = { type: 'post'; tick: number } & PostNote;
 
 /** 사건. */
@@ -356,7 +357,11 @@ export interface SimState {
   /** 발각: tick of the last one (150 s pass before the next can count), −1 never. */
   compromised: number;
   /** 보복 under way: who fires, at the post as it stood when found (`at`), the unit that fires, rounds fired so far. */
-  fire: { shooter: Shooter; at: Point; pid: number; fired: number } | null;
+  fire: { shooter: Exclude<Shooter, 'artillery'>; at: Point; pid: number; fired: number } | null;
+  /** 노출의 셈과 자리 (F-20): points since `place`, the post where the count last started; null outside a combat game. */
+  signature: { points: number; place: Point | null } | null;
+  /** 적 포병 사격 (F-20): the exposed place and the barrage rounds fallen; null while none is on (always outside combat). */
+  artillery: { at: Point; fired: number } | null;
   /** 관측반 전투 불능: the operation ends 4 s later. */
   observerLost: boolean;
   /** The tick every combat unit was down with no 진지 돌파 (섬멸 if the 관측반 lives on); −1 not (yet). */
