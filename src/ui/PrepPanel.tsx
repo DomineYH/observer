@@ -1,11 +1,11 @@
-// 작전 준비 (F-22, demo lines 922–936): the 판 정보 카드 (seed and weather), the briefing, the 관측소 후보 and 작전 개시.
+// 작전 준비 (F-22, demo lines 922–936): the 판 정보 카드 (seed, scenario, gun, mode and weather), the briefing, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
 // The 지형 자료's 자료 출처 lines close the prep screen; the mock land has none, so its screen is unchanged.
 import type { Input, Mode, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import type { WeatherPreset } from '@adapters/index';
 import type { Briefing } from '@content/placement';
 import { gridOf, underCanopy } from '@render/mapView';
-import { InfoCard, type ScenarioChoice } from './InfoCard';
+import { gunChoices, InfoCard, type ScenarioChoice } from './InfoCard';
 import { startInput } from './prep';
 import { gridLabel } from './radio/readings';
 
@@ -32,6 +32,9 @@ export interface PrepPanelProps {
   /** The mode in use, and choosing one in the 판 정보 카드 (#142). */
   mode: Mode;
   onMode: (m: Mode) => void;
+  /** The gun in use, and choosing another one in a practice game (#147). */
+  gun: string;
+  onGun: (id: string) => void;
 }
 
 /** The 머리띠 메뉴's short 기상 (demo 349): visibility and wind. */
@@ -44,7 +47,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios, mode, onMode }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios, mode, onMode, gun, onGun }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
@@ -57,7 +60,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
     );
   return (
     <section aria-label="작전 준비">
-      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} scenario={briefing.name} scenarios={scenarios} mode={mode} onMode={onMode} />
+      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} scenario={briefing.name} scenarios={scenarios} mode={mode} onMode={onMode} gun={gun} guns={gunChoices(scenario)} onGun={onGun} />
       <h2>작전 준비 — 관측소 선정</h2>
       <p>
         <b>적정(첩보)</b> {briefing.enemy}

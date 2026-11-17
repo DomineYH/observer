@@ -36,7 +36,7 @@ import { battlefieldOf, loadTerrain, selectBackend } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
-import { newGame, remade, type Game } from './game';
+import { newGame, regunned, remade, type Game } from './game';
 import { startLoop, timescaleOf } from './loop';
 import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
@@ -172,7 +172,7 @@ function switchMode(m: Mode): void {
 
 let colours = terrainColours(terrain, game.init.weather);
 
-/** A new game in 작전 준비 (a weather change, or 실전 in or out): a fresh 무전 기록 and remounted panels. */
+/** A new game in 작전 준비 (a weather or gun change, or 실전 in or out): a fresh 무전 기록 and remounted panels. */
 function replace(next: Game): void {
   game = next;
   games++;
@@ -198,6 +198,11 @@ async function changeWeather(p: WeatherPreset): Promise<void> {
   if (game.sim.state.phase !== 'prep') return; // started while the weather was on its way
   preset = p;
   replace(newGame({ ...game.init, weather }, game));
+}
+/** 연습의 포 고르기 (#147): like a weather change, only in a practice game's 작전 준비. */
+function changeGun(id: string): void {
+  const next = regunned(game, id);
+  if (next) replace(next);
 }
 const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사람 검수용 fps 표시
 
@@ -309,6 +314,8 @@ function App() {
             scenarios={scenarios}
             mode={mode}
             onMode={chooseMode}
+            gun={init.guns.id}
+            onGun={changeGun}
           />
           <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} send={send} />
           {covered ? (

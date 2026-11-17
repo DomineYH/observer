@@ -1,9 +1,11 @@
 // 판 정보 카드 (#135, #130 Q1–Q3): on top of 작전 준비, the game's choices in one card. Its head is the 시드 line and its
 // 기상 row the weather with 기상 바꾸기 (practice) or the "일일 · 읽기만" tag (daily). Under the head the 시나리오 row (#145),
-// above 기상 the 모드 row (#142); the 포 row comes between 시나리오 and 모드 in a later slice.
+// above 기상 the 모드 row (#142), and between them the 포 row (#147).
 import { useState } from 'react';
-import type { Mode, SeedKind, Weather } from '@sim';
+import type { Mode, Scenario, SeedKind, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
+import { GUNS } from '@content/guns';
+import { inRange } from '@content/range';
 import { MODE_NAMES, MODE_ORDER } from './HeadBand';
 
 /** A 배치 of this build's 전장 as the 시나리오 고르기 list shows it. */
@@ -12,6 +14,15 @@ export interface ScenarioChoice {
   name: string;
   blurb: string;
 }
+
+/** A gun of the 포 바꾸기 list; `out` when it fails the 판 전 사거리 검사 for this 배치 (#119 Q8). */
+export interface GunChoice {
+  id: string;
+  name: string;
+  out: boolean;
+}
+
+export const gunChoices = (s: Scenario): GunChoice[] => GUNS.map((g) => ({ id: g.profile.id, name: g.name, out: !inRange(s, g.profile) }));
 
 export interface InfoCardProps {
   seed: number;
@@ -26,6 +37,10 @@ export interface InfoCardProps {
   /** The mode in use, and choosing one (#115 Q1, Q10): 실전 in or out makes a new game, 훈련↔표준 is the mode input. */
   mode: Mode;
   onMode: (m: Mode) => void;
+  /** The gun in use, every gun for this 배치, and choosing one (practice only, #119 Q6). */
+  gun: string;
+  guns: readonly GunChoice[];
+  onGun: (id: string) => void;
 }
 
 const COMBAT_INTRO = '실전: 적이 더 오고 적 포병이 쏜다. 보조 정보와 일시정지가 없고 작전 준비에 시간 제한이 있으며, 작전 개시 뒤에는 모드를 바꿀 수 없다.';
@@ -45,7 +60,7 @@ function weatherText(w: Weather): string {
   return parts.join(' · ');
 }
 
-export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, scenarios, mode, onMode }: InfoCardProps) {
+export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, scenarios, mode, onMode, gun, guns, onGun }: InfoCardProps) {
   const daily = seedKind === 'daily';
   const [open, setOpen] = useState(false);
   return (
@@ -68,6 +83,29 @@ export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, 
             </li>
           ))}
         </ul>
+      )}
+      <p>
+        <b>포</b> {guns.find((g) => g.id === gun)?.name}
+        {daily && (
+          <>
+            {' '}
+            <span className="info-tag">일일 · 읽기만</span>
+          </>
+        )}
+      </p>
+      {!daily && (
+        <p>
+          <label>
+            포 바꾸기{' '}
+            <select value={gun} onChange={(e) => onGun(e.target.value)}>
+              {guns.map((g) => (
+                <option key={g.id} value={g.id} disabled={g.out}>
+                  {g.out ? `${g.name} — 사거리 밖` : g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </p>
       )}
       {/* Radios, not buttons: the 머리띠 메뉴's 훈련·표준·실전 stay the only buttons of those names. */}
       <p role="radiogroup" aria-label="모드">
