@@ -4,7 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { replay, type Input, type RadioEvent, type RecordedInput, type RadioUtterance, type Sim, type SimEvent } from '@sim';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CALL_ADJUST, CALL_FFE, DESC_UNKNOWN, LOC, LOC_CLEAR, LOC_NEAR, POLAR, answered, corr, desc, openRadio, radioEvents, send, started, toAdjust, unstarted, untilImpact } from './mission';
 import { START, replayData } from './init';
 import { oneUnit } from './enemy';

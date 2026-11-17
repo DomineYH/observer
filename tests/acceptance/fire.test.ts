@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'vitest';
 import { fromGrid, validateReplay, type Input, type RadioEvent, type Sim } from '@sim';
 import { radioSentence, spoken } from '@ui/radio/sentence';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawEffects } from '@render/effects';
 import { splashOf } from '@render/overlay';

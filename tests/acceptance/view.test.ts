@@ -10,7 +10,7 @@ import { startInput } from '@ui/prep';
 import { atmosphere, fbm, terrainColours } from '@render/shade';
 import { createViewBuffers, renderView } from '@render/voxel';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init, replayData, START } from './init';
 import { flatTerrain } from './terrain';
 

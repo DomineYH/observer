@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { createSim, type ImpactEvent, type RadioEvent, type Sim } from '@sim';
 import { silentVoice } from '@adapters/mock/voice';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init, START } from '../../tests/acceptance/init';
 import { CALL_ADJUST, LOC, openRadio, started, toAdjust, toReady, untilImpact, untilSaid } from '../../tests/acceptance/mission';
 import { oneUnit, started as startedWith } from '../../tests/acceptance/enemy';

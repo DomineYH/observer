@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, type Input } from '@sim';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init, replayData, START } from './init';
 
 const TRAINING: Input = { a: 'mode', v: ['training'] };

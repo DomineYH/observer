@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, validateReplay } from '@sim';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { createSession } from '@app/session';
 import { startInput } from '@ui/prep';
 import { init, replayData, START } from './init';

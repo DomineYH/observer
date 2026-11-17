@@ -1,7 +1,7 @@
 import { SIM_VERSION, type Input, type ReplayData, type SimInit, type TerrainData, type Weather } from '@sim';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { flatTerrain } from './terrain';
 

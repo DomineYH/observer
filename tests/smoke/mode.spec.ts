@@ -4,7 +4,7 @@ import { DEFAULT_QUALITY, eyeAt, focalOf, MIL, project, QUALITIES } from '../../
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { CLEAR_WEATHER } from '../../src/adapters/mock/weather';
 import { BASE_GUNS } from '../../src/content/guns';
-import { BASE_SCENARIO } from '../../src/content/scenario';
+import { BASE_SCENARIO } from '../../src/content/scenarios/base';
 import { mapPixels, settledMap, skipReport, speedTo, standardGame, toReady } from './helpers';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });

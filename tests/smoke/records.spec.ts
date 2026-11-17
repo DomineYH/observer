@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { replay, validateReplay } from '../../src/sim/index';
 import { mockTerrain } from '../../src/adapters/mock/terrain/index';
 import { BASE_GUNS } from '../../src/content/guns';
-import { BASE_SCENARIO } from '../../src/content/scenario';
+import { BASE_SCENARIO } from '../../src/content/scenarios/base';
 import { fireOnOwnPost, mapPixels, settledMap, speedTo, standardGame } from './helpers';
 
 // A real 재생 자료 and 임무 요약 (one 바로 효력사 on the flat test terrain, built once with tests/acceptance/session.ts).

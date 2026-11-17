@@ -3,9 +3,8 @@ import type { TerrainData } from '@sim';
 import { TerrainLoadError, TERRAIN_FAILURES, type TerrainFailure, type TerrainSource } from '@adapters/index';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { flatTerrain } from '../../tests/acceptance/terrain';
-import { BASE_SCENARIO, BRIEFING } from '@content/scenario';
-import { MOCK_PLACEMENT } from '@content/placement';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE, BASE_SCENARIO, BRIEFING } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { loadTerrain, placementOf, selectBackend, terrainSourceOf, type BootScreen } from './backend';
 
 test('조립 지점: real을 받는다', () => {
@@ -25,7 +24,7 @@ test('조립 지점: real은 문경 지형 원천', () => {
 
 test('배치: 조립 지점이 지형 원천과 짝지어 고른다', async () => {
   const placement = placementOf('mock');
-  expect(placement).toBe(MOCK_PLACEMENT);
+  expect(placement).toBe(BASE);
   expect(placement.scenario).toBe(BASE_SCENARIO);
   expect(placement.briefing).toEqual({ ...BRIEFING, plannedOp: '1번 고지' });
   expect(placement.scenario.reserveOps).toBeUndefined();
@@ -34,7 +33,7 @@ test('배치: 조립 지점이 지형 원천과 짝지어 고른다', async () =
     expect({ id: terrain.id, version: terrain.version }, String(seed)).toEqual(placement.terrain);
   }
   // real pairs the 문경 배치 with the 문경 지형
-  expect(placementOf('real')).toBe(MUNGYEONG_PLACEMENT);
+  expect(placementOf('real')).toBe(BASE_MUNGYEONG);
   expect(placementOf('real').terrain).toEqual({ id: 'mungyeong', version: 2 });
 }, 30_000); // two mock terrain generations: several seconds, more under load
 

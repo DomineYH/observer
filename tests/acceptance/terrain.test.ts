@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest';
 import { COVER, terrainHash, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { readGolden } from '../golden/golden';
 
 const SEED = 20261106;

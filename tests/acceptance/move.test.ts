@@ -2,7 +2,7 @@
 // square with the post at its middle (320, 320); destinations must stay 200 m inside every side.
 import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, type Input, type Point, type RadioEvent, type Sim, type SimEvent } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { planMove } from '@sim/post';
 import { answered, CALL_ADJUST, CALL_FFE, corr, DESC_UNKNOWN, ended, EOM, LOC, LOC_CLEAR, MOVE, POLAR, openRadio, POS, POS_SKIP, SHIFT, send, started, toAdjust, toReady, unstarted, untilSaid, untilTaken } from './mission';
 import { init, START } from './init';

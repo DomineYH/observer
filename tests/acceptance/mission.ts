@@ -1,7 +1,7 @@
 // Fixtures for the radio procedure tests: an empty battlefield on the flat test terrain, started at its middle.
 import { createSim, type ImpactEvent, type Input, type RadioEvent, type RadioKind, type Sim, type SimEvent, type Speaker, type Weather } from '@sim';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init, START } from './init';
 
 /** No enemy, and no friendly troops either (their walkers draw from the 행동 stream), for the stream-isolation checks.

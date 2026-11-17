@@ -3,8 +3,8 @@ import { SIM_VERSION, toGrid, type ReplayData } from '@sim';
 import { BASE_GUNS } from '@content/guns';
 import { MIL } from '@sim/ballistics';
 import { atan2 } from '@sim/math';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE_SCENARIO } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { REAL_TERRAIN_FILE } from './land';
@@ -26,7 +26,7 @@ const START = { t: 0, a: 'start', v: [BASE_SCENARIO.plannedOp.x, BASE_SCENARIO.p
 // its square on the committed 지형 파일's 방안 (the position report).
 const { grid } = await unpackTerrain(new Uint8Array(readFileSync(REAL_TERRAIN_FILE)));
 const MUNGYEONG = (() => {
-  const { scenario, terrain } = MUNGYEONG_PLACEMENT;
+  const { scenario, terrain } = BASE_MUNGYEONG;
   const op = scenario.plannedOp;
   const nai = scenario.nais[2]!;
   const moveTo = { x: op.x + 80, y: op.y };

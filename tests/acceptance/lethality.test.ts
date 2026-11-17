@@ -6,7 +6,7 @@ import { fall } from '@sim/ballistics';
 import { killChance as chance, killMembers } from '@sim/lethality';
 import { createStreams, next } from '@sim/rng';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init } from './init';
 
 // The base gun bound once, so the model's checks below read as before.

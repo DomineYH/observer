@@ -9,7 +9,7 @@ import { MUNGYEONG, realTerrain } from '@adapters/realTerrain';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { mockWeather } from '@adapters/mock/weather';
 import { BASE_GUNS } from '@content/guns';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { newGame } from '@app/game';
 import { submissionOf } from '@app/records';
 import { viewshed } from '@render/viewshed';
@@ -147,7 +147,7 @@ describe('실제 지형 원천', () => {
 
   // The 문경 지형 as the app loads it, for the tests below.
   const mungyeong = realTerrain(MUNGYEONG, terrainHash, serve()).load(0);
-  const { scenario } = MUNGYEONG_PLACEMENT;
+  const { scenario } = BASE_MUNGYEONG;
 
   /** A game on the 문경 지형 as the app builds it, started at the 계획 관측소 (no pick) and run `ticks` ticks. */
   async function played(seed: number, seedKind: SeedKind, ticks: number, preset?: 'clear' | 'fog') {

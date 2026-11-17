@@ -6,9 +6,9 @@ import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf } from '@content/lookup';
-import { MOCK_PLACEMENT } from '@content/placement';
-import { BASE_SCENARIO } from '@content/scenario';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
+import { BASE } from '@content/scenarios/base';
+import { BASE_SCENARIO } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { currentHeader, goldenFiles, headerVersions, readGolden, shouldWrite, type Versions } from './golden';
 import { landOf, REAL_TERRAIN_FILE } from './land';
 import { SCRIPTS } from './scripts';
@@ -43,7 +43,7 @@ describe('골든', () => {
     for (const f of files) {
       const d = readGolden(f).replay;
       const found = contentOf(d);
-      const [terrain, scenario, guns] = [d.terrain ? ref(real) : MOCK_PLACEMENT.terrain, ref(found.scenario), ref(found.guns)];
+      const [terrain, scenario, guns] = [d.terrain ? ref(real) : BASE.terrain, ref(found.scenario), ref(found.guns)];
       expect(headerVersions(d), f).toEqual({ simVersion: SIM_VERSION, terrain, scenario, guns, combat: found.combat?.version });
     }
   }, 30000); // reads every golden file
@@ -141,7 +141,7 @@ describe('골든', () => {
     const { terrainHash: header, replay: data, ...expected } = readGolden(FIVE);
     expect(validateReplay(data).ok).toBe(true);
     expect(expected.ignored).toBe(0);
-    expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
+    expect(data.terrain).toEqual(BASE_MUNGYEONG.terrain);
     expect(data.mode).toBe('standard');
     expect(data.totalTicks).toBeLessThanOrEqual(12000);
     const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
@@ -176,8 +176,8 @@ describe('골든', () => {
     const { terrainHash: header, replay: data, ...expected } = readGolden('6-real-play.json');
     expect(validateReplay(data).ok).toBe(true);
     expect(expected.ignored).toBe(0); // every recorded input was taken
-    expect(data.terrain).toEqual(MUNGYEONG_PLACEMENT.terrain);
-    expect(data.scenario).toEqual({ id: MUNGYEONG_PLACEMENT.scenario.id, version: 2 });
+    expect(data.terrain).toEqual(BASE_MUNGYEONG.terrain);
+    expect(data.scenario).toEqual({ id: BASE_MUNGYEONG.scenario.id, version: 2 });
     const { terrain, scenario, guns } = await landOf(data); // the committed 지형 파일: missing → ENOENT, never a skip
     expect(terrainHash(terrain)).toBe(header);
     const result = replay(data, terrain, scenario, guns);

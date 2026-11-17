@@ -3,7 +3,7 @@
 // Public interface only: create, step, events, read-only state, state hash, record.
 import { describe, expect, test } from 'vitest';
 import { enemyFireChance, friendlyLossChance, type ImpactEvent, type Point, type ReadonlySimState, type Scenario, type Sim } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { dist, oneUnit, started, until } from './enemy';
 import { CALL_ADJUST, CALL_FFE, DESC_UNKNOWN, answered, corr, desc, openRadio, send, untilTaken } from './mission';
 import { gridAt, isImpact } from './strike';

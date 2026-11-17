@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { mockWeather } from '@adapters/mock/weather';
 import { replay, validateReplay, type SimInit } from '@sim';
 import { flatTerrain } from '../../tests/acceptance/terrain';

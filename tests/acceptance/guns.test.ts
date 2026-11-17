@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { fromGrid, type GunProfile } from '@sim';
 import { killChance } from '@sim/lethality';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init } from './init';
 import { NO_ENEMY, oneMission } from './session';
 import { isImpact } from './strike';

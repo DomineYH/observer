@@ -2,7 +2,7 @@
 // for effect at the shifted point under a new 표적번호. Public interface only: create, step, events, read-only state, record.
 import { describe, expect, test } from 'vitest';
 import type { ImpactEvent, Input, RadioEvent, Sim, SimEvent } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, SHIFT, answered, ended, openRadio, send, started, unstarted, untilSaid } from './mission';
 
 /** 전이 from the base mission: 방향 0800 (from the post toward the target), no 좌우, 사거리 200 m, 포대 3발, 미상 표적. */

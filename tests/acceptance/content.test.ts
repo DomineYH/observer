@@ -2,8 +2,8 @@ import { expect, test } from 'vitest';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, GUNS, PLACEMENTS } from '@content/lookup';
-import { MUNGYEONG_PLACEMENT } from '@content/mungyeong';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { EXPECTED, mismatches, valueHash } from './expected';
 
 const piece = { id: 'x', version: 1, list: [1, 2], nested: { a: 1, b: 2 } };
@@ -35,7 +35,7 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   const found = contentOf({ scenario: base, guns: base });
   expect(found.scenario).toBe(BASE_SCENARIO);
   expect(found.guns).toBe(BASE_GUNS);
-  expect(contentOf({ scenario: { id: 'base-mungyeong', version: 2 }, guns: base }).scenario).toBe(MUNGYEONG_PLACEMENT.scenario);
+  expect(contentOf({ scenario: { id: 'base-mungyeong', version: 2 }, guns: base }).scenario).toBe(BASE_MUNGYEONG.scenario);
   // Ids no later slice adds: a real one (apc-mungyeong, k9) would turn this red when it arrives.
   expect(() => contentOf({ scenario: { id: 'nowhere', version: 1 }, guns: base })).toThrow('scenario nowhere: unknown id');
   expect(() => contentOf({ scenario: { id: 'base', version: 2 }, guns: base })).toThrow('scenario base@2: unknown version (this build has base@1)');
@@ -55,4 +55,12 @@ test('자료: 내용과 버전이 어긋나지 않는다', () => {
   pieces[`combat@${COMBAT.version} numbers`] = COMBAT.numbers;
   for (const g of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
+});
+
+test('시나리오: 배치 목록과 폴더의 파일이 같다', () => {
+  expect(PLACEMENTS.slice(0, 2).map((p) => p.scenario.id)).toEqual(['base', 'base-mungyeong']); // a new 배치 goes at the end
+  // 배치 하나 = 파일 하나: every file of the folder holds the one 배치 it is named after, and the list holds no other.
+  const files = import.meta.glob<Record<string, unknown>>('/src/content/scenarios/*', { eager: true });
+  const held = Object.entries(files).map(([path, file]) => `${path}: ${PLACEMENTS.filter((p) => Object.values(file).includes(p)).map((p) => p.scenario.id).join(' ')}`);
+  expect(held.sort()).toEqual(PLACEMENTS.map((p) => `/src/content/scenarios/${p.scenario.id}.ts: ${p.scenario.id}`).sort());
 });

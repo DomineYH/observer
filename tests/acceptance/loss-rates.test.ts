@@ -9,7 +9,7 @@
 // and seeds 2 and 3 were checked too). A chance wired to a fixed value, or a factor dropped, puts a group 4σ or more out.
 import { describe, expect, test } from 'vitest';
 import { enemyFireChance, friendlyLossChance, type Point, type Scenario, type UnitDef } from '@sim';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { dist, RESERVE, started } from './enemy';
 import { flatTerrain } from './terrain';
 

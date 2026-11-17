@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createSim, replay, SIM_VERSION, validateReplay } from '@sim';
 import { BASE_GUNS } from '@content/guns';
-import { BASE_SCENARIO } from '@content/scenario';
+import { BASE_SCENARIO } from '@content/scenarios/base';
 import { init, replayData, START } from './init';
 
 const { terrain } = init(20261106); // terrain is not part of 재생 자료
