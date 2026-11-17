@@ -1,7 +1,8 @@
 // 랭킹 창 (demo lines 1496–1530, PRD 10.2): four boards and 내 기록, in the browser's own modal dialog.
 // Every stored string goes in as React text, so markup in a callsign shows as characters.
 import { useRef, useState } from 'react';
-import type { Board, RankRow, RecordArchive, StoredRun } from '@adapters/index';
+import type { Mode } from '@sim';
+import type { Board, RankedMode, RankRow, RecordArchive, StoredRun } from '@adapters/index';
 import { GUNS } from '@content/guns';
 import { clock } from './clock';
 
@@ -30,7 +31,14 @@ function modeOf(r: StoredRun, placements: readonly Named[]): string {
   return cell.join(' · ');
 }
 const resultOf = (r: StoredRun) => (r.record.cleared ? '섬멸' : r.record.observerLost ? '관측반 손실' : '미완');
+const MODES: { mode: RankedMode; name: string }[] = [
+  { mode: 'standard', name: '표준' },
+  { mode: 'combat', name: '실전' },
+];
 const MINE_SHOWN = 10;
+
+/** The board the dialog opens on: 실전 when the game is 실전, otherwise 표준. */
+export const firstMode = (m: Mode): RankedMode => (m === 'combat' ? 'combat' : 'standard');
 
 interface Props {
   board: Board;
@@ -39,15 +47,36 @@ interface Props {
   callsign: string;
   onBoard: (b: Board) => void;
   placements: readonly Named[]; // 배치 목록: names the 배치 in 내 기록
+  mode: RankedMode;
+  onMode: (m: RankedMode) => void;
+  scenario: string;
+  scenarios: readonly Named[]; // today's 일일 후보 on this 전장: buttons only when there are two or more
+  onScenario: (id: string) => void;
 }
 
 /** The dialog's content: the chosen board, its tabs and this browser's runs. */
-export function Ranking({ board, rows, mine, callsign, onBoard, placements }: Props) {
+export function Ranking({ board, rows, mine, callsign, onBoard, placements, mode, onMode, scenario, scenarios, onScenario }: Props) {
   const shown = BOARDS.find((b) => b.board === board)!;
   return (
     <>
       <h2 id="ranking-title">랭킹</h2>
-      <p>표준 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개 · 목업 표시는 가상의 예시 데이터입니다.</p>
+      <p>{MODES.find((m) => m.mode === mode)!.name} 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개 · 목업 표시는 가상의 예시 데이터입니다.</p>
+      <div>
+        {MODES.map((m) => (
+          <button key={m.mode} type="button" aria-pressed={m.mode === mode} onClick={() => onMode(m.mode)}>
+            {m.name}
+          </button>
+        ))}
+      </div>
+      {scenarios.length > 1 && (
+        <div>
+          {scenarios.map((p) => (
+            <button key={p.scenario.id} type="button" aria-pressed={p.scenario.id === scenario} onClick={() => onScenario(p.scenario.id)}>
+              {p.briefing.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div>
         {BOARDS.map((b) => (
           <button key={b.board} type="button" aria-pressed={b.board === board} onClick={() => onBoard(b.board)}>
@@ -104,25 +133,44 @@ export function Ranking({ board, rows, mine, callsign, onBoard, placements }: Pr
   );
 }
 
-/** The 랭킹 button and its modal dialog; boards load from 기록 보관소 each time one is shown. Until the mode and scenario
- * buttons exist the boards are 표준 on `scenario`, the 전장's 기본 시나리오. */
-export function RankingDialog({ archive, callsign, scenario, placements }: { archive: RecordArchive; callsign: string; scenario: string; placements: readonly Named[] }) {
+/** The 랭킹 button and its modal dialog; boards load from 기록 보관소 each time one is shown. It opens on the game's mode
+ * (`firstMode`), today's 일일 시나리오 and 종합. */
+export function RankingDialog(props: {
+  archive: RecordArchive;
+  callsign: string;
+  mode: Mode; // the game's
+  today: string; // today's 일일 시나리오 id
+  scenarios: readonly Named[]; // today's 일일 후보
+  placements: readonly Named[];
+}) {
+  const { archive, callsign } = props;
+  type Pick = { mode: RankedMode; scenario: string; board: Board };
   const dialog = useRef<HTMLDialogElement>(null);
-  const [shown, setShown] = useState<{ board: Board; rows: RankRow[]; mine: StoredRun[] } | null>(null);
-  const load = async (board: Board) => setShown({ board, rows: await archive.board('standard', scenario, board), mine: await archive.mine() });
+  const [shown, setShown] = useState<(Pick & { rows: RankRow[]; mine: StoredRun[] }) | null>(null);
+  const load = async (p: Pick) => setShown({ ...p, rows: await archive.board(p.mode, p.scenario, p.board), mine: await archive.mine() });
   return (
     <>
       <button
         type="button"
         onClick={async () => {
-          await load('total');
+          await load({ mode: firstMode(props.mode), scenario: props.today, board: 'total' });
           dialog.current?.showModal();
         }}
       >
         랭킹
       </button>
       <dialog ref={dialog} aria-labelledby="ranking-title">
-        {shown && <Ranking {...shown} callsign={callsign} onBoard={(b) => void load(b)} placements={placements} />}
+        {shown && (
+          <Ranking
+            {...shown}
+            callsign={callsign}
+            placements={props.placements}
+            scenarios={props.scenarios}
+            onBoard={(board) => void load({ ...shown, board })}
+            onMode={(mode) => void load({ ...shown, mode })}
+            onScenario={(scenario) => void load({ ...shown, scenario })}
+          />
+        )}
         <form method="dialog">
           <button>닫기</button>
         </form>
