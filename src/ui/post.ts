@@ -16,7 +16,7 @@ export const POSITION_HINT: Record<Mode, string> = {
 export const LOCATION_HINT: Record<Mode, string> = {
   training: '훈련: 마지막 레이저 측정점의 좌표가 자동으로 들어갑니다. 극좌표는 레이저의 방위각·거리를 그대로 씁니다.',
   standard: '표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.',
-  combat: '표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.', // M3-11 replaces this with 실전's own sentence
+  combat: '실전: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 쓰고, 레이저를 다 쓰면 지도에서 거리를 읽어 넣습니다.',
 };
 
 /** The 위치 보고 is due and its form open: at idle, once the walk and the setup are over. */

@@ -1,5 +1,5 @@
 import type { Point } from '@sim';
-import type { BaseScenario, Placement } from '../placement';
+import type { Placement } from '../placement';
 
 const line = (...xy: [number, number][]): Point[] => xy.map(([x, y]) => ({ x, y }));
 
@@ -7,7 +7,7 @@ const line = (...xy: [number, number][]): Point[] => xy.map(([x, y]) => ({ x, y 
  * 상자, 작전 시간 한도, names) equal `base`'s and are written out here: `배치: 데모 값은 그대로` holds the two together.
  * The three posts are copied into `terrain/mungyeong/config.json` as 벌채 원: move a post → change that copy, raise the
  * 지형 판 and rebuild (terrain/README.md). Any change in `scenario` raises `version`. */
-export const BASE_MUNGYEONG: Placement & { scenario: BaseScenario } = {
+export const BASE_MUNGYEONG: Placement = {
   scenario: {
     id: 'base-mungyeong',
     version: 2,
