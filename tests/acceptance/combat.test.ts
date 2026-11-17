@@ -46,3 +46,39 @@ test('실전: 판 기록의 모드는 실전 판에서만 combat이다', () => {
     expect(Object.keys(sim.record()), m).toEqual(Object.keys(combat.record())); // the same 23 items
   }
 });
+
+test('실전: 더 많은 적 — 증원은 실전에서만 나오고 같은 시드의 원래 적·아군 배치는 표준과 같다', () => {
+  for (const seed of [20261106, 1]) {
+    const standard = createSim(init(seed));
+    const combat = createSim(combatInit(seed));
+    // 표준: the scenario stream draws as it did before 증원 (the count at creation, measured before M3-16).
+    expect(standard.state.rng.scn.count, `${seed}`).toBe(1051);
+    expect(standard.state.platoons, `${seed}`).toHaveLength(5);
+    expect(combat.state.rng.scn.count, `${seed}`).toBeGreaterThan(1051); // 실전 draws the 증원 second
+    // The five units and the friendly soldiers stand where 표준 puts them, to the last digit; 실전 has two more.
+    expect(combat.state.platoons.slice(0, 5), `${seed}`).toEqual(standard.state.platoons);
+    expect(combat.state.friendlies, `${seed}`).toEqual(standard.state.friendlies);
+    const [inf, apc] = combat.state.platoons.slice(5);
+    expect(combat.state.platoons, `${seed}`).toHaveLength(7);
+    expect(inf, `${seed}`).toMatchObject({ type: 'inf', state: 'wait', t0: 420 * 20 });
+    expect(['A', 'C'], `${seed}`).toContain(inf!.route);
+    expect(apc, `${seed}`).toMatchObject({ type: 'apc', state: 'wait', t0: 480 * 20 });
+    expect(['B', 'C'], `${seed}`).toContain(apc!.route);
+    // Ordinary units once added: 판 기록의 전투 부대 수 counts them.
+    expect(standard.record().combatUnits).toBe(4);
+    expect(combat.record().combatUnits).toBe(6);
+  }
+  // `base` sets them off at 420 s and 480 s.
+  const sim = createSim(combatInit(20261106));
+  sim.step([START]);
+  const [inf, apc] = sim.state.platoons.slice(5);
+  while (sim.state.tick < 420 * 20 - 1) sim.step([]);
+  expect([inf!.state, apc!.state]).toEqual(['wait', 'wait']);
+  sim.step([]);
+  expect([inf!.state, apc!.state]).toEqual(['approach', 'wait']);
+  while (sim.state.tick < 480 * 20 - 1) sim.step([]);
+  expect(apc!.state).toBe('wait');
+  sim.step([]);
+  expect(apc!.state).toBe('approach');
+  expect(sim.state.phase).toBe('live');
+});
