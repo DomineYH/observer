@@ -45,7 +45,9 @@ function combatChunk(h: Hasher, s: SimState): void {
     h.f64(a.at.y);
     h.u32(a.fired);
   }
-  // 포대: 첫 발 시각, 진지 변환이 끝나는 시각 (M3-20)
+  const b = s.battery!; // 포대: 첫 발 시각, 진지 변환이 끝나는 시각
+  h.i32(b.firstShot);
+  h.i32(b.until);
   for (const m of s.missions) {
     // 임무마다의 밀린 복창, 임무 차례 (M3-14): every mission of a combat game carries one
     const r = m.readback!;

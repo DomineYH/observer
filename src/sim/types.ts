@@ -363,6 +363,9 @@ export interface SimState {
   signature: { points: number; place: Point | null } | null;
   /** 적 포병 사격 (F-20): the exposed place and the barrage rounds fallen; null while none is on (always outside combat). */
   artillery: { at: Point; fired: number } | null;
+  /** 포대 (F-20): tick of the first round at this position (−1 none yet) and the tick its 진지 변환 ends (−1 none on);
+   * null outside a combat game. */
+  battery: { firstShot: number; until: number } | null;
   /** 관측반 전투 불능: the operation ends 4 s later. */
   observerLost: boolean;
   /** The tick every combat unit was down with no 진지 돌파 (섬멸 if the 관측반 lives on); −1 not (yet). */

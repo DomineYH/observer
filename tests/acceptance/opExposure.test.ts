@@ -16,10 +16,17 @@ function game(mode: 'training' | 'standard' | 'combat', seed = 7): Sim {
   sim.step([START]);
   return sim;
 }
-/** `sim` with every step's inputs written down, to send the same script to a twin. */
-function recorded(sim: Sim): { sim: Sim; log: Input[][] } {
+/** `sim` with every step's inputs written down, to send the same script to a twin, and its 진지 변환 words. */
+function recorded(sim: Sim): { sim: Sim; log: Input[][]; moved: SimEvent[] } {
   const log: Input[][] = [];
-  return { log, sim: { ...sim, state: sim.state, step: (i) => (log.push([...i]), sim.step(i)) } };
+  const moved: SimEvent[] = [];
+  const step: Sim['step'] = (i) => {
+    log.push([...i]);
+    const r = sim.step(i);
+    moved.push(...displacement(r.events));
+    return r;
+  };
+  return { log, moved, sim: { ...sim, state: sim.state, step } };
 }
 
 const RB_SHOT: Input = { a: 'readback', v: ['shot'] };
@@ -50,6 +57,8 @@ function watch(sim: Sim, ticks: number): PostEvent[] {
   return out;
 }
 const sec = (s: number) => s * 20;
+const displacement = (events: readonly SimEvent[]) =>
+  events.filter((e) => e.type === 'radio' && (e.utterance.kind === 'displacing' || e.utterance.kind === 'displaced'));
 
 /** A 효력사 mission whose 사격지휘통보 the observer reads back wrong to 39 points, then the 40th; the mission ended at
  * once and the post 150 m east: the rounds' notes, the place exposed and the tick of the 40th. */
@@ -115,12 +124,16 @@ test('F-20: 훈련·표준에서는 노출도 진지 변환도 없고 발각 스
   const combat = recorded(game('combat'));
   exposedAndMoved(combat.sim);
   expect(combat.sim.state.rng.exp.count).toBeGreaterThan(0); // the ranging round's direction, the barrage's gaussians
+  expect(combat.moved.map((e) => e.type === 'radio' && e.utterance.kind)).toEqual(['displacing']); // 600 s after the 효력사
   for (const mode of ['standard', 'training'] as const) {
     const sim = game(mode);
-    const notes = combat.log.flatMap((inputs) => shellNotes(sim.step(inputs).events));
+    const events = combat.log.flatMap((inputs) => sim.step(inputs).events);
+    const notes = shellNotes(events);
     expect(notes, mode).toEqual([]);
     expect(sim.state.signature, mode).toBeNull();
     expect(sim.state.artillery, mode).toBeNull();
+    expect(displacement(events), mode).toEqual([]);
+    expect(sim.state.battery, mode).toBeNull();
     expect(sim.state.rng.exp.count, mode).toBe(0); // as now: no enemy to find the post, nothing else draws
   }
 });

@@ -254,6 +254,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       const tof = tofSec(ctx.guns, Math.sqrt(dx * dx + dy * dy));
       say({ speaker: 'fdc', ending: 'over', kind: 'shot' });
       s.radio.stage = 'flight';
+      if (s.battery && s.battery.firstShot < 0) s.battery.firstShot = s.tick; // 진지 변환: the first round here
       if (m.readback) m.readback.shot = true; // 실전: the player's readback is that utterance
       else after(s, 1.2, 'shot_readback');
       if (m.phase === 'adjust') { // 수정탄: the centre gun, one round, quick fuze

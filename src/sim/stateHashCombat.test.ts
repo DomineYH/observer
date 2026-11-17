@@ -44,6 +44,12 @@ test('상태 해시: 실전의 상태는 실전에서만 든다', () => {
     { artillery: { ...ARTILLERY, at: { x: 320, y: 321 } } },
   ];
   expect(new Set(exposure.map(varied)).size).toBe(exposure.length);
+  // 포대 (M3-20): 첫 발 시각, 진지 변환이 끝나는 시각; a standard game has none.
+  expect(combat.state.battery).toEqual({ firstShot: -1, until: -1 });
+  expect(standard.state.battery).toBeNull();
+  expect(hashState({ ...structuredClone(state), battery: { firstShot: 200, until: 900 } })).toBe(base);
+  const battery = [{}, { battery: { firstShot: 200, until: -1 } }, { battery: { firstShot: 200, until: 900 } }, { battery: { firstShot: -1, until: 900 } }];
+  expect(new Set(battery.map(varied)).size).toBe(battery.length);
   // 밀린 복창 (M3-14): per mission, in mission order; a standard game's missions carry none.
   const called = (sim: Sim): SimState => {
     sim.step([START]);
