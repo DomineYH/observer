@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Mode, Phase } from '@sim';
+import { MODES, type Mode, type Phase } from '@sim';
 import { QUALITIES, type Quality } from '@render/projection';
 import { clock } from './clock';
 
@@ -11,7 +11,12 @@ export const nextSpeed = (s: Speed): Speed => SPEEDS[(SPEEDS.indexOf(s) + 1) % S
  * pauses freely and 실전 cannot pause. */
 export const pauseCovers = (paused: boolean, mode: Mode, phase: Phase) => paused && mode === 'standard' && phase === 'live';
 
-const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준', combat: '실전' };
+/** m:ss of the ms left, rounded up: 5:00 when chosen, 0:01 in its last second. */
+const prepClock = (ms: number) => {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+export const MODE_NAMES: Record<Mode, string> = { training: '훈련', standard: '표준', combat: '실전' };
 const QUALITY_NAMES: Record<Quality, string> = { medium: '보통', high: '높음', max: '최고' };
 
 interface Props {
@@ -22,6 +27,8 @@ interface Props {
   speed: Speed;
   paused: boolean;
   phase: Phase;
+  /** 실전's 작전 준비 시간 제한: the ms left, shown in the 경과 자리; null or absent when none applies. */
+  prepLeft?: number | null;
   onSpeed: (s: Speed) => void;
   onPause: () => void;
   /** The 머리띠 메뉴 items, in the spec's order. */
@@ -33,7 +40,7 @@ interface Props {
  * spreads the menu inline on a wide screen and makes it a sheet over the lower tabs on a narrow one. Pause and speed
  * are not inputs, and opening the menu does not pause. 실전 has no pause (#115 Q2).
  */
-export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSpeed, onPause, children }: Props) {
+export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, prepLeft = null, onSpeed, onPause, children }: Props) {
   const [open, setOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLElement>(null);
@@ -57,8 +64,16 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
           OBSERVER <small>포병 관측·목업</small>
         </span>
         <span className="stat">
-          <span className="hb-label">경과 </span>
-          <output aria-live="off" aria-label="경과">{clock(tick)}</output>
+          {prepLeft === null ? (
+            <>
+              <span className="hb-label">경과 </span>
+              <output aria-live="off" aria-label="경과">{clock(tick)}</output>
+            </>
+          ) : (
+            <output aria-live="off" aria-label="준비 남은 시간">
+              준비 {prepClock(prepLeft)}
+            </output>
+          )}
         </span>
         <span className="stat">
           <span className="hb-label">점수 </span>
@@ -88,13 +103,14 @@ export function HeadBand({ tick, score, rounds, mode, speed, paused, phase, onSp
   );
 }
 
-/** 모드 전환 (F-14): an input, applied on the next tick, so not while paused or after the end. */
+/** 모드 전환 (F-14): an input, applied on the next tick, so not while paused or after the end. 실전 is chosen only in 작전
+ * 준비 (a new game): after 작전 개시 a combat game locks all three, a training or standard game 실전 only (#115 Q1). */
 export function ModeSwitch({ mode, paused, phase, onMode }: { mode: Mode; paused: boolean; phase: Phase; onMode: (m: Mode) => void }) {
   const off = paused || phase === 'ended';
   return (
     <span role="group" aria-label="모드 전환">
-      {(['training', 'standard'] as const).map((m) => (
-        <button key={m} type="button" aria-pressed={mode === m} disabled={off} onClick={() => onMode(m)}>
+      {MODES.map((m) => (
+        <button key={m} type="button" aria-pressed={mode === m} disabled={off || (phase !== 'prep' && (m === 'combat' || mode === 'combat'))} onClick={() => onMode(m)}>
           {MODE_NAMES[m]}
         </button>
       ))}
