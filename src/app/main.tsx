@@ -261,6 +261,7 @@ function App() {
             showFps={showFps}
             covered={covered}
             friends={scenario.friends}
+            laserLimit={init.combat?.numbers.laserLimit}
           />
         </div>
         <LowerTabs tab={tab} onTab={setTab} owed={owedOf(mission?.readback ?? null).length} />
