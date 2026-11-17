@@ -15,18 +15,20 @@ const NAMES = { callsign: '', gridLetters: '' }; // the readbacks' sentences nam
 interface Props {
   /** The current mission (its 밀린 복창 and 사격지휘통보); nothing is shown outside 실전 or with nothing owed. */
   mission: Pick<Mission, 'readback' | 'mto'> | undefined;
+  /** Inputs sent and not yet stepped (the session's, live): a readback there is not judged yet. */
+  queued: readonly Input[];
   send: (input: Input) => void;
 }
 
 /** Mounted per mission (keyed by the mission count), so a new mission starts empty. */
-export function ReadbackBox({ mission, send }: Props) {
+export function ReadbackBox({ mission, queued, send }: Props) {
   const [entry, setEntry] = useState<Entry>({ fuze: null, rounds: '', amc: false, tn: '' });
   const [sent, setSent] = useState<MtoSlots | null>(null); // the last 사격지휘통보 readback sent
   const onSend = (input: Input) => {
     send(input);
     if (input.v![0] === 'mto') setSent(readbackSlots(input));
   };
-  return <ReadbackForm mission={mission} entry={entry} sent={sent} onEntry={setEntry} onSend={onSend} />;
+  return <ReadbackForm mission={mission} entry={entry} sent={sent} queued={queued} onEntry={setEntry} onSend={onSend} />;
 }
 
 interface FormProps extends Omit<Props, 'send'> {
@@ -36,14 +38,16 @@ interface FormProps extends Omit<Props, 'send'> {
   onSend: (input: Input) => void;
 }
 
-export function ReadbackForm({ mission, entry, sent, onEntry, onSend }: FormProps) {
+export function ReadbackForm({ mission, queued, entry, sent, onEntry, onSend }: FormProps) {
   const r = mission?.readback;
   const owed = owedOf(r ?? null);
   if (!r || !owed.length) return null;
   const asked = owed[0]!;
   const input = readbackInput(asked, entry);
+  // From 송신 to 기러기's 정정: queued for the next tick, then 정정 on its way. The simulation takes no readback then.
+  const held = r.correcting || queued.some((q) => q.a === 'readback');
   // 틀린 칸: shown once 기러기's 정정 is in, from what was sent against the right values (#121 rule 3).
-  const wrong = asked === 'mto' && sent && !r.correcting ? wrongFields(sent, mission!.mto!) : [];
+  const wrong = asked === 'mto' && sent && !held ? wrongFields(sent, mission!.mto!) : [];
   const mark = (name: string) => (wrong.includes(name) ? WRONG : undefined);
   const set = (patch: Partial<Entry>) => onEntry({ ...entry, ...patch });
   return (
@@ -77,9 +81,9 @@ export function ReadbackForm({ mission, entry, sent, onEntry, onSend }: FormProp
       {wrong.length > 0 && <p role="alert">틀린 칸: {wrong.join(' · ')}</p>}
       <button
         type="button"
-        disabled={!input || r.correcting} // 정정 is on its way: the simulation takes no readback of it until then
+        disabled={!input || held}
         onClick={() => {
-          if (input && !r.correcting) onSend(input);
+          if (input && !held) onSend(input);
         }}
       >
         복창 송신
