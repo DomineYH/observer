@@ -96,6 +96,15 @@ describe('F-31', () => {
     expect(replay(switched, flatTerrain(), BASE_SCENARIO, BASE_GUNS, COMBAT).ignored).toBe(1);
     // guns stay an id and a version in a combat header too
     expect(validateReplay({ ...combat(), guns: BASE_GUNS })).toEqual({ ok: false, error: 'guns: unknown key' });
+    // readback: three forms pass, in any header (a training or standard game ignores them when replayed)
+    const readback = (v?: unknown) => ({ ...combat(), inputs: [{ t: 0, ...START }, { t: 1, a: 'readback', ...(v === undefined ? {} : { v }) }] });
+    for (const v of [['mto', 'quick', 1, 'ready', 0], ['mto', 'vt', 5, 'amc', 9999], ['shot'], ['rounds_complete']]) {
+      expect(validateReplay(readback(v)).ok, JSON.stringify(v)).toBe(true);
+      expect(validateReplay({ ...data(), inputs: readback(v).inputs }).ok, JSON.stringify(v)).toBe(true);
+    }
+    const bad = [undefined, [], ['mto'], ['mto', 'none', 1, 'ready', 1001], ['mto', 'vt', 0, 'ready', 1001], ['mto', 'vt', 6, 'ready', 1001],
+      ['mto', 'vt', 1, 'amc', 10000], ['mto', 'vt', 1.5, 'amc', 1001], ['mto', 'vt', 1, 'none', 1001], ['mto', 'vt', 1, 'amc', 1001, 0], ['shot', 1], ['rounds'], ['correction']];
+    for (const v of bad) expect(validateReplay(readback(v)), JSON.stringify(v)).toEqual({ ok: false, error: 'inputs[1]: unknown kind or bad value' });
   });
 
   // The terrain check comes before the simulation starts, so no real land is loaded here.

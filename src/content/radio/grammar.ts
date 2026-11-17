@@ -171,5 +171,12 @@ export const RADIO_GRAMMAR = {
     ),
     move_notice: p(true, [['관측소 이동']], 'design', true, '관측소 이동 통보'),
     position_report: p(true, [['관측소 이동 끝'], ['현 위치 ', ...GRID]], 'design', true, '위치 보고'),
+    mto_correction: p(
+      false,
+      [['정정'], ['사격지휘통보'], ['포대'], [{ slot: 'fuze' }], [ROUNDS], [{ if: { slot: 'control', is: 'amc' }, then: ['지명사'] }], TARGET_NUMBER],
+      'us',
+      true,
+      '기러기의 정정(미군 Correction의 옮김). 기러기가 관측자의 틀린 복창에 쓰는 한국군 표현은 미확인',
+    ),
   },
 } satisfies Grammar;

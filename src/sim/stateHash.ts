@@ -29,12 +29,19 @@ function target(h: Hasher, t: Target): void {
 }
 
 /** 실전 덩이 (ADR 0016): everything a combat game adds to the state is hashed here, in this order, and nowhere above. */
-function combatChunk(h: Hasher, c: NonNullable<SimState['combat']>): void {
-  h.u32(c.lasesUsed); // 쓴 레이저 횟수
+function combatChunk(h: Hasher, s: SimState): void {
+  h.u32(s.combat!.lasesUsed); // 쓴 레이저 횟수
   // 노출: 셈과 자리 (M3-18)
   // 적 포병 사격: 예약의 상태 (M3-18)
   // 포대: 첫 발 시각, 진지 변환이 끝나는 시각 (M3-20)
-  // 임무마다의 밀린 복창, 임무 차례 (M3-14)
+  for (const m of s.missions) {
+    // 임무마다의 밀린 복창, 임무 차례 (M3-14): every mission of a combat game carries one
+    const r = m.readback!;
+    h.u32(bit(r.mto));
+    h.u32(bit(r.shot));
+    h.u32(bit(r.rounds_complete));
+    h.u32(bit(r.correcting));
+  }
 }
 
 export function hashState(state: SimState): string {
@@ -312,6 +319,6 @@ export function hashState(state: SimState): string {
     h.u32(state.rng[name].count);
   }
   h.i32(state.score);
-  if (state.mode === 'combat') combatChunk(h, state.combat!); // last, and in a combat game only
+  if (state.mode === 'combat') combatChunk(h, state); // last, and in a combat game only
   return h.hex();
 }
