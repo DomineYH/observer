@@ -1,8 +1,9 @@
-import type { BaseScenario, Briefing, Placement } from '../placement';
+import type { Scenario } from '@sim';
+import type { Briefing, Placement } from '../placement';
 
 /** 시나리오 자료 of `base`, 기본 시나리오 on the mock 전장 (demo lines 207–209, 406–433). Keep `plannedOp` and `friends` equal
  * to the mock terrain's `OP_HILL` and `FRIEND_HILLS`. Any change here raises `version`. */
-export const BASE_SCENARIO: BaseScenario = {
+export const BASE_SCENARIO: Scenario = {
   id: 'base',
   version: 1,
   plannedOp: { x: 5120, y: 1800 }, // 1번 고지
