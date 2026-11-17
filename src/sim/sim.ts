@@ -3,7 +3,8 @@ import { deploy } from './deploy';
 import { checkEnd } from './end';
 import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
-import { exposureTick, runExposureAct } from './exposure';
+import { displacementEnds, displacementStarts, holdReady } from './displacement';
+import { expose, exposureTick, runArtilleryAct, runExposureAct } from './exposure';
 import { makeFriendlies, makeTruck, updateFriendlies } from './friendly';
 import { applyLase } from './laser';
 import { runLossAct } from './losses';
@@ -12,6 +13,7 @@ import { applyMove, applyReport, runPostAct, updatePost } from './post';
 import { applyPrep } from './prep';
 import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
 import { takeDue } from './queue';
+import { applyReadback, runCorrection } from './readback';
 import { recordOf } from './record';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
@@ -39,6 +41,9 @@ export function createSim(init: SimInit): Sim {
     posReport: null,
     compromised: -1,
     fire: null,
+    signature: init.mode === 'combat' ? { points: 0, place: null } : null,
+    artillery: null,
+    battery: init.mode === 'combat' ? { firstShot: -1, until: -1 } : null,
     observerLost: false,
     clearTick: -1,
     endAt: -1,
@@ -62,6 +67,10 @@ export function createSim(init: SimInit): Sim {
     rng,
   };
   state.friendlies = makeFriendlies(init.scenario.friends, rng.scn); // after the enemy's draws (demo order)
+  // 증원: 실전 only, drawn second, so a seed's units and soldiers stand as in 훈련·표준
+  const extra = init.mode === 'combat' ? init.scenario.reinforcements : [];
+  state.platoons.push(...deploy({ ...init.scenario, units: extra }, init.terrain, rng.scn));
+  const units = [...init.scenario.units, ...extra];
 
   // This step's events, stamped with the tick the step ends at.
   let out: (Omit<RadioEvent, 'tick'> | Omit<ImpactEvent, 'tick'> | ({ type: 'post' } & PostNote))[] = [];
@@ -71,15 +80,19 @@ export function createSim(init: SimInit): Sim {
     exp: rng.exp,
     ai: rng.ai,
     frontY: init.scenario.frontY,
-    mortarFrom: init.scenario.units.map((u) => (u.type === 'mortar' ? Math.round(u.fireFromS * 20) : 0)), // M3-16: reinforcements appended to the platoons need an entry here
+    mortarFrom: units.map((u) => (u.type === 'mortar' ? Math.round(u.fireFromS * 20) : 0)),
     terrain: init.terrain,
     battery: init.scenario.battery,
     guns: init.guns,
     residual: weatherResidual(init.weather, init.scenario.battery, init.scenario.fixedPoint),
-    say: (utterance) => out.push({ type: 'radio', utterance }),
+    say: (utterance) => {
+      out.push({ type: 'radio', utterance });
+      if (utterance.speaker === 'observer' && init.combat) expose(state, ctx, init.combat.numbers.radioExposure); // 노출: every word
+    },
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
     note: (n) => out.push({ type: 'post', ...n }),
     friends: init.scenario.friends,
+    ...(init.combat ? { combat: init.combat.numbers } : {}),
   };
 
   return {
@@ -98,6 +111,7 @@ export function createSim(init: SimInit): Sim {
           return true;
         }
         if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom' || a === 'shift') return applyRadio(state, ctx, a, input.v);
+        if (a === 'readback') return applyReadback(state, ctx, input.v!);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'move') return applyMove(state, ctx, v);
         if (a === 'pos' || a === 'pos_skip') return applyReport(state, ctx, a, input.v as readonly number[] | undefined);
@@ -107,7 +121,15 @@ export function createSim(init: SimInit): Sim {
           state.bino = v[0] === 1;
         }
         else if (a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
-        else if (a === 'lase') return state.post.state === 'ready' && applyLase(state, init.terrain, rng.las, v); // so does the laser
+        else if (a === 'lase') {
+          const c = state.combat; // 레이저 한도: 실전 only, never refilled
+          if (state.post.state !== 'ready' || (c && c.lasesUsed >= init.combat!.numbers.laserLimit)) return false;
+          if (!applyLase(state, init.terrain, rng.las, v)) return false; // so does the laser
+          if (c) {
+            c.lasesUsed++;
+            expose(state, ctx, init.combat!.numbers.laserExposure);
+          }
+        }
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
           if (a === 'start') {
@@ -123,13 +145,17 @@ export function createSim(init: SimInit): Sim {
         for (let i = 0; i < state.platoons.length; i++) updatePlatoon(state, ctx, i);
         updateFriendlies(state, init.terrain, rng.ai, init.scenario.friends);
         state.effects = state.effects.filter((e) => state.tick - e.tick <= e.life);
+        displacementEnds(state, ctx); // before the due acts: 진지 변환 끝 before the 사격준비 끝 it held
         // Due acts run before 보임 so a round landing now is seen now; no act reads this tick's 보임 or 적정.
         for (let act = takeDue(state); act; act = takeDue(state)) {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
           else if (act === 'retaliation' || act === 'retaliation_muzzle' || act === 'end') runExposureAct(state, ctx, act);
           else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
-          else runAct(state, ctx, act);
+          else if (act === 'ranging' || act === 'barrage') runArtilleryAct(state, ctx, act);
+          else if (act === 'mto_correction') runCorrection(state, ctx);
+          else if (act !== 'ready' || !holdReady(state)) runAct(state, ctx, act);
         }
+        displacementStarts(state, ctx); // after them: a fire that just ended lets it start this tick
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.
         const all = state.tick % VIS_TICKS === 0 || state.bino !== before.bino || before.phase === 'prep';
         updateVisibility(state, init.terrain, init.weather, all);

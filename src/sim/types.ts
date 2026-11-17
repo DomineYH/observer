@@ -25,6 +25,7 @@ export interface GunProfile extends Ref {
     vehicle: number;
     tube: { quick: number; vt: number };
   };
+  displacementS: number; // 진지 변환 시간: 실전 only, under the 실전 자료 판 and outside this profile's version
 }
 
 /** 접근로 열쇠: one uppercase letter. */
@@ -50,6 +51,9 @@ export interface Scenario extends Ref {
   intelRoutes: readonly { route: RouteKey; conf: Confidence }[]; // 예상 접근로
   timeLimitS: number; // 작전 시간 한도, seconds
   units: readonly UnitDef[];
+  /** 증원 (ADR 0019): read and drawn in 실전 only, after the friendly soldiers, then appended to the units. Outside the
+   * scenario version: the 실전 자료 판 covers it. */
+  reinforcements: readonly UnitDef[];
   reserveOps?: readonly Point[]; // 예비 관측소: the simulation does not read it
 }
 
@@ -183,8 +187,8 @@ export interface Truck {
   vis: boolean;
 }
 
-/** Who fires at a compromised post: the enemy mortar section, or infantry/APC direct fire. */
-export type Shooter = 'mortar' | 'direct';
+/** Who fires at the post: the enemy mortar section or infantry/APC direct fire (보복), or the enemy artillery (F-20). */
+export type Shooter = 'mortar' | 'direct' | 'artillery';
 
 /** 기상 값, all integers in spec units. */
 export interface Weather {
@@ -255,7 +259,7 @@ export interface ImpactEvent {
  * compromised by unit `pid`, and who will fire (null: nobody can) · a near miss of the first retaliation round · lost.
  * And to our positions: the enemy mortar's rounds begin to fall (26 s after its first volley) · our round fell within
  * 70 m of position `pos` and `k` men fell to it · the first enemy APC burst of the game · unit `pid` overran its
- * objective (진지 돌파). */
+ * objective (진지 돌파). And in a combat game the enemy artillery's ranging round and each barrage round, where it fell. */
 export type PostNote =
   | { what: 'arrived' | 'set_up' }
   | { what: 'compromised'; pid: number; fire: Shooter | null }
@@ -264,7 +268,8 @@ export type PostNote =
   | { what: 'shelling' }
   | { what: 'apc_fire' }
   | { what: 'friendly_hit'; pos: number; k: number }
-  | { what: 'overrun'; pid: number };
+  | { what: 'overrun'; pid: number }
+  | { what: 'ranging' | 'barrage'; x: number; y: number };
 export type PostEvent = { type: 'post'; tick: number } & PostNote;
 
 /** 사건. */
@@ -315,6 +320,16 @@ export interface Mission {
   dangerClose: boolean; // 위험근접 rules apply: declared, or applied by 기러기
   dangerMissed: boolean; // near and not declared (−30)
   shift: ShiftSlots | null; // the 전이 as sent (snapped); null for a mission opened by a call
+  readback: Readbacks | null; // 밀린 복창, in a combat game only (hashed in the 실전 덩이); null otherwise
+}
+
+/** 밀린 복창 (ADR 0018): which of 기러기's three transmissions await the player's readback, and whether 기러기's 정정
+ * of a wrong 사격지휘통보 readback is on its way (no readback of it is taken until then). */
+export interface Readbacks {
+  mto: boolean;
+  shot: boolean;
+  rounds_complete: boolean;
+  correcting: boolean;
 }
 
 /** One 레이저 press: the angles it went out on and what came back. */
@@ -346,7 +361,14 @@ export interface SimState {
   /** 발각: tick of the last one (150 s pass before the next can count), −1 never. */
   compromised: number;
   /** 보복 under way: who fires, at the post as it stood when found (`at`), the unit that fires, rounds fired so far. */
-  fire: { shooter: Shooter; at: Point; pid: number; fired: number } | null;
+  fire: { shooter: Exclude<Shooter, 'artillery'>; at: Point; pid: number; fired: number } | null;
+  /** 노출의 셈과 자리 (F-20): points since `place`, the post where the count last started; null outside a combat game. */
+  signature: { points: number; place: Point | null } | null;
+  /** 적 포병 사격 (F-20): the exposed place and the barrage rounds fallen; null while none is on (always outside combat). */
+  artillery: { at: Point; fired: number } | null;
+  /** 포대 (F-20): tick of the first round at this position (−1 none yet) and the tick its 진지 변환 ends (−1 none on);
+   * null outside a combat game. */
+  battery: { firstShot: number; until: number } | null;
   /** 관측반 전투 불능: the operation ends 4 s later. */
   observerLost: boolean;
   /** The tick every combat unit was down with no 진지 돌파 (섬멸 if the 관측반 lives on); −1 not (yet). */

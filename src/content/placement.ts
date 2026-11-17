@@ -1,4 +1,4 @@
-import type { Confidence, Point, Ref, RouteKey, Scenario } from '@sim';
+import type { Confidence, Ref, RouteKey, Scenario } from '@sim';
 
 /** 글: the 배치's name and 한 줄 소개 (on the screen from M3-13), the 작전 준비 글 (demo lines 925–933, in the scenario's
  * order) and the planned post's place name. Outside the scenario version. */
@@ -20,7 +20,8 @@ export interface Placement {
   scenario: Scenario;
   briefing: Briefing;
   terrain: Ref;
+  /** 일일 시작일 (ADR 0020): the first day, YYYYMMDD, it is a 일일 시나리오 candidate; outside every version. Never on a
+   * 전장's first 배치, and once on main never changed (`시나리오: main에 들어간 일일 시작일은 그대로다`). */
+  dailyFrom?: number;
 }
 
-/** The two base scenarios always have routes A, B and C. M3-9 drops this when the 배치 tests loop over every 배치. */
-export type BaseScenario = Scenario & { routes: Readonly<Record<'A' | 'B' | 'C', readonly Point[]>> };

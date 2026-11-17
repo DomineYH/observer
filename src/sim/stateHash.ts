@@ -7,7 +7,7 @@ import { MODES, type Cue, type FieldEffect, type Member, type Phase, type Platoo
 
 const PHASES: readonly Phase[] = ['prep', 'live', 'ended'];
 const POST_STATES: readonly PostState[] = ['ready', 'moving', 'setup'];
-export const SHOOTERS: readonly Shooter[] = ['mortar', 'direct'];
+export const SHOOTERS: readonly Shooter[] = ['mortar', 'direct', 'artillery'];
 const UNIT_TYPES: readonly UnitType[] = ['recon', 'inf', 'apc', 'mortar'];
 /** 접근로 번호: the key letter's place in the alphabet (A = 1 … Z = 26), 0 without a route. */
 export const routeNumber = (route: RouteKey | null): number => (route === null ? 0 : route.charCodeAt(0) - 64);
@@ -29,12 +29,33 @@ function target(h: Hasher, t: Target): void {
 }
 
 /** 실전 덩이 (ADR 0016): everything a combat game adds to the state is hashed here, in this order, and nowhere above. */
-function combatChunk(h: Hasher, c: NonNullable<SimState['combat']>): void {
-  h.u32(c.lasesUsed); // 쓴 레이저 횟수
-  // 노출: 셈과 자리 (M3-18)
-  // 적 포병 사격: 예약의 상태 (M3-18)
-  // 포대: 첫 발 시각, 진지 변환이 끝나는 시각 (M3-20)
-  // 임무마다의 밀린 복창, 임무 차례 (M3-14)
+function combatChunk(h: Hasher, s: SimState): void {
+  h.u32(s.combat!.lasesUsed); // 쓴 레이저 횟수
+  const g = s.signature!; // 노출: 셈과 자리
+  h.u32(g.points);
+  h.u32(g.place ? 1 : 0);
+  if (g.place) {
+    h.f64(g.place.x);
+    h.f64(g.place.y);
+  }
+  const a = s.artillery; // 적 포병 사격: the exposed place and the barrage rounds fallen
+  h.u32(a ? 1 : 0);
+  if (a) {
+    h.f64(a.at.x);
+    h.f64(a.at.y);
+    h.u32(a.fired);
+  }
+  const b = s.battery!; // 포대: 첫 발 시각, 진지 변환이 끝나는 시각
+  h.i32(b.firstShot);
+  h.i32(b.until);
+  for (const m of s.missions) {
+    // 임무마다의 밀린 복창, 임무 차례 (M3-14): every mission of a combat game carries one
+    const r = m.readback!;
+    h.u32(bit(r.mto));
+    h.u32(bit(r.shot));
+    h.u32(bit(r.rounds_complete));
+    h.u32(bit(r.correcting));
+  }
 }
 
 export function hashState(state: SimState): string {
@@ -312,6 +333,6 @@ export function hashState(state: SimState): string {
     h.u32(state.rng[name].count);
   }
   h.i32(state.score);
-  if (state.mode === 'combat') combatChunk(h, state.combat!); // last, and in a combat game only
+  if (state.mode === 'combat') combatChunk(h, state); // last, and in a combat game only
   return h.hex();
 }

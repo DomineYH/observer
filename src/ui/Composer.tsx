@@ -9,6 +9,7 @@ import type { RadioNames } from './radio/sentence';
 import { prefillDirection, type suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
 import { casualtyNote } from './effect';
+import { owedOf } from './readback';
 import { EffectForm } from './EffectForm';
 import { PositionForm } from './PositionForm';
 import { LOCATION_HINT, postStatus, reportOpen, staleKnown } from './post';
@@ -76,15 +77,17 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   const mission = state.missions.at(-1);
   // 지명사: 기러기 waits for 준비 쏴, for the adjusting round and for 효력사 alike (the simulation's own rule).
   const amc = stage === 'ready' && mission?.mto?.control === 'amc';
+  // 실전: an owed readback holds 준비 쏴 · 수정 · 재효력사 · 임무끝; the screen sends none of them (#121 screen rule 1).
+  const held = owedOf(mission?.readback ?? null).length > 0;
   useEffect(() => {
-    if (!amc) return;
+    if (!amc || held) return;
     const down = (e: KeyboardEvent) => {
       const input = !ignoreShortcut(e) && fireKey(e.key);
       if (input && !e.repeat) send(input);
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [amc, send]);
+  }, [amc, held, send]);
 
   const chosen = options.find((t) => JSON.stringify(t) === target)!;
   // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
@@ -112,8 +115,9 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         )}
         {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} pin={pin} transfer={transfer} />}
         {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
+        {held && (amc || stage === 'adjust' || stage === 'effect') && <p role="status">복창을 먼저 보내십시오</p>}
         {amc && (
-          <button type="button" onClick={() => send(FIRE)}>
+          <button type="button" disabled={held} onClick={() => !held && send(FIRE)}>
             준비 쏴 <kbd>F</kbd>
           </button>
         )}
@@ -121,7 +125,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {stage === 'effect' && <p>효과를 관측하십시오.</p>}
         {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
         {stage === 'effect' && mission && (
-          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} />
         )}
         {stage === 'adjust' && mission && (
           <CorrectionForm
@@ -132,6 +136,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             names={names}
             mode={mode}
             send={send}
+            held={held}
           />
         )}
         {callable && (

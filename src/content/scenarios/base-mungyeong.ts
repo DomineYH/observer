@@ -1,5 +1,5 @@
 import type { Point } from '@sim';
-import type { BaseScenario, Placement } from '../placement';
+import type { Placement } from '../placement';
 
 const line = (...xy: [number, number][]): Point[] => xy.map(([x, y]) => ({ x, y }));
 
@@ -7,7 +7,7 @@ const line = (...xy: [number, number][]): Point[] => xy.map(([x, y]) => ({ x, y 
  * 상자, 작전 시간 한도, names) equal `base`'s and are written out here: `배치: 데모 값은 그대로` holds the two together.
  * The three posts are copied into `terrain/mungyeong/config.json` as 벌채 원: move a post → change that copy, raise the
  * 지형 판 and rebuild (terrain/README.md). Any change in `scenario` raises `version`. */
-export const BASE_MUNGYEONG: Placement & { scenario: BaseScenario } = {
+export const BASE_MUNGYEONG: Placement = {
   scenario: {
     id: 'base-mungyeong',
     version: 2,
@@ -40,6 +40,10 @@ export const BASE_MUNGYEONG: Placement & { scenario: BaseScenario } = {
       { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 200 }, // 적 2소대
       { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 260 }, // 적 장갑차 2대
       { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0, fireFromS: 210 }, // 적 82mm 박격포반
+    ],
+    reinforcements: [
+      { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 420 }, // 적 3소대
+      { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 480 }, // 적 장갑차 2대
     ],
   },
   // Only the NAI 세 줄 and the 박격포 구절 differ from `base`'s, named by villages on the map (no 산·고개 이름).

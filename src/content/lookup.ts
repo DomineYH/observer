@@ -1,13 +1,14 @@
 import type { CombatData, GunProfile, ReplayData, Ref, Scenario } from '@sim';
 import { COMBAT } from './combat';
-import { BASE_GUNS } from './guns';
+import { GUNS } from './guns';
 import type { Placement } from './placement';
 import { BASE } from './scenarios/base';
+import { APC_MUNGYEONG } from './scenarios/apc-mungyeong';
 import { BASE_MUNGYEONG } from './scenarios/base-mungyeong';
 
 /** 배치 목록: every 배치 of this build, in order. A new 배치 goes at the end; a 전장's first 배치 is its 기본 시나리오. */
-export const PLACEMENTS: readonly Placement[] = [BASE, BASE_MUNGYEONG];
-export const GUNS: readonly GunProfile[] = [BASE_GUNS];
+export const PLACEMENTS: readonly Placement[] = [BASE, BASE_MUNGYEONG, APC_MUNGYEONG];
+export { GUNS };
 
 function find<T extends Ref>(kind: string, list: readonly T[], want: Ref): T {
   const found = list.find((x) => x.id === want.id);
@@ -27,7 +28,7 @@ export function contentOf(header: Pick<ReplayData, 'scenario' | 'guns'> & Partia
     throw new Error(`combat@${header.combatDataVersion}: unknown version (this build has combat@${COMBAT.version})`);
   return {
     scenario: find('scenario', PLACEMENTS.map((p) => p.scenario), header.scenario),
-    guns: find('guns', GUNS, header.guns),
+    guns: find('guns', GUNS.map((g) => g.profile), header.guns),
     ...(header.mode === 'combat' ? { combat: COMBAT } : {}),
   };
 }

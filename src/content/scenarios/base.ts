@@ -1,8 +1,9 @@
-import type { BaseScenario, Briefing, Placement } from '../placement';
+import type { Scenario } from '@sim';
+import type { Briefing, Placement } from '../placement';
 
 /** 시나리오 자료 of `base`, 기본 시나리오 on the mock 전장 (demo lines 207–209, 406–433). Keep `plannedOp` and `friends` equal
  * to the mock terrain's `OP_HILL` and `FRIEND_HILLS`. Any change here raises `version`. */
-export const BASE_SCENARIO: BaseScenario = {
+export const BASE_SCENARIO: Scenario = {
   id: 'base',
   version: 1,
   plannedOp: { x: 5120, y: 1800 }, // 1번 고지
@@ -36,6 +37,10 @@ export const BASE_SCENARIO: BaseScenario = {
     { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 200 }, // 적 2소대
     { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 260 }, // 적 장갑차 2대
     { type: 'mortar', nai: 2, spread: { x: 700, y: 500 }, t0: 0, fireFromS: 210 }, // 적 82mm 박격포반
+  ],
+  reinforcements: [
+    { type: 'inf', route: { first: 'A', second: 'C', p: 0.5 }, t0: 420 }, // 적 3소대
+    { type: 'apc', route: { first: 'B', second: 'C', p: 0.5 }, t0: 480 }, // 적 장갑차 2대
   ],
 };
 

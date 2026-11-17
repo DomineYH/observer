@@ -1,9 +1,13 @@
 // 포 프로파일 (ADR 0014): base@1 holds the numbers the simulation code held before M3-2.
 import { describe, expect, test } from 'vitest';
-import { fromGrid, type GunProfile } from '@sim';
-import { killChance } from '@sim/lethality';
+import { createSim, fromGrid, type GunProfile } from '@sim';
+import { fall } from '@sim/ballistics';
+import { killChance, killMembers } from '@sim/lethality';
+import { createStreams, next } from '@sim/rng';
 import { BASE_GUNS } from '@content/guns';
+import { GUNS } from '@content/lookup';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { versioned } from './expected';
 import { init } from './init';
 import { NO_ENEMY, oneMission } from './session';
 import { isImpact } from './strike';
@@ -11,7 +15,7 @@ import { flatTerrain } from './terrain';
 
 test('포 프로파일: base의 숫자는 지금 코드의 값이다', () => {
   // A second copy on purpose: a changed number goes red here by name, not only in the 기대값 표.
-  expect(BASE_GUNS).toEqual({
+  expect(versioned(BASE_GUNS)).toEqual({
     id: 'base',
     version: 1,
     maxRangeM: 24000,
@@ -86,3 +90,74 @@ describe('포 프로파일: 시뮬레이션은 넘겨받은 프로파일의 수�
     expect(killChance('tube', false, up(17), 'vt', guns)).toBeCloseTo(0.9 / Math.E, 9);
   });
 });
+
+// The four guns are #118's 게임 조정 묶음, written out in full: a changed number goes red here by name.
+const W = [[-60, 22], [-36, -22], [-12, 22], [12, -22], [36, 22], [60, -22]];
+const R155 = { man: { quick: { stand: 26, prone: 15 }, vt: { stand: 28, prone: 24 } }, vehicle: 7, tube: { quick: 10, vt: 7 } };
+const p155 = { tof: { baseS: 3, sPerKm: 2.6 }, peRange: { baseM: 2, mPerKm: 1.5 }, peDeflection: { baseM: 1, mPerKm: 0.5 }, sheaf: W, lethalRadiusM: R155 };
+
+test('포 프로파일: 다섯 프로파일의 숫자', () => {
+  expect(GUNS.map((g) => g.profile.id)).toEqual(['base', 'kh178', 'kh179', 'k55', 'k9']); // base first
+  expect(GUNS[0]!.profile).toBe(BASE_GUNS);
+  const [, kh178, kh179, k55, k9] = GUNS.map((g) => versioned(g.profile));
+  expect(kh178).toEqual({
+    id: 'kh178',
+    version: 1,
+    maxRangeM: 14700,
+    tof: { baseS: 4.22, sPerKm: 3.66 },
+    peRange: { baseM: 2.53, mPerKm: 1.89 },
+    peDeflection: { baseM: 1.26, mPerKm: 0.63 },
+    sheaf: W,
+    ffe: { intervalS: 4, jitterS: 0.98 },
+    lethalRadiusM: { man: { quick: { stand: 20.6, prone: 11.9 }, vt: { stand: 22.1, prone: 19.0 } }, vehicle: 5.5, tube: { quick: 7.9, vt: 5.5 } },
+  });
+  expect(kh179).toEqual({ id: 'kh179', version: 1, maxRangeM: 24000, ...p155, ffe: { intervalS: 15, jitterS: 3.67 } });
+  expect(k55).toEqual({ ...kh179, id: 'k55' }); // KH179 and K55: the same to the last number
+  expect(k9).toEqual({ id: 'k9', version: 1, maxRangeM: 40000, ...p155, tof: { baseS: 2.2, sPerKm: 1.91 }, ffe: { intervalS: 7.5, jitterS: 1.83 } });
+  for (const g of GUNS) expect(g.profile.sheaf, g.profile.id).toHaveLength(6); // 문수 6 for all five
+  expect(GUNS.map((g) => g.name)).toEqual(['155mm 견인포', 'KH178 105mm 견인포', 'KH179 155mm 견인포', 'K55 155mm 자주포', 'K9 155mm 자주포']);
+  expect(GUNS[3]!.blurb).toContain('탄도는 KH179와 같다');
+});
+
+test('포 프로파일: 진지 변환 시간 다섯 값', () => {
+  // #123 규칙 3's middle values (조사 행 18의 추정; KH178 `설계`), under the 실전 자료 판, outside every profile version.
+  expect(Object.fromEntries(GUNS.map((g) => [g.profile.id, g.profile.displacementS]))).toEqual({ base: 1300, kh178: 230, kh179: 1300, k55: 500, k9: 130 });
+});
+
+// 포대 삼발 under #118's measure A: lethality.test.ts's harness (one rifle platoon in line 9.1 km from the battery,
+// 6 guns × 3 rounds with no bias, standing for the first volley and prone after, 순발), each profile's own sheaf, PE and R.
+const RUNS = 2000;
+const CENTRE = { x: BASE_SCENARIO.battery.x + 800, y: BASE_SCENARIO.battery.y + 9100 };
+const formations = Array.from({ length: RUNS }, (_, i) => {
+  const sim = createSim({ ...init(i + 1), scenario: { ...BASE_SCENARIO, units: [{ type: 'inf', route: 'B', t0: 0 }] } });
+  return sim.state.platoons[0]!.members.map((m) => ({ u: m.u, v: m.v }));
+});
+function threeRounds(guns: GunProfile): number {
+  let dead = 0;
+  let total = 0;
+  formations.forEach((f, i) => {
+    const bal = createStreams(i + 1).bal;
+    const men = f.map((m) => ({ kind: 'man' as const, x: CENTRE.x - m.u, y: CENTRE.y - m.v, prone: false, alive: true }));
+    next(bal); // the harness's aim-error bearing, drawn here too so the draws match it
+    for (let k = 0; k < 3; k++) {
+      if (k > 0) for (const m of men) m.prone = true;
+      for (const g of guns.sheaf) {
+        const p = fall(CENTRE, BASE_SCENARIO.battery, { x: 0, y: 0 }, bal, guns, g);
+        killMembers(men, p.x, p.y, 'quick', bal, guns);
+      }
+    }
+    dead += men.filter((m) => !m.alive).length;
+    total += men.length;
+  });
+  return (dead / total) * 100;
+}
+
+test('포 프로파일: 포대 삼발 살상률의 범위', () => {
+  // PRD §6's anchor for base and the 155mm guns; #118's measured 46–53 % for the 105mm.
+  const range: Record<string, [number, number]> = { base: [70, 80], kh178: [46, 53], kh179: [70, 80], k55: [70, 80], k9: [70, 80] };
+  for (const { profile } of GUNS) {
+    const c = threeRounds(profile);
+    const [lo, hi] = range[profile.id]!;
+    expect(c >= lo && c <= hi, `${profile.id}: ${c.toFixed(1)} % in ${lo}–${hi}`).toBe(true);
+  }
+}, 60000);

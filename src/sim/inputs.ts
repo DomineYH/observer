@@ -1,6 +1,6 @@
 // 입력 종류 and their value formats (재생 자료 format 1, spec 입력 기록). The one kind table: the replay format check
 // and the simulation's step both use it. Kinds are added by the slices that use them.
-import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, LATERAL_DIRS, NEXTS, RANGE_DIRS, SLOT_RANGES, TARGET_TYPES, WARNINGS } from './radio';
+import { ACTIVITIES, CONTROLS, EFFECTS, FUZE_REQUESTS, FUZES, LATERAL_DIRS, NEXTS, RANGE_DIRS, SLOT_RANGES, TARGET_TYPES, WARNINGS } from './radio';
 import type { Input, Mode } from './types';
 
 /** An integer in range, or one of the enum identifiers (ASCII strings, spec 열거형 식별자). */
@@ -50,6 +50,8 @@ const FORMATS = new Map<string, Format>([
   ['pos', [[range('easting'), range('northing')]]], // 위치 보고: 동 · 북 4자리
   ['pos_skip', [[]]], // 위치 보고 생략: no values
   ['mode', [[SWITCH_MODES]]], // 모드: training · standard
+  // 복창 (실전): 사격지휘통보 with the values put in (신관, 발수, 통제, 표적번호), 하나발 떳다, 마감탄 떳다
+  ['readback', [[['mto'], FUZES, range('rounds'), CONTROLS, range('targetNumber')], [['shot']], [['rounds_complete']]]],
 ]);
 
 function fits(f: Field, x: unknown): boolean {

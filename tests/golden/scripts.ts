@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { SIM_VERSION, toGrid, type ReplayData } from '@sim';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { MIL } from '@sim/ballistics';
 import { atan2 } from '@sim/math';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { APC_MUNGYEONG } from '@content/scenarios/apc-mungyeong';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
@@ -33,6 +35,32 @@ const MUNGYEONG = (() => {
   const pos = toGrid(moveTo.x, moveTo.y, grid);
   return { scenario, terrain, op, laseAz: Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL * 10), moveTo, pos: [pos.e, pos.n] };
 })();
+
+// 장갑차 선두's points (#127): its planned post, NAI 1's centre as a square on the committed 방안, and the 관측방위각 to it in
+// mils (the grid method's first correction carries it).
+const APC = (() => {
+  const { scenario, terrain } = APC_MUNGYEONG;
+  const op = scenario.plannedOp;
+  const nai = scenario.nais[0]!;
+  const at = toGrid(nai.x, nai.y, grid);
+  return { scenario, terrain, op, loc: ['grid', at.e, at.n], dir: (Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL) + 6400) % 6400 };
+})();
+
+// 포 넷 (#126): one script, the header's `guns` alone differs. ①'s 82 mm mortar section fired for effect straight from the
+// call (접근신관), through 임무끝. Each input comes about 200 ticks after its stage opens on the slowest gun (probe,
+// SIM_VERSION 17: 효과 관측 from 2789 on kh179 and k55, 2273 on k9).
+const FOUR_GUNS: ReplayData = {
+  ...HEAD,
+  seedKind: 'practice',
+  inputs: [
+    START,
+    { t: 200, a: 'call', v: ['ffe'] },
+    { t: 400, a: 'loc', v: ['grid', 4567, 3752] },
+    { t: 600, a: 'desc', v: [3, 'vt', 'ready', 0, 'mortar', 'halted', 'none'] },
+    { t: 3000, a: 'eom', v: ['neutralized'] },
+  ],
+  totalTicks: 3400,
+};
 
 // 각본 입력: the source each golden file is generated from by `npm run golden:update`.
 export const SCRIPTS: { file: string; replay: ReplayData }[] = [
@@ -357,4 +385,79 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       terrain: { id: 'mungyeong', version: 2 },
     },
   },
+  {
+    // 장갑차 선두 (#127): ①'s form on the 문경 land, 연습 시드 — 좌표법 조정 at NAI 1's centre, 미상 표적 → 수정 0과 함께
+    // 효력사 → 임무끝. Each input about 200 ticks after its stage opens (probe, SIM_VERSION 17: call 110, loc 386, desc 641,
+    // adjust 2312, effect 4062). Past tick 3000 the five units have set off and the mortar has fired once.
+    file: '7-apc-grid-eom.json',
+    replay: {
+      ...HEAD,
+      seedKind: 'practice',
+      scenario: { id: APC.scenario.id, version: APC.scenario.version },
+      terrain: APC.terrain,
+      inputs: [
+        { t: 0, a: 'start', v: [APC.op.x, APC.op.y] },
+        { t: 310, a: 'call', v: ['adjust'] },
+        { t: 586, a: 'loc', v: APC.loc },
+        { t: 841, a: 'desc', v: [3, 'none', 'ready', 0, 'unknown'] },
+        { t: 2512, a: 'corr', v: [APC.dir, 'left', 0, 'drop', 0, 'ffe'] },
+        { t: 4262, a: 'eom', v: ['neutralized'] },
+      ],
+      totalTicks: 4662,
+    },
+  },
+  {
+    // 실전 각본 (#126, #155): the planned post, 실전, 일일 시드. ②'s lase and 극좌표 조정 at the mortar section with every
+    // readback (the first 사격지휘통보 one wrong: 기러기's 정정 50 ticks on), 재효력사, and the other four lases on the way;
+    // past the fifth, 효력사 by grid at the 정찰조 (halted at grid 4336 3646) and 좌표법 조정 at the mortar section. Their
+    // words reach the 노출 한도 at 임무끝 (10 935): the ranging round at 15 735, the post walks 150 m east, the barrage
+    // falls round the old post from 17 535. The 증원 sets off at 420 and 480 s; the 진지 변환 starts at 13 363 (first round
+    // 1363 + 체류 한도). Each input 100 ticks after its stage opens, a readback 40, a lase 60 (probe, SIM_VERSION 17).
+    file: '8-combat.json',
+    replay: {
+      ...HEAD,
+      mode: 'combat',
+      combatDataVersion: COMBAT.version,
+      inputs: [
+        START,
+        { t: 151, a: 'lase', v: [987, -14] },
+        { t: 252, a: 'call', v: ['adjust'] },
+        { t: 428, a: 'loc', v: ['polar', 99, 5425] },
+        { t: 583, a: 'desc', v: [3, 'none', 'ready', 0, 'mortar', 'halted', 'none'] },
+        { t: 644, a: 'lase', v: [900, -14] },
+        { t: 861, a: 'readback', v: ['mto', 'quick', 1, 'ready', 1001] }, // wrong: 3 rounds
+        { t: 951, a: 'readback', v: ['mto', 'quick', 3, 'ready', 1001] },
+        { t: 1403, a: 'readback', v: ['shot'] },
+        { t: 1464, a: 'lase', v: [1100, -14] },
+        { t: 2172, a: 'corr', v: ['left', 0, 'drop', 0, 'ffe'] },
+        { t: 2660, a: 'readback', v: ['shot'] },
+        { t: 3098, a: 'readback', v: ['rounds_complete'] },
+        { t: 3840, a: 'repeat', v: ['ineffective', 3] },
+        { t: 4370, a: 'readback', v: ['shot'] },
+        { t: 4805, a: 'readback', v: ['rounds_complete'] },
+        { t: 4866, a: 'lase', v: [800, -20] },
+        { t: 5547, a: 'eom', v: ['neutralized'] },
+        { t: 5608, a: 'lase', v: [1200, -20] },
+        { t: 5709, a: 'call', v: ['ffe'] },
+        { t: 5863, a: 'loc', v: ['grid', 4336, 3646] },
+        { t: 6032, a: 'desc', v: [1, 'none', 'ready', 0, 'unknown'] },
+        { t: 6263, a: 'readback', v: ['mto', 'quick', 1, 'ready', 1002] },
+        { t: 6592, a: 'readback', v: ['shot'] },
+        { t: 6680, a: 'readback', v: ['rounds_complete'] },
+        { t: 7381, a: 'eom', v: ['ineffective'] },
+        { t: 7482, a: 'call', v: ['adjust'] },
+        { t: 7655, a: 'loc', v: ['grid', 4567, 3752] },
+        { t: 7808, a: 'desc', v: [3, 'vt', 'ready', 0, 'mortar', 'halted', 'none'] },
+        { t: 8047, a: 'readback', v: ['mto', 'vt', 3, 'ready', 1003] },
+        { t: 8563, a: 'readback', v: ['shot'] },
+        { t: 9349, a: 'corr', v: [100, 'right', 60, 'drop', 50, 'ffe'] },
+        { t: 9728, a: 'readback', v: ['shot'] },
+        { t: 10178, a: 'readback', v: ['rounds_complete'] },
+        { t: 10935, a: 'eom', v: ['neutralized'] },
+        { t: 15795, a: 'move', v: [BASE_SCENARIO.plannedOp.x + 150, BASE_SCENARIO.plannedOp.y] },
+      ],
+      totalTicks: 18000,
+    },
+  },
+  ...['kh178', 'kh179', 'k55', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
 ];

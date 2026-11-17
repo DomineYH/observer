@@ -84,6 +84,7 @@ const SHAPES: Record<RadioKind, Axis[][]> = {
   danger_close_adjust_first: [[]],
   danger_close_resend: [[]],
   mto: [[en('fuze', FUZES), int('rounds'), en('control', CONTROLS), int('targetNumber')]],
+  mto_correction: [[en('fuze', FUZES), int('rounds'), en('control', CONTROLS), int('targetNumber')]],
   ready: [[en('fuze', FUZES, true)]],
   fire: [[]],
   shot: [[]],
@@ -95,6 +96,8 @@ const SHAPES: Record<RadioKind, Axis[][]> = {
   shift: [[int('targetNumber'), int('direction'), ...CORRECTIONS, TARGET, int('rounds'), en('dangerClose', FLAG)]],
   move_notice: [[]],
   position_report: [[int('easting'), int('northing')]],
+  displacing: [[]],
+  displaced: [[]],
 };
 
 /** Full product of the axes, with the integer of axis `vary` at each boundary value and every other integer representative. */
@@ -207,4 +210,10 @@ export const SNAPSHOT_CASES: RadioUtterance[] = [
   { ...fdcOver, kind: 'move_notice' },
   { ...o, kind: 'position_report', slots: { easting: 4123, northing: 3050 } },
   { ...fdcOver, kind: 'position_report', slots: { easting: 4123, northing: 3050 } },
+  // 실전의 복창 (M3-14): 기러기's 정정, and the observer's 사격지휘통보 readback
+  { ...fdcWait, kind: 'mto_correction', slots: { fuze: 'vt', rounds: 2, control: 'ready', targetNumber: 1002 } },
+  { ...obsWait, kind: 'mto', slots: { fuze: 'vt', rounds: 1, control: 'amc', targetNumber: 1001 } },
+  // 실전의 진지 변환 (M3-20): 기러기's two words
+  { ...fdcWait, kind: 'displacing' },
+  { ...fdcNone, kind: 'displaced' },
 ];
