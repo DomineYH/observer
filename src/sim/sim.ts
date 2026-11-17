@@ -3,7 +3,7 @@ import { deploy } from './deploy';
 import { checkEnd } from './end';
 import { updatePlatoon } from './enemy';
 import { activityOf, applyId, updateIntel } from './intel';
-import { exposureTick, runExposureAct } from './exposure';
+import { expose, exposureTick, runArtilleryAct, runExposureAct } from './exposure';
 import { makeFriendlies, makeTruck, updateFriendlies } from './friendly';
 import { applyLase } from './laser';
 import { runLossAct } from './losses';
@@ -40,6 +40,8 @@ export function createSim(init: SimInit): Sim {
     posReport: null,
     compromised: -1,
     fire: null,
+    signature: init.mode === 'combat' ? { points: 0, place: null } : null,
+    artillery: null,
     observerLost: false,
     clearTick: -1,
     endAt: -1,
@@ -81,7 +83,10 @@ export function createSim(init: SimInit): Sim {
     battery: init.scenario.battery,
     guns: init.guns,
     residual: weatherResidual(init.weather, init.scenario.battery, init.scenario.fixedPoint),
-    say: (utterance) => out.push({ type: 'radio', utterance }),
+    say: (utterance) => {
+      out.push({ type: 'radio', utterance });
+      if (utterance.speaker === 'observer' && init.combat) expose(state, ctx, init.combat.numbers.radioExposure); // 노출: every word
+    },
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
     note: (n) => out.push({ type: 'post', ...n }),
     friends: init.scenario.friends,
@@ -118,7 +123,10 @@ export function createSim(init: SimInit): Sim {
           const c = state.combat; // 레이저 한도: 실전 only, never refilled
           if (state.post.state !== 'ready' || (c && c.lasesUsed >= init.combat!.numbers.laserLimit)) return false;
           if (!applyLase(state, init.terrain, rng.las, v)) return false; // so does the laser
-          if (c) c.lasesUsed++;
+          if (c) {
+            c.lasesUsed++;
+            expose(state, ctx, init.combat!.numbers.laserExposure);
+          }
         }
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
@@ -140,6 +148,7 @@ export function createSim(init: SimInit): Sim {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
           else if (act === 'retaliation' || act === 'retaliation_muzzle' || act === 'end') runExposureAct(state, ctx, act);
           else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
+          else if (act === 'ranging' || act === 'barrage') runArtilleryAct(state, ctx, act);
           else if (act === 'mto_correction') runCorrection(state, ctx);
           else runAct(state, ctx, act);
         }

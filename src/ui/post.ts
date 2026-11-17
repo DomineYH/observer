@@ -55,7 +55,7 @@ export const postStatus = (s: Pick<ReadonlySimState, 'post' | 'tick'>): string |
   s.post.state === 'ready' ? null : `${s.post.state === 'moving' ? '관측소 이동 중' : '관측 장비 설치 중'} — ${eta(postLeft(s))}`;
 
 const KIND: Record<UnitType, string> = { inf: '보병', recon: '정찰조', apc: '장갑차', mortar: '박격포' };
-const FIRE = { mortar: '박격포', direct: '직사' } as const;
+const FIRE = { mortar: '박격포', direct: '직사', artillery: '포병' } as const;
 
 /** A post note as log lines; `canopy`: the post stands in forest; `sc`: the scenario, for the position a route ends on. */
 export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], canopy: boolean, sc: Pick<Scenario, 'routes' | 'friends'>): string[] {
@@ -85,6 +85,10 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
       const pos = goal ? sc.friends.findIndex((f) => f.x === goal.x && f.y === goal.y) : -1;
       return [`${unitName(platoons, n.pid)}이(가) ${pos >= 0 ? `아군 ${pos + 1}소대` : '아군'} 진지를 돌파했습니다.`];
     }
+    case 'ranging': // the player hears where it fell, never the count or the time left (#123 Q11)
+      return ['관측소 근처에 적 포탄 한 발이 떨어졌습니다. 적 포병의 시사탄 같습니다 — 자리를 옮기십시오.'];
+    case 'barrage':
+      return ['관측소 주변에 적 포병의 포탄이 떨어집니다!'];
     case 'lost':
       return [`${n.cause === 'friendly' ? '아군 포탄이 관측소에 떨어졌습니다.' : `적 ${FIRE[n.cause]} 사격에 관측반이 피격됐습니다.`} 관측반 전투 불능 — 임무 종료.`];
   }

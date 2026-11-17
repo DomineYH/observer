@@ -9,6 +9,7 @@ import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
 import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
+import { PLACEMENTS } from '@content/lookup';
 import { gridOf, type Pin } from '@render/mapView';
 import { DEFAULT_QUALITY, type Quality } from '@render/projection';
 import { terrainColours } from '@render/shade';
@@ -31,7 +32,7 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { loadTerrain, placementOf, selectBackend } from './backend';
+import { battlefieldOf, loadTerrain, selectBackend } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
@@ -39,7 +40,7 @@ import { newGame, remade, type Game } from './game';
 import { startLoop, timescaleOf } from './loop';
 import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
-import { chooseSeed } from './seed';
+import { chooseSeed, placementFor } from './seed';
 import './app.css';
 
 const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
@@ -48,7 +49,10 @@ const backend = selectBackend(import.meta.env.VITE_OBSERVER_BACKEND);
 const { seed, seedKind } = chooseSeed(location.search, Date.now());
 // On real: the 받는 중 line until the 지형 자료 is in; a refusal shows the 오류 화면 and stops here (no game, no mock land).
 const terrain = await loadTerrain(backend, seed, bootScreen(document.getElementById('root')!));
-const { scenario, briefing } = placementOf(backend);
+// The 배치: a daily seed's 일일 시나리오, or the practice seed's `?scenario=` (the 기본 시나리오 when it names none here).
+const field = battlefieldOf(backend);
+const { scenario, briefing } = placementFor(location.search, seed, seedKind, field, PLACEMENTS);
+const scenarios = PLACEMENTS.filter((p) => p.terrain.id === field).map((p) => ({ id: p.scenario.id, name: p.briefing.name, blurb: p.briefing.blurb }));
 // A practice seed starts in clear weather and may change it during 작전 준비; a daily seed's weather comes with the seed.
 let preset: WeatherPreset | null = seedKind === 'practice' ? 'clear' : null;
 // Replaced as a whole on a weather change: read `game` at use, never keep its sim or session.
@@ -266,7 +270,7 @@ function App() {
           <span>
             기상 <output aria-live="off" aria-label="기상">{weatherChip(init.weather)}</output>
           </span>
-          <RankingDialog archive={archive} callsign={callsign} />
+          <RankingDialog archive={archive} callsign={callsign} scenario={scenario.id} />
         </HeadBand>
         <div className="sr-only">
           <TickCounter tick={tick} />
@@ -302,6 +306,7 @@ function App() {
             live={sim.state}
             preset={preset}
             onPreset={(p) => void changeWeather(p)}
+            scenarios={scenarios}
             mode={mode}
             onMode={chooseMode}
           />

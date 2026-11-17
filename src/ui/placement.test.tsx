@@ -33,6 +33,7 @@ test('배치: 패널과 강평은 고른 배치에서 읽는다', () => {
         live={state}
         preset={null}
         onPreset={() => {}}
+        scenarios={[]}
         mode="training"
         onMode={() => {}}
       />,
@@ -89,7 +90,7 @@ test('배치: 문경 작전 준비 글', async () => {
   const state = { phase: 'prep', op: scenario.plannedOp, picked: false, reportDue: false } as const;
   const panel = strip(
     renderToStaticMarkup(
-      <PrepPanel state={state} scenario={scenario} briefing={briefing} terrain={terrain} seed={1} seedKind="daily" weather={init(1).weather} send={() => {}} queued={[]} live={state} preset={null} onPreset={() => {}} mode="training" onMode={() => {}} />,
+      <PrepPanel state={state} scenario={scenario} briefing={briefing} terrain={terrain} seed={1} seedKind="daily" weather={init(1).weather} send={() => {}} queued={[]} live={state} preset={null} onPreset={() => {}} scenarios={[]} mode="training" onMode={() => {}} />,
     ),
   );
   // 방안 CH (40230, 30490): 계획 (6340, 660), 예비 1 (5400, 1380), 예비 2 (8010, 870)

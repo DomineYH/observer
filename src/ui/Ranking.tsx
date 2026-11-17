@@ -90,11 +90,12 @@ export function Ranking({ board, rows, mine, callsign, onBoard }: Props) {
   );
 }
 
-/** The 랭킹 button and its modal dialog; boards load from 기록 보관소 each time one is shown. */
-export function RankingDialog({ archive, callsign }: { archive: RecordArchive; callsign: string }) {
+/** The 랭킹 button and its modal dialog; boards load from 기록 보관소 each time one is shown. Until the mode and scenario
+ * buttons exist the boards are 표준 on `scenario`, the 전장's 기본 시나리오. */
+export function RankingDialog({ archive, callsign, scenario }: { archive: RecordArchive; callsign: string; scenario: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [shown, setShown] = useState<{ board: Board; rows: RankRow[]; mine: StoredRun[] } | null>(null);
-  const load = async (board: Board) => setShown({ board, rows: await archive.board(board), mine: await archive.mine() });
+  const load = async (board: Board) => setShown({ board, rows: await archive.board('standard', scenario, board), mine: await archive.mine() });
   return (
     <>
       <button
