@@ -53,7 +53,7 @@ test('자료: 내용과 버전이 어긋나지 않는다', () => {
   const pieces: Record<string, unknown> = {};
   for (const { scenario: s } of PLACEMENTS) pieces[`scenario ${s.id}@${s.version}`] = s; // 증원 (M3-16) will be left out here
   pieces[`combat@${COMBAT.version} numbers`] = COMBAT.numbers;
-  for (const g of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
+  for (const { profile: g } of GUNS) pieces[`guns ${g.id}@${g.version}`] = g; // 진지 변환 시간 (M3-20) will be left out here
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });
 

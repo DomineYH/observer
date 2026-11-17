@@ -196,6 +196,32 @@ test('F-30: 연습 시드의 기상 선택 — 화면', async ({ page }) => {
   await picker.selectOption({ label: '비' });
   await expect(prep).toContainText('기상 시정 8.0 km · 구름 100% · 바람 200° 5.2 m/s · 11.2°C · 습도 94% · 1009 hPa · 강수 2.4 mm/h');
   await expect(picker).toHaveValue('rain');
+
+  // 시나리오 고르기 (#145): the practice game shows its scenario; an item of the list opens that practice address as a new
+  // game at its first values (훈련, 맑음, no 관측소 후보), so the 비 chosen above is gone.
+  const card = page.getByRole('region', { name: '판 정보' });
+  await expect(card).toContainText('시나리오 보병 중대');
+  await card.getByRole('button', { name: '시나리오 고르기', exact: true }).click();
+  const list = card.getByRole('list', { name: '시나리오' });
+  await expect(list.getByRole('listitem')).toHaveCount(1); // the mock build has one 배치
+  await expect(list).toContainText('보병 중대 — 세 접근로. 보병 중대(-)와 장갑차, 박격포. 40분.');
+  await list.getByRole('link', { name: '보병 중대' }).click();
+  await expect(page).toHaveURL(/\/\?seed=20261106&scenario=base$/);
+  await expect(prep).toContainText('연습 20261106');
+  await expect(card).toContainText('시나리오 보병 중대');
+  await expect(picker).toHaveValue('clear');
+  await expect(prep).toContainText('고르지 않으면 계획된 1번 고지를 점령합니다.');
+  await expect(page.getByRole('button', { name: '훈련', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+  // From a daily game the button leads to practice: today's daily seed number becomes the practice seed.
+  await page.goto('/');
+  await expect(card).toContainText('시나리오 보병 중대');
+  const today = (await card.textContent())!.match(/일일 (\d{8})/)![1]!;
+  await card.getByRole('button', { name: '시나리오 고르기 · 연습' }).click();
+  await list.getByRole('link', { name: '보병 중대' }).click();
+  await expect(page).toHaveURL(new RegExp(`/\\?seed=${today}&scenario=base$`));
+  await expect(prep).toContainText(`연습 ${today} — 랭킹 제외`);
+  await expect(card).toContainText('시나리오 보병 중대');
 });
 
 test('F-30: 기상 변경은 판을 새로 만든다 — 화면', async ({ page }) => {
