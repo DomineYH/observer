@@ -18,6 +18,7 @@ const WEATHER = {
   pressureHpa: 1023,
   humidityPct: 48,
 };
+const SCENARIOS = [BASE, BASE_MUNGYEONG].map((p) => ({ id: p.scenario.id, name: p.briefing.name, blurb: p.briefing.blurb }));
 const PREP: PrepState = { phase: 'prep', op: BASE_SCENARIO.plannedOp, picked: false, reportDue: false };
 const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', terrain: TerrainData = flatTerrain({ grid: { letters, e0: 40000, n0: 30000 } }), placement = BASE) =>
   renderToStaticMarkup(
@@ -34,6 +35,7 @@ const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', 
       live={state}
       preset={seedKind === 'practice' ? 'fog' : null}
       onPreset={() => {}}
+      scenarios={SCENARIOS}
     />,
   );
 const text = (...args: Parameters<typeof markup>) => markup(...args).replace(/<[^>]*>/g, '');
@@ -70,6 +72,21 @@ test('F-22: 판 정보 카드 — 시드 줄과 기상 바꾸기를 담는다', 
   for (const html of [practice, daily]) for (const word of ['시드', '기상</b>', '기상 바꾸기']) expect(outside(html)).not.toContain(word);
   // Only before the start: the one-line panel after it has no card.
   expect(markup(20261106, 'daily', { ...PREP, phase: 'live' })).not.toContain('판 정보');
+});
+
+test('F-30: 연습의 시나리오 — 카드의 시나리오 줄', () => {
+  const card = (html: string) => html.match(/<section aria-label="판 정보"[^>]*>(.*?)<\/section>/)?.[1] ?? '';
+  // Every game shows its 배치's name; the button says where it leads, and the list stays folded until it is pressed.
+  const practice = card(markup(1234, 'practice'));
+  expect(practice).toContain(`<b>시나리오</b> ${BASE.briefing.name}`);
+  expect(practice).toMatch(/<button type="button" aria-expanded="false">시나리오 고르기<\/button>/);
+  const daily = card(markup(20261106, 'daily'));
+  expect(daily).toContain(`<b>시나리오</b> ${BASE.briefing.name}`);
+  expect(daily).toMatch(/<button type="button" aria-expanded="false">시나리오 고르기 · 연습<\/button>/);
+  for (const html of [practice, daily]) expect(html).not.toContain('scenario=');
+  // In the card, after the seed line and before the weather.
+  expect(practice.indexOf('<b>시드</b>')).toBeLessThan(practice.indexOf('<b>시나리오</b>'));
+  expect(practice.indexOf('<b>시나리오</b>')).toBeLessThan(practice.indexOf('<b>기상</b>'));
 });
 
 test('F-22: 작전 준비 화면', () => {
