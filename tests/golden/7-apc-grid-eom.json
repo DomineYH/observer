@@ -1,0 +1,211 @@
+{
+  "terrainHash": "b1ce12cc49b22d43",
+  "replay": {
+    "format": 1,
+    "simVersion": 17,
+    "seed": 20261106,
+    "seedKind": "practice",
+    "scenario": {
+      "id": "apc-mungyeong",
+      "version": 1
+    },
+    "guns": {
+      "id": "base",
+      "version": 1
+    },
+    "weather": {
+      "visibilityM": 24000,
+      "cloudPct": 15,
+      "windFromDeg": 285,
+      "windSpeedTenthMs": 26,
+      "tempTenthC": 94,
+      "precipTenthMmH": 0,
+      "pressureHpa": 1023,
+      "humidityPct": 48
+    },
+    "mode": "standard",
+    "stepMs": 50,
+    "terrain": {
+      "id": "mungyeong",
+      "version": 2
+    },
+    "inputs": [
+      {
+        "t": 0,
+        "a": "start",
+        "v": [
+          6340,
+          660
+        ]
+      },
+      {
+        "t": 310,
+        "a": "call",
+        "v": [
+          "adjust"
+        ]
+      },
+      {
+        "t": 586,
+        "a": "loc",
+        "v": [
+          "grid",
+          4579,
+          3629
+        ]
+      },
+      {
+        "t": 841,
+        "a": "desc",
+        "v": [
+          3,
+          "none",
+          "ready",
+          0,
+          "unknown"
+        ]
+      },
+      {
+        "t": 2512,
+        "a": "corr",
+        "v": [
+          6247,
+          "left",
+          0,
+          "drop",
+          0,
+          "ffe"
+        ]
+      },
+      {
+        "t": 4262,
+        "a": "eom",
+        "v": [
+          "neutralized"
+        ]
+      }
+    ],
+    "totalTicks": 4662
+  },
+  "record": {
+    "ticks": 4662,
+    "seed": 20261106,
+    "seedKind": "practice",
+    "cleared": false,
+    "clearTick": null,
+    "roundsTotal": 19,
+    "missions": 1,
+    "adjustRounds": 1,
+    "firstErrorAvg": 163,
+    "directionErrorAvg": 28,
+    "reportAccuracyPct": 0,
+    "roundsPerUnit": null,
+    "neutralized": 0,
+    "combatUnits": 4,
+    "earlyDefeats": 0,
+    "friendlyHits": 0,
+    "friendlyLosses": 1,
+    "dangerCloseMissed": 0,
+    "observerLost": false,
+    "postMoves": 0,
+    "compromised": false,
+    "score": -45,
+    "mode": "standard"
+  },
+  "ignored": 0,
+  "chain": "786fb8051d1ccc90",
+  "checkpoints": [
+    {
+      "tick": 200,
+      "hash": "32c950cd9afc9f24"
+    },
+    {
+      "tick": 400,
+      "hash": "9924c8a65c76d137"
+    },
+    {
+      "tick": 600,
+      "hash": "9e09c9cb27f7e73a"
+    },
+    {
+      "tick": 800,
+      "hash": "90bf60fa42ecbbb7"
+    },
+    {
+      "tick": 1000,
+      "hash": "33ac0fb753075482"
+    },
+    {
+      "tick": 1200,
+      "hash": "eb4de776a81675ff"
+    },
+    {
+      "tick": 1400,
+      "hash": "9f63aa6d2910c07c"
+    },
+    {
+      "tick": 1600,
+      "hash": "72a24f92c0c56927"
+    },
+    {
+      "tick": 1800,
+      "hash": "8761b46b9f4c2eaa"
+    },
+    {
+      "tick": 2000,
+      "hash": "4b7f1dfefec3d78f"
+    },
+    {
+      "tick": 2200,
+      "hash": "5bbd5a265abeb9fb"
+    },
+    {
+      "tick": 2400,
+      "hash": "cc9ae2ca10d9c1df"
+    },
+    {
+      "tick": 2600,
+      "hash": "fcfc9061e44ec7f4"
+    },
+    {
+      "tick": 2800,
+      "hash": "0742a3f489a7e2f5"
+    },
+    {
+      "tick": 3000,
+      "hash": "66041ba8c1947e61"
+    },
+    {
+      "tick": 3200,
+      "hash": "fd3e8b3088ee3e99"
+    },
+    {
+      "tick": 3400,
+      "hash": "9dcfd984281c47c5"
+    },
+    {
+      "tick": 3600,
+      "hash": "5a82b22939c88e38"
+    },
+    {
+      "tick": 3800,
+      "hash": "9f3ab6c94214259c"
+    },
+    {
+      "tick": 4000,
+      "hash": "8faa97a4094653f9"
+    },
+    {
+      "tick": 4200,
+      "hash": "a7f263c96456d5a8"
+    },
+    {
+      "tick": 4400,
+      "hash": "29de0d94472cb4f1"
+    },
+    {
+      "tick": 4600,
+      "hash": "776b3176429885db"
+    }
+  ]
+}
