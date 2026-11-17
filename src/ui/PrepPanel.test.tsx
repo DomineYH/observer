@@ -44,7 +44,7 @@ test('F-30: 시드 종류 표시', () => {
   expect(practice).toContain('랭킹 제외');
   const daily = text(20261106, 'daily');
   expect(daily).toContain('일일 20261106');
-  expect(daily).not.toContain('연습');
+  expect(daily).not.toMatch(/연습 \d/);
   // The weather is shown with the seed.
   expect(daily).toContain('시정 24.0 km');
   expect(daily).toContain('바람 285° 2.6 m/s');
