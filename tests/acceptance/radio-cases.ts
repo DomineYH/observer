@@ -96,6 +96,8 @@ const SHAPES: Record<RadioKind, Axis[][]> = {
   shift: [[int('targetNumber'), int('direction'), ...CORRECTIONS, TARGET, int('rounds'), en('dangerClose', FLAG)]],
   move_notice: [[]],
   position_report: [[int('easting'), int('northing')]],
+  displacing: [[]],
+  displaced: [[]],
 };
 
 /** Full product of the axes, with the integer of axis `vary` at each boundary value and every other integer representative. */
@@ -211,4 +213,7 @@ export const SNAPSHOT_CASES: RadioUtterance[] = [
   // 실전의 복창 (M3-14): 기러기's 정정, and the observer's 사격지휘통보 readback
   { ...fdcWait, kind: 'mto_correction', slots: { fuze: 'vt', rounds: 2, control: 'ready', targetNumber: 1002 } },
   { ...obsWait, kind: 'mto', slots: { fuze: 'vt', rounds: 1, control: 'amc', targetNumber: 1001 } },
+  // 실전의 진지 변환 (M3-20): 기러기's two words
+  { ...fdcWait, kind: 'displacing' },
+  { ...fdcNone, kind: 'displaced' },
 ];

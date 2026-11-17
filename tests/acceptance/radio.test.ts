@@ -70,6 +70,8 @@ test('F-08: 출처 표시와 검수 필요', () => {
     'pattern.radio_check_reply',
     'pattern.move_notice',
     'pattern.position_report',
+    'pattern.displacing',
+    'pattern.displaced',
     'pattern.mto',
     'pattern.danger_close_applied',
     'pattern.danger_close_adjust_first',
