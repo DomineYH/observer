@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type ReplayData, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, PLACEMENTS } from '@content/lookup';
 import { BASE } from '@content/scenarios/base';
@@ -15,6 +16,7 @@ import { landOf, REAL_TERRAIN_FILE } from './land';
 import { SCRIPTS } from './scripts';
 
 const FIVE = '5-real-laser-move.json';
+const COMBAT_FILE = '8-combat.json';
 
 // M3 keeps these seven as they are (#126): name → SHA-256 of the file parsed and written again (values count, line
 // endings and indentation do not). A SIM_VERSION rise after the M3 gate rewrites this table in the same PR.
@@ -269,6 +271,52 @@ describe('골든', () => {
     expect(results.k55).toEqual(results.kh179); // KH179 and K55: the same ballistics, the same game
   }, 60000); // five replays of 3 400 ticks each and the mock land
 
+  test('골든: 실전 각본', async () => {
+    const { terrainHash: header, replay: data, ...expected } = readGolden(COMBAT_FILE);
+    expect(validateReplay(data).ok).toBe(true);
+    expect(expected.ignored).toBe(0); // every scripted input was taken: no lase past the 레이저 한도 is in the record
+    expect(data).toMatchObject({ mode: 'combat', combatDataVersion: COMBAT.version, seedKind: 'daily', seed: 20261106 });
+    expect(data).toMatchObject({ scenario: { id: BASE_SCENARIO.id }, guns: { id: BASE_GUNS.id } });
+    expect(data.terrain).toBeUndefined(); // the mock land
+    expect(data.totalTicks).toBeLessThanOrEqual(18000);
+    const { terrain, scenario, guns, combat } = await landOf(data);
+    expect(terrainHash(terrain)).toBe(header);
+    const result = replay(data, terrain, scenario, guns, combat);
+    expect(result).toEqual(expected);
+    expect(result.record.mode).toBe('combat');
+    expect(Object.keys(result.record)).toHaveLength(23);
+    // The script does what it says, through the public interface.
+    const sim = createSim({ ...data, scenario, guns, terrain, combat });
+    const events: SimEvent[] = [];
+    for (let t = 0; t < data.totalTicks; t++) events.push(...sim.step(data.inputs.filter((i) => i.t === t)).events);
+    const said = (speaker: string, kind: string) => events.filter((e) => e.type === 'radio' && e.utterance.speaker === speaker && e.utterance.kind === kind);
+    const notes = (what: string) => events.filter((e): e is Extract<SimEvent, { type: 'post' }> => e.type === 'post' && e.what === what);
+    // 증원: the two reinforcement units stand past the scenario's own and have set off.
+    const own = scenario.units.length;
+    expect(sim.state.platoons).toHaveLength(own + scenario.reinforcements.length);
+    expect(sim.state.platoons.slice(own).every((p) => p.state !== 'wait')).toBe(true);
+    // 적 포병: the exposed post (the planned one) drew the barrage; the 관측반 had walked off and lived.
+    const op = scenario.plannedOp;
+    const barrage = notes('barrage') as unknown as { x: number; y: number }[];
+    expect(barrage).toHaveLength(combat!.numbers.barrage.rounds);
+    expect(barrage.every((b) => Math.hypot(b.x - op.x, b.y - op.y) < 150)).toBe(true);
+    expect(sim.state.observerLost).toBe(false);
+    // 진지 변환: once, past the 체류 한도.
+    expect(said('fdc', 'displacing')).toHaveLength(1);
+    // 복창: all three kinds taken; one wrong 사격지휘통보 readback drew 기러기's 정정.
+    for (const kind of ['mto', 'shot', 'rounds_complete']) expect(said('observer', kind).length, kind).toBeGreaterThan(0);
+    const rbs = data.inputs.filter((i) => i.a === 'readback');
+    expect(new Set(rbs.map((i) => i.v![0]))).toEqual(new Set(['mto', 'shot', 'rounds_complete']));
+    expect(said('fdc', 'mto_correction')).toHaveLength(1);
+    // 레이저 한도: all five used; after the fifth a mission is opened by grid and the game goes on with no lase.
+    expect(sim.state.combat).toEqual({ lasesUsed: combat!.numbers.laserLimit });
+    const lases = data.inputs.flatMap((i, k) => (i.a === 'lase' ? [k] : []));
+    expect(lases).toHaveLength(combat!.numbers.laserLimit);
+    expect(data.inputs.slice(lases.at(-1)! + 1).some((i) => i.a === 'loc' && i.v![0] === 'grid')).toBe(true);
+    const fifth = data.inputs[lases.at(-1)!]!.t;
+    expect(events.some((e) => e.type === 'radio' && e.utterance.speaker === 'observer' && e.utterance.kind === 'location' && e.utterance.slots.method === 'grid' && e.tick > fifth)).toBe(true);
+  }, 60000); // two runs of 18 000 ticks on the mock land
+
   test('골든: 다시 만드는 조건', () => {
     const v = (simVersion: number, terrain: number, scenario: number, ids: { terrain: string; scenario: string; guns?: string } = { terrain: 'mock', scenario: 'base' }, guns = 1): Versions => ({
       simVersion,
@@ -312,11 +360,11 @@ describe('골든', () => {
     const mock = { id: 'mock', version: 1 };
     const now: Versions = { simVersion: SIM_VERSION, terrain: mock, scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version }, guns: { id: 'base', version: 1 } };
     const mocks = SCRIPTS.filter((s) => !s.replay.terrain);
-    for (const { file, replay: d } of mocks) expect(currentHeader(d, { ...now, guns: d.guns }), file).toEqual(d); // versions unchanged: as is
+    for (const { file, replay: d } of mocks) expect(currentHeader(d, { ...now, guns: d.guns, combat: d.combatDataVersion }), file).toEqual(d); // versions unchanged: as is
     // A version rise: ④ pins simVersion 17 and base@1, every mock script leaves terrain out (mock).
     const risen: Versions = { simVersion: 99, terrain: mock, scenario: { id: 'base', version: 9 }, guns: { id: 'base', version: 1 } };
     for (const { file, replay: d } of mocks) {
-      const h = currentHeader(d, { ...risen, guns: d.guns });
+      const h = currentHeader(d, { ...risen, guns: d.guns, combat: d.combatDataVersion });
       expect(h, file).toEqual({ ...d, simVersion: 99, scenario: { id: 'base', version: 9 } });
       expect(Object.hasOwn(h, 'terrain'), file).toBe(false); // mock is never written
       expect(validateReplay(h).ok, file).toBe(true);

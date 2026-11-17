@@ -1,4 +1,5 @@
 {
+  "combat.spec.ts › 스모크: 실전 — 실전으로 개시하고 복창 한 번 뒤 시간이 흐른다": 17,
   "game.spec.ts › 스모크: 훈련 모드 한 판 완주": 120,
   "keyboard.spec.ts › B7: 단축키는 단추와 같은 입력": 138,
   "keyboard.spec.ts › B7: 조합 키에서는 단축키 무시": 132,
