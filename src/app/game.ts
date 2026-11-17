@@ -1,6 +1,6 @@
 // One game: its 생성 인자, the simulation and the session that records its accepted inputs. A weather change in a
 // practice seed's 작전 준비 replaces the whole game (spec: 재생 자료 starts again), keeping the 관측소 후보 and the mode (실전 by its 생성 인자).
-import { createSim, type Input, type Mode, type Sim, type SimInit } from '@sim';
+import { createSim, type CombatData, type Input, type Mode, type Sim, type SimInit } from '@sim';
 import { createSession } from './session';
 
 export interface Game {
@@ -22,4 +22,14 @@ export function newGame(init: SimInit, carry?: Game): Game {
   // 실전 is a 생성 인자 (init.mode), never an input: nothing is put in again into or out of a combat game (ADR 0016).
   if (mode && mode !== init.mode && mode !== 'combat' && init.mode !== 'combat') session.send({ a: 'mode', v: [mode] });
   return { init, sim, session };
+}
+
+/** 모드 고르기 (#115 Q1): 실전 is a 생성 인자, so choosing it or leaving it in 작전 준비 makes a new game (as a weather change
+ * does). null when the choice is no new game: 훈련↔표준 (the mode input), the mode in use, or after 작전 개시 (locked). */
+export function remade(game: Game, m: Mode, combat: CombatData): Game | null {
+  const s = game.sim.state;
+  if (s.phase !== 'prep' || m === s.mode || (m !== 'combat' && s.mode !== 'combat')) return null;
+  const init: SimInit = { ...game.init, mode: m, combat };
+  if (m !== 'combat') delete init.combat; // 실전 자료 goes with mode combat only
+  return newGame(init, game);
 }

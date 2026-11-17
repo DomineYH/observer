@@ -34,6 +34,8 @@ const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', 
       live={state}
       preset={seedKind === 'practice' ? 'fog' : null}
       onPreset={() => {}}
+      mode="training"
+      onMode={() => {}}
     />,
   );
 const text = (...args: Parameters<typeof markup>) => markup(...args).replace(/<[^>]*>/g, '');
