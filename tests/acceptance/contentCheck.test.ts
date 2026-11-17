@@ -4,8 +4,10 @@ import { isDeepStrictEqual } from 'node:util';
 import { expect, test } from 'vitest';
 import { contentCheck, type Finding } from '@content/check';
 import { COMBAT } from '@content/combat';
+import { BASE_GUNS, type Gun } from '@content/guns';
 import { GUNS, PLACEMENTS } from '@content/lookup';
 import type { Placement } from '@content/placement';
+import { farthestM, inRange } from '@content/range';
 import { BASE } from '@content/scenarios/base';
 import type { CombatData } from '@sim';
 
@@ -134,11 +136,86 @@ const roundTrips = (x: unknown) => isDeepStrictEqual(JSON.parse(JSON.stringify(x
 
 test('시나리오: JSON으로 옮겼다 되돌려도 같다', () => {
   expect(PLACEMENTS.filter((p) => !roundTrips(p)).map((p) => p.scenario.id)).toEqual([]);
-  expect(GUNS.filter((g) => !roundTrips(g)).map((g) => g.id)).toEqual([]);
+  expect(GUNS.filter((g) => !roundTrips(g)).map((g) => g.profile.id)).toEqual([]);
   expect(roundTrips(COMBAT)).toBe(true);
   // Numbers that are not finite are caught, in each of the three.
   expect(roundTrips(broken((p) => (p.scenario.nais[0].r = NaN)))).toBe(false);
   expect(roundTrips(broken((p) => (p.scenario.routes.A[1].x = Infinity)))).toBe(false);
-  expect(roundTrips({ ...GUNS[0], maxRangeM: -Infinity })).toBe(false);
+  expect(roundTrips({ ...GUNS[0]!.profile, maxRangeM: -Infinity })).toBe(false);
   expect(roundTrips({ ...COMBAT, numbers: { ...COMBAT.numbers, hitRadiusM: NaN } })).toBe(false);
+});
+
+test('포 프로파일: 내용 검증', () => {
+  const guns = (change: (g: Raw[]) => unknown): Gun[] => {
+    const list: Raw = structuredClone(GUNS);
+    change(list);
+    return list;
+  };
+  const gunCheck = (list: readonly Gun[]) => contentCheck({ placements: [], guns: list, combat: COMBAT });
+  expect(gunCheck(GUNS)).toEqual([]); // the five pass as they are
+  const bad = (rule: number, where: string, id = 'kh178'): Finding => ({ id, rule: `포 프로파일 ${rule}`, at: where });
+  const k = 1; // kh178
+  const cases: [Gun[], Finding[]][] = [
+    // 1. 식별자의 꼴과 버전은 시나리오와 같고 겹치지 않는다. 첫 항목이 기본 포 base다
+    [guns((l) => (l[k].profile.id = 'KH178')), [bad(1, 'id', 'KH178')]],
+    [guns((l) => (l[k].profile.id = '178')), [bad(1, 'id', '178')]],
+    [guns((l) => (l[k].profile.id = 'base')), [bad(1, 'id', 'base')]],
+    [guns((l) => (l[k].profile.version = 0)), [bad(1, 'version')]],
+    [guns((l) => (l[k].profile.version = 1.5)), [bad(1, 'version')]],
+    [guns((l) => l.reverse()), [bad(1, 'id', 'k9')]],
+    [guns((l) => l.splice(0, 1)), [bad(1, 'id')]],
+    // 2. 방렬이 1문 이상
+    [guns((l) => (l[k].profile.sheaf = [])), [bad(2, 'sheaf')]],
+    // 3. 효력사 간격, 살상 반경 일곱 값, 최대 사거리는 양수
+    [guns((l) => (l[k].profile.ffe.intervalS = 0)), [bad(3, 'ffe.intervalS')]],
+    [guns((l) => (l[k].profile.maxRangeM = -1)), [bad(3, 'maxRangeM')]],
+    ...['man.quick.stand', 'man.quick.prone', 'man.vt.stand', 'man.vt.prone', 'vehicle', 'tube.quick', 'tube.vt'].map((path): [Gun[], Finding[]] => [
+      guns((l) => {
+        const keys = path.split('.');
+        const last = keys.pop()!;
+        keys.reduce((o, key) => o[key], l[k].profile.lethalRadiusM)[last] = 0;
+      }),
+      [bad(3, `lethalRadiusM.${path}`)],
+    ]),
+    [guns((l) => (l[k].profile.lethalRadiusM.vehicle = NaN)), [bad(3, 'lethalRadiusM.vehicle')]],
+    // 4. 비과시간·공산오차의 계수 여섯과 효력사 흔들림은 0 이상
+    ...['tof.baseS', 'tof.sPerKm', 'peRange.baseM', 'peRange.mPerKm', 'peDeflection.baseM', 'peDeflection.mPerKm', 'ffe.jitterS'].map((path): [Gun[], Finding[]] => {
+      const [a, b] = path.split('.') as [string, string];
+      return [guns((l) => (l[k].profile[a][b] = -0.1)), [bad(4, path)]];
+    }),
+    [guns((l) => ((l[k].profile.tof.baseS = 0), (l[k].profile.peRange.mPerKm = 0), (l[k].profile.ffe.jitterS = 0))), []], // 0 is allowed
+    // 5. 이름과 소개 글이 빈 글이 아니다
+    [guns((l) => (l[k].name = ' ')), [bad(5, 'name')]],
+    [guns((l) => (l[k].blurb = '')), [bad(5, 'blurb')]],
+  ];
+  cases.forEach(([list, findings], i) => expect(gunCheck(list), `case ${i}`).toEqual(findings));
+});
+
+test('포 프로파일: 사거리 검사 — 모든 시나리오는 기본 포로 통과한다', () => {
+  // #119's 사거리 검사로 본 지금의 내용: base 12.80 km (NAI 3's edge), base-mungyeong 12.20 km (route C's first point).
+  expect(PLACEMENTS.slice(0, 2).map((p) => Math.round(farthestM(p.scenario) / 10) / 100)).toEqual([12.8, 12.2]);
+  for (const p of PLACEMENTS) for (const g of GUNS) expect(inRange(p.scenario, g.profile), `${p.scenario.id} ${g.profile.id}`).toBe(true);
+  expect(check(PLACEMENTS)).toEqual([]); // rule 12 holds for every 배치
+
+  // Each kind of point counts: moved out until it alone is 23.6 km from the battery, it fails the base gun's 24 km.
+  const { battery } = BASE.scenario;
+  const far = { x: battery.x, y: battery.y + 23600 };
+  const cases: [string, (p: Raw) => unknown][] = [
+    ['route point', (p) => (p.scenario.routes.B[1] = far)],
+    ['NAI edge', (p) => (p.scenario.nais[0] = { ...p.scenario.nais[0], x: far.x, y: far.y - 100, r: 100 })],
+    ['mortar box corner', (p) => ((p.scenario.nais[2] = { ...p.scenario.nais[2], x: far.x, y: far.y - 1000, r: 10 }), (p.scenario.units[4].spread = { x: 10, y: 2000 }))],
+    ['friendly position', (p) => (p.scenario.friends[0] = { x: far.x, y: battery.y - 23600 })],
+    ['증원 mortar box corner', (p) => ((p.scenario.nais[2] = { ...p.scenario.nais[2], x: far.x, y: far.y - 1000, r: 10 }), p.scenario.reinforcements.push({ ...p.scenario.units[4], spread: { x: 10, y: 2000 } }))],
+  ];
+  for (const [what, change] of cases) {
+    const p = broken(change);
+    expect(farthestM(p.scenario), what).toBeCloseTo(23600, 0); // a box corner is 5 m off the line
+    expect(inRange(p.scenario, BASE_GUNS), what).toBe(false);
+    expect(check([p]).filter((f) => f.rule === '시나리오 12'), what).toEqual([at('시나리오 12', 'battery')]);
+  }
+  // The 500 m margin: 23.5 km passes, a metre more fails.
+  expect(inRange(broken((p) => (p.scenario.routes.B[1] = { x: battery.x, y: battery.y + 23500 })).scenario, BASE_GUNS)).toBe(true);
+  expect(inRange(broken((p) => (p.scenario.routes.B[1] = { x: battery.x, y: battery.y + 23501 })).scenario, BASE_GUNS)).toBe(false);
+  // The 105mm's 14.7 km against today's base: 12.80 + 0.5 km is inside.
+  expect(inRange(BASE.scenario, { ...BASE_GUNS, maxRangeM: 13290 })).toBe(false);
 });

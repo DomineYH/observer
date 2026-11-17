@@ -34,6 +34,22 @@ const MUNGYEONG = (() => {
   return { scenario, terrain, op, laseAz: Math.round(atan2(nai.x - op.x, nai.y - op.y) * MIL * 10), moveTo, pos: [pos.e, pos.n] };
 })();
 
+// 포 넷 (#126): one script, the header's `guns` alone differs. ①'s 82 mm mortar section fired for effect straight from the
+// call (접근신관), through 임무끝. Each input comes about 200 ticks after its stage opens on the slowest gun (probe,
+// SIM_VERSION 17: 효과 관측 from 2789 on kh179 and k55, 2273 on k9).
+const FOUR_GUNS: ReplayData = {
+  ...HEAD,
+  seedKind: 'practice',
+  inputs: [
+    START,
+    { t: 200, a: 'call', v: ['ffe'] },
+    { t: 400, a: 'loc', v: ['grid', 4567, 3752] },
+    { t: 600, a: 'desc', v: [3, 'vt', 'ready', 0, 'mortar', 'halted', 'none'] },
+    { t: 3000, a: 'eom', v: ['neutralized'] },
+  ],
+  totalTicks: 3400,
+};
+
 // 각본 입력: the source each golden file is generated from by `npm run golden:update`.
 export const SCRIPTS: { file: string; replay: ReplayData }[] = [
   {
@@ -357,4 +373,5 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       terrain: { id: 'mungyeong', version: 2 },
     },
   },
+  ...['kh178', 'kh179', 'k55', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
 ];

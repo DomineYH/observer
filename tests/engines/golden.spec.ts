@@ -12,6 +12,10 @@ for (const [file, name, long] of [
   ['4-desktop-play.json', '골든: ④ 데스크톱 한 판 (실행 환경)', true],
   ['5-real-laser-move.json', '골든: ⑤ 실제 지형의 레이저·효력사·이동 (실행 환경)', false],
   ['6-real-play.json', '골든: ⑥ 실제 지형의 사람 플레이 (실행 환경)', true],
+  ['guns-kh178.json', '골든: 포 넷의 같은 각본 — KH178 (실행 환경)', false],
+  ['guns-kh179.json', '골든: 포 넷의 같은 각본 — KH179 (실행 환경)', false],
+  ['guns-k55.json', '골든: 포 넷의 같은 각본 — K55 (실행 환경)', false],
+  ['guns-k9.json', '골든: 포 넷의 같은 각본 — K9 (실행 환경)', false],
 ] as const) {
   test(name, async ({ page }) => {
     if (long) test.setTimeout(LONG.test);
@@ -29,7 +33,7 @@ for (const [file, name, long] of [
 
 // Every golden file has its test above.
 test('골든: 모든 골든 기록이 실행 환경 검사에 걸린다', () => {
-  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json']);
+  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json', 'guns-k55.json', 'guns-k9.json', 'guns-kh178.json', 'guns-kh179.json']);
 });
 
 // The page generates each mock golden record's terrain in this browser; its hash must equal the golden header. The seed

@@ -1,5 +1,7 @@
 import type { CombatData, GunProfile, Point, UnitDef } from '@sim';
+import type { Gun } from './guns';
 import type { Placement } from './placement';
+import { inRange } from './range';
 
 /** 어긋난 곳: whose datum (식별자, or `combat` for the 실전 자료), which content rule, and where in it. */
 export interface Finding {
@@ -21,8 +23,9 @@ function realDay(d: number): boolean {
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === day;
 }
 
-/** 시나리오와 배치 rules 1–11 · 13–16 (#116, #124) of one 배치; `first` = the first 배치 of its 전장. */
-function placementFindings(p: Placement, seen: Set<string>, first: boolean): Finding[] {
+/** 시나리오와 배치 rules 1–16 (#116, #124) of one 배치; `first` = the first 배치 of its 전장, `base` the 기본 포 (none when
+ * the 포 프로파일 목록 lacks it, which 포 프로파일 1 reports). */
+function placementFindings(p: Placement, seen: Set<string>, first: boolean, base: GunProfile | undefined): Finding[] {
   const { scenario: s, briefing: b } = p;
   const out: Finding[] = [];
   const bad = (rule: number, at: string) => out.push({ id: s.id, rule: `시나리오 ${rule}`, at });
@@ -69,6 +72,8 @@ function placementFindings(p: Placement, seen: Set<string>, first: boolean): Fin
   if (!s.units.some((u) => u.type !== 'recon')) bad(9, 'units');
   if (!s.reinforcements.some((u) => u.type !== 'recon')) bad(10, 'reinforcements');
 
+  if (base && !inRange(s, base)) bad(12, 'battery');
+
   if (!count(s.timeLimitS)) bad(11, 'timeLimitS');
   const second = (t: number) => Number.isInteger(t) && t >= 0 && t < s.timeLimitS;
   each((u, at) => {
@@ -85,6 +90,32 @@ function placementFindings(p: Placement, seen: Set<string>, first: boolean): Fin
 
   if (p.dailyFrom !== undefined && !realDay(p.dailyFrom)) bad(15, 'dailyFrom');
   if (p.dailyFrom !== undefined && first) bad(16, 'dailyFrom');
+  return out;
+}
+
+/** 포 프로파일 rules 1–5 (#116); 진지 변환 시간 joins rule 3 with M3-20. */
+function gunFindings(guns: readonly Gun[]): Finding[] {
+  const out: Finding[] = [];
+  const seen = new Set<string>();
+  guns.forEach(({ profile: g, name, blurb: text }, i) => {
+    const bad = (rule: number, at: string) => out.push({ id: g.id, rule: `포 프로파일 ${rule}`, at });
+    if (!ID.test(g.id) || seen.has(g.id) || (i === 0 && g.id !== 'base')) bad(1, 'id');
+    seen.add(g.id);
+    if (!count(g.version)) bad(1, 'version');
+    if (g.sheaf.length === 0) bad(2, 'sheaf');
+    const { man, vehicle, tube } = g.lethalRadiusM;
+    const positive = { 'ffe.intervalS': g.ffe.intervalS, maxRangeM: g.maxRangeM, 'lethalRadiusM.man.quick.stand': man.quick.stand,
+      'lethalRadiusM.man.quick.prone': man.quick.prone, 'lethalRadiusM.man.vt.stand': man.vt.stand, 'lethalRadiusM.man.vt.prone': man.vt.prone,
+      'lethalRadiusM.vehicle': vehicle, 'lethalRadiusM.tube.quick': tube.quick, 'lethalRadiusM.tube.vt': tube.vt };
+    for (const [at, v] of Object.entries(positive)) if (!(v > 0)) bad(3, at);
+    const { tof, peRange: r, peDeflection: d } = g;
+    const nonNegative = { 'tof.baseS': tof.baseS, 'tof.sPerKm': tof.sPerKm, 'peRange.baseM': r.baseM, 'peRange.mPerKm': r.mPerKm,
+      'peDeflection.baseM': d.baseM, 'peDeflection.mPerKm': d.mPerKm, 'ffe.jitterS': g.ffe.jitterS };
+    for (const [at, v] of Object.entries(nonNegative)) if (!(v >= 0)) bad(4, at);
+    if (blank(name)) bad(5, 'name');
+    if (blank(text)) bad(5, 'blurb');
+  });
+  if (guns.length === 0) out.push({ id: 'base', rule: '포 프로파일 1', at: 'id' });
   return out;
 }
 
@@ -107,15 +138,15 @@ function combatFindings(c: CombatData): Finding[] {
 }
 
 /** 내용 검증 (ADR 0017): the 어긋난 곳 of the 배치 목록, the 포 프로파일 목록 and the 실전 수치, none when all keep the
- * content rules. Run by the tests only; the app never checks its content. The 포 프로파일 rules and rule 12 (M3-12) arrive
- * with their data. */
-export function contentCheck(content: { placements: readonly Placement[]; guns: readonly GunProfile[]; combat: CombatData }): Finding[] {
+ * content rules. Run by the tests only; the app never checks its content. */
+export function contentCheck(content: { placements: readonly Placement[]; guns: readonly Gun[]; combat: CombatData }): Finding[] {
+  const base = content.guns.find((g) => g.profile.id === 'base')?.profile;
   const seen = new Set<string>();
   const fields = new Set<string>();
   const out = content.placements.flatMap((p) => {
     const first = !fields.has(p.terrain.id);
     fields.add(p.terrain.id);
-    return placementFindings(p, seen, first);
+    return placementFindings(p, seen, first, base);
   });
-  return [...out, ...combatFindings(content.combat)];
+  return [...out, ...gunFindings(content.guns), ...combatFindings(content.combat)];
 }
