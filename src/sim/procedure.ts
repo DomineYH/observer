@@ -17,7 +17,7 @@ import { EFFECTS, type Corrections, type CorrectionSlots, type DescriptionSlots,
 import { next, type Stream } from './rng';
 import { corrections, corrSlots, descSlots, targetSlots } from './slots';
 import { heightAt, type Point, type TerrainData } from './terrain';
-import type { Flight, GunProfile, Mission, PostNote, SimState } from './types';
+import type { CombatNumbers, Flight, GunProfile, Mission, PostNote, SimState } from './types';
 
 export type Say = (u: RadioUtterance) => void;
 
@@ -37,6 +37,7 @@ export interface Ctx {
   landed: (x: number, y: number, fuze: Fuze) => void;
   note: (n: PostNote) => void;
   friends: readonly Point[]; // 아군 진지, for 위험근접
+  combat?: CombatNumbers; // 실전 수치, in a combat game only
 }
 
 const TICKS_PER_S = 20;
@@ -84,6 +85,7 @@ const newMission = (s: SimState, warning: Warning, bias: Point): Mission => ({
   flights: [], impacts: [], kills: s.platoons.map(() => null), target: -1, firstError: null, directionError: null,
   rangeCorrections: [], corrections: 0, report: null, truth: null, truthPct: -1, score: 0, dangerClose: false,
   dangerMissed: false, shift: null,
+  readback: s.mode === 'combat' ? { mto: false, shot: false, rounds_complete: false, correcting: false } : null,
 });
 
 /** Applies `call`, `loc`, `desc`, `fire`, `corr`, `repeat`, `eom` or `shift` if the stage takes it; false means ignored and nothing changed. `v` is valid for
@@ -95,6 +97,9 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   // 사격요구 waits for a set-up post that 기러기 knows (or was told to keep): moving, setting up, or before the
   // 위치 보고 or its skipping, neither a call nor a 전이 goes (demo 713; its ui hides the 전이 then).
   if ((a === 'call' || a === 'shift') && (s.post.state !== 'ready' || s.reportDue)) return false;
+  // 실전: any 밀린 복창 holds the mission's 준비 쏴 · 수정 · 재효력사 · 임무끝 (ADR 0018).
+  const r = m?.readback;
+  if ((a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom') && r && (r.mto || r.shot || r.rounds_complete)) return false;
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const b = drawBias(ctx.bal);
@@ -235,6 +240,7 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
     case 'mto':
       m.mto = decideMto(s, m.description!, fdc);
       say({ speaker: 'fdc', ending: 'wait', kind: 'mto', slots: { ...m.mto } });
+      if (m.readback) m.readback.mto = true;
       break;
     case 'ready': // 사격준비 끝: the fuze is named only for 효력사
       say({ speaker: 'fdc', ending: 'none', kind: 'ready', slots: m.phase === 'ffe' ? { fuze: m.mto!.fuze } : {} });
@@ -248,7 +254,8 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
       const tof = tofSec(ctx.guns, Math.sqrt(dx * dx + dy * dy));
       say({ speaker: 'fdc', ending: 'over', kind: 'shot' });
       s.radio.stage = 'flight';
-      after(s, 1.2, 'shot_readback');
+      if (m.readback) m.readback.shot = true; // 실전: the player's readback is that utterance
+      else after(s, 1.2, 'shot_readback');
       if (m.phase === 'adjust') { // 수정탄: the centre gun, one round, quick fuze
         const at = s.tick + secTicks(tof);
         m.flights = [{ ...fall(aim, ctx.battery, m.bias, ctx.bal, ctx.guns), at, fuze: 'quick' }];
@@ -293,7 +300,8 @@ export function runAct(s: SimState, ctx: Ctx, act: Act): void {
     }
     case 'rounds_complete':
       say({ speaker: 'fdc', ending: 'over', kind: 'rounds_complete' });
-      after(s, 1.2, 'rounds_complete_readback');
+      if (m.readback) m.readback.rounds_complete = true;
+      else after(s, 1.2, 'rounds_complete_readback');
       break;
     case 'rounds_complete_readback': // 마감탄 떳다, 잠깐대기: the observer's readback goes out by itself
       say({ speaker: 'observer', ending: 'wait', kind: 'rounds_complete' });
