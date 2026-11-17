@@ -21,7 +21,9 @@ export function selectBackend(value: string | undefined): Backend {
 // | ----------- | ------------------------------------------ | ----------------------------------------------------- |
 // | 지형 원천   | mockTerrain: the seed makes the land       | realTerrain(MUNGYEONG): the 문경 지형 파일, any seed, |
 // |             |                                            | checked by the sim's 지형 해시                        |
-// | 배치        | 배치 목록의 첫 mock 배치 (base@1)          | 배치 목록의 첫 mungyeong 배치 (base-mungyeong@2)      |
+// | 배치        | a mock 배치: placementFor (seed.ts) picks  | a mungyeong 배치, picked the same way; 기본 시나리오  |
+// |             | the 일일 시나리오 or ?scenario=; 기본 시나리오 | base-mungyeong@2                                      |
+// |             | base@1                                     |                                                       |
 // | 기상        | mockWeather                                | mockWeather                                           |
 // | 계정        | mockAccount (this browser's localStorage)  | mockAccount (this browser's localStorage)             |
 // | 기록 보관소 | mockArchive (this browser's localStorage)  | mockArchive (this browser's localStorage)             |
