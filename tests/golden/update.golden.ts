@@ -17,7 +17,7 @@ test('golden:update', async () => {
     // By id at the code's version, not the script's: ④ and ⑥ pin theirs and currentHeader rewrites them (ADR 0009).
     const scenario = PLACEMENTS.map((p) => p.scenario).find((s) => s.id === script.scenario.id);
     if (!scenario) throw new Error(`${file}: scenario ${script.scenario.id}: unknown id`);
-    const guns = GUNS.find((g) => g.id === script.guns.id);
+    const guns = GUNS.map((g) => g.profile).find((g) => g.id === script.guns.id);
     if (!guns) throw new Error(`${file}: guns ${script.guns.id}: unknown id`);
     const combat = script.mode === 'combat' ? COMBAT : undefined; // at the code's 실전 자료 판, as the others
     const terrain = await terrainOf(script); // terrain version from the land's data

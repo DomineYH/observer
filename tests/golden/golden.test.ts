@@ -211,6 +211,38 @@ describe('골든', () => {
     expect(result.record.ticks).toBeLessThan(48000);
   }, 60000); // one replay hashing every tick (~6 s alone)
 
+  test('골든: 포 넷의 같은 각본', async () => {
+    const files = ['guns-kh178.json', 'guns-kh179.json', 'guns-k55.json', 'guns-k9.json'];
+    const goldens = files.map(readGolden);
+    const head = goldens[0]!.replay;
+    const results: Record<string, unknown> = {};
+    for (const [i, { terrainHash: header, replay: data, ...expected }] of goldens.entries()) {
+      const f = files[i]!;
+      expect(validateReplay(data).ok, f).toBe(true);
+      expect(data.guns, f).toEqual({ id: f.slice(5, -5), version: 1 });
+      expect({ ...data, guns: undefined }, f).toEqual({ ...head, guns: undefined }); // the header's guns alone differs
+      expect(data).toMatchObject({ seed: 20261106, seedKind: 'practice', mode: 'standard', scenario: { id: 'base' } });
+      expect(data.terrain, f).toBeUndefined(); // the mock land
+      expect(data.totalTicks, f).toBeLessThanOrEqual(3500);
+      expect(expected.ignored, f).toBe(0); // every input taken, on the slowest gun too
+      const { terrain, scenario, guns } = await landOf(data);
+      expect(terrainHash(terrain), f).toBe(header);
+      const result = replay(data, terrain, scenario, guns);
+      expect(result, f).toEqual(expected);
+      expect(result.record, f).toMatchObject({ missions: 1, mode: 'standard' }); // one 효력사 mission, through 임무끝
+      expect(result.record.roundsTotal, f).toBeGreaterThan(0);
+      results[data.guns.id] = result;
+    }
+    // The same script on the base gun, for comparison: its own header, the base profile.
+    const d = goldens[0]!.replay;
+    const { terrain } = await landOf(d);
+    results.base = replay({ ...d, guns: { id: 'base', version: 1 } }, terrain, BASE_SCENARIO, BASE_GUNS);
+    const chain = (id: string) => (results[id] as { chain: string }).chain;
+    const differ = ['base', 'kh178', 'kh179', 'k9'];
+    expect(new Set(differ.map(chain)).size).toBe(differ.length); // KH178, KH179 and K9 differ from each other and from base
+    expect(results.k55).toEqual(results.kh179); // KH179 and K55: the same ballistics, the same game
+  }, 60000); // five replays of 3 400 ticks each and the mock land
+
   test('골든: 다시 만드는 조건', () => {
     const v = (simVersion: number, terrain: number, scenario: number, ids: { terrain: string; scenario: string; guns?: string } = { terrain: 'mock', scenario: 'base' }, guns = 1): Versions => ({
       simVersion,
@@ -254,11 +286,11 @@ describe('골든', () => {
     const mock = { id: 'mock', version: 1 };
     const now: Versions = { simVersion: SIM_VERSION, terrain: mock, scenario: { id: BASE_SCENARIO.id, version: BASE_SCENARIO.version }, guns: { id: 'base', version: 1 } };
     const mocks = SCRIPTS.filter((s) => !s.replay.terrain);
-    for (const { file, replay: d } of mocks) expect(currentHeader(d, now), file).toEqual(d); // versions unchanged: as is
+    for (const { file, replay: d } of mocks) expect(currentHeader(d, { ...now, guns: d.guns }), file).toEqual(d); // versions unchanged: as is
     // A version rise: ④ pins simVersion 17 and base@1, every mock script leaves terrain out (mock).
     const risen: Versions = { simVersion: 99, terrain: mock, scenario: { id: 'base', version: 9 }, guns: { id: 'base', version: 1 } };
     for (const { file, replay: d } of mocks) {
-      const h = currentHeader(d, risen);
+      const h = currentHeader(d, { ...risen, guns: d.guns });
       expect(h, file).toEqual({ ...d, simVersion: 99, scenario: { id: 'base', version: 9 } });
       expect(Object.hasOwn(h, 'terrain'), file).toBe(false); // mock is never written
       expect(validateReplay(h).ok, file).toBe(true);
