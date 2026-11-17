@@ -84,6 +84,7 @@ const SHAPES: Record<RadioKind, Axis[][]> = {
   danger_close_adjust_first: [[]],
   danger_close_resend: [[]],
   mto: [[en('fuze', FUZES), int('rounds'), en('control', CONTROLS), int('targetNumber')]],
+  mto_correction: [[en('fuze', FUZES), int('rounds'), en('control', CONTROLS), int('targetNumber')]],
   ready: [[en('fuze', FUZES, true)]],
   fire: [[]],
   shot: [[]],
@@ -207,4 +208,7 @@ export const SNAPSHOT_CASES: RadioUtterance[] = [
   { ...fdcOver, kind: 'move_notice' },
   { ...o, kind: 'position_report', slots: { easting: 4123, northing: 3050 } },
   { ...fdcOver, kind: 'position_report', slots: { easting: 4123, northing: 3050 } },
+  // 실전의 복창 (M3-14): 기러기's 정정, and the observer's 사격지휘통보 readback
+  { ...fdcWait, kind: 'mto_correction', slots: { fuze: 'vt', rounds: 2, control: 'ready', targetNumber: 1002 } },
+  { ...obsWait, kind: 'mto', slots: { fuze: 'vt', rounds: 1, control: 'amc', targetNumber: 1001 } },
 ];

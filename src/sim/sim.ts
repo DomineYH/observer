@@ -12,6 +12,7 @@ import { applyMove, applyReport, runPostAct, updatePost } from './post';
 import { applyPrep } from './prep';
 import { applyRadio, openProcedure, runAct, type Ctx } from './procedure';
 import { takeDue } from './queue';
+import { applyReadback, runCorrection } from './readback';
 import { recordOf } from './record';
 import { createStreams } from './rng';
 import { hashState } from './stateHash';
@@ -80,6 +81,7 @@ export function createSim(init: SimInit): Sim {
     landed: (x, y, fuze) => out.push({ type: 'impact', x, y, fuze }),
     note: (n) => out.push({ type: 'post', ...n }),
     friends: init.scenario.friends,
+    ...(init.combat ? { combat: init.combat.numbers } : {}),
   };
 
   return {
@@ -98,6 +100,7 @@ export function createSim(init: SimInit): Sim {
           return true;
         }
         if (a === 'call' || a === 'loc' || a === 'desc' || a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom' || a === 'shift') return applyRadio(state, ctx, a, input.v);
+        if (a === 'readback') return applyReadback(state, ctx, input.v!);
         const v = input.v as readonly number[]; // every other kind carries integers only
         if (a === 'move') return applyMove(state, ctx, v);
         if (a === 'pos' || a === 'pos_skip') return applyReport(state, ctx, a, input.v as readonly number[] | undefined);
@@ -107,7 +110,12 @@ export function createSim(init: SimInit): Sim {
           state.bino = v[0] === 1;
         }
         else if (a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
-        else if (a === 'lase') return state.post.state === 'ready' && applyLase(state, init.terrain, rng.las, v); // so does the laser
+        else if (a === 'lase') {
+          const c = state.combat; // 레이저 한도: 실전 only, never refilled
+          if (state.post.state !== 'ready' || (c && c.lasesUsed >= init.combat!.numbers.laserLimit)) return false;
+          if (!applyLase(state, init.terrain, rng.las, v)) return false; // so does the laser
+          if (c) c.lasesUsed++;
+        }
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
           if (a === 'start') {
@@ -128,6 +136,7 @@ export function createSim(init: SimInit): Sim {
           if (act === 'move_readback' || act === 'pos_readback') runPostAct(state, ctx, act);
           else if (act === 'retaliation' || act === 'retaliation_muzzle' || act === 'end') runExposureAct(state, ctx, act);
           else if (act === 'shell' || act === 'shelling_note') runLossAct(state, ctx, act);
+          else if (act === 'mto_correction') runCorrection(state, ctx);
           else runAct(state, ctx, act);
         }
         // Every 0.3 s, and at once when the binoculars change or the operation starts; new effects always.

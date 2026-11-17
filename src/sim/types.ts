@@ -315,6 +315,16 @@ export interface Mission {
   dangerClose: boolean; // 위험근접 rules apply: declared, or applied by 기러기
   dangerMissed: boolean; // near and not declared (−30)
   shift: ShiftSlots | null; // the 전이 as sent (snapped); null for a mission opened by a call
+  readback: Readbacks | null; // 밀린 복창, in a combat game only (hashed in the 실전 덩이); null otherwise
+}
+
+/** 밀린 복창 (ADR 0018): which of 기러기's three transmissions await the player's readback, and whether 기러기's 정정
+ * of a wrong 사격지휘통보 readback is on its way (no readback of it is taken until then). */
+export interface Readbacks {
+  mto: boolean;
+  shot: boolean;
+  rounds_complete: boolean;
+  correcting: boolean;
 }
 
 /** One 레이저 press: the angles it went out on and what came back. */
