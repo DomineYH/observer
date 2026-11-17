@@ -5,6 +5,7 @@
 import { mortarFlash } from './enemy';
 import type { Ctx } from './procedure';
 import { schedule } from './queue';
+import { cos, sin } from './math';
 import { gauss, next } from './rng';
 import { EYE_HEIGHT, heightAt, lineOfSight, underCanopy } from './terrain';
 import type { Platoon, SimState, Shooter } from './types';
@@ -13,10 +14,11 @@ export const EXPOSURE_TICKS = 100;
 const REACH_M = 1100;
 const COOLDOWN_TICKS = 150 * 20;
 const DIRECT_M = 800; // 직사: infantry or APCs this near the found post
-const SPREAD_M = 35;
+const SPREAD_M = 35; // 흩어짐, also the enemy artillery's
+const HIT_CHANCE = 0.7; // also the enemy artillery's
 const BURST_TICKS = 240;
 // Rounds, first one after (s), then apart (s), and how near (m) puts the 관측반 out of action (70 %).
-const SALVO: Record<Shooter, { n: number; first: number; gap: number; hit: number }> = {
+const SALVO: Record<Exclude<Shooter, 'artillery'>, { n: number; first: number; gap: number; hit: number }> = {
   mortar: { n: 4, first: 60, gap: 4, hit: 25 },
   direct: { n: 6, first: 20, gap: 2, hit: 4 },
 };
@@ -60,7 +62,7 @@ function compromise(s: SimState, ctx: Ctx, pid: number): void {
   const p = s.platoons[pid]!;
   // 보복: the first mortar section in list order that can fire
   const mi = s.platoons.findIndex((q) => q.type === 'mortar' && q.state !== 'destroyed' && q.state !== 'broken' && q.members.some((m) => m.kind === 'tube' && m.alive));
-  let shooter: Shooter | null = null;
+  let shooter: Exclude<Shooter, 'artillery'> | null = null;
   if (mi >= 0) shooter = 'mortar';
   else if ((p.type === 'inf' || p.type === 'apc') && far(p, at) < DIRECT_M) shooter = 'direct';
   ctx.note({ what: 'compromised', pid, fire: shooter });
@@ -100,6 +102,45 @@ export function runExposureAct(s: SimState, ctx: Ctx, act: 'retaliation' | 'reta
   if (f.shooter === 'mortar')
     s.effects.push({ kind: 'burst', x, y, gz: heightAt(ctx.terrain, x, y), tick: s.tick, life: BURST_TICKS, pid: -1, small: true, vt: false, tiny: false, vis: false });
   const d = far({ x, y }, s.op);
-  if (d < salvo.hit && next(ctx.exp) < 0.7) lose(s, ctx, f.shooter);
+  if (d < salvo.hit && next(ctx.exp) < HIT_CHANCE) lose(s, ctx, f.shooter);
   else if (d < 120 && k === 0) ctx.note({ what: 'near_miss', fire: f.shooter });
+}
+
+// 관측소 노출과 적 포병 사격 (F-20, #123 규칙 2), in a combat game only, apart from 발각 and 보복: every word the observer
+// says and every lase taken scores at one place; at the limit it is exposed and the off-map enemy artillery answers.
+// Draws from the 발각 stream: the ranging round's direction; per barrage round two gaussians, then one only when it is close.
+
+/** Scores `points` at the post as it stands now (no-op outside a combat game or while the enemy artillery fires). */
+export function expose(s: SimState, ctx: Ctx, points: number): void {
+  const g = s.signature;
+  if (!g || s.artillery) return;
+  const n = ctx.combat!;
+  if (g.points === 0 || far(g.place!, s.op) >= n.samePlaceM) {
+    g.points = 0; // the count starts again here
+    g.place = { ...s.op };
+  }
+  g.points += points;
+  if (g.points < n.exposureLimit) return;
+  g.points = 0; // 노출: not counted again until the enemy artillery is done
+  s.artillery = { at: { ...g.place! }, fired: 0 };
+  schedule(s, s.tick + ticks(n.rangingDelayS), 'ranging');
+}
+
+/** Runs a due act of the enemy artillery: the ranging round (and the barrage's times from it), or a barrage round. */
+export function runArtilleryAct(s: SimState, ctx: Ctx, act: 'ranging' | 'barrage'): void {
+  const f = s.artillery!;
+  const n = ctx.combat!;
+  if (act === 'ranging') {
+    for (let k = 0; k < n.barrage.rounds; k++) schedule(s, s.tick + ticks(n.barrageDelayS + k * n.barrage.intervalS), 'barrage');
+    if (s.observerLost) return;
+    const a = next(ctx.exp) * 2 * Math.PI;
+    ctx.note({ what: 'ranging', x: f.at.x + cos(a) * n.rangingOffsetM, y: f.at.y + sin(a) * n.rangingOffsetM }); // no hit
+    return;
+  }
+  if (++f.fired === n.barrage.rounds) s.artillery = null;
+  if (s.observerLost) return;
+  const x = f.at.x + gauss(ctx.exp) * SPREAD_M;
+  const y = f.at.y + gauss(ctx.exp) * SPREAD_M;
+  ctx.note({ what: 'barrage', x, y });
+  if (far({ x, y }, s.op) < n.hitRadiusM && next(ctx.exp) < HIT_CHANCE) lose(s, ctx, 'artillery'); // the post as it stands now
 }

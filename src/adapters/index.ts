@@ -71,6 +71,8 @@ export interface StoredRun extends Submission {
 }
 
 export type Board = 'total' | 'time' | 'rounds' | 'accuracy';
+/** The modes a ranked run ends in: a 보드 is one of these, a scenario id and a Board (ADR 0021). */
+export type RankedMode = Extract<GameRecord['mode'], 'standard' | 'combat'>;
 
 export interface RankRow {
   callsign: string;
@@ -82,8 +84,9 @@ export interface RankRow {
 /** 기록 보관소: keeps ended games and ranks them by board. */
 export interface RecordArchive {
   submit(s: Submission): Promise<StoredRun>;
-  /** Ranked runs and the fake rows: the best one per callsign, best first, at most 20. */
-  board(b: Board): Promise<RankRow[]>;
+  /** One board's ranked runs and the fake rows: the best one per callsign, best first, at most 20. The scenario is the
+   * 재생 자료 header's id, the mode the 판 기록's; versions are not looked at. */
+  board(mode: RankedMode, scenario: string, b: Board): Promise<RankRow[]>;
   /** This browser's runs, newest first. */
   mine(): Promise<StoredRun[]>;
 }
