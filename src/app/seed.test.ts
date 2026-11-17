@@ -60,7 +60,7 @@ function datesBetween(from: number, to: number): number[] {
 test('F-30: 일일 판의 시나리오 — 후보가 하나면 기본 시나리오다', () => {
   // The repository's list as it is: no 배치 has a 일일 시작일, so every date gives the 전장's 기본 시나리오. Once one
   // comes in with a start date, the scan stops the day before the first one.
-  const starts = PLACEMENTS.map((p) => (p as { dailyFrom?: number }).dailyFrom).filter((d) => d !== undefined);
+  const starts = PLACEMENTS.map((p) => p.dailyFrom).filter((d) => d !== undefined);
   const dates = datesBetween(20260101, Math.min(20310101, ...starts));
   for (const [backend, id] of [['mock', 'base'], ['real', 'base-mungyeong']] as const) {
     expect(placementOf(backend).scenario.id).toBe(id);

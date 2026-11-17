@@ -16,7 +16,7 @@ export const POSITION_HINT: Record<Mode, string> = {
 export const LOCATION_HINT: Record<Mode, string> = {
   training: '훈련: 마지막 레이저 측정점의 좌표가 자동으로 들어갑니다. 극좌표는 레이저의 방위각·거리를 그대로 씁니다.',
   standard: '표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.',
-  combat: '표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.', // M3-11 replaces this with 실전's own sentence
+  combat: '실전: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 쓰고, 레이저를 다 쓰면 지도에서 거리를 읽어 넣습니다.',
 };
 
 /** The 위치 보고 is due and its form open: at idle, once the walk and the setup are over. */
@@ -55,7 +55,7 @@ export const postStatus = (s: Pick<ReadonlySimState, 'post' | 'tick'>): string |
   s.post.state === 'ready' ? null : `${s.post.state === 'moving' ? '관측소 이동 중' : '관측 장비 설치 중'} — ${eta(postLeft(s))}`;
 
 const KIND: Record<UnitType, string> = { inf: '보병', recon: '정찰조', apc: '장갑차', mortar: '박격포' };
-const FIRE = { mortar: '박격포', direct: '직사' } as const;
+const FIRE = { mortar: '박격포', direct: '직사', artillery: '포병' } as const;
 
 /** A post note as log lines; `canopy`: the post stands in forest; `sc`: the scenario, for the position a route ends on. */
 export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], canopy: boolean, sc: Pick<Scenario, 'routes' | 'friends'>): string[] {
@@ -85,6 +85,10 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
       const pos = goal ? sc.friends.findIndex((f) => f.x === goal.x && f.y === goal.y) : -1;
       return [`${unitName(platoons, n.pid)}이(가) ${pos >= 0 ? `아군 ${pos + 1}소대` : '아군'} 진지를 돌파했습니다.`];
     }
+    case 'ranging': // the player hears where it fell, never the count or the time left (#123 Q11)
+      return ['관측소 근처에 적 포탄 한 발이 떨어졌습니다. 적 포병의 시사탄 같습니다 — 자리를 옮기십시오.'];
+    case 'barrage':
+      return ['관측소 주변에 적 포병의 포탄이 떨어집니다!'];
     case 'lost':
       return [`${n.cause === 'friendly' ? '아군 포탄이 관측소에 떨어졌습니다.' : `적 ${FIRE[n.cause]} 사격에 관측반이 피격됐습니다.`} 관측반 전투 불능 — 임무 종료.`];
   }

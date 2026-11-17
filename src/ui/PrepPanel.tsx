@@ -1,7 +1,7 @@
 // 작전 준비 (F-22, demo lines 922–936): the 판 정보 카드 (seed and weather), the briefing, the 관측소 후보 and 작전 개시.
 // After the start, one line on the occupied post until the 위치 보고 slice brings its form.
 // The 지형 자료's 자료 출처 lines close the prep screen; the mock land has none, so its screen is unchanged.
-import type { Input, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
+import type { Input, Mode, Point, ReadonlySimState, Scenario, SeedKind, TerrainData, Weather } from '@sim';
 import type { WeatherPreset } from '@adapters/index';
 import type { Briefing } from '@content/placement';
 import { gridOf, underCanopy } from '@render/mapView';
@@ -29,6 +29,9 @@ export interface PrepPanelProps {
   onPreset: (p: WeatherPreset) => void;
   /** The 배치 on this build's 전장, for the card's 시나리오 고르기. */
   scenarios: readonly ScenarioChoice[];
+  /** The mode in use, and choosing one in the 판 정보 카드 (#142). */
+  mode: Mode;
+  onMode: (m: Mode) => void;
 }
 
 /** The 머리띠 메뉴's short 기상 (demo 349): visibility and wind. */
@@ -41,7 +44,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios, mode, onMode }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
@@ -54,7 +57,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
     );
   return (
     <section aria-label="작전 준비">
-      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} scenario={briefing.name} scenarios={scenarios} />
+      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} scenario={briefing.name} scenarios={scenarios} mode={mode} onMode={onMode} />
       <h2>작전 준비 — 관측소 선정</h2>
       <p>
         <b>적정(첩보)</b> {briefing.enemy}

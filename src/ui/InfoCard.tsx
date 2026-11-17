@@ -1,9 +1,10 @@
 // 판 정보 카드 (#135, #130 Q1–Q3): on top of 작전 준비, the game's choices in one card. Its head is the 시드 line and its
-// 기상 row the weather with 기상 바꾸기 (practice) or the "일일 · 읽기만" tag (daily). Under the head the 시나리오 row (#145);
-// the 포 → 모드 rows come between it and 기상 in later slices.
+// 기상 row the weather with 기상 바꾸기 (practice) or the "일일 · 읽기만" tag (daily). Under the head the 시나리오 row (#145),
+// above 기상 the 모드 row (#142); the 포 row comes between 시나리오 and 모드 in a later slice.
 import { useState } from 'react';
-import type { SeedKind, Weather } from '@sim';
+import type { Mode, SeedKind, Weather } from '@sim';
 import { WEATHER_PRESETS, type WeatherPreset } from '@adapters/index';
+import { MODE_NAMES, MODE_ORDER } from './HeadBand';
 
 /** A 배치 of this build's 전장 as the 시나리오 고르기 list shows it. */
 export interface ScenarioChoice {
@@ -22,7 +23,12 @@ export interface InfoCardProps {
   /** The game's 배치 name, and every 배치 on this 전장 to open as a practice game (#124 Q9). */
   scenario: string;
   scenarios: readonly ScenarioChoice[];
+  /** The mode in use, and choosing one (#115 Q1, Q10): 실전 in or out makes a new game, 훈련↔표준 is the mode input. */
+  mode: Mode;
+  onMode: (m: Mode) => void;
 }
+
+const COMBAT_INTRO = '실전: 적이 더 오고 적 포병이 쏜다. 보조 정보와 일시정지가 없고 작전 준비에 시간 제한이 있으며, 작전 개시 뒤에는 모드를 바꿀 수 없다.';
 
 const PRESET_NAMES: Record<WeatherPreset, string> = { clear: '맑음', haze: '박무', rain: '비', wind: '강한 북서풍', fog: '안개' };
 
@@ -39,7 +45,7 @@ function weatherText(w: Weather): string {
   return parts.join(' · ');
 }
 
-export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, scenarios }: InfoCardProps) {
+export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, scenarios, mode, onMode }: InfoCardProps) {
   const daily = seedKind === 'daily';
   const [open, setOpen] = useState(false);
   return (
@@ -63,6 +69,19 @@ export function InfoCard({ seed, seedKind, weather, preset, onPreset, scenario, 
           ))}
         </ul>
       )}
+      {/* Radios, not buttons: the 머리띠 메뉴's 훈련·표준·실전 stay the only buttons of those names. */}
+      <p role="radiogroup" aria-label="모드">
+        <b>모드</b>
+        {MODE_ORDER.map((m) => (
+          <label key={m}>
+            {' '}
+            <input type="radio" name="mode" checked={mode === m} onChange={() => onMode(m)} /> {MODE_NAMES[m]}
+          </label>
+        ))}
+      </p>
+      <p>
+        <small>{COMBAT_INTRO}</small>
+      </p>
       <p>
         <b>기상</b> {weatherText(weather)}
         {daily && (

@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { createSim, type Input, type Lase, type Mode, type Phase, type RadioEvent, type Sim } from '@sim';
 import { terrainColours } from '@render/shade';
+import { COMBAT } from '@content/combat';
 import { answered, CALL_ADJUST, CALL_FFE, desc, DESC_UNKNOWN, ended, LOC_NEAR, openRadio, send, started, toAdjust, toReady } from '../../tests/acceptance/mission';
 import { angleTo, idAt, mortarAt, oneUnit, run, started as startedWith } from '../../tests/acceptance/enemy';
 import { combatInit, START } from '../../tests/acceptance/init';
@@ -13,11 +14,11 @@ import { Composer } from './Composer';
 import { deviation, prefillDirection, suggestion } from './correction';
 import { Preview } from './CorrectionForm';
 import { HeadBand, nextSpeed, pauseCovers, SPEEDS, type Speed } from './HeadBand';
-import { LaseReadout } from './Laser';
+import { LaserButton, laserKey, LaseReadout, lasesLeft } from './Laser';
 import { MapPanel } from './MapPanel';
 import { darkInPrep, namesFriends } from './ObservationView';
 import { PositionForm } from './PositionForm';
-import { reportError } from './post';
+import { LOCATION_HINT, reportError } from './post';
 import { RadioLog } from './RadioLog';
 import { callDraft, descDraft, locDraft, type Draft } from './radio/drafts';
 import { TargetList } from './TargetList';
@@ -34,8 +35,8 @@ const composer = (mode: Mode, stage: Stage, state: State, extra: Partial<Paramet
   renderToStaticMarkup(<Composer stage={stage} live platoons={[]} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={state} {...extra} />);
 const PREVIEW = /<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/g; // 훈련·표준
 const HINT = /<p role="status" aria-live="off">(.*?)<\/p>/g; // 실전
-/** The form without its preview or hint. */
-const forms = (html: string) => html.replace(PREVIEW, '').replace(HINT, '');
+/** The form without its preview or hint, nor the 표적위치 hint (실전 has its own, `실전: 레이저 표시`). */
+const forms = (html: string) => html.replace(PREVIEW, '').replace(HINT, '').replace(`<p>${LOCATION_HINT.standard}</p>`, '').replace(`<p>${LOCATION_HINT.combat}</p>`, '');
 
 /** A started game, radio open, at the 수정 stage of an adjust mission. */
 function atAdjust(): Sim {
@@ -273,4 +274,42 @@ test('실전: 훈련 전용 표시 없음 — 기러기가 아는 위치·보고
   expect(forms(form('combat'))).toBe(forms(form('standard')));
   expect(form('training')).toContain('value="4040"');
   expect(form('training')).toContain('value="3032"');
+});
+
+test('실전: 레이저 표시 — 단추에 남은 횟수가 보이고 다 쓰면 눌리지 않으며 훈련·표준 화면에는 없다', () => {
+  const LIMIT = COMBAT.numbers.laserLimit;
+  const SPENT = '레이저를 다 썼습니다 — 지도에서 지형을 대조해 위치를 정하십시오';
+  const button = (state: Sim['state'], limit?: number) => renderToStaticMarkup(<LaserButton state={state} limit={limit} onLase={() => {}} />);
+  const readout = (state: Sim['state'], limit?: number) =>
+    text(renderToStaticMarkup(<LaseReadout lases={state.lases} mode={state.mode} grid={GRID} spent={lasesLeft(state, limit) === 0} />).replace(/<\/(li|p)>/g, '\n'));
+  const combat = createSim({ ...combatInit(7), scenario: mortarAt({ x: 320, y: 1020 }) });
+  // 작전 준비: the count is there before 작전 개시, on a button that cannot be pressed yet.
+  expect(button(combat.state, LIMIT)).toBe('<button type="button" disabled="">레이저 <kbd>R</kbd> · 남은 5</button>');
+  combat.step([START]);
+  expect(button(combat.state, LIMIT)).toBe('<button type="button">레이저 <kbd>R</kbd> · 남은 5</button>');
+  expect(laserKey(combat.state, LIMIT)).toBe(true);
+  expect(combat.step([{ a: 'lase', v: [32000, 50] }]).accepted).toEqual([true]);
+  expect(text(button(combat.state, LIMIT))).toBe('레이저 R · 남은 4');
+  for (let k = 0; k < 3; k++) combat.step([{ a: 'lase', v: [k * 100, -100] }]);
+  expect(readout(combat.state, LIMIT)).not.toContain(SPENT);
+  combat.step([{ a: 'lase', v: [300, -100] }]);
+  // Spent: the button cannot be pressed, R sends nothing, and the line stands above the last lase, which stays.
+  expect(button(combat.state, LIMIT)).toBe('<button type="button" disabled="">레이저 <kbd>R</kbd> · 남은 0</button>');
+  expect(laserKey(combat.state, LIMIT)).toBe(false);
+  const lines = readout(combat.state, LIMIT).split('\n');
+  expect(lines[0]).toBe(SPENT);
+  expect(lines[1]).toMatch(/^레이저: 방위각 0030 밀 · 거리 /);
+  expect(lines.length).toBeGreaterThan(3); // the list of lases that met something
+  // 훈련·표준: no count, no line, R as before, after any number of lases.
+  for (const mode of ['standard', 'training'] as const) {
+    const sim = startedWith(mortarAt({ x: 320, y: 1020 }), { mode });
+    for (let k = 0; k < 6; k++) sim.step([{ a: 'lase', v: [k * 100, -100] }]);
+    expect(button(sim.state), mode).toBe('<button type="button">레이저 <kbd>R</kbd></button>');
+    expect(laserKey(sim.state), mode).toBe(true);
+    expect(readout(sim.state), mode).not.toContain(SPENT);
+  }
+  // The 표적위치 hint of 실전; 표준's stays.
+  expect(LOCATION_HINT.combat).toBe('실전: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 쓰고, 레이저를 다 쓰면 지도에서 거리를 읽어 넣습니다.');
+  expect(LOCATION_HINT.standard).toBe('표준: 지도를 눌러 좌표자로 읽은 값이 들어갑니다. 극좌표는 레이저 측정값을 씁니다.');
+  expect(text(composer('combat', 'loc', EMPTY))).toContain(LOCATION_HINT.combat);
 });

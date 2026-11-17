@@ -22,7 +22,28 @@ test('상태 해시: 실전의 상태는 실전에서만 든다', () => {
   combat.step([START]);
   expect(combat.state.combat).toEqual({ lasesUsed: 0 });
   expect(combat.hash()).not.toBe(base);
-  // M3-11 · 14 · 18 · 20 add here: each value of the chunk, changed alone in a combat state, changes the hash.
+  const used = (lasesUsed: number) => hashState({ ...structuredClone(combat.state as SimState), combat: { lasesUsed } });
+  expect(used(0)).toBe(combat.hash());
+  expect(new Set([0, 1, 5].map(used)).size).toBe(3); // 쓴 레이저 횟수
+  // M3-18 · 20 add here: each value of the chunk, changed alone in a combat state, changes the hash.
+  const SIGNATURE = { points: 7, place: { x: 320, y: 320 } };
+  const ARTILLERY = { at: { x: 320, y: 320 }, fired: 2 };
+  expect(hashState({ ...structuredClone(state), signature: SIGNATURE, artillery: ARTILLERY })).toBe(base); // 표준: not hashed
+  expect(combat.state.signature).toEqual({ points: 0, place: null });
+  expect(combat.state.artillery).toBeNull();
+  const varied = (v: Partial<SimState>) => hashState({ ...structuredClone(combat.state as SimState), ...v });
+  const exposure = [
+    {},
+    { signature: { points: 7, place: null } }, // 노출의 셈
+    { signature: SIGNATURE },
+    { signature: { ...SIGNATURE, place: { x: 321, y: 320 } } }, // 자리
+    { signature: { ...SIGNATURE, place: { x: 320, y: 321 } } },
+    { artillery: ARTILLERY }, // 적 포병 사격
+    { artillery: { ...ARTILLERY, fired: 3 } },
+    { artillery: { ...ARTILLERY, at: { x: 321, y: 320 } } },
+    { artillery: { ...ARTILLERY, at: { x: 320, y: 321 } } },
+  ];
+  expect(new Set(exposure.map(varied)).size).toBe(exposure.length);
   // 밀린 복창 (M3-14): per mission, in mission order; a standard game's missions carry none.
   const called = (sim: Sim): SimState => {
     sim.step([START]);
@@ -52,5 +73,7 @@ test('상태 해시: 번호로 읽는 목록은 끝에만 더한다', () => {
     'effect_open', 'repeat_ack', 'dc_resend', 'shift_readback', 'move_readback', 'pos_readback',
     'retaliation', 'retaliation_muzzle', 'end', 'shell', 'shelling_note']);
   expect(SHOOTERS.slice(0, 2)).toEqual(['mortar', 'direct']);
+  expect(ACTS.slice(25)).toEqual(['mto_correction', 'ranging', 'barrage']); // M3-14, then M3-18's two
+  expect(SHOOTERS.slice(2)).toEqual(['artillery']); // M3-18
   expect(STREAMS).toEqual(['scn', 'bal', 'fdc', 'exp', 'ai', 'las']);
 });

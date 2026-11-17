@@ -13,7 +13,7 @@ import { createAimControl } from './aim';
 import { ignoreShortcut } from './shortcut';
 import { postStatus } from './post';
 import { AimPad } from './AimPad';
-import { LaseReadout } from './Laser';
+import { LaserButton, laserKey, LaseReadout, lasesLeft } from './Laser';
 
 const TAP_PX = 5;
 
@@ -38,9 +38,11 @@ export interface ObservationViewProps {
   covered: boolean;
   /** 아군 진지, labelled in training. */
   friends: readonly Point[];
+  /** 레이저 한도: a combat game's, from its 실전 수치. */
+  laserLimit?: number;
 }
 
-export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, covered, friends }: ObservationViewProps) {
+export function ObservationView({ terrain, colours, weather, state, send, onFrame, showFps, quality, covered, friends, laserLimit }: ObservationViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const hidden = useRef(covered); // read by the frame and key listeners, which outlive a render
   hidden.current = covered;
@@ -141,7 +143,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       if (hidden.current || ignoreShortcut(e)) return;
       if (aim.key(e.key, e.shiftKey)) e.preventDefault();
       else if (e.key === 'b' || e.key === 'B') aim.toggleBino();
-      else if ((e.key === 'r' || e.key === 'R') && !e.repeat && state.phase === 'live') aim.lase();
+      else if ((e.key === 'r' || e.key === 'R') && !e.repeat && laserKey(state, laserLimit)) aim.lase();
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
@@ -182,11 +184,9 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       <button type="button" aria-pressed={bino} disabled={state.post.state === 'moving'} onClick={() => aim.toggleBino()}>
         쌍안경
       </button>
-      <button type="button" disabled={state.phase !== 'live' || state.post.state !== 'ready'} onClick={() => aim.lase()}>
-        레이저 <kbd>R</kbd>
-      </button>
+      <LaserButton state={state} limit={laserLimit} onLase={() => aim.lase()} />
       <AimPad aim={aim} />
-      <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} />
+      <LaseReadout lases={state.lases} mode={state.mode} grid={terrain.grid} spent={lasesLeft(state, laserLimit) === 0} />
     </section>
   );
 }

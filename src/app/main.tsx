@@ -7,6 +7,7 @@ import { mockAccount } from '@adapters/mock/account';
 import { mockArchive } from '@adapters/mock/records';
 import { silentVoice } from '@adapters/mock/voice';
 import { webSpeech } from '@adapters/webSpeech';
+import { COMBAT } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { PLACEMENTS } from '@content/lookup';
 import { gridOf, type Pin } from '@render/mapView';
@@ -18,6 +19,8 @@ import { MapPanel } from '@ui/MapPanel';
 import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
+import { ReadbackBox } from '@ui/ReadbackBox';
+import { owedOf } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
@@ -33,8 +36,9 @@ import { battlefieldOf, loadTerrain, selectBackend } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
-import { newGame } from './game';
+import { newGame, remade, type Game } from './game';
 import { startLoop, timescaleOf } from './loop';
+import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
 import { chooseSeed, placementFor } from './seed';
 import './app.css';
@@ -104,7 +108,10 @@ for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audi
 // 무전 기록: a new array on every append, so its identity is a valid snapshot.
 let log: readonly LogLine[] = [];
 let started = false;
+const limit = prepLimit();
+let prepShown: number | null = null; // the ms left in whole seconds, read at the publish rate
 const step = () => {
+  limit.check(game);
   const due = game.sim.state.reportDue;
   const events = game.session.step();
   submitOnEnd();
@@ -122,7 +129,7 @@ const step = () => {
   for (const e of events) {
     if (e.type === 'post') say(postNote(e, s.platoons, underCanopy(terrain, s.op.x, s.op.y), scenario));
     if (e.type !== 'radio') continue;
-    lines.push(e);
+    lines.push({ ...e, at: performance.now() }); // 실전 covers a 교신 to read back after 4 s of real time
     const u = e.utterance;
     if (u.kind === 'move_notice' && u.speaker === 'observer' && s.post.move) say(moveStarted(s.post.move, scenario.frontY));
     if (u.kind === 'position_report' && u.speaker === 'fdc') {
@@ -146,6 +153,8 @@ startLoop(
     frameListeners.forEach((draw) => draw(now));
     if (now - lastPublish < PUBLISH_MS) return;
     lastPublish = now;
+    const left = limit.left(game.sim.state);
+    prepShown = left === null ? null : Math.ceil(left / 1000) * 1000;
     listeners.forEach((l) => l());
   },
   // test aid, read each frame so a test can switch it mid-game; never an input
@@ -163,18 +172,32 @@ function switchMode(m: Mode): void {
 
 let colours = terrainColours(terrain, game.init.weather);
 
+/** A new game in 작전 준비 (a weather change, or 실전 in or out): a fresh 무전 기록 and remounted panels. */
+function replace(next: Game): void {
+  game = next;
+  games++;
+  colours = terrainColours(terrain, next.init.weather);
+  log = [];
+  started = false;
+  listeners.forEach((l) => l());
+}
+
+/** 모드 고르기 (#115 Q1): 실전 in or out in 작전 준비 makes a new game; 훈련↔표준 is the 모드 전환 input. */
+function chooseMode(m: Mode): void {
+  const next = remade(game, m, COMBAT);
+  if (next) {
+    limit.chose(m);
+    replace(next);
+  } else if (m !== 'combat' && game.sim.state.mode !== 'combat') switchMode(m);
+}
+
 /** 연습 시드의 기상 변경 (F-30): only in 작전 준비; a new simulation and 입력 기록, with the 관측소 후보 and the mode put in again. */
 async function changeWeather(p: WeatherPreset): Promise<void> {
   if (seedKind !== 'practice' || game.sim.state.phase !== 'prep') return;
   const weather = await mockWeather.load(seed, seedKind, p);
   if (game.sim.state.phase !== 'prep') return; // started while the weather was on its way
-  game = newGame({ ...game.init, weather }, game);
-  games++;
-  colours = terrainColours(terrain, weather);
   preset = p;
-  log = [];
-  started = false;
-  listeners.forEach((l) => l());
+  replace(newGame({ ...game.init, weather }, game));
 }
 const showFps = new URLSearchParams(location.search).get('fps') === '1'; // 사람 검수용 fps 표시
 
@@ -198,7 +221,9 @@ function App() {
   const ended = useSyncExternalStore(subscribe, () => result);
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
+  const prepLeft = useSyncExternalStore(subscribe, () => prepShown);
   const covered = pauseCovers(paused, mode, phase);
+  const mission = sim.state.missions.at(-1);
   const names = { callsign, gridLetters: terrain.grid.letters };
   // 탄착 편의 and the 수정값 제안: worked out once for each round landed, as the demo keeps R.suggest (786–790).
   const impact = sim.state.missions.at(-1)?.impacts.at(-1);
@@ -228,10 +253,11 @@ function App() {
           speed={speed}
           paused={paused}
           phase={phase}
+          prepLeft={prepLeft}
           onSpeed={(s) => setPace({ speed: s })}
           onPause={() => setPace({ paused: !paused })}
         >
-          <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={switchMode} />
+          <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={chooseMode} />
           <QualityPicker quality={quality} onQuality={setQuality} />
           <SoundToggles sound={sound} />
           <div>
@@ -262,9 +288,10 @@ function App() {
             showFps={showFps}
             covered={covered}
             friends={scenario.friends}
+            laserLimit={init.combat?.numbers.laserLimit}
           />
         </div>
-        <LowerTabs tab={tab} onTab={setTab} />
+        <LowerTabs tab={tab} onTab={setTab} owed={owedOf(mission?.readback ?? null).length} />
         <div data-panel="input">
           <PrepPanel
             state={{ phase, op, picked, reportDue }}
@@ -280,7 +307,10 @@ function App() {
             preset={preset}
             onPreset={(p) => void changeWeather(p)}
             scenarios={scenarios}
+            mode={mode}
+            onMode={chooseMode}
           />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} send={send} />
           {covered ? (
             <section aria-label="입력기">
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
@@ -312,7 +342,7 @@ function App() {
           <TargetList platoons={sim.state.platoons} mode={mode} op={op} /* re-rendered with the tick above */ />
         </div>
         <div data-panel="log">
-          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} />
+          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} />
         </div>
       </div>
     </>

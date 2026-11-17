@@ -36,6 +36,8 @@ const markup = (seed: number, seedKind: SeedKind, state = PREP, letters = 'CH', 
       preset={seedKind === 'practice' ? 'fog' : null}
       onPreset={() => {}}
       scenarios={SCENARIOS}
+      mode="training"
+      onMode={() => {}}
     />,
   );
 const text = (...args: Parameters<typeof markup>) => markup(...args).replace(/<[^>]*>/g, '');
@@ -84,9 +86,10 @@ test('F-30: 연습의 시나리오 — 카드의 시나리오 줄', () => {
   expect(daily).toContain(`<b>시나리오</b> ${BASE.briefing.name}`);
   expect(daily).toMatch(/<button type="button" aria-expanded="false">시나리오 고르기 · 연습<\/button>/);
   for (const html of [practice, daily]) expect(html).not.toContain('scenario=');
-  // In the card, after the seed line and before the weather.
+  // In the card, after the seed line and before the mode and the weather (#130 Q2).
   expect(practice.indexOf('<b>시드</b>')).toBeLessThan(practice.indexOf('<b>시나리오</b>'));
-  expect(practice.indexOf('<b>시나리오</b>')).toBeLessThan(practice.indexOf('<b>기상</b>'));
+  expect(practice.indexOf('<b>시나리오</b>')).toBeLessThan(practice.indexOf('<b>모드</b>'));
+  expect(practice.indexOf('<b>모드</b>')).toBeLessThan(practice.indexOf('<b>기상</b>'));
 });
 
 test('F-22: 작전 준비 화면', () => {

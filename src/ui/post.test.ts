@@ -49,3 +49,9 @@ test('F-13: 진지 돌파 문구', () => {
   const second = platoons[2]!.route === 'A' ? 1 : 3;
   expect(postNote({ what: 'overrun', pid: 2 }, platoons, false)).toEqual([`적 2소대이(가) 아군 ${second}소대 진지를 돌파했습니다.`]);
 });
+
+test('F-20: 적 포병 사격의 기록 줄 — 시사탄 탄착, 본사격 탄착, 손실', () => {
+  expect(postNote({ what: 'ranging', x: 1, y: 2 }, [], false)).toEqual(['관측소 근처에 적 포탄 한 발이 떨어졌습니다. 적 포병의 시사탄 같습니다 — 자리를 옮기십시오.']);
+  expect(postNote({ what: 'barrage', x: 1, y: 2 }, [], false)).toEqual(['관측소 주변에 적 포병의 포탄이 떨어집니다!']);
+  expect(postNote({ what: 'lost', cause: 'artillery' }, [], false)).toEqual(['적 포병 사격에 관측반이 피격됐습니다. 관측반 전투 불능 — 임무 종료.']);
+});

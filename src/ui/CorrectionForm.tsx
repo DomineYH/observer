@@ -16,9 +16,10 @@ export interface PreviewProps {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  held?: boolean; // 실전: an owed readback holds the mission's 송신 (#121 screen rule 1)
 }
 
-export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
+export function Preview({ draft, empty, names, mode, send, held }: PreviewProps) {
   return (
     <>
       {mode === 'combat' ? (
@@ -27,7 +28,7 @@ export function Preview({ draft, empty, names, mode, send }: PreviewProps) {
       ) : (
         <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
       )}
-      <button type="button" disabled={!draft} onClick={() => draft && send(draft.input)}>
+      <button type="button" disabled={!draft || held} onClick={() => draft && !held && send(draft.input)}>
         송신
       </button>
     </>
@@ -73,7 +74,7 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
 }
 
 /** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
-export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send }: CorrectionProps) {
+export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send, held }: CorrectionProps) {
   const capped = (metres: string) => (dangerClose && Number(metres) > Number(DANGER_CAP_M) ? DANGER_CAP_M : metres);
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
@@ -108,6 +109,7 @@ export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names
         names={names}
         mode={mode}
         send={send}
+        held={held}
       />
     </>
   );
