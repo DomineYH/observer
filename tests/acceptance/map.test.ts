@@ -1,7 +1,7 @@
 // 지도 바탕: the map panel's drawing, observed through a recording 2D context.
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
-import { COVER, type TerrainData } from '@sim';
+import { COVER, type Mode, type TerrainData } from '@sim';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { CLEAR_WEATHER } from '@adapters/mock/weather';
 import { drawMap, gridLines, mapBase, MAP_PX, type MapContext, type MapMarks } from '@render/map';
@@ -576,5 +576,71 @@ describe('지도', () => {
     const named = (m?: MapMarks) => draw(t, FULL_VIEW, m).words.filter((o) => o.op === 'fillText' && /요성리|관측봉/.test(o.text)).map((o) => o.text);
     expect(named()).toEqual(['요성리', '관측봉']);
     expect(named(marks)).toEqual([]);
+  });
+});
+
+describe('실전', () => {
+  test('실전: 지도 — 방위각 선도 탄착도 없이 요구 좌표와 표적번호만', () => {
+    // One state drawn twice: a recon team found 1 km north, then a grid mission's round landed. 0.05 px/m: the post
+    // (320, 320) at (16, 496), the grid sent (505, 505) at (25.25, 486.75).
+    const t = flatTerrain({ n: 1024 });
+    const route = [
+      { x: 320, y: 1320 },
+      { x: 320, y: 2320 },
+      { x: 320, y: 3320 },
+    ];
+    const sim = started(oneUnit({ type: 'recon', route: 'A', t0: 0 }, route), { terrain: t });
+    expect(sim.step([idAt(angleTo(sim, sim.state.platoons[0]!.members[0]!))]).accepted).toEqual([true]);
+    openRadio(sim);
+    toReady(sim, DESC_UNKNOWN, CALL_ADJUST, LOC_NEAR);
+    const { impact } = untilImpact(sim);
+    const p = sim.state.platoons[0]!;
+    expect(p.intel.stage).toBeGreaterThanOrEqual(1);
+    expect(sim.state.tick - impact.tick).toBeLessThanOrEqual(3000);
+    // 기러기 knows the post 120 m off: training would mark it, standard and combat do not.
+    const marks = (mode: Mode): MapMarks => ({
+      scenario: BASE_SCENARIO,
+      op: sim.state.op,
+      knownOp: { x: sim.state.op.x - 120, y: sim.state.op.y },
+      dest: null,
+      az: 0,
+      fovMil: 1066,
+      pin: null,
+      platoons: sim.state.platoons,
+      mode,
+      missions: sim.state.missions,
+      tick: sim.state.tick,
+      weather: CLEAR_WEATHER,
+      viewshed: null,
+    });
+    const s = draw(t, FULL_VIEW, marks('standard'));
+    const c = draw(t, FULL_VIEW, marks('combat'));
+    const fromPost = (d: Path) => d.length === 2 && d[0]![0] === 16 && d[0]![1] === 496;
+    const [ix, iy] = [impact.x * 0.05, 512 - impact.y * 0.05];
+    const crossAt = (r: ReturnType<typeof draw>) =>
+      r.strokes.some((q) => q.length === 4 && Math.abs(q[0]![0] - (ix - 2)) < 1e-9 && Math.abs(q[0]![1] - (iy - 2)) < 1e-9);
+    const near = (x: number, y: number) => Math.hypot(x - p.x * 0.05, y - (512 - p.y * 0.05)) < 12;
+
+    // 표준, the same state: the bearing line with its label, and the ×.
+    expect(s.dashes.find(fromPost)).toBeDefined();
+    expect(s.texts.some((x) => /^T1 \d{4}$/.test(x.text))).toBe(true);
+    expect(crossAt(s)).toBe(true);
+
+    // 실전: none of them, nor the real position or the post 기러기 knows.
+    expect(c.dashes.filter(fromPost)).toEqual([]);
+    expect(c.texts.filter((x) => x.text.startsWith('T1') || x.text === '?' || x.text === '기러기가 아는 위치')).toEqual([]);
+    expect(c.arcs.filter(([x, y]) => near(x, y))).toEqual([]);
+    expect(crossAt(c)).toBe(false);
+    // The requested grid's square and its 표적번호 stay.
+    expect(c.rects).toContainEqual([505 * 0.05 - 4, 512 - 505 * 0.05 - 4, 8, 8]);
+    expect(c.texts).toContainEqual({ text: 'AB1001', x: 505 * 0.05 + 6, y: 512 - 505 * 0.05 - 5 });
+
+    // Everything else is the standard map, stroke by stroke and in order: sector, friendlies, intel points, the post.
+    type Op = (typeof s.ops)[number];
+    const aid = (o: Op) => (o.op === 'stroke' ? o.style === 'rgba(226,96,74,.75)' || o.style === 'rgba(255,140,40,.9)' : /^T\d+ \d{4}$/.test(o.text));
+    expect(s.ops.filter(aid)).toHaveLength(3); // the line, its label, the ×
+    expect(c.ops).toEqual(s.ops.filter((o) => !aid(o)));
+    expect(c.rects).toEqual(s.rects);
+    expect(c.arcs).toEqual(s.arcs);
   });
 });

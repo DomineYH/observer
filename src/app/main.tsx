@@ -22,7 +22,7 @@ import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
-import { HeadBand, ModeSwitch, QualityPicker, type Speed } from '@ui/HeadBand';
+import { HeadBand, ModeSwitch, pauseCovers, QualityPicker, type Speed } from '@ui/HeadBand';
 import { LowerTabs, type Tab } from '@ui/LowerTabs';
 import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
@@ -194,8 +194,7 @@ function App() {
   const ended = useSyncExternalStore(subscribe, () => result);
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
-  // 표준 모드 일시정지: no free thinking time, so the view, the map and the 입력기 are hidden (demo 918).
-  const covered = paused && mode === 'standard' && phase === 'live';
+  const covered = pauseCovers(paused, mode, phase);
   const names = { callsign, gridLetters: terrain.grid.letters };
   // 탄착 편의 and the 수정값 제안: worked out once for each round landed, as the demo keeps R.suggest (786–790).
   const impact = sim.state.missions.at(-1)?.impacts.at(-1);

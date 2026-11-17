@@ -226,7 +226,7 @@ export function drawMap(c: MapContext, t: TerrainData, base: CanvasImageSource, 
   }
 }
 
-/** 사격 임무 (demo 1302, 1305): each requested grid as a square with its 표적번호, and the recent 탄착 as ×. */
+/** 사격 임무 (demo 1302, 1305): each requested grid as a square with its 표적번호, and the recent 탄착 as ×; 실전 draws the grid only. */
 /** 바람 화살표 (demo 1311–1316): bottom right, pointing downwind, 8 px + 1.4 px per m/s, the speed under it. */
 function drawWind(c: MapContext, w: Weather): void {
   const x0 = MAP_PX - 34;
@@ -271,6 +271,7 @@ function drawFire(c: MapContext, m: MapMarks, t: TerrainData, mx: (x: number) =>
       c.fillStyle = 'rgba(255,255,255,.9)';
       c.fillText(ms.mto ? `AB${String(ms.mto.targetNumber).padStart(4, '0')}` : `#${i + 1}`, x + 6, y - 5);
     }
+    if (m.mode === 'combat') return; // 실전: the 탄착 × is not drawn (#115 Q4); the requested grid above is
     c.strokeStyle = 'rgba(255,140,40,.9)';
     for (const im of ms.impacts) {
       if (m.tick - im.tick > IMPACT_TICKS) continue;
@@ -425,11 +426,11 @@ function drawMarks(c: MapContext, m: MapMarks, k: number, mx: (x: number) => num
     c.stroke();
     c.lineWidth = 1;
   }
-  drawTargets(c, m, k, mx, my);
+  if (m.mode !== 'combat') drawTargets(c, m, k, mx, my); // 실전: no target marks at all (#115 Q4)
 }
 
 /** 표적 (demo 1294–1301). 표준: the position is unknown, so only the bearing it was last seen on from the post.
- * 훈련: where it really is, a `?` until its type is identified. */
+ * 훈련: where it really is, a `?` until its type is identified. 실전: nothing (drawMarks does not call this). */
 function drawTargets(c: MapContext, m: MapMarks, k: number, mx: (x: number) => number, my: (y: number) => number): void {
   const ox = mx(m.op.x);
   const oy = my(m.op.y);

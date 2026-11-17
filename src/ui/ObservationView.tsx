@@ -2,7 +2,7 @@
 // the 화질 buttons, and a tap that names a target by its angles (demo lines 1185–1234, 1336–1342, 1370–1389).
 // Panels never step the simulation.
 import { useEffect, useRef, useState } from 'react';
-import type { Input, Point, ReadonlySimState, TerrainData, Weather } from '@sim';
+import type { Input, Mode, Point, ReadonlySimState, TerrainData, Weather } from '@sim';
 import { drawEffects } from '@render/effects';
 import { drawOverlay, drawRain, friendLabels, rainStreaks, splashOf } from '@render/overlay';
 import { angleAt, eyeAt, QUALITIES, type Quality, type ViewGeometry } from '@render/projection';
@@ -16,6 +16,11 @@ import { AimPad } from './AimPad';
 import { LaseReadout } from './Laser';
 
 const TAP_PX = 5;
+
+/** Outside 훈련 the view stays dark until the post is occupied (demo 1194): 표준 and 실전 alike. */
+export const darkInPrep = (s: Pick<ReadonlySimState, 'phase' | 'mode'>) => s.phase === 'prep' && s.mode !== 'training';
+/** Only 훈련 names our positions on the view (demo 1217). */
+export const namesFriends = (mode: Mode) => mode === 'training';
 
 export interface ObservationViewProps {
   terrain: TerrainData;
@@ -73,7 +78,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       if (hidden.current) return;
       // Before the post is occupied the view stays dark in 표준 (demo 1194); 훈련 previews from where the post would stand:
       // the 관측소 후보, or the planned post before any pick.
-      if (state.phase === 'prep' && state.mode !== 'training') {
+      if (darkInPrep(state)) {
         c.fillStyle = '#0b0e0a';
         c.fillRect(0, 0, W, H);
         c.fillStyle = '#8b947c';
@@ -90,7 +95,7 @@ export function ObservationView({ terrain, colours, weather, state, send, onFram
       c.drawImage(low, 0, 0, W, H);
       drawSprites(c, spritesOf(state, geom, terrain, weather), W / buf.w, on, dpr, fog); // only what the simulation sees
       drawRain(c, rainStreaks(weather, a.h, W, H, dpr, now / 1000), dpr);
-      if (state.mode === 'training') {
+      if (namesFriends(state.mode)) {
         // 훈련: our positions named where they stand (demo 1217)
         const k = W / buf.w;
         c.fillStyle = 'rgba(98,174,230,.95)';
