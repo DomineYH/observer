@@ -1,8 +1,9 @@
 // 실전의 복창 화면 (M3-17, #120 Q1·Q2·Q4·Q7, #121 ⑤): the clock is turned by hand. The box, the log, the forms and the tabs read
 // the simulation's read-only state, driven through its public interface.
+import { isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { createSim, type Mode, type MtoSlots, type RadioEvent, type RadioStage, type Sim } from '@sim';
+import { createSim, type Input, type Mode, type MtoSlots, type RadioEvent, type RadioStage, type Sim } from '@sim';
 import { BASE_SCENARIO } from '@content/scenarios/base';
 import { combatInit, init, START } from '../../tests/acceptance/init';
 import { corr, DESC_AMC, openRadio, radioEvents, send, toReady, untilImpact } from '../../tests/acceptance/mission';
@@ -52,7 +53,7 @@ test('실전: 복창 상자 — 복창할 교신은 4초 보이고 가려지며 
 
   // The adjusting round: 하나발 떳다 is owed too. The box asks the first that came, and shows how many are owed.
   for (const [s, l] of [[sim, log], [twin, std]] as const) l.push(...timed(untilImpact(s).said), ...timed(radioEvents(s, 30)));
-  const box = (s: Sim) => text(renderToStaticMarkup(<ReadbackBox mission={s.state.missions.at(-1)} send={() => {}} />)).replace(/\s+/g, ' ');
+  const box = (s: Sim) => text(renderToStaticMarkup(<ReadbackBox mission={s.state.missions.at(-1)} queued={[]} send={() => {}} />)).replace(/\s+/g, ' ');
   expect(box(sim)).toBe('복창: 사격지휘통보 · 밀린 복창 2사격지휘통보, 포대, 순발신관접근신관, 발, 지명사, 표적번호 알파브라보 , 잠깐대기.복창 송신');
   expect(box(twin)).toBe('');
   // The 입력 tab shows the count while another tab is open; it never switches by itself.
@@ -69,7 +70,7 @@ test('실전: 복창 상자 — 복창할 교신은 4초 보이고 가려지며 
   // A wrong 사격지휘통보 readback goes out as put in; 복창 송신 cannot be pressed until 기러기's 정정 is in (2.5 s).
   const wrong: Entry = { ...right, rounds: mto.rounds === 1 ? '2' : '1' };
   const form = (e: Entry, sent: MtoSlots | null) =>
-    renderToStaticMarkup(<ReadbackForm mission={sim.state.missions.at(-1)} entry={e} sent={sent} onEntry={() => {}} onSend={() => {}} />);
+    renderToStaticMarkup(<ReadbackForm mission={sim.state.missions.at(-1)} entry={e} sent={sent} queued={[]} onEntry={() => {}} onSend={() => {}} />);
   const RB_SEND = /<button type="button"( disabled="")?>복창 송신<\/button>/;
   expect(form(wrong, null).match(RB_SEND)![1]).toBeUndefined();
   const sentWrong = { ...mto, rounds: Number(wrong.rounds) };
@@ -126,4 +127,70 @@ test('실전: 복창 상자 — 복창할 교신은 4초 보이고 가려지며 
   expect(composer(amc, 'ready').match(FIRE_BUTTON)![1]).toBe(' disabled=""');
   expect(text(composer(amc, 'ready'))).toContain(HELD);
   expect(composer(amcStd, 'ready').match(FIRE_BUTTON)![1]).toBeUndefined();
+});
+
+type FormProps = Parameters<typeof ReadbackForm>[0];
+/** 복창 송신 pressed: its click handler called as the button would (the tests have no DOM). */
+function press(p: FormProps): void {
+  const find = (n: unknown): ReactElement | undefined => {
+    if (Array.isArray(n)) return n.map(find).find(Boolean);
+    if (!isValidElement(n)) return undefined;
+    const { children, onClick } = n.props as { children?: unknown; onClick?: () => void };
+    return n.type === 'button' && children === '복창 송신' && onClick ? n : find(children);
+  };
+  (find(ReadbackForm(p))!.props as { onClick: () => void }).onClick();
+}
+
+test('실전: 복창 상자 — 틀린 복창은 보낸 때부터 정정이 올 때까지 다시 보낼 수 없고 틀린 칸은 정정이 온 뒤에야 선다', () => {
+  const sim = game('combat');
+  openRadio(sim);
+  toReady(sim);
+  // The app's session: an input sent waits for the next tick (50 ms) of the hand-turned clock.
+  const queued: Input[] = [];
+  const tick = () => sim.step(queued.splice(0));
+  const mission = sim.state.missions.at(-1)!;
+  const mto = { ...mission.mto! };
+  const wrong: Entry = { fuze: mto.fuze, rounds: mto.rounds === 1 ? '2' : '1', amc: mto.control === 'amc', tn: String(mto.targetNumber).padStart(4, '0') };
+  let sent: MtoSlots | null = null; // what ReadbackBox keeps once it has sent
+  const sends: Input[] = [];
+  const props = (): FormProps => ({
+    mission, entry: wrong, sent, queued, onEntry: () => {},
+    onSend: (input) => {
+      sends.push(input);
+      queued.push(input);
+      sent = { ...mto, rounds: Number(wrong.rounds) };
+    },
+  });
+  /** The box as drawn now: can 복창 송신 be pressed, the 틀린 칸 line, how many fields are outlined. */
+  const look = () => {
+    const html = renderToStaticMarkup(<ReadbackForm {...props()} />);
+    return { sendable: !/<button type="button" disabled="">복창 송신/.test(html), wrong: text(html).match(/틀린 칸: [^<]*?(?=복창 송신)/)?.[0] ?? '', outlined: html.match(/outline/g)?.length ?? 0 };
+  };
+  const quiet = { sendable: false, wrong: '', outlined: 0 };
+
+  expect(look()).toEqual({ sendable: true, wrong: '', outlined: 0 });
+  press(props());
+  // Sent, not yet stepped: nothing is judged yet, and it cannot go out twice.
+  expect(queued).toHaveLength(1);
+  expect(look()).toEqual(quiet);
+  press(props());
+  expect(sends).toHaveLength(1);
+  // The next tick takes it: 기러기's 정정 is on its way (2.5 s); still quiet and still held.
+  tick();
+  expect(mission.readback!.correcting).toBe(true);
+  expect(look()).toEqual(quiet);
+  let ticks = 1;
+  for (; mission.readback!.correcting; ticks++) {
+    expect(look(), `tick ${ticks}`).toEqual(quiet);
+    press(props());
+    tick();
+  }
+  expect(ticks).toBe(50); // ticks stepped from the readback's own: 2.5 s
+  expect(sends).toHaveLength(1);
+  // The 정정 is in: the wrong field is named and outlined, what was put in stays, and it can be sent again.
+  expect(look()).toEqual({ sendable: true, wrong: '틀린 칸: 발수', outlined: 1 });
+  expect(renderToStaticMarkup(<ReadbackForm {...props()} />)).toContain(`value="${wrong.rounds}"`);
+  press(props());
+  expect(sends).toHaveLength(2);
+  expect(look()).toEqual(quiet); // the second readback waits for its tick in turn
 });

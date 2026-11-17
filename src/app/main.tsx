@@ -323,7 +323,7 @@ function App() {
             gun={init.guns.id}
             onGun={changeGun}
           />
-          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} send={send} />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} />
           {covered ? (
             <section aria-label="입력기">
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
