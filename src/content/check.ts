@@ -42,10 +42,12 @@ function placementFindings(p: Placement, seen: Set<string>, first: boolean, base
   for (const [k, pts] of routes) if (pts.length < 3) bad(3, `routes.${k}`);
 
   if (s.friends.length === 0) bad(4, 'friends');
-  for (const [k, pts] of routes) if (!s.friends.some((f) => same(f, pts[pts.length - 1]!))) bad(4, `routes.${k}`);
+  // An empty route has no end or first point: rule 3 already lists it.
+  const ends = routes.filter(([, pts]) => pts.length > 0);
+  for (const [k, pts] of ends) if (!s.friends.some((f) => same(f, pts[pts.length - 1]!))) bad(4, `routes.${k}`);
 
   s.friends.forEach((f, i) => f.y < s.frontY || bad(5, `friends[${i}]`));
-  for (const [k, pts] of routes) if (!(pts[0]!.y > s.frontY)) bad(5, `routes.${k}`);
+  for (const [k, pts] of ends) if (!(pts[0]!.y > s.frontY)) bad(5, `routes.${k}`);
 
   const each = (f: (u: UnitDef, at: string) => void) =>
     (['units', 'reinforcements'] as const).forEach((list) => s[list].forEach((u, i) => f(u, `${list}[${i}]`)));
