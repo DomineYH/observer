@@ -17,17 +17,19 @@ export function selectBackend(value: string | undefined): Backend {
 // 이음매 표: what each seam is under VITE_OBSERVER_BACKEND. Only the first two rows differ, and they are the two records
 // below; the others are wired in main.tsx the same way on both.
 //
-// | 이음매      | mock                                       | real                                                  |
-// | ----------- | ------------------------------------------ | ----------------------------------------------------- |
-// | 지형 원천   | mockTerrain: the seed makes the land       | realTerrain(MUNGYEONG): the 문경 지형 파일, any seed, |
-// |             |                                            | checked by the sim's 지형 해시                        |
-// | 배치        | a mock 배치: placementFor (seed.ts) picks  | a mungyeong 배치, picked the same way; 기본 시나리오  |
-// |             | the 일일 시나리오 or ?scenario=; 기본 시나리오 | base-mungyeong@2                                      |
-// |             | base@1                                     |                                                       |
-// | 기상        | mockWeather                                | mockWeather                                           |
-// | 계정        | mockAccount (this browser's localStorage)  | mockAccount (this browser's localStorage)             |
-// | 기록 보관소 | mockArchive (this browser's localStorage)  | mockArchive (this browser's localStorage)             |
-// | 음성 출력   | webSpeech, or silentVoice without speechSynthesis in the browser (not chosen by the backend) | same     |
+// | 이음매      | mock                                         | real                                                |
+// | ----------- | -------------------------------------------- | --------------------------------------------------- |
+// | 지형 원천   | mockTerrain: the seed makes the land         | realTerrain(MUNGYEONG): the 문경 지형 파일, any     |
+// |             |                                              | seed, checked by the sim's 지형 해시                |
+// | 고른 배치   | placementFor (seed.ts) over the 배치 목록 on | the same on the mungyeong 전장: base-mungyeong@2,   |
+// |             | the mock 전장: the 일일 시나리오, or a       | and apc-mungyeong@1 by ?scenario= only (it has no   |
+// |             | practice ?scenario=; only base@1 is there    | 일일 시작일)                                        |
+// | 고른 포     | BASE_GUNS (base@1); a practice game's 작전 준비 may pick one of GUNS in range of the 배치 (regunned, game.ts) | same |
+// | 실전        | 모드 실전 in 작전 준비 makes a new game with the 실전 자료 COMBAT (remade, game.ts) | same              |
+// | 기상        | mockWeather                                  | mockWeather                                         |
+// | 계정        | mockAccount (this browser's localStorage)    | mockAccount (this browser's localStorage)           |
+// | 기록 보관소 | mockArchive (this browser's localStorage)    | mockArchive (this browser's localStorage)           |
+// | 음성 출력   | webSpeech, or silentVoice without speechSynthesis in the browser (not chosen by the backend) | same       |
 const TERRAIN: Record<Backend, TerrainSource> = { mock: mockTerrain, real: realTerrain(MUNGYEONG, terrainHash) };
 
 export const terrainSourceOf = (backend: Backend): TerrainSource => TERRAIN[backend];
