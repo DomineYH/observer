@@ -21,7 +21,10 @@ test('상태 해시: 실전의 상태는 실전에서만 든다', () => {
   combat.step([START]);
   expect(combat.state.combat).toEqual({ lasesUsed: 0 });
   expect(combat.hash()).not.toBe(base);
-  // M3-11 · 14 · 18 · 20 add here: each value of the chunk, changed alone in a combat state, changes the hash.
+  const used = (lasesUsed: number) => hashState({ ...structuredClone(combat.state as SimState), combat: { lasesUsed } });
+  expect(used(0)).toBe(combat.hash());
+  expect(new Set([0, 1, 5].map(used)).size).toBe(3); // 쓴 레이저 횟수
+  // M3-14 · 18 · 20 add here: each value of the chunk, changed alone in a combat state, changes the hash.
 });
 
 test('상태 해시: 번호로 읽는 목록은 끝에만 더한다', () => {

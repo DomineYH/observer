@@ -107,7 +107,12 @@ export function createSim(init: SimInit): Sim {
           state.bino = v[0] === 1;
         }
         else if (a === 'id') return applyId(state, init.terrain, init.weather, v); // sees last step's 보임
-        else if (a === 'lase') return state.post.state === 'ready' && applyLase(state, init.terrain, rng.las, v); // so does the laser
+        else if (a === 'lase') {
+          const c = state.combat; // 레이저 한도: 실전 only, never refilled
+          if (state.post.state !== 'ready' || (c && c.lasesUsed >= init.combat!.numbers.laserLimit)) return false;
+          if (!applyLase(state, init.terrain, rng.las, v)) return false; // so does the laser
+          if (c) c.lasesUsed++;
+        }
         else if (a === 'pick' || a === 'start') {
           if (!applyPrep(state, init.terrain, init.scenario.plannedOp, a, v)) return false;
           if (a === 'start') {
