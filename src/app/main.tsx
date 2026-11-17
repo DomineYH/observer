@@ -270,7 +270,7 @@ function App() {
           <span>
             기상 <output aria-live="off" aria-label="기상">{weatherChip(init.weather)}</output>
           </span>
-          <RankingDialog archive={archive} callsign={callsign} scenario={scenario.id} />
+          <RankingDialog archive={archive} callsign={callsign} scenario={scenario.id} placements={PLACEMENTS} />
         </HeadBand>
         <div className="sr-only">
           <TickCounter tick={tick} />

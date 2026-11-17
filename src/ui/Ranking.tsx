@@ -2,6 +2,7 @@
 // Every stored string goes in as React text, so markup in a callsign shows as characters.
 import { useRef, useState } from 'react';
 import type { Board, RankRow, RecordArchive, StoredRun } from '@adapters/index';
+import { GUNS } from '@content/guns';
 import { clock } from './clock';
 
 const BOARDS: { board: Board; name: string; value: (r: RankRow['record']) => string }[] = [
@@ -15,7 +16,19 @@ const BOARDS: { board: Board; name: string; value: (r: RankRow['record']) => str
   },
 ];
 const error = (m: number | null) => (m === null ? '—' : `${m} m`);
-const modeOf = (r: StoredRun) => (r.record.mode === 'training' ? '훈련' : r.record.seedKind === 'practice' ? '연습' : '표준');
+/** What the 모드 cell reads of a 배치: its scenario id, its 전장 and its name. */
+type Named = { scenario: { id: string }; terrain: { id: string }; briefing: { name: string } };
+/** 내 기록's 모드 cell: the 기록 종류, then only what is not the default (ADR 0021). Ids not in the lists are written as they are. */
+function modeOf(r: StoredRun, placements: readonly Named[]): string {
+  const { mode, seedKind } = r.record;
+  const cell = [mode === 'training' ? '훈련' : seedKind === 'practice' ? '연습' : mode === 'combat' ? '실전' : '표준'];
+  if (mode === 'combat' && seedKind === 'practice') cell.push('실전');
+  const laid = placements.find((p) => p.scenario.id === r.replay.scenario.id);
+  if (!laid) cell.push(r.replay.scenario.id);
+  else if (placements.find((p) => p.terrain.id === laid.terrain.id) !== laid) cell.push(laid.briefing.name);
+  if (r.replay.guns.id !== GUNS[0]!.profile.id) cell.push(GUNS.find((g) => g.profile.id === r.replay.guns.id)?.name ?? r.replay.guns.id);
+  return cell.join(' · ');
+}
 const resultOf = (r: StoredRun) => (r.record.cleared ? '섬멸' : r.record.observerLost ? '관측반 손실' : '미완');
 const MINE_SHOWN = 10;
 
@@ -25,10 +38,11 @@ interface Props {
   mine: readonly StoredRun[];
   callsign: string;
   onBoard: (b: Board) => void;
+  placements: readonly Named[]; // 배치 목록: names the 배치 in 내 기록
 }
 
 /** The dialog's content: the chosen board, its tabs and this browser's runs. */
-export function Ranking({ board, rows, mine, callsign, onBoard }: Props) {
+export function Ranking({ board, rows, mine, callsign, onBoard, placements }: Props) {
   const shown = BOARDS.find((b) => b.board === board)!;
   return (
     <>
@@ -76,7 +90,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard }: Props) {
             <tr key={r.createdAt}>
               <td>{r.createdAt.slice(5, 16).replace('T', ' ')}</td>
               <td>{r.callsign}</td>
-              <td>{modeOf(r)}</td>
+              <td>{modeOf(r, placements)}</td>
               <td>{resultOf(r)}</td>
               <td>{r.record.clearTick === null ? '—' : clock(r.record.clearTick)}</td>
               <td>{r.record.roundsTotal}</td>
@@ -92,7 +106,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard }: Props) {
 
 /** The 랭킹 button and its modal dialog; boards load from 기록 보관소 each time one is shown. Until the mode and scenario
  * buttons exist the boards are 표준 on `scenario`, the 전장's 기본 시나리오. */
-export function RankingDialog({ archive, callsign, scenario }: { archive: RecordArchive; callsign: string; scenario: string }) {
+export function RankingDialog({ archive, callsign, scenario, placements }: { archive: RecordArchive; callsign: string; scenario: string; placements: readonly Named[] }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [shown, setShown] = useState<{ board: Board; rows: RankRow[]; mine: StoredRun[] } | null>(null);
   const load = async (board: Board) => setShown({ board, rows: await archive.board('standard', scenario, board), mine: await archive.mine() });
@@ -108,7 +122,7 @@ export function RankingDialog({ archive, callsign, scenario }: { archive: Record
         랭킹
       </button>
       <dialog ref={dialog} aria-labelledby="ranking-title">
-        {shown && <Ranking {...shown} callsign={callsign} onBoard={(b) => void load(b)} />}
+        {shown && <Ranking {...shown} callsign={callsign} onBoard={(b) => void load(b)} placements={placements} />}
         <form method="dialog">
           <button>닫기</button>
         </form>

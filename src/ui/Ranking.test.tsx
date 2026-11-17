@@ -2,9 +2,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { expect, test } from 'vitest';
 import { validateReplay } from '@sim';
-import type { Board, RecordArchive } from '@adapters/index';
+import type { Board, RecordArchive, StoredRun } from '@adapters/index';
 import { mockArchive } from '@adapters/mock/records';
 import { submissionOf } from '@app/records';
+import { PLACEMENTS } from '@content/lookup';
+import { BASE } from '@content/scenarios/base';
+import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { init } from '../../tests/acceptance/init';
 import { NO_ENEMY, oneMission } from '../../tests/acceptance/session';
 import { memoryStorage } from '../../tests/acceptance/storage';
@@ -20,7 +23,7 @@ const text = (el: ReactElement) =>
     .map((l) => l.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 const shown = async (archive: RecordArchive, board: Board, callsign = '참새12') => (
-  <Ranking board={board} rows={await archive.board('standard', 'base', board)} mine={await archive.mine()} callsign={callsign} onBoard={() => {}} />
+  <Ranking board={board} rows={await archive.board('standard', 'base', board)} mine={await archive.mine()} callsign={callsign} onBoard={() => {}} placements={PLACEMENTS} />
 );
 
 test('F-31: 제출한 기록이 랭킹에 보인다 — 랭킹 창', async () => {
@@ -69,4 +72,43 @@ test('F-31: 제출한 기록이 랭킹에 보인다 — 저장된 문자열은 �
   expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
   expect(html).not.toContain('<img');
   expect(html).not.toContain('<b>');
+});
+
+test('랭킹: 내 기록의 모드 칸 — 기록 종류와 기본과 다른 것', () => {
+  const g = oneMission();
+  const sub = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
+  // A 배치 list made in the test: mock's 기본 시나리오, a second mock 배치 and mungyeong's 기본 시나리오.
+  const NIGHT = { ...BASE, scenario: { ...BASE.scenario, id: 'night' }, briefing: { ...BASE.briefing, name: '야간 중대' } };
+  const run = (mode: 'standard' | 'combat' | 'training', seedKind: 'daily' | 'practice', scenario = 'base', guns = 'base'): StoredRun => ({
+    ...sub,
+    record: { ...sub.record, mode, seedKind },
+    replay: { ...sub.replay, scenario: { ...sub.replay.scenario, id: scenario }, guns: { ...sub.replay.guns, id: guns } },
+    createdAt: '2026-11-07T00:00:00.000Z',
+    ranked: false,
+  });
+  const mine = [
+    run('standard', 'daily'),
+    run('combat', 'daily'),
+    run('training', 'daily'),
+    run('standard', 'practice'),
+    run('combat', 'practice'),
+    run('standard', 'practice', 'base', 'k9'),
+    run('standard', 'daily', 'night'),
+    run('standard', 'daily', 'base-mungyeong'),
+    run('combat', 'practice', 'gone', 'm1'), // an old build's ids: written as they are
+  ];
+  const lines = text(<Ranking board="total" rows={[]} mine={mine} callsign="참새12" onBoard={() => {}} placements={[BASE, NIGHT, BASE_MUNGYEONG]} />);
+  const head = lines.indexOf('일시 | 호출부호 | 모드 | 결과 | 시간 | 탄 | 초탄 오차 | 점수 |');
+  expect(head).toBeGreaterThan(0);
+  expect(lines.slice(head + 1).map((l) => l.split(' | ')[2])).toEqual([
+    '표준',
+    '실전',
+    '훈련',
+    '연습',
+    '연습 · 실전',
+    '연습 · K9 155mm 자주포',
+    '표준 · 야간 중대',
+    '표준',
+    '연습 · 실전 · gone · m1',
+  ]);
 });
