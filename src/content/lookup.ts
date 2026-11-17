@@ -3,10 +3,11 @@ import { COMBAT } from './combat';
 import { GUNS } from './guns';
 import type { Placement } from './placement';
 import { BASE } from './scenarios/base';
+import { APC_MUNGYEONG } from './scenarios/apc-mungyeong';
 import { BASE_MUNGYEONG } from './scenarios/base-mungyeong';
 
 /** 배치 목록: every 배치 of this build, in order. A new 배치 goes at the end; a 전장's first 배치 is its 기본 시나리오. */
-export const PLACEMENTS: readonly Placement[] = [BASE, BASE_MUNGYEONG];
+export const PLACEMENTS: readonly Placement[] = [BASE, BASE_MUNGYEONG, APC_MUNGYEONG];
 export { GUNS };
 
 function find<T extends Ref>(kind: string, list: readonly T[], want: Ref): T {
