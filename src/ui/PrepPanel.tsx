@@ -5,7 +5,7 @@ import type { Input, Mode, Point, ReadonlySimState, Scenario, SeedKind, TerrainD
 import type { WeatherPreset } from '@adapters/index';
 import type { Briefing } from '@content/placement';
 import { gridOf, underCanopy } from '@render/mapView';
-import { InfoCard } from './InfoCard';
+import { InfoCard, type ScenarioChoice } from './InfoCard';
 import { startInput } from './prep';
 import { gridLabel } from './radio/readings';
 
@@ -27,6 +27,8 @@ export interface PrepPanelProps {
   /** The practice seed's preset in use (null for a daily seed), and choosing another one (F-30). */
   preset: WeatherPreset | null;
   onPreset: (p: WeatherPreset) => void;
+  /** The 배치 on this build's 전장, for the card's 시나리오 고르기. */
+  scenarios: readonly ScenarioChoice[];
   /** The mode in use, and choosing one in the 판 정보 카드 (#142). */
   mode: Mode;
   onMode: (m: Mode) => void;
@@ -42,7 +44,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
   send(startInput(live, queued));
 }
 
-export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, mode, onMode }: PrepPanelProps) {
+export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios, mode, onMode }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
   if (state.phase === 'live')
@@ -55,7 +57,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
     );
   return (
     <section aria-label="작전 준비">
-      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} mode={mode} onMode={onMode} />
+      <InfoCard seed={seed} seedKind={seedKind} weather={weather} preset={preset} onPreset={onPreset} scenario={briefing.name} scenarios={scenarios} mode={mode} onMode={onMode} />
       <h2>작전 준비 — 관측소 선정</h2>
       <p>
         <b>적정(첩보)</b> {briefing.enemy}
