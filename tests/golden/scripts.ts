@@ -459,5 +459,5 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       totalTicks: 18000,
     },
   },
-  ...['kh178', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
+  ...['k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
 ];
