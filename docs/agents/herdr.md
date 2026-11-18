@@ -17,12 +17,14 @@ How the host (the coordinator session) runs workers in Herdr panes for this repo
   - `tools/host/record.py` — write and check task records in `.routing/tasks/`.
   - `tools/host/jev.py` — call Jev and apply the decision rules.
   - `tools/host/templates/research-order.md` — the researcher order template.
+  - `tools/host/templates/review-order.md` — the reviewer order template (task-verifier); fill every placeholder.
 
 ## 3. Orders
 
 - Write each order with the file-write tool, never with a shell heredoc: a quoting error once meant an order was never sent.
 - The first line is `# Work order <order_id> (revision <n>) — role: <role> — ...`, and the last section ends with the one-line report command for that order id. `dispatch.py` refuses anything else.
 - Researcher orders start from `tools/host/templates/research-order.md`; fill every `@NAME@` placeholder (dispatch refuses leftovers).
+- An issue or order for a slice quotes that slice's own section of the split comment verbatim, not its summary-table row (issue #167 missed a step that only the section held).
 - An order never tells a worker to ignore a failing check. If a check is known to fail, fix it or stop and decide.
 
 ## 4. Dispatch
