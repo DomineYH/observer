@@ -77,6 +77,10 @@ jobs:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    # Browsers and their system libraries come from this image; the tag must match @playwright/test in package-lock.json (1.65.0).
+    container: { image: mcr.microsoft.com/playwright:v1.65.0-noble }
+    # Firefox refuses to run as root when HOME belongs to another user (Actions sets /github/home).
+    env: { HOME: /root }
     steps:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
@@ -85,8 +89,6 @@ jobs:
         with: { node-version: 24, cache: npm }
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
-        run: npx playwright install --with-deps chromium firefox webkit
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm run test:engines
 
@@ -95,7 +97,11 @@ jobs:
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    # Browsers and their system libraries come from this image; the tag must match @playwright/test in package-lock.json (1.65.0).
+    container: { image: mcr.microsoft.com/playwright:v1.65.0-noble }
     strategy: { fail-fast: false, matrix: { shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] } }
+    # A container job's run steps default to sh; the shard step needs bash (pipefail, mapfile).
+    defaults: { run: { shell: bash } }
     steps:
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         uses: actions/checkout@v4
@@ -104,8 +110,6 @@ jobs:
         with: { node-version: 24, cache: npm }
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: npm ci
-      - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
-        run: npx playwright install --with-deps chromium
       - if: needs.changes.result != 'success' || needs.changes.outputs.code != 'false'
         run: |
           set -euo pipefail
