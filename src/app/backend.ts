@@ -21,9 +21,10 @@ export function selectBackend(value: string | undefined): Backend {
 // | ----------- | -------------------------------------------- | --------------------------------------------------- |
 // | 지형 원천   | mockTerrain: the seed makes the land         | realTerrain(MUNGYEONG): the 문경 지형 파일, any     |
 // |             |                                              | seed, checked by the sim's 지형 해시                |
-// | 고른 배치   | placementFor (seed.ts) over the 배치 목록 on | the same on the mungyeong 전장: base-mungyeong@2,   |
-// |             | the mock 전장: the 일일 시나리오, or a       | and apc-mungyeong@1 by ?scenario= only (it has no   |
-// |             | practice ?scenario=; only base@1 is there    | 일일 시작일)                                        |
+// | 고른 배치   | placementFor (seed.ts) over the 배치 목록 on | the same on the mungyeong 전장: base-mungyeong@2    |
+// |             | the mock 전장: the 일일 시나리오, or a       | and apc-mungyeong@1, a 일일 후보 from 2026-11-25    |
+// |             | practice ?scenario=; only base@1 is there    | (its 일일 시작일), the two alternating day by       |
+// |             |                                              | day; apc-mungyeong@1 also by ?scenario=             |
 // | 고른 포     | BASE_GUNS (base@1); a practice game's 작전 준비 may pick one of GUNS in range of the 배치 (regunned, game.ts) | same |
 // | 실전        | 모드 실전 in 작전 준비 makes a new game with the 실전 자료 COMBAT (remade, game.ts) | same              |
 // | 기상        | mockWeather                                  | mockWeather                                         |
