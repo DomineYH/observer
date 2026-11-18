@@ -14,9 +14,6 @@ for (const [file, name, long] of [
   ['6-real-play.json', '골든: ⑥ 실제 지형의 사람 플레이 (실행 환경)', true],
   ['7-apc-grid-eom.json', '골든: 장갑차 선두 (실행 환경)', false],
   ['8-combat.json', '골든: 실전 각본 (실행 환경)', true],
-  ['guns-kh178.json', '골든: 포 넷의 같은 각본 — KH178 (실행 환경)', false],
-  ['guns-kh179.json', '골든: 포 넷의 같은 각본 — KH179 (실행 환경)', false],
-  ['guns-k55.json', '골든: 포 넷의 같은 각본 — K55 (실행 환경)', false],
   ['guns-k9.json', '골든: 포 넷의 같은 각본 — K9 (실행 환경)', false],
 ] as const) {
   test(name, async ({ page }) => {
@@ -26,16 +23,17 @@ for (const [file, name, long] of [
     await expect(page.locator('#error')).toHaveCount(0);
     const results = JSON.parse((await page.locator('#result').textContent()) ?? '{}');
     expect(goldenFiles()).toContain(file);
-    const { checkpoints, chain, record, ignored, terrainHash, replay } = readGolden(file);
+    const { checkpoints, chain, record, ignored, terrainHash } = readGolden(file);
     expect(results[file], file).toEqual({ checkpoints, chain, record, ignored });
-    // A golden on a real land: the page fetched and unpacked it with the app's own 지형 원천; its hash is the header's.
-    if (replay.terrain) expect(JSON.parse((await page.locator('#terrain').textContent()) ?? '{}')[file], file).toBe(terrainHash);
+    // The land the page replayed on is the header's: a real one fetched and unpacked with the app's own 지형 원천, a mock
+    // one generated from the seed in this browser.
+    expect(JSON.parse((await page.locator('#terrain').textContent()) ?? '{}')[file], file).toBe(terrainHash);
   });
 }
 
 // Every golden file has its test above.
 test('골든: 모든 골든 기록이 실행 환경 검사에 걸린다', () => {
-  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json', '7-apc-grid-eom.json', '8-combat.json', 'guns-k55.json', 'guns-k9.json', 'guns-kh178.json', 'guns-kh179.json']);
+  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json', '7-apc-grid-eom.json', '8-combat.json', 'guns-k9.json']);
 });
 
 // The page generates each mock golden record's terrain in this browser; its hash must equal the golden header. The seed

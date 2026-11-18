@@ -1,7 +1,7 @@
-// Replayer-only page for the engines job: generates each mock golden record's terrain, evaluates the 결정적 수학 bit
-// output table in this browser, replays the golden record named by `?golden=<file>` (only that one: ③ alone runs 48 000
-// ticks), and prints the results. A golden that names a terrain is fetched and unpacked with the app's own 지형 원천, on
-// its own page only.
+// Replayer-only page for the engines job: evaluates the 결정적 수학 bit output table in this browser, replays the golden
+// record named by `?golden=<file>` (only that one: ③ alone runs 48 000 ticks) on its own terrain only, and prints the
+// results and that terrain's hash. The bare page (no `?golden=`) generates every mock golden record's terrain instead. A
+// golden that names a terrain is fetched and unpacked with the app's own 지형 원천, on its own page only.
 import { replay, terrainHash, type ReplayData } from '@sim';
 import { atan2, cos, exp, log, sin, tan } from '@sim/math';
 import { generateTerrain } from '@adapters/mock/terrain';
@@ -24,7 +24,7 @@ try {
     const file = path.split('/').pop()!;
     const seed = golden.replay.seed;
     const real = golden.replay.terrain; // the one real land: the replayer refuses another id or 판
-    if (real && file !== only) continue;
+    if (only ? file !== only : real) continue;
     if (!real && !terrains.has(seed)) terrains.set(seed, generateTerrain(seed));
     const t = real ? await terrainSourceOf('real').load(seed) : terrains.get(seed)!;
     hashes[file] = terrainHash(t);
