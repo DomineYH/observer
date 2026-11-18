@@ -26,10 +26,11 @@ for (const [file, name, long] of [
     await expect(page.locator('#error')).toHaveCount(0);
     const results = JSON.parse((await page.locator('#result').textContent()) ?? '{}');
     expect(goldenFiles()).toContain(file);
-    const { checkpoints, chain, record, ignored, terrainHash, replay } = readGolden(file);
+    const { checkpoints, chain, record, ignored, terrainHash } = readGolden(file);
     expect(results[file], file).toEqual({ checkpoints, chain, record, ignored });
-    // A golden on a real land: the page fetched and unpacked it with the app's own 지형 원천; its hash is the header's.
-    if (replay.terrain) expect(JSON.parse((await page.locator('#terrain').textContent()) ?? '{}')[file], file).toBe(terrainHash);
+    // The land the page replayed on is the header's: a real one fetched and unpacked with the app's own 지형 원천, a mock
+    // one generated from the seed in this browser.
+    expect(JSON.parse((await page.locator('#terrain').textContent()) ?? '{}')[file], file).toBe(terrainHash);
   });
 }
 
