@@ -105,7 +105,9 @@ test('시나리오: 일일 시작일은 실제 날짜이고 기본 시나리오�
 });
 
 /** 일일 시작일 on main, 식별자 → 시작일: a row is never changed or removed, a new 배치 with one adds its row (ADR 0020). */
-const DAILY_FROM: Readonly<Record<string, number>> = {};
+const DAILY_FROM: Readonly<Record<string, number>> = {
+  'apc-mungyeong': 20261125,
+};
 
 test('시나리오: main에 들어간 일일 시작일은 그대로다', () => {
   const held = Object.fromEntries(PLACEMENTS.filter((p) => p.dailyFrom !== undefined).map((p) => [p.scenario.id, p.dailyFrom]));

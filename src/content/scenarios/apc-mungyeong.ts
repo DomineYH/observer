@@ -54,4 +54,5 @@ export const APC_MUNGYEONG: Placement = {
       '파란 점선은 아군 전선(이동 한계선). 그 앞으로도 나갈 수 있지만 적에게 발각되면 관측소가 사격을 받는다. 작전 개시 후 이동은 도보. 다른 곳을 점령하면 기러기에게 위치를 보고해야 함.',
   },
   terrain: { id: 'mungyeong', version: 2 },
+  dailyFrom: 20261125,
 };
