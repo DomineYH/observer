@@ -58,10 +58,10 @@ function datesBetween(from: number, to: number): number[] {
 }
 
 test('F-30: 일일 판의 시나리오 — 후보가 하나면 기본 시나리오다', () => {
-  // The repository's list as it is, on every date before its first 일일 시작일: each 전장 has its 기본 시나리오 as its one
-  // candidate, so the daily game opens as before. From that date on see the next test.
+  // The repository's list as it is, on every date from 2000-01-01 to the day before the first 일일 시작일: each 전장 has its
+  // 기본 시나리오 as its one candidate, so the daily game opens as before. From that date on see the next test.
   const starts = PLACEMENTS.map((p) => p.dailyFrom).filter((d) => d !== undefined);
-  const dates = datesBetween(20260101, Math.min(20310101, ...starts));
+  const dates = datesBetween(20000101, Math.min(20310101, ...starts));
   for (const [backend, id] of [['mock', 'base'], ['real', 'base-mungyeong']] as const) {
     expect(placementOf(backend).scenario.id).toBe(id);
     for (const date of dates) {
@@ -82,6 +82,7 @@ test('F-30: 일일 판의 시나리오 — 시작일부터 문경은 하루씩 �
   };
   const before = dateOf(days(start) - 1);
   const dates = datesBetween(start, dateOf(days(start) + 61));
+  expect([dates.length, dates[0], dates.at(-1)]).toEqual([61, start, dateOf(days(start) + 60)]);
   const real = battlefieldOf('real');
   const pick = (date: number) => dailyScenario(date, real, PLACEMENTS).scenario.id;
   // Two candidates in list order: 일수 mod 2 = 0 picks the 기본 시나리오, 1 picks `apc-mungyeong`.
