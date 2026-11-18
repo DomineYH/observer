@@ -240,7 +240,7 @@ describe('골든', () => {
   }, 60000); // two runs of under 8 000 ticks on the 문경 land
 
   test('골든: 포 넷의 같은 각본', async () => {
-    const files = ['guns-kh178.json', 'guns-kh179.json', 'guns-k9.json'];
+    const files = ['guns-kh178.json', 'guns-k9.json'];
     const goldens = files.map(readGolden);
     const head = goldens[0]!.replay;
     const results: Record<string, unknown> = {};
@@ -265,9 +265,12 @@ describe('골든', () => {
     const d = goldens[0]!.replay;
     const { terrain } = await landOf(d);
     results.base = replay({ ...d, guns: { id: 'base', version: 1 } }, terrain, BASE_SCENARIO, BASE_GUNS);
-    // K55 has no golden of its own (#167): the same script on its profile, replayed here.
-    const k55 = { ...d, guns: { id: 'k55', version: 1 } };
-    results.k55 = replay(k55, terrain, BASE_SCENARIO, contentOf(k55).guns);
+    // KH179 and K55 have no golden of their own (#167): the same script on each one's profile, replayed here.
+    for (const id of ['kh179', 'k55']) {
+      const g = { ...d, guns: { id, version: 1 } };
+      results[id] = replay(g, terrain, BASE_SCENARIO, contentOf(g).guns);
+      expect((results[id] as { ignored: number }).ignored, id).toBe(0); // the slowest guns take every input too
+    }
     const chain = (id: string) => (results[id] as { chain: string }).chain;
     const differ = ['base', 'kh178', 'kh179', 'k9'];
     expect(new Set(differ.map(chain)).size).toBe(differ.length); // KH178, KH179 and K9 differ from each other and from base

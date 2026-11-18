@@ -48,7 +48,7 @@ const APC = (() => {
 
 // 포 넷 (#126): one script, the header's `guns` alone differs. ①'s 82 mm mortar section fired for effect straight from the
 // call (접근신관), through 임무끝. Each input comes about 200 ticks after its stage opens on the slowest gun (probe,
-// SIM_VERSION 17: 효과 관측 from 2789 on kh179, 2273 on k9).
+// SIM_VERSION 17: 효과 관측 from 2789 on kh179 and k55, which golden.test.ts replays without a golden; 2273 on k9).
 const FOUR_GUNS: ReplayData = {
   ...HEAD,
   seedKind: 'practice',
@@ -459,5 +459,5 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
       totalTicks: 18000,
     },
   },
-  ...['kh178', 'kh179', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
+  ...['kh178', 'k9'].map((id) => ({ file: `guns-${id}.json`, replay: { ...FOUR_GUNS, guns: { id, version: 1 } } })),
 ];

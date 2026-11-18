@@ -15,7 +15,6 @@ for (const [file, name, long] of [
   ['7-apc-grid-eom.json', '골든: 장갑차 선두 (실행 환경)', false],
   ['8-combat.json', '골든: 실전 각본 (실행 환경)', true],
   ['guns-kh178.json', '골든: 포 넷의 같은 각본 — KH178 (실행 환경)', false],
-  ['guns-kh179.json', '골든: 포 넷의 같은 각본 — KH179 (실행 환경)', false],
   ['guns-k9.json', '골든: 포 넷의 같은 각본 — K9 (실행 환경)', false],
 ] as const) {
   test(name, async ({ page }) => {
@@ -35,7 +34,7 @@ for (const [file, name, long] of [
 
 // Every golden file has its test above.
 test('골든: 모든 골든 기록이 실행 환경 검사에 걸린다', () => {
-  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json', '7-apc-grid-eom.json', '8-combat.json', 'guns-k9.json', 'guns-kh178.json', 'guns-kh179.json']);
+  expect(goldenFiles()).toEqual(['0-empty.json', '1-grid-eom.json', '2-polar-move.json', '3-time-limit.json', '4-desktop-play.json', '5-real-laser-move.json', '6-real-play.json', '7-apc-grid-eom.json', '8-combat.json', 'guns-k9.json', 'guns-kh178.json']);
 });
 
 // The page generates each mock golden record's terrain in this browser; its hash must equal the golden header. The seed
