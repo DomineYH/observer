@@ -58,8 +58,8 @@ function datesBetween(from: number, to: number): number[] {
 }
 
 test('F-30: 일일 판의 시나리오 — 후보가 하나면 기본 시나리오다', () => {
-  // The repository's list as it is: no 배치 has a 일일 시작일, so every date gives the 전장's 기본 시나리오. Once one
-  // comes in with a start date, the scan stops the day before the first one.
+  // The repository's list as it is, on every date before its first 일일 시작일: each 전장 has its 기본 시나리오 as its one
+  // candidate, so the daily game opens as before. From that date on see the next test.
   const starts = PLACEMENTS.map((p) => p.dailyFrom).filter((d) => d !== undefined);
   const dates = datesBetween(20260101, Math.min(20310101, ...starts));
   for (const [backend, id] of [['mock', 'base'], ['real', 'base-mungyeong']] as const) {
@@ -69,6 +69,31 @@ test('F-30: 일일 판의 시나리오 — 후보가 하나면 기본 시나리�
       expect(placementFor('', date, 'daily', battlefieldOf(backend), PLACEMENTS).scenario.id, `${backend} ${date}`).toBe(id);
     }
   }
+});
+
+test('F-30: 일일 판의 시나리오 — 시작일부터 문경은 하루씩 번갈아, mock은 늘 base', () => {
+  // The repository's list as it is: `apc-mungyeong` is a daily candidate on 문경 from its 일일 시작일.
+  const start = PLACEMENTS.find((p) => p.scenario.id === 'apc-mungyeong')!.dailyFrom!;
+  expect(start).toBeGreaterThan(20261112); // after golden ⑥'s date
+  const days = (n: number) => Date.UTC(Math.trunc(n / 10000), (Math.trunc(n / 100) % 100) - 1, n % 100) / 86400e3; // 일수
+  const dateOf = (day: number) => {
+    const t = new Date(day * 86400e3);
+    return dailySeed(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+  };
+  const before = dateOf(days(start) - 1);
+  const dates = datesBetween(start, dateOf(days(start) + 61));
+  const real = battlefieldOf('real');
+  const pick = (date: number) => dailyScenario(date, real, PLACEMENTS).scenario.id;
+  // Two candidates in list order: 일수 mod 2 = 0 picks the 기본 시나리오, 1 picks `apc-mungyeong`.
+  expect(ids(PLACEMENTS.filter((p) => p.terrain.id === real))).toEqual(['base-mungyeong', 'apc-mungyeong']);
+  expect(pick(start)).toBe(['base-mungyeong', 'apc-mungyeong'][days(start) % 2]);
+  for (const [i, date] of dates.entries()) {
+    expect(pick(date), String(date)).toBe(['base-mungyeong', 'apc-mungyeong'][days(date) % 2]);
+    if (i > 0) expect(pick(date), String(date)).not.toBe(pick(dates[i - 1]!));
+    expect(placementFor('', date, 'daily', real, PLACEMENTS).scenario.id, String(date)).toBe(pick(date));
+  }
+  expect(pick(before)).toBe('base-mungyeong');
+  for (const date of [before, ...dates]) expect(dailyScenario(date, battlefieldOf('mock'), PLACEMENTS).scenario.id, String(date)).toBe('base');
 });
 
 test('F-30: 일일 판의 시나리오 — 날짜의 일수 mod 후보 수, 배치 목록의 차례', () => {
