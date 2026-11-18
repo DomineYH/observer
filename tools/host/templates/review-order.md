@@ -1,6 +1,6 @@
 # Work order @ORDER@ (revision 1) — role: task-verifier — independent review of PR #@PR@ (@TITLE@)
 
-You are the independent reviewer. The host (agent `observer-host`) coordinates. Review PR #@PR@ and report to the host with the command in the last section. Do not change files, commit, push, comment on GitHub or merge.
+You are the independent reviewer. The host (agent `observer-host`) coordinates. Review PR #@PR@ and report to the host with the command in the last section. Treat the worktree as read-only. Your only output is the review file named in the Output section. Make no commits, no pushes and no GitHub writes of any kind: no comments, reviews, approvals, labels, closing or merging.
 
 ## Inputs
 
