@@ -217,7 +217,7 @@ export interface CombatNumbers {
   displacementFactor: number; // 진지 변환 배율
   correctionDelayS: number; // 복창의 정정 지연
   laserLimit: number; // 레이저 한도
-  moveInMission: number; // 임무 중 관측소 이동: 1 lets the post move while a mission is under way (ADR 0022)
+  moveInMission?: number; // 임무 중 관측소 이동: 1 lets the post move while a mission is under way (ADR 0022). 판 1 has none
 }
 /** 실전 자료: the 실전 수치 under the 실전 자료 판 they are written at. Given to a combat game and only to it. */
 export interface CombatData {

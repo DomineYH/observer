@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { COMBAT } from '@content/combat';
+import { COMBAT, COMBAT_1, COMBAT_VERSIONS } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, GUNS, PLACEMENTS } from '@content/lookup';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
@@ -45,21 +45,23 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   expect(found.combat).toBeUndefined();
   expect(contentOf({ scenario: base, guns: base, mode: 'standard' }).combat).toBeUndefined();
   expect(contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 2 }).combat).toBe(COMBAT);
+  expect(contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 1 }).combat).toBe(COMBAT_1); // an older 판 it keeps
   expect(() => contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 3 })).toThrow('combat@3: unknown version (this build has combat@2)');
   expect(() => contentOf({ scenario: base, guns: base, mode: 'combat' })).toThrow('combat@undefined: unknown version (this build has combat@2)');
 });
 
 test('자료: 내용과 버전이 어긋나지 않는다', () => {
   const pieces: Record<string, unknown> = {};
+  // Every 실전 자료 판 this build keeps covers the same three things: the 판 1 rows stand as M3 wrote them (ADR 0022).
   for (const { scenario: s } of PLACEMENTS) {
     const { reinforcements, ...rest } = s; // the 증원 is the 실전 자료 판's, not the scenario version's
     pieces[`scenario ${s.id}@${s.version}`] = rest;
-    pieces[`combat@${COMBAT.version} scenario ${s.id}`] = reinforcements;
+    for (const c of COMBAT_VERSIONS) pieces[`combat@${c.version} scenario ${s.id}`] = reinforcements;
   }
-  pieces[`combat@${COMBAT.version} numbers`] = COMBAT.numbers;
+  for (const c of COMBAT_VERSIONS) pieces[`combat@${c.version} numbers`] = c.numbers;
   for (const { profile: g } of GUNS) {
     pieces[`guns ${g.id}@${g.version}`] = versioned(g); // 진지 변환 시간 is the 실전 자료 판's, below
-    pieces[`combat@${COMBAT.version} guns ${g.id}`] = g.displacementS;
+    for (const c of COMBAT_VERSIONS) pieces[`combat@${c.version} guns ${g.id}`] = g.displacementS;
   }
   expect(mismatches(EXPECTED, pieces)).toEqual([]);
 });

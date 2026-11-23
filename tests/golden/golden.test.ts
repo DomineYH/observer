@@ -4,14 +4,14 @@ import { describe, expect, test } from 'vitest';
 import { createSim, fromGrid, replay, SIM_VERSION, terrainHash, toGrid, validateReplay, type ReplayData, type SimEvent } from '@sim';
 import { generateTerrain } from '@adapters/mock/terrain';
 import { unpackTerrain } from '@adapters/terrainFile/unpack';
-import { COMBAT } from '@content/combat';
+import { COMBAT, COMBAT_1 } from '@content/combat';
 import { BASE_GUNS } from '@content/guns';
 import { contentOf, PLACEMENTS } from '@content/lookup';
 import { BASE } from '@content/scenarios/base';
 import { BASE_SCENARIO } from '@content/scenarios/base';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
 import { dailyScenario } from '../../src/app/seed';
-import { currentHeader, goldenFiles, headerVersions, readGolden, shouldWrite, type Versions } from './golden';
+import { currentHeader, goldenFiles, headerVersions, readGolden, shouldWrite, type Golden, type Versions } from './golden';
 import { landOf, REAL_TERRAIN_FILE } from './land';
 import { SCRIPTS } from './scripts';
 
@@ -342,6 +342,22 @@ describe('골든', () => {
     expect(reports).toHaveLength(1);
     expect(tickOf(reports[0])).toBeGreaterThan(eom);
   }, 60000); // two runs of 18 000 ticks on the mock land
+
+  test('골든: 실전 자료 판 1의 판은 옛 규칙으로 재생된다', async () => {
+    // M3's combat golden (실전 자료 판 1), kept as a fixture: the 찾기 함수 gives it the 판 1 자료, and the replay is what
+    // M3 recorded, hash for hash (ADR 0022). Under 판 1 a move during a mission is still refused.
+    const { terrainHash: header, replay: data, ...expected } = JSON.parse(readFileSync(new URL('../fixtures/combat-data-1.json', import.meta.url), 'utf8')) as Golden;
+    expect(data.combatDataVersion).toBe(1);
+    const { terrain, scenario, guns, combat } = await landOf(data);
+    expect(combat).toBe(COMBAT_1);
+    expect(combat!.numbers.moveInMission).toBeUndefined();
+    expect(terrainHash(terrain)).toBe(header);
+    expect(replay(data, terrain, scenario, guns, combat)).toEqual(expected);
+    // The 판 2 script (a move inside its third mission) under 판 1: that move is not taken.
+    const now = readGolden(COMBAT_FILE).replay;
+    const old = replay({ ...now, combatDataVersion: 1 }, terrain, scenario, guns, COMBAT_1);
+    expect(old.ignored).toBeGreaterThan(0);
+  }, 60000);
 
   test('골든: 다시 만드는 조건', () => {
     const v = (simVersion: number, terrain: number, scenario: number, ids: { terrain: string; scenario: string; guns?: string } = { terrain: 'mock', scenario: 'base' }, guns = 1): Versions => ({
