@@ -286,14 +286,15 @@ function App() {
   useEffect(() => {
     openKey.current = talkKey;
   });
-  // The button gone (음성 입력 off, a narrow screen): what was held is let go, and 기러기 is heard again.
-  useEffect(() => {
-    if (!voiceOn) talk.reset();
-  }, [voiceOn]);
+  // A form closed (it was built again, the pause covers it, the game is over) or the button gone (음성 입력 off, a narrow
+  // screen): what was held for it is let go, a 들린 글 still being worked out is dropped, and 기러기 is heard again. Done
+  // here and not by comparing keys later: a later form can have the same key as the one that closed.
+  const speakable = voiceOn && !covered && phase === 'live';
+  useEffect(() => talk.reset(), [talkKey, speakable]);
   // What was said fills its form once: gone with that form, or with 음성 입력, it does not come back to a later one.
   if (spoken && (!voiceOn || spoken.key !== talkKey)) setSpoken(null);
   const talkBar = voiceOn && (
-    <TalkBar talk={talk} line={talkLine} forms={covered || phase !== 'live' ? [] : openForms(stage, sim.state, lists)} names={names} formKey={talkKey} openKey={openKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
+    <TalkBar talk={talk} line={talkLine} forms={speakable ? openForms(stage, sim.state, lists) : []} names={names} formKey={talkKey} openKey={openKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
   );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.

@@ -72,7 +72,9 @@ export function voskInput(env: VoskEnv = browserEnv()): VoiceInput {
         timer = setTimeout(() => reject(new Error('180 s')), MODEL_LIMIT_MS);
       });
       try {
-        model = await Promise.race([loading.ready, stopped]);
+        const loaded = await Promise.race([loading.ready, stopped]);
+        if (mine !== turn) return loaded.close(); // came as the setting was turned off: not kept
+        model = loaded;
       } catch (e) {
         loading.cancel(); // the fetch and the worker go, loaded or not
         if (mine !== turn) return; // turned off meanwhile: `close` let the microphone go
@@ -117,7 +119,13 @@ type VoskRecogniser = {
   retrieveFinalResult(): void;
   remove(): void;
 };
-type VoskModel = { KaldiRecognizer: new (rate: number, grammar: string) => VoskRecogniser; on(event: 'load', listener: (m: { result?: boolean }) => void): void; terminate(): void };
+type VoskModel = {
+  KaldiRecognizer: new (rate: number, grammar: string) => VoskRecogniser;
+  on(event: 'load', listener: (m: { result?: boolean }) => void): void;
+  terminate(): void;
+  /** vosk-browser's own worker (a private field of its Model). */
+  worker?: { terminate(): void };
+};
 type VoskModule = { Model: new (url: string) => VoskModel };
 const QUIET_MS = 500; // no event says which result is the last: it is the one no other follows this long
 const FINISH_LIMIT_MS = 10_000;
@@ -160,6 +168,7 @@ export function browserEnv(): VoskEnv {
     model() {
       const abort = new AbortController();
       let made: VoskModel | null = null;
+      let loadedWhole = false;
       const load = async (): Promise<Model> => {
         // A missing file must not be the page itself: a static host answers an unknown path with its index.
         const head = await fetch(MODEL_URL, { method: 'HEAD', signal: abort.signal });
@@ -169,6 +178,7 @@ export function browserEnv(): VoskEnv {
         // The model object is there before it has loaded, so its worker can be ended while it loads.
         const loaded = (made = new (vosk.Model ?? vosk.default!.Model)(MODEL_URL));
         await new Promise<void>((done, fail) => loaded.on('load', (m) => (m.result ? done() : fail(new Error('load')))));
+        loadedWhole = true;
         return {
           recogniser(grammar) {
             const rec = new loaded.KaldiRecognizer(RATE, JSON.stringify(grammar));
@@ -199,7 +209,10 @@ export function browserEnv(): VoskEnv {
         ready: load(),
         cancel() {
           abort.abort();
-          made?.terminate();
+          // A loaded model ends itself. One still loading cannot: vosk-browser's own terminate asks the worker to free a
+          // model it does not have yet, and the worker never closes. Its worker is ended directly.
+          if (loadedWhole) made?.terminate();
+          else made?.worker?.terminate();
         },
       };
     },

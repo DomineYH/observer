@@ -93,6 +93,17 @@ test('음성 입력: 실패의 갈래 — 모델이 180초 안에 오지 않으�
   expect(off.log).toEqual(['mic closed', 'loading cancelled']);
   expect(vi.getTimerCount()).toBe(0);
   expect(await closing.listen(['조정']).stop()).toEqual([]);
+  // Turned off in the very moment the model is ready: it is closed, not kept for a setting that is off.
+  let ready!: (m: Model) => void;
+  const edge = fakeEnv({ model: () => new Promise((r) => (ready = r)) });
+  const edging = voskInput(edge.env);
+  const done = reason(edging.open());
+  await vi.advanceTimersByTimeAsync(0);
+  ready(edge.model);
+  edging.close();
+  expect(await done).toBe('opened');
+  expect(edge.log).toEqual(['mic closed', 'model closed']);
+  expect(await edging.listen(['조정']).stop()).toEqual([]);
   // Turned on again while the first is still loading: the first gives up, the second opens.
   let give!: (m: Model) => void;
   let asked = 0;
