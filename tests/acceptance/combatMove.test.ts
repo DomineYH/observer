@@ -216,7 +216,8 @@ test('실전: 임무 중 관측소 이동 — 위치 보고의 응답을 기다�
   expect(send(sim, POS(4035, 3032)).ok).toBe(true);
   expect([sim.state.radio.stage, sim.state.missions.length]).toEqual(['wait', 0]);
   for (const to of [MOVE(351, 320), FAR]) expect(send(sim, to).ok).toBe(false);
-  expect(moveCheck(sim.state, flatTerrain(), { x: 440, y: 440 }, true)).toBe('mission');
+  // The reason is the report's own in 실전; without the 실전 value it is the words as before.
+  expect([moveCheck(sim.state, flatTerrain(), { x: 440, y: 440 }, true), moveCheck(sim.state, flatTerrain(), { x: 440, y: 440 })]).toEqual(['report', 'mission']);
   // Answered: the report is no longer owed, and now the post may move; that move owes a report of its own.
   until(sim, () => sim.state.radio.stage === 'idle');
   expect(sim.state.reportDue).toBe(false);

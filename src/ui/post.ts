@@ -29,6 +29,7 @@ export const BLOCKED: Record<MoveBlock, string> = {
   moving: '이미 이동 중입니다.',
   setup: '관측소 설치 중입니다.',
   mission: '사격 임무 중에는 이동할 수 없습니다. 임무끝을 먼저 보내십시오.',
+  report: '위치 보고의 응답을 기다리는 중입니다.',
 };
 
 const FOREST_SHOWN_M = 50; // less forest than this on the way is not worth a word (demo)

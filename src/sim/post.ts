@@ -17,13 +17,15 @@ const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + Math.
 
 /** Why a move to `to` is refused, or null: not live, 지도 가장자리 (200 m on all four sides, B2), already moving or setting
  * up, or a 사격 임무 under way (the radio is neither before 감명 양호 nor idle). The ui shows the same reasons.
- * `inMission`: 실전's 임무 중 관측소 이동 (the 실전 수치's `moveInMission`, ADR 0022) lifts the last one only. */
-export type MoveBlock = 'not_live' | 'edge' | 'moving' | 'setup' | 'mission';
+ * `inMission`: 실전's 임무 중 관측소 이동 (the 실전 수치's `moveInMission`, ADR 0022) lifts the last one only; a 위치 보고
+ * waiting for its answer then still refuses, as `report`. */
+export type MoveBlock = 'not_live' | 'edge' | 'moving' | 'setup' | 'mission' | 'report';
 export function moveCheck(s: ReadonlySimState, t: TerrainData, to: Point, inMission = false): MoveBlock | null {
   if (s.phase !== 'live') return 'not_live';
   if (!onMap(t, to.x, to.y)) return 'edge';
   if (s.post.state !== 'ready') return s.post.state;
-  if (underMission(s) && (!inMission || reporting(s))) return 'mission';
+  if (underMission(s) && !inMission) return 'mission';
+  if (reporting(s)) return 'report'; // 실전: no mission holds the post, but the report's answer is on its way
   return null;
 }
 const underMission = (s: ReadonlySimState) => s.radio.stage !== 'off' && s.radio.stage !== 'idle';
