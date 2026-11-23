@@ -21,6 +21,7 @@ import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { ReadbackBox } from '@ui/ReadbackBox';
 import { openForms } from '@ui/openForms';
+import { shiftOptions, targetOptions } from '@ui/radio/drafts';
 import type { Fill } from '@ui/radio/matching';
 import { owedOf, SHOWN_MS } from '@ui/readback';
 import { webAudio } from '@ui/audio';
@@ -270,9 +271,11 @@ function App() {
   // setting off, arriving or set up, 위치 보고 owed or skipped, each pause toggle, and a lase hit at 표적위치. Never on a
   // tick: typing stands.
   const composerKey = [mode, stage, sim.state.post.state, sim.state.reportDue, paused, stage === 'loc' ? lastHit?.tick : ''].join();
+  // The 표적성질 choices the forms list: made when the 입력기 is built, as it makes its own (same render, same state).
+  const lists = useMemo(() => ({ desc: targetOptions(sim.state.platoons), shift: shiftOptions(sim.state.platoons) }), [composerKey]);
   // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the forms.
   const talkBar = !narrow && voiceInput.state === 'on' && (
-    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state)} names={names} formKey={composerKey} onFill={(fill) => setSpoken({ key: composerKey, fill })} send={send} />
+    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state, lists)} names={names} formKey={composerKey} onFill={(fill) => setSpoken({ key: composerKey, fill })} send={send} />
   );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.

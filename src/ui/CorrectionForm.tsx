@@ -4,7 +4,9 @@ import type { Effect, Input, Mode } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
 import type { Draft } from './radio/drafts';
+import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
+import { useSpokenSend } from './talk';
 import { corrDraft, suggestion, type Amount, type CorrForm } from './correction';
 
 const W = RADIO_GRAMMAR.tables;
@@ -72,10 +74,12 @@ interface CorrectionProps extends Omit<PreviewProps, 'draft' | 'empty'> {
   /** 수정 후 효력사: the 효과 seen, sent with the correction; 다음 is then 효력사. */
   effect?: Effect;
   dangerClose?: boolean; // the mission's 위험근접 rules apply
+  /** What was just said: a 수정 fill replaces every field (#180 Q1). */
+  spoken?: Fill | null;
 }
 
 /** 수정: mounted when the stage opens, so each correction starts from the 방향 and the suggestion of that moment. */
-export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send, held }: CorrectionProps) {
+export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names, mode, send, held, spoken = null }: CorrectionProps) {
   const capped = (metres: string) => (dangerClose && Number(metres) > Number(DANGER_CAP_M) ? DANGER_CAP_M : metres);
   const [form, setForm] = useState<CorrForm>(() => ({
     direction: prefill,
@@ -83,7 +87,13 @@ export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names
     ...(help?.form ? { ...help.form, lateral: capped(help.form.lateral), range: capped(help.form.range) } : { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '0' }),
   }));
   const set = (patch: Partial<CorrForm>) => setForm({ ...form, ...patch });
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'corr') setForm(spoken.values);
+  }
   const draft = corrDraft(form, { direction: sent }, effect);
+  const sendRef = useSpokenSend(spoken?.form === 'corr' ? spoken : null, () => draft && !held && send(draft.input));
   return (
     <>
       {help && <p aria-label="탄착 편의">{help.text}</p>}
@@ -111,6 +121,7 @@ export function CorrectionForm({ sent, help, prefill, effect, dangerClose, names
         mode={mode}
         send={send}
         held={held}
+        sendRef={sendRef}
       />
     </>
   );

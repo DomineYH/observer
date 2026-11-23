@@ -89,6 +89,18 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
   const [control, setControl] = useState<Control>('ready');
   const [dangerClose, setDangerClose] = useState<Flag>(0);
+  // 표적성질 said: every field of the form, what was not said at its first value. Only a choice the form lists is taken.
+  const [lastDesc, setLastDesc] = useState<Fill | null>(null);
+  if (spoken !== lastDesc) {
+    setLastDesc(spoken);
+    if (spoken?.form === 'desc' && options.some((t) => JSON.stringify(t) === JSON.stringify(spoken.values.target))) {
+      setTarget(JSON.stringify(spoken.values.target));
+      setRounds(spoken.values.rounds);
+      setFuze(spoken.values.fuzeRequest);
+      setControl(spoken.values.control);
+      setDangerClose(spoken.values.dangerClose);
+    }
+  }
 
   const mission = state.missions.at(-1);
   const { ready, reporting, callable, amc, held } = offered(stage, state);
@@ -113,7 +125,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     if (d >= 100 && d <= 15000) draft = polarDraft(Number(polar.az), d);
   }
   else if (stage === 'desc') draft = descDraft({ rounds, fuzeRequest, control, dangerClose, target: chosen });
-  const sendRef = useSpokenSend(spoken?.form === 'call' || spoken?.form === 'loc' ? spoken : null, () => draft && send(draft.input));
+  const sendRef = useSpokenSend(spoken?.form === 'call' || spoken?.form === 'loc' || spoken?.form === 'desc' ? spoken : null, () => draft && send(draft.input));
 
   return (
     <>
@@ -139,7 +151,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {stage === 'effect' && <p>효과를 관측하십시오.</p>}
         {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
         {stage === 'effect' && mission && (
-          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} walking={walking} />
+          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} walking={walking} spoken={spoken} />
         )}
         {stage === 'adjust' && mission && (
           <CorrectionForm
@@ -151,6 +163,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             mode={mode}
             send={send}
             held={held || walking}
+            spoken={spoken}
           />
         )}
         {callable && (
@@ -250,7 +263,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         )}
       </section>
       {callable && mission?.mto && (
-        <ShiftForm targetNumber={mission.mto.targetNumber} options={toShift} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+        <ShiftForm targetNumber={mission.mto.targetNumber} options={toShift} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} spoken={spoken} />
       )}
     </>
   );
