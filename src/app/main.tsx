@@ -376,6 +376,7 @@ function App() {
               setTransfer(g);
               setTab('input'); // the form and its 송신 are there on a phone; the demo has no tabs
             }}
+            moveInMission={init.combat?.numbers.moveInMission === 1}
           />
         </div>
         <div data-panel="targets">

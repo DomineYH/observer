@@ -22,9 +22,10 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   held?: boolean; // 실전: owed readbacks hold 임무끝 · 재효력사 · 수정 후 효력사
+  walking?: boolean; // 실전: the post walks (임무 중 관측소 이동): no 재효력사 and no 수정 후 효력사; 임무끝 goes
 }
 
-export function EffectForm({ state, mission, prefill, names, mode, send, held }: Props) {
+export function EffectForm({ state, mission, prefill, names, mode, send, held, walking }: Props) {
   const [effect, setEffect] = useState<Effect>('neutralized');
   const [action, setAction] = useState<Action>('eom');
   const [rounds, setRounds] = useState(2);
@@ -59,7 +60,7 @@ export function EffectForm({ state, mission, prefill, names, mode, send, held }:
       )}
       {action === 'corr' ? (
         // B1: a mission that never sent 방향 (바로 효력사) gets the 방향 field here.
-        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} held={held} />
+        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} held={held || walking} />
       ) : (
         <Preview
           draft={action === 'eom' ? eomDraft(effect, name) : repeatDraft(effect, rounds, name)}
@@ -67,7 +68,7 @@ export function EffectForm({ state, mission, prefill, names, mode, send, held }:
           names={names}
           mode={mode}
           send={send}
-          held={held}
+          held={held || (walking && action === 'repeat')}
         />
       )}
     </>

@@ -41,9 +41,11 @@ export interface MapPanelProps {
   mark: Point | null;
   /** 사격요구에 입력 · 위치 보고에 입력: a new object each press (demo 1420–1421). */
   onTransfer: (grid: { e: number; n: number }) => void;
+  /** 실전's 임무 중 관측소 이동 (the 실전 수치's value): the post may be moved while a mission is under way. */
+  moveInMission?: boolean;
 }
 
-export function MapPanel({ terrain, scenario, state, send, onFrame, weather, colours, callsign, pin, onPin, mark, onTransfer }: MapPanelProps) {
+export function MapPanel({ terrain, scenario, state, send, onFrame, weather, colours, callsign, pin, onPin, mark, onTransfer, moveInMission }: MapPanelProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<MapView>(FULL_VIEW);
   const [base, setBase] = useState<HTMLCanvasElement | null>(null);
@@ -202,14 +204,15 @@ export function MapPanel({ terrain, scenario, state, send, onFrame, weather, col
           )}
         </p>
       )}
-      {pin && state.phase === 'live' && <MoveTo terrain={terrain} state={state} to={{ x: Math.round(pin.x), y: Math.round(pin.y) }} send={send} />}
+      {pin && state.phase === 'live' && <MoveTo terrain={terrain} state={state} to={{ x: Math.round(pin.x), y: Math.round(pin.y) }} send={send} inMission={moveInMission} />}
     </section>
   );
 }
 
-/** 관측소 이동 to the 좌표자 point (demo 1417–1419): distance, walking time and forest on the way, or why not. */
-function MoveTo({ terrain, state, to, send }: { terrain: TerrainData; state: ReadonlySimState; to: Point; send: (input: Input) => void }) {
-  const block = moveCheck(state, terrain, to);
+/** 관측소 이동 to the 좌표자 point (demo 1417–1419): distance, walking time and forest on the way, or why not. `inMission`:
+ * 실전 moves with a mission under way, so that refusal is not shown there. */
+export function MoveTo({ terrain, state, to, send, inMission }: { terrain: TerrainData; state: ReadonlySimState; to: Point; send: (input: Input) => void; inMission?: boolean }) {
+  const block = moveCheck(state, terrain, to, inMission);
   if (block) return <p>이동 불가: {BLOCKED[block]}</p>;
   return (
     <p>

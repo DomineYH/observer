@@ -92,6 +92,8 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
 
   const mission = state.missions.at(-1);
   const { ready, reporting, callable, amc, held } = offered(stage, state);
+  // 실전의 임무 중 관측소 이동: while the post walks no 수정 and no 재효력사 goes (the simulation refuses them).
+  const walking = state.post.state === 'moving';
   useEffect(() => {
     if (!amc || held) return;
     const down = (e: KeyboardEvent) => {
@@ -127,6 +129,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} pin={pin} transfer={transfer} spoken={spoken} />}
         {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
         {held && (amc || stage === 'adjust' || stage === 'effect') && <p role="status">복창을 먼저 보내십시오</p>}
+        {walking && (stage === 'adjust' || stage === 'effect') && <p role="status">이동 중에는 수정을 보낼 수 없습니다</p>}
         {amc && (
           <button type="button" disabled={held} onClick={() => !held && send(FIRE)}>
             준비 쏴 <kbd>F</kbd>
@@ -136,7 +139,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {stage === 'effect' && <p>효과를 관측하십시오.</p>}
         {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
         {stage === 'effect' && mission && (
-          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} />
+          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} walking={walking} />
         )}
         {stage === 'adjust' && mission && (
           <CorrectionForm
@@ -147,7 +150,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             names={names}
             mode={mode}
             send={send}
-            held={held}
+            held={held || walking}
           />
         )}
         {callable && (
