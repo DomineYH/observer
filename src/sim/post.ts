@@ -23,10 +23,13 @@ export function moveCheck(s: ReadonlySimState, t: TerrainData, to: Point, inMiss
   if (s.phase !== 'live') return 'not_live';
   if (!onMap(t, to.x, to.y)) return 'edge';
   if (s.post.state !== 'ready') return s.post.state;
-  if (!inMission && underMission(s)) return 'mission';
+  if (underMission(s) && (!inMission || reporting(s))) return 'mission';
   return null;
 }
 const underMission = (s: ReadonlySimState) => s.radio.stage !== 'off' && s.radio.stage !== 'idle';
+/** A 위치 보고 waiting for 기러기's answer holds the radio too, but is no 사격 임무: 임무 중 관측소 이동 does not lift that
+ * refusal, or the answer on its way would clear the report the new move owes. */
+const reporting = (s: ReadonlySimState) => s.queue.some((q) => q.act === 'pos_readback');
 
 /** 도보 이동 (demo planMove): 토블러 6·exp(−3.5·|경사 + 0.05|) km/h × 장비 휴대 0.85 × 숲 0.7, step by step. */
 export function planMove(t: TerrainData, from: Point, to: Point): MovePlan {
@@ -75,7 +78,8 @@ export function updatePost(s: SimState, ctx: Ctx): void {
       s.post = { ...p, state: 'setup', move: null, until: s.tick + SETUP_TICKS };
       // Arrived with a mission under way (실전's 임무 중 관측소 이동 only): the 기준선 was the old post's, so the next
       // correction sends 방향 again. The 방향 오차 scored stays the first one's.
-      if (underMission(s)) s.missions[s.missions.length - 1]!.direction = null;
+      const mission = s.missions[s.missions.length - 1];
+      if (underMission(s) && mission) mission.direction = null;
       ctx.note({ what: 'arrived' });
       return;
     }

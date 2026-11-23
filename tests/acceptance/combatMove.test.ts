@@ -206,3 +206,22 @@ test('실전: 임무 중 관측소 이동 — 훈련·표준은 거절 그대로
     expect(send(sim, FAR).ok, mode).toBe(true);
   }
 });
+
+test('실전: 임무 중 관측소 이동 — 위치 보고의 응답을 기다리는 동안에는 임무가 아니므로 이동이 거절된다', () => {
+  // No mission yet: the post moves, sets up and reports. Until 기러기 answers, the radio is held by the report, not by a
+  // mission: a move then would be answered by the report on its way, and the new post would go unreported.
+  const sim = game('combat');
+  expect(send(sim, MOVE(350, 320)).ok).toBe(true);
+  until(sim, () => sim.state.post.state === 'ready');
+  expect(send(sim, POS(4035, 3032)).ok).toBe(true);
+  expect([sim.state.radio.stage, sim.state.missions.length]).toEqual(['wait', 0]);
+  for (const to of [MOVE(351, 320), FAR]) expect(send(sim, to).ok).toBe(false);
+  expect(moveCheck(sim.state, flatTerrain(), { x: 440, y: 440 }, true)).toBe('mission');
+  // Answered: the report is no longer owed, and now the post may move; that move owes a report of its own.
+  until(sim, () => sim.state.radio.stage === 'idle');
+  expect(sim.state.reportDue).toBe(false);
+  expect(send(sim, FAR).ok).toBe(true);
+  expect(sim.state.reportDue).toBe(true);
+  until(sim, () => sim.state.post.state === 'ready');
+  expect(send(sim, CALL_ADJUST).ok).toBe(false); // not before the new post is reported (or the report skipped)
+});
