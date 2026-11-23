@@ -331,3 +331,18 @@ test('랭킹: 판 기록은 23개 항목이고 시나리오와 포가 없다', a
   for (const r of await archive.mine()) expect(Object.keys(r).sort()).toEqual([...ROW].sort());
   for (const r of JSON.parse(storage.getItem('observer.runs')!) as object[]) expect(Object.keys(r).sort()).toEqual([...ROW].sort());
 });
+
+test('랭킹: 가짜 순위 행은 표준 모드의 기본 시나리오 보드에만 선다', async () => {
+  const archive = mockArchive(memoryStorage(), isReplay);
+  const fakes = async (mode: RankedMode, scenario: string, b: Board) => (await archive.board(mode, scenario, b)).filter((r) => r.fake).length;
+  // 표준 · 기본 시나리오 (mock base, 문경 base-mungyeong): the board as before.
+  for (const scenario of ['base', 'base-mungyeong']) expect(await fakes('standard', scenario, 'total'), scenario).toBe(12);
+  // 실전 boards and another scenario's boards: no 가짜 순위 행, so with no run of this browser they are empty.
+  const OTHERS: [RankedMode, string][] = [['combat', 'base'], ['combat', 'base-mungyeong'], ['standard', 'apc-mungyeong'], ['combat', 'apc-mungyeong'], ['standard', 'night']];
+  for (const [mode, scenario] of OTHERS) for (const b of BOARDS) expect(await archive.board(mode, scenario, b), `${mode} ${scenario} ${b}`).toEqual([]);
+  // This browser's runs stand there alone, ranked as before.
+  await archive.submit(run('실전병', { mode: 'combat', score: 300 }));
+  await archive.submit(run('실전둘', { mode: 'combat', score: 900 }));
+  expect((await archive.board('combat', 'base', 'total')).map((r) => [r.callsign, r.fake])).toEqual([['실전둘', false], ['실전병', false]]);
+  expect(await fakes('standard', 'base', 'total')).toBe(12);
+});

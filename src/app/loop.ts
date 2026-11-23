@@ -16,11 +16,16 @@ export function frameSteps(acc: { ms: number }, dtMs: number, speed = 1): number
   return n;
 }
 
-/** Hidden test aid: `?timescale=2|4` multiplies the 배속. Exact match only; anything else is 1. Never an input. */
-export function timescaleOf(search: string): 1 | 2 | 4 {
+/** Hidden test aid: `?timescale=2|4` multiplies the 배속, and so does the 느린 배속 `0.25|0.5` on a practice game only
+ * (a slowed daily game would get around 실전 having no pause). Exact match only; anything else is 1. Never an input. */
+export function timescaleOf(search: string, practice = false): 0.25 | 0.5 | 1 | 2 | 4 {
   const v = new URLSearchParams(search).get('timescale');
-  return v === '4' ? 4 : v === '2' ? 2 : 1;
+  return v === '4' ? 4 : v === '2' ? 2 : practice && v === '0.5' ? 0.5 : practice && v === '0.25' ? 0.25 : 1;
 }
+
+/** 느린 배속 stretches what the screen times in real time by the same ratio (실전's 작전 준비 시간 제한, the cover of a 교신
+ * to read back): ×4 at 0.25. 2 and 4 leave them as they are. */
+export const stretchOf = (timescale: number): number => (timescale < 1 ? 1 / timescale : 1);
 
 /** Fixed-step frame loop. `pace()` is the 배속, 0 while paused: pausing is simply not calling step. Neither is an input.
  * Returns a stop function. */

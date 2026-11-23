@@ -7,7 +7,7 @@ import { declaredNames } from './testNames';
 
 const ROOT = new URL('../..', import.meta.url).pathname;
 const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `F-${String(a + i).padStart(2, '0')}`);
-const IDS = [...range(1, 15), 'F-17', 'F-20', ...range(21, 31), 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
+const IDS = [...range(1, 15), 'F-17', 'F-18', 'F-20', ...range(21, 31), 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'];
 
 /** The 식별 번호 the tests declared in `source` start with: a number ends at a non-word character (B1 is not B10). */
 function idsIn(source: string, fileName?: string): Set<string> {

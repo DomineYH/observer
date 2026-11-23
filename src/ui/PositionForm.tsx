@@ -6,7 +6,9 @@ import { gridOf } from '@render/mapView';
 import { Preview } from './CorrectionForm';
 import { POSITION_HINT } from './post';
 import { posDraft, POS_SKIP } from './radio/drafts';
+import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
+import { useSpokenSend } from './talk';
 
 const four = (n: number) => String(n).padStart(4, '0');
 
@@ -20,9 +22,11 @@ interface Props {
   pin?: { e: number; n: number } | null;
   /** 위치 보고에 입력: a new object each press fills the fields. */
   transfer?: { e: number; n: number } | null;
+  /** What was just said: a new 위치 보고 fill replaces the fields. */
+  spoken?: Fill | null;
 }
 
-export function PositionForm({ op, grid, names, mode, send, pin, transfer }: Props) {
+export function PositionForm({ op, grid, names, mode, send, pin, transfer, spoken = null }: Props) {
   const [at, setAt] = useState(() => {
     const g = mode === 'training' ? gridOf(grid, op) : pin;
     return g ? { e: four(g.e), n: four(g.n) } : { e: '', n: '' };
@@ -32,6 +36,13 @@ export function PositionForm({ op, grid, names, mode, send, pin, transfer }: Pro
     setLastTransfer(transfer);
     if (transfer) setAt({ e: four(transfer.e), n: four(transfer.n) });
   }
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'pos') setAt({ e: spoken.e, n: spoken.n });
+  }
+  const draft = posDraft(at.e, at.n);
+  const sendRef = useSpokenSend(spoken?.form === 'pos' ? spoken : null, () => draft && send(draft.input));
   return (
     <section aria-label="위치 보고">
       <p>관측소 위치 보고</p>
@@ -42,7 +53,7 @@ export function PositionForm({ op, grid, names, mode, send, pin, transfer }: Pro
           <input inputMode="numeric" maxLength={4} size={4} value={at[k]} onChange={(ev) => setAt({ ...at, [k]: ev.target.value })} />
         </label>
       ))}
-      <Preview draft={posDraft(at.e, at.n)} empty="동·북 네 자리씩" names={names} mode={mode} send={send} />
+      <Preview draft={draft} empty="동·북 네 자리씩" names={names} mode={mode} send={send} sendRef={sendRef} />
       <button type="button" onClick={() => send(POS_SKIP)}>
         보고하지 않고 계속
       </button>

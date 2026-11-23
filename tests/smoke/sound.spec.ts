@@ -20,7 +20,7 @@ test('F-28: 음성 켬과 끔', async ({ page }) => {
     speechSynthesis.speak = (u) => void heard.spoken.push({ text: u.text, lang: u.lang });
     speechSynthesis.cancel = () => void heard.cancels++;
   });
-  const voice = page.getByRole('button', { name: '음성' });
+  const voice = page.getByRole('button', { name: '음성', exact: true });
 
   // Off by default: 기러기's 감명 보고 is shown but not read.
   await page.goto('/?seed=20261106');

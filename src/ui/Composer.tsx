@@ -1,20 +1,23 @@
 // 입력기 (demo lines 905–1044): the form for the transmission the 교신 단계 takes, and the sentence it will send; after
 // 임무끝 the 전이사격 form beside it.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Control, Flag, FuzeRequest, GridRef, Input, Lase, Mode, RadioStage, ReadonlySimState, Warning } from '@sim';
 import { gridOf } from '@render/mapView';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { callDraft, defaultTarget, descDraft, FIRE, fireKey, locDraft, polarDraft, shiftOptions, targetLabel, targetOptions, type Draft } from './radio/drafts';
+import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
 import { prefillDirection, type suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
+import { waitClock } from './clock';
 import { casualtyNote } from './effect';
-import { owedOf } from './readback';
 import { EffectForm } from './EffectForm';
+import { offered } from './openForms';
 import { PositionForm } from './PositionForm';
-import { LOCATION_HINT, postStatus, reportOpen, staleKnown } from './post';
+import { LOCATION_HINT, postStatus, staleKnown } from './post';
 import { ShiftForm } from './ShiftForm';
 import { ignoreShortcut } from './shortcut';
+import { useSpokenSend } from './talk';
 
 const W = RADIO_GRAMMAR.tables;
 const FUZE_LABEL: Record<FuzeRequest, string> = { none: '신관 요청 없음', quick: W.fuze.quick.text, vt: W.fuze.vt.text };
@@ -41,7 +44,7 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission. */
-  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'post' | 'reportDue' | 'tick' | 'knownOp'> & Partial<Pick<ReadonlySimState, 'battery'>>;
   /** The map's last point (좌표자 or 관측소 후보): what the location grid and the 위치 보고 start from (demo 942, 958–959). */
   pin?: { e: number; n: number } | null;
   /** The last lase that met something: it fills 극좌표, and in training the grid too (demo 958–966). */
@@ -50,10 +53,14 @@ interface Props {
   help?: ReturnType<typeof suggestion> | null;
   /** 사격요구에 입력 · 위치 보고에 입력: a new object each press fills the form open at that moment (demo 1420–1421). */
   transfer?: { e: number; n: number } | null;
+  /** 눌러서 말하기 단추와 한 줄, while 음성 입력 is on. */
+  talk?: ReactNode;
+  /** What was just said, as the open form's values: a new object each time fills that form whole (#180 Q1). */
+  spoken?: Fill | null;
 }
 
 /** Holds each form's fields from their start: `composerKey` remounts it whenever the demo rebuilds the form. */
-export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, lastHit, help, transfer }: Props) {
+export function Composer({ stage, live, platoons, names, grid: gridRef, mode, send, state, pin, lastHit, help, transfer, talk, spoken = null }: Props) {
   const [warning, setWarning] = useState<Warning>('adjust');
   const fill = lastHit?.range ? filled(lastHit.az, lastHit.range, gridRef) : undefined;
   const [method, setMethod] = useState<'grid' | 'polar'>('grid');
@@ -65,6 +72,16 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     setLastTransfer(transfer);
     if (transfer && stage === 'loc') setGrid({ e: four(transfer.e), n: four(transfer.n) });
   }
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'call') setWarning(spoken.warning);
+    if (spoken?.form === 'loc') {
+      setMethod(spoken.method);
+      if (spoken.method === 'grid') setGrid({ e: spoken.e, n: spoken.n });
+      else setPolar({ az: spoken.az, dist: spoken.dist });
+    }
+  }
   // The lists are made when the form is built, as is its start (demo 952, 967–972).
   const [options] = useState(() => targetOptions(platoons));
   const [toShift] = useState(() => shiftOptions(state.platoons));
@@ -73,12 +90,26 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   const [fuzeRequest, setFuze] = useState<FuzeRequest>('none');
   const [control, setControl] = useState<Control>('ready');
   const [dangerClose, setDangerClose] = useState<Flag>(0);
+  // 표적성질 said: every field of the form, what was not said at its first value. Only a choice the form lists is taken.
+  const [lastDesc, setLastDesc] = useState<Fill | null>(null);
+  if (spoken !== lastDesc) {
+    setLastDesc(spoken);
+    if (spoken?.form === 'desc' && options.some((t) => JSON.stringify(t) === JSON.stringify(spoken.values.target))) {
+      setTarget(JSON.stringify(spoken.values.target));
+      setRounds(spoken.values.rounds);
+      setFuze(spoken.values.fuzeRequest);
+      setControl(spoken.values.control);
+      setDangerClose(spoken.values.dangerClose);
+    }
+  }
 
   const mission = state.missions.at(-1);
-  // 지명사: 기러기 waits for 준비 쏴, for the adjusting round and for 효력사 alike (the simulation's own rule).
-  const amc = stage === 'ready' && mission?.mto?.control === 'amc';
-  // 실전: an owed readback holds 준비 쏴 · 수정 · 재효력사 · 임무끝; the screen sends none of them (#121 screen rule 1).
-  const held = owedOf(mission?.readback ?? null).length > 0;
+  const { ready, reporting, callable, amc, held } = offered(stage, state);
+  // 실전의 임무 중 관측소 이동: while the post walks no 수정 and no 재효력사 goes (the simulation refuses them).
+  const walking = state.post.state === 'moving';
+  // 실전의 포대 진지 변환 (#183 Q5): until it is over no 사격준비 끝 comes; the screen says how long that is. The battery's
+  // own state: the length is the simulation's (진지 변환 시간 × 배율).
+  const displacing = state.battery && state.battery.until >= 0 ? state.battery.until - state.tick : null;
   useEffect(() => {
     if (!amc || held) return;
     const down = (e: KeyboardEvent) => {
@@ -90,10 +121,6 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   }, [amc, held, send]);
 
   const chosen = options.find((t) => JSON.stringify(t) === target)!;
-  // At idle: the walk or the setup first, then the 위치 보고 (or its skip), then a call or a 전이 (the simulation's rules).
-  const ready = state.post.state === 'ready';
-  const reporting = reportOpen(stage, state);
-  const callable = stage === 'idle' && ready && !state.reportDue;
   let draft: Draft | null = null;
   if (callable) draft = callDraft(warning);
   else if (stage === 'loc' && method === 'grid' && GRID_FIELD.test(grid.e) && GRID_FIELD.test(grid.n)) draft = locDraft(Number(grid.e), Number(grid.n));
@@ -102,10 +129,13 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     if (d >= 100 && d <= 15000) draft = polarDraft(Number(polar.az), d);
   }
   else if (stage === 'desc') draft = descDraft({ rounds, fuzeRequest, control, dangerClose, target: chosen });
+  const sendRef = useSpokenSend(spoken?.form === 'call' || spoken?.form === 'loc' || spoken?.form === 'desc' ? spoken : null, () => draft && send(draft.input));
 
   return (
     <>
       <section aria-label="입력기">
+        {talk}
+        {displacing !== null && <p role="status">포대 진지 변환 중 · 사격준비 끝까지 약 {waitClock(displacing)}</p>}
         {stage === 'off' && live && <p>기러기 통신 점검 대기…</p>}
         {stage === 'wait' && <p>기러기 응답 대기…</p>}
         {stage === 'idle' && !ready && (
@@ -113,9 +143,10 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             {postStatus(state)}. {state.post.state === 'moving' ? '이동 중에는 쌍안경·레이저·사격요구를 쓸 수 없습니다.' : '설치가 끝나야 레이저와 사격요구를 씁니다.'}
           </p>
         )}
-        {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} pin={pin} transfer={transfer} />}
+        {reporting && <PositionForm op={state.op} grid={gridRef} names={names} mode={mode} send={send} pin={pin} transfer={transfer} spoken={spoken} />}
         {stage === 'ready' && !amc && <p>사격준비 끝.</p>}
         {held && (amc || stage === 'adjust' || stage === 'effect') && <p role="status">복창을 먼저 보내십시오</p>}
+        {walking && (stage === 'adjust' || stage === 'effect') && <p role="status">이동 중에는 수정을 보낼 수 없습니다</p>}
         {amc && (
           <button type="button" disabled={held} onClick={() => !held && send(FIRE)}>
             준비 쏴 <kbd>F</kbd>
@@ -125,7 +156,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
         {stage === 'effect' && <p>효과를 관측하십시오.</p>}
         {stage === 'effect' && mode === 'training' && casualtyNote(state) && <p>{casualtyNote(state)}</p>}
         {stage === 'effect' && mission && (
-          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} />
+          <EffectForm state={state} mission={mission} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} held={held} walking={walking} spoken={spoken} />
         )}
         {stage === 'adjust' && mission && (
           <CorrectionForm
@@ -136,7 +167,8 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
             names={names}
             mode={mode}
             send={send}
-            held={held}
+            held={held || walking}
+            spoken={spoken}
           />
         )}
         {callable && (
@@ -232,11 +264,11 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
           <p>기러기는 관측소 위치를 다른 지점으로 알고 있습니다. 극좌표로 보낸 표적 위치가 어긋납니다.</p>
         )}
         {(callable || stage === 'loc' || stage === 'desc') && (
-          <Preview draft={draft} empty={stage === 'loc' && method === 'polar' ? '방위각(밀)과 거리(m)를 입력' : '동·북 네 자리씩'} names={names} mode={mode} send={send} />
+          <Preview draft={draft} empty={stage === 'loc' && method === 'polar' ? '방위각(밀)과 거리(m)를 입력' : '동·북 네 자리씩'} names={names} mode={mode} send={send} sendRef={sendRef} />
         )}
       </section>
       {callable && mission?.mto && (
-        <ShiftForm targetNumber={mission.mto.targetNumber} options={toShift} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} />
+        <ShiftForm targetNumber={mission.mto.targetNumber} options={toShift} prefill={prefillDirection({ mode, aim: state.aim })} names={names} mode={mode} send={send} spoken={spoken} />
       )}
     </>
   );

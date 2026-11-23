@@ -106,6 +106,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard, placements, mode
           ))}
         </tbody>
       </table>
+      {!rows.length && <p>아직 기록이 없습니다</p>}
       {board !== 'total' && <p>섬멸 시간·사용 탄은 모든 전투부대를 격멸·제압하고 관측반이 살아남은 기록만 오릅니다. 정확도 = 사격 임무별 초탄 오차 평균 (작을수록 좋음).</p>}
       <h3>내 기록 (이 브라우저에 저장됨 · 훈련 모드와 연습 시드는 랭킹 제외)</h3>
       <table>

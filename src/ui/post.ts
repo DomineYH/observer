@@ -29,6 +29,7 @@ export const BLOCKED: Record<MoveBlock, string> = {
   moving: '이미 이동 중입니다.',
   setup: '관측소 설치 중입니다.',
   mission: '사격 임무 중에는 이동할 수 없습니다. 임무끝을 먼저 보내십시오.',
+  report: '위치 보고의 응답을 기다리는 중입니다.',
 };
 
 const FOREST_SHOWN_M = 50; // less forest than this on the way is not worth a word (demo)
@@ -56,6 +57,8 @@ export const postStatus = (s: Pick<ReadonlySimState, 'post' | 'tick'>): string |
 
 const KIND: Record<UnitType, string> = { inf: '보병', recon: '정찰조', apc: '장갑차', mortar: '박격포' };
 const FIRE = { mortar: '박격포', direct: '직사', artillery: '포병' } as const;
+/** The 무전 기록's line for the enemy artillery's 시사탄: one per 적 포병 사격 (the 강평 counts them). */
+export const RANGING_NOTE = '관측소 근처에 적 포탄 한 발이 떨어졌습니다. 적 포병의 시사탄 같습니다 — 자리를 옮기십시오.';
 
 /** A post note as log lines; `canopy`: the post stands in forest; `sc`: the scenario, for the position a route ends on. */
 export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], canopy: boolean, sc: Pick<Scenario, 'routes' | 'friends'>): string[] {
@@ -86,7 +89,7 @@ export function postNote(n: PostNote, platoons: ReadonlySimState['platoons'], ca
       return [`${unitName(platoons, n.pid)}이(가) ${pos >= 0 ? `아군 ${pos + 1}소대` : '아군'} 진지를 돌파했습니다.`];
     }
     case 'ranging': // the player hears where it fell, never the count or the time left (#123 Q11)
-      return ['관측소 근처에 적 포탄 한 발이 떨어졌습니다. 적 포병의 시사탄 같습니다 — 자리를 옮기십시오.'];
+      return [RANGING_NOTE];
     case 'barrage':
       return ['관측소 주변에 적 포병의 포탄이 떨어집니다!'];
     case 'lost':

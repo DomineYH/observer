@@ -15,10 +15,10 @@ const sameMto = (a: Timed['utterance'], b: Timed['utterance']) =>
 
 /** The lines covered at real time `now` (실전 only): a 기러기 교신 to read back, `SHOWN_MS` after it came in, until the
  * observer reads it back right (a later readback of its kind, with the same four values for a 사격지휘통보). */
-export function hiddenLines(lines: readonly Line[], now: number): Set<number> {
+export function hiddenLines(lines: readonly Line[], now: number, shownMs = SHOWN_MS): Set<number> {
   const out = new Set<number>();
   lines.forEach((l, i) => {
-    if (l.type !== 'radio' || l.utterance.speaker !== 'fdc' || l.at === undefined || now - l.at < SHOWN_MS) return;
+    if (l.type !== 'radio' || l.utterance.speaker !== 'fdc' || l.at === undefined || now - l.at < shownMs) return;
     const kind = ASKS[l.utterance.kind];
     if (!kind) return;
     const back = lines.slice(i + 1).some((b) => b.type === 'radio' && b.utterance.speaker === 'observer' && b.utterance.kind === kind && (kind !== 'mto' || sameMto(b.utterance, l.utterance)));

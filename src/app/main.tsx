@@ -1,5 +1,5 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
-import { StrictMode, useMemo, useState, useSyncExternalStore } from 'react';
+import { StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
@@ -20,10 +20,16 @@ import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { ReadbackBox } from '@ui/ReadbackBox';
-import { owedOf } from '@ui/readback';
+import { openForms } from '@ui/openForms';
+import { shiftOptions, targetOptions } from '@ui/radio/drafts';
+import type { Fill } from '@ui/radio/matching';
+import { owedOf, SHOWN_MS } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
+import { createTalk } from '@ui/talk';
+import { TalkBar } from '@ui/TalkBar';
+import { createVoiceSetting } from '@ui/voiceSetting';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { HeadBand, ModeSwitch, pauseCovers, QualityPicker, type Speed } from '@ui/HeadBand';
@@ -32,12 +38,12 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { battlefieldOf, loadTerrain, selectBackend } from './backend';
+import { battlefieldOf, loadTerrain, selectBackend, voiceCreditsOf, voiceInputOf } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame, regunned, remade, type Game } from './game';
-import { startLoop, timescaleOf } from './loop';
+import { startLoop, stretchOf, timescaleOf } from './loop';
 import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
 import { chooseSeed, dailyCandidates, dailyScenario, dailySeed, kstDate, placementFor } from './seed';
@@ -111,10 +117,26 @@ const submitOnEnd = () => {
 const audio = webAudio();
 const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(), audio, NAMES);
 for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audio.unlock, { once: true });
+// 음성 입력: chosen by the backend variable, off until its setting opens it. Not offered under 768 px (#178 Q8).
+const heardBy = voiceInputOf(backend, location.search);
+// The 작전 준비 screen's 자료 출처 lines: the land's, then the 음성 모델's where the real 음성 입력 is used.
+const credited = { ...terrain, credits: [...terrain.credits, ...voiceCreditsOf(backend)] };
+const talk = createTalk(heardBy, sound.hush, () => listeners.forEach((l) => l()));
+const voiceSetting = createVoiceSetting(heardBy, () => {
+  if (voiceSetting.setting.state !== 'on') talk.reset(); // which tells the listeners
+  else listeners.forEach((l) => l());
+});
+const NARROW = matchMedia('(width < 768px)');
+const watchNarrow = (l: () => void) => {
+  NARROW.addEventListener('change', l);
+  return () => NARROW.removeEventListener('change', l);
+};
 // 무전 기록: a new array on every append, so its identity is a valid snapshot.
 let log: readonly LogLine[] = [];
 let started = false;
-const limit = prepLimit();
+// test aid, read each time so a test can switch it mid-game; never an input
+const timescale = () => timescaleOf(location.search, seedKind === 'practice');
+const limit = prepLimit(Date.now, () => stretchOf(timescale()));
 let prepShown: number | null = null; // the ms left in whole seconds, read at the publish rate
 const step = () => {
   limit.check(game);
@@ -163,8 +185,7 @@ startLoop(
     prepShown = left === null ? null : Math.ceil(left / 1000) * 1000;
     listeners.forEach((l) => l());
   },
-  // test aid, read each frame so a test can switch it mid-game; never an input
-  () => (pace.paused ? 0 : pace.speed * timescaleOf(location.search)),
+  () => (pace.paused ? 0 : pace.speed * timescale()),
 );
 
 const TRAINING_WARNING = '표준 모드 작전 중에 훈련 모드를 켜면 이 판은 저장만 되고 랭킹에서 제외됩니다. 계속할까요?';
@@ -230,6 +251,10 @@ function App() {
   const lines = useSyncExternalStore(subscribe, () => log);
   const callsign = useSyncExternalStore(subscribe, () => NAMES.callsign);
   const ended = useSyncExternalStore(subscribe, () => result);
+  const voiceInput = useSyncExternalStore(subscribe, () => voiceSetting.setting);
+  const narrow = useSyncExternalStore(watchNarrow, () => NARROW.matches);
+  const talkLine = useSyncExternalStore(subscribe, () => talk.line);
+  const [spoken, setSpoken] = useState<{ key: string; fill: Fill } | null>(null); // what was said, for the form it was said to
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
   const prepLeft = useSyncExternalStore(subscribe, () => prepShown);
@@ -248,13 +273,37 @@ function App() {
   // setting off, arriving or set up, 위치 보고 owed or skipped, each pause toggle, and a lase hit at 표적위치. Never on a
   // tick: typing stands.
   const composerKey = [mode, stage, sim.state.post.state, sim.state.reportDue, paused, stage === 'loc' ? lastHit?.tick : ''].join();
+  // The 표적성질 choices the forms list: made when the 입력기 is built, as it makes its own (same render, same state).
+  const lists = useMemo(() => ({ desc: targetOptions(sim.state.platoons), shift: shiftOptions(sim.state.platoons) }), [composerKey]);
+  // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the
+  // forms, or once the game is over. What is said belongs to the form open at the press: the 복창 상자's asked readback
+  // while one is owed, else the 입력기's.
+  const voiceOn = !narrow && voiceInput.state === 'on';
+  const asked = owedOf(mission?.readback ?? null)[0];
+  const talkKey = asked ? `${games}-${sim.state.missions.length}-${asked}` : composerKey;
+  // The form open now, for a 들린 글 that comes later: the 입력기 (and the button in it) is built again with every form.
+  const openKey = useRef(talkKey);
+  useEffect(() => {
+    openKey.current = talkKey;
+  });
+  // A form closed (it was built again, the pause covers it, the game is over) or the button gone (음성 입력 off, a narrow
+  // screen): what was held for it is let go, a 들린 글 still being worked out is dropped, and 기러기 is heard again. Done
+  // here and not by comparing keys later: a later form can have the same key as the one that closed.
+  const speakable = voiceOn && !covered && phase === 'live';
+  // While it can still be spoken to (only the form changed), a 들린 글 already shown stays to be read.
+  useEffect(() => talk.reset(speakable), [talkKey, speakable]);
+  // What was said fills its form once: gone with that form, or with 음성 입력, it does not come back to a later one.
+  if (spoken && (!voiceOn || spoken.key !== talkKey)) setSpoken(null);
+  const talkBar = voiceOn && (
+    <TalkBar talk={talk} line={talkLine} forms={speakable ? openForms(stage, sim.state, lists) : []} names={names} formKey={talkKey} openKey={openKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
+  );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
   const point = useMemo(() => pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null), [pin, picked, op]);
   // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
-      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} briefing={briefing} />}
+      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} briefing={briefing} lines={lines} laserLimit={init.combat?.numbers.laserLimit} />}
       <div className="app" data-tab={tab}>
         <HeadBand
           tick={tick}
@@ -270,7 +319,7 @@ function App() {
         >
           <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={chooseMode} />
           <QualityPicker quality={quality} onQuality={setQuality} />
-          <SoundToggles sound={sound} />
+          <SoundToggles sound={sound} voiceInput={narrow ? undefined : { setting: voiceInput, toggle: voiceSetting.toggle }} />
           <div>
             {/* M1 has only the mock backend: callsigns and records stay in this browser. */}
             <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} /> <output aria-live="off" aria-label="연결">오프라인</output>
@@ -308,7 +357,7 @@ function App() {
             state={{ phase, op, picked, reportDue }}
             scenario={scenario}
             briefing={briefing}
-            terrain={terrain}
+            terrain={credited}
             seed={seed}
             seedKind={seedKind}
             weather={init.weather}
@@ -323,13 +372,14 @@ function App() {
             gun={init.guns.id}
             onGun={changeGun}
           />
-          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} spoken={voiceOn && asked && spoken?.key === talkKey ? spoken.fill : null} />
           {covered ? (
             <section aria-label="입력기">
+              {talkBar}
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} />
+            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} talk={talkBar} spoken={voiceOn && !asked && spoken?.key === talkKey ? spoken.fill : null} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>
@@ -349,13 +399,14 @@ function App() {
               setTransfer(g);
               setTab('input'); // the form and its 송신 are there on a phone; the demo has no tabs
             }}
+            moveInMission={init.combat?.numbers.moveInMission === 1}
           />
         </div>
         <div data-panel="targets">
           <TargetList platoons={sim.state.platoons} mode={mode} op={op} /* re-rendered with the tick above */ />
         </div>
         <div data-panel="log">
-          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} />
+          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} shownMs={SHOWN_MS * stretchOf(timescale())} />
         </div>
       </div>
     </>

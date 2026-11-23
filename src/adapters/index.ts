@@ -1,4 +1,4 @@
-// 다섯 이음매(지형 원천·기상 원천·계정·기록 보관소·음성 출력)의 인터페이스와 mock 구현 자리. 각 슬라이스가 더한다.
+// 여섯 이음매(지형 원천·기상 원천·계정·기록 보관소·음성 출력·음성 입력)의 인터페이스와 mock 구현 자리. 각 슬라이스가 더한다.
 import type { Effect, GameRecord, ReplayData, SeedKind, Speaker, TerrainData, Weather } from '@sim';
 
 /** 지형 원천: one 지형 자료 per seed, finished. */
@@ -33,6 +33,36 @@ export interface WeatherSource {
 export interface VoiceOutput {
   speak(speaker: Speaker, text: string): void;
   stop(): void;
+}
+
+/** Why 음성 입력 cannot be used: this browser cannot run it, no microphone permission, or the 음성 모델 did not come. */
+export const VOICE_INPUT_FAILURES = ['unsupported', 'denied', 'model'] as const;
+export type VoiceInputFailure = (typeof VOICE_INPUT_FAILURES)[number];
+
+/** The only rejection of `VoiceInput.open`. */
+export class VoiceInputError extends Error {
+  constructor(
+    readonly reason: VoiceInputFailure,
+    options?: ErrorOptions,
+  ) {
+    super(`음성 입력: ${reason}`, options);
+    this.name = 'VoiceInputError';
+  }
+}
+
+/** 음성 입력: hears what is said while the player holds 눌러서 말하기 and gives it as text. Knows words, not 교신 문법 (ADR 0023). */
+export interface VoiceInput {
+  /** Asks for the microphone and gets the 인식기 ready. Rejects with a `VoiceInputError`; may be called again. */
+  open(): Promise<void>;
+  /** Starts hearing. `words` (들을 낱말): the only words that may be heard. */
+  listen(words: readonly string[]): Listening;
+  /** Lets the microphone and the 인식기 go; an `open` still under way is given up. */
+  close(): void;
+}
+export interface Listening {
+  /** The player stopped talking: the 들린 글, likeliest first; empty when nothing was heard. */
+  stop(): Promise<string[]>;
+  cancel(): void;
 }
 
 /** Why 계정 refuses a callsign. */

@@ -2,6 +2,8 @@
 import type { Effect, ReadonlySimState } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { clock } from './clock';
+import { RANGING_NOTE } from './post';
+import type { LogLine } from './RadioLog';
 
 type Platoons = ReadonlySimState['platoons'];
 
@@ -49,4 +51,28 @@ export function missionRow(m: ReadonlySimState['missions'][number]): string[] {
     m.truth ? `${word(m.truth)} (${m.truthPct}%)` : '—',
     m.report && m.truth ? (m.report === m.truth ? '일치' : '불일치') : '',
   ];
+}
+
+const MTO = ['fuze', 'rounds', 'control', 'targetNumber'] as const;
+/** 틀린 복창: the observer's 사격지휘통보 readbacks that differ from what 기러기 had last said (its 사격지휘통보 or 정정).
+ * Counted from what was sent, not from 기러기's 정정: a game can end before the 정정 comes. */
+function wrongReadbacks(lines: readonly LogLine[]): number {
+  let asked: Record<string, unknown> | null = null;
+  let wrong = 0;
+  for (const l of lines) {
+    if (l.type !== 'radio' || !('slots' in l.utterance) || (l.utterance.kind !== 'mto' && l.utterance.kind !== 'mto_correction')) continue;
+    const slots: Record<string, unknown> = l.utterance.slots;
+    if (l.utterance.speaker === 'fdc') asked = slots;
+    else if (asked && MTO.some((k) => slots[k] !== asked![k])) wrong++;
+  }
+  return wrong;
+}
+
+/** 강평의 실전 한 줄 (#183 Q3·Q4), a combat game's only: the lases taken from the final state, the rest counted off that
+ * game's 무전 기록 (the wrong readbacks sent, the 시사탄's line, 기러기's 진지 변환 중). The screen counts; the 판 기록 holds none of it. */
+export function combatLine(state: Pick<ReadonlySimState, 'mode' | 'combat'>, lines: readonly LogLine[], laserLimit: number): string | null {
+  if (state.mode !== 'combat') return null;
+  const displaced = lines.filter((l) => l.type === 'radio' && l.utterance.speaker === 'fdc' && l.utterance.kind === 'displacing').length;
+  const shelled = lines.filter((l) => l.type === 'system' && l.text === RANGING_NOTE).length;
+  return `실전: 쓴 레이저 ${state.combat?.lasesUsed ?? 0}/${laserLimit} · 틀린 복창 ${wrongReadbacks(lines)}회 · 적 포병 사격 ${shelled}회 · 진지 변환 ${displaced}회`;
 }

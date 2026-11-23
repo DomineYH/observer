@@ -5,7 +5,9 @@ import type { Input, Mode, Target } from '@sim';
 import { Amounts, Preview } from './CorrectionForm';
 import { shiftDraft, type ShiftForm as Form } from './correction';
 import { targetLabel } from './radio/drafts';
+import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
+import { useSpokenSend } from './talk';
 
 const ROUNDS = [1, 2, 3, 4, 5];
 
@@ -16,9 +18,11 @@ interface Props {
   names: RadioNames;
   mode: Mode;
   send: (input: Input) => void;
+  /** What was just said: a 전이사격 fill replaces every field. */
+  spoken?: Fill | null;
 }
 
-export function ShiftForm({ targetNumber, options, prefill, names, mode, send }: Props) {
+export function ShiftForm({ targetNumber, options, prefill, names, mode, send, spoken = null }: Props) {
   const [form, setForm] = useState<Omit<Form, 'target'>>(() => ({
     direction: prefill,
     lateralDir: 'left',
@@ -30,7 +34,18 @@ export function ShiftForm({ targetNumber, options, prefill, names, mode, send }:
   }));
   const [target, setTarget] = useState('');
   const set = (patch: Partial<Form>) => setForm({ ...form, ...patch });
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'shift') {
+      const { target: said, ...fields } = spoken.values;
+      setForm(fields);
+      setTarget(JSON.stringify(said)); // one the form does not list falls back to its first choice, as below
+    }
+  }
   const chosen = options.find((t) => JSON.stringify(t) === target) ?? options[0]!;
+  const draft = shiftDraft({ ...form, target: chosen }, targetNumber);
+  const sendRef = useSpokenSend(spoken?.form === 'shift' ? spoken : null, () => draft && send(draft.input));
   return (
     <section aria-label="전이사격">
       <p>
@@ -63,7 +78,7 @@ export function ShiftForm({ targetNumber, options, prefill, names, mode, send }:
       <label>
         <input type="checkbox" checked={form.dangerClose === 1} onChange={(e) => set({ dangerClose: e.target.checked ? 1 : 0 })} /> 위험근접
       </label>
-      <Preview draft={shiftDraft({ ...form, target: chosen }, targetNumber)} empty="방향(밀)을 먼저 입력" names={names} mode={mode} send={send} />
+      <Preview draft={draft} empty="방향(밀)을 먼저 입력" names={names} mode={mode} send={send} sendRef={sendRef} />
     </section>
   );
 }

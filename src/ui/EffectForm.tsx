@@ -6,7 +6,9 @@ import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { CorrectionForm, Preview } from './CorrectionForm';
 import { reportName } from './effect';
 import { eomDraft, repeatDraft } from './radio/drafts';
+import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
+import { useSpokenSend } from './talk';
 
 const W = RADIO_GRAMMAR.tables;
 const EFFECTS: readonly Effect[] = ['destroyed', 'neutralized', 'ineffective'];
@@ -22,13 +24,27 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   held?: boolean; // 실전: owed readbacks hold 임무끝 · 재효력사 · 수정 후 효력사
+  walking?: boolean; // 실전: the post walks (임무 중 관측소 이동): no 재효력사 and no 수정 후 효력사; 임무끝 goes
+  /** What was just said: 임무끝, 재효력사 or 수정 후 효력사 picks the 다음 조치 and fills its fields. */
+  spoken?: Fill | null;
 }
 
-export function EffectForm({ state, mission, prefill, names, mode, send, held }: Props) {
+export function EffectForm({ state, mission, prefill, names, mode, send, held, walking, spoken = null }: Props) {
   const [effect, setEffect] = useState<Effect>('neutralized');
   const [action, setAction] = useState<Action>('eom');
   const [rounds, setRounds] = useState(2);
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'eom' || spoken?.form === 'repeat' || spoken?.form === 'corr') setAction(spoken.form);
+    // 수정 후 효력사 said without a 효과 keeps the one chosen here.
+    if ((spoken?.form === 'eom' || spoken?.form === 'repeat' || spoken?.form === 'corr') && spoken.effect) setEffect(spoken.effect);
+    if (spoken?.form === 'repeat') setRounds(spoken.rounds);
+  }
   const name = reportName(state);
+  const blocked = held || (walking && action === 'repeat');
+  const draft = action === 'eom' ? eomDraft(effect, name) : repeatDraft(effect, rounds, name);
+  const sendRef = useSpokenSend(spoken?.form === 'eom' || spoken?.form === 'repeat' ? spoken : null, () => action !== 'corr' && !blocked && send(draft.input));
   return (
     <>
       <select aria-label="효과" value={effect} onChange={(e) => setEffect(e.target.value as Effect)}>
@@ -59,16 +75,9 @@ export function EffectForm({ state, mission, prefill, names, mode, send, held }:
       )}
       {action === 'corr' ? (
         // B1: a mission that never sent 방향 (바로 효력사) gets the 방향 field here.
-        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} held={held} />
+        <CorrectionForm sent={mission.direction} help={null} prefill={prefill} effect={effect} dangerClose={mission.dangerClose} names={names} mode={mode} send={send} held={held || walking} spoken={spoken} />
       ) : (
-        <Preview
-          draft={action === 'eom' ? eomDraft(effect, name) : repeatDraft(effect, rounds, name)}
-          empty=""
-          names={names}
-          mode={mode}
-          send={send}
-          held={held}
-        />
+        <Preview draft={draft} empty="" names={names} mode={mode} send={send} held={blocked} sendRef={sendRef} />
       )}
     </>
   );

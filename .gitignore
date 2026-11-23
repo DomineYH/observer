@@ -8,3 +8,5 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 dist-real/
+# 음성 모델 (npm run voice:fetch)
+public/voice/

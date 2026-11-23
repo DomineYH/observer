@@ -100,6 +100,8 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
   // 실전: any 밀린 복창 holds the mission's 준비 쏴 · 수정 · 재효력사 · 임무끝 (ADR 0018).
   const r = m?.readback;
   if ((a === 'fire' || a === 'corr' || a === 'repeat' || a === 'eom') && r && (r.mto || r.shot || r.rounds_complete)) return false;
+  // Walking (임무 중 관측소 이동): the observer–target line keeps turning, so no 수정 and no 재효력사 until the post arrives.
+  if ((a === 'corr' || a === 'repeat') && s.post.state === 'moving') return false;
   if (a === 'call' && stage === 'idle') {
     const warning = v![0] as Warning;
     const b = drawBias(ctx.bal);
@@ -152,7 +154,7 @@ export function applyRadio(s: SimState, ctx: Ctx, a: string, v: readonly (number
     if (stage === 'effect') report(s, m!, v!.at(-1) as Effect);
     const first = m!.direction === null;
     m!.correction = correct(m!, sent);
-    if (first) noteDirection(s, m!);
+    if (first && m!.directionError === null) noteDirection(s, m!); // sent again after a move: the first one's error stands
     say({ speaker: 'observer', ending: 'over', kind: 'correction', slots: { ...m!.correction } });
     // Two draws, in this order: readback, 사격준비 끝 (효력사 takes longer: the fuzes are set for the whole battery).
     after(s, 2.5 + next(fdc) * 1.5, 'corr_readback');

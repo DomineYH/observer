@@ -1,7 +1,9 @@
 import { terrainHash, type TerrainData } from '@sim';
-import { TerrainLoadError, type TerrainFailure, type TerrainSource } from '@adapters/index';
+import { TerrainLoadError, type TerrainFailure, type TerrainSource, type VoiceInput } from '@adapters/index';
 import { mockTerrain } from '@adapters/mock/terrain';
+import { fakeRecogniser, heardOf, noVoiceInput } from '@adapters/mock/voiceInput';
 import { MUNGYEONG, realTerrain } from '@adapters/realTerrain';
+import { browserEnv, VOICE_CREDITS, voskInput } from '@adapters/vosk/voiceInput';
 import { PLACEMENTS } from '@content/lookup';
 import type { Placement } from '@content/placement';
 
@@ -14,8 +16,8 @@ export function selectBackend(value: string | undefined): Backend {
   throw new Error(`VITE_OBSERVER_BACKEND=${JSON.stringify(value)}: mock 또는 real이어야 한다`);
 }
 
-// 이음매 표: what each seam is under VITE_OBSERVER_BACKEND. Only the first two rows differ, and they are the two records
-// below; the others are wired in main.tsx the same way on both.
+// 이음매 표: what each seam is under VITE_OBSERVER_BACKEND. The first two rows and the last differ: the two records and
+// voiceInputOf below; the others are wired in main.tsx the same way on both.
 //
 // | 이음매      | mock                                         | real                                                |
 // | ----------- | -------------------------------------------- | --------------------------------------------------- |
@@ -31,9 +33,22 @@ export function selectBackend(value: string | undefined): Backend {
 // | 계정        | mockAccount (this browser's localStorage)    | mockAccount (this browser's localStorage)           |
 // | 기록 보관소 | mockArchive (this browser's localStorage)    | mockArchive (this browser's localStorage)           |
 // | 음성 출력   | webSpeech, or silentVoice without speechSynthesis in the browser (not chosen by the backend) | same       |
+// | 음성 입력   | fakeRecogniser: the 들린 글 a test gives it, | voskInput: vosk small-ko in this browser (ADR 0023),|
+// |             | or the address's ?heard=                     | noVoiceInput where the browser cannot run it;       |
+// |             |                                              | unlike 음성 출력, chosen by the backend             |
 const TERRAIN: Record<Backend, TerrainSource> = { mock: mockTerrain, real: realTerrain(MUNGYEONG, terrainHash) };
 
 export const terrainSourceOf = (backend: Backend): TerrainSource => TERRAIN[backend];
+
+/** 음성 입력 for the page at `search`. */
+export function voiceInputOf(backend: Backend, search: string): VoiceInput {
+  if (backend === 'mock') return fakeRecogniser(heardOf(search));
+  const env = browserEnv();
+  return env.capable() ? voskInput(env) : noVoiceInput;
+}
+
+/** 자료 출처 lines for the 음성 입력: the model and the library, where the real one is used. */
+export const voiceCreditsOf = (backend: Backend): readonly string[] => (backend === 'real' ? VOICE_CREDITS : []);
 
 /** What the page shows before the app's screen: the 받는 중 line, or the 오류 화면 for one cause. */
 export interface BootScreen {

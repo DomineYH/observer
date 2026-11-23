@@ -19,6 +19,8 @@ interface Props {
   mode: Mode;
   /** Real time, ms: in 실전 a 기러기 교신 to read back is covered `SHOWN_MS` after it came in, until read back right. */
   now?: number;
+  /** The cover time when the 느린 배속 stretches it; `SHOWN_MS` when left out. */
+  shownMs?: number;
 }
 
 /** One utterance's sentence. Arabic numerals are shown beside the words in training mode only. */
@@ -37,8 +39,8 @@ export function Sentence({ utterance, names, mode }: { utterance: RadioUtterance
 }
 
 /** 무전 기록: one line per 교신 한 마디 or notice: time, who said it, the sentence. */
-export function RadioLog({ lines, callsign, gridLetters, mode, now }: Props) {
-  const hidden = mode === 'combat' && now !== undefined ? hiddenLines(lines, now) : null;
+export function RadioLog({ lines, callsign, gridLetters, mode, now, shownMs }: Props) {
+  const hidden = mode === 'combat' && now !== undefined ? hiddenLines(lines, now, shownMs) : null;
   return (
     <section aria-label="무전 기록">
       <ol>

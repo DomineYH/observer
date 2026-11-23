@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { replay, validateReplay, type SimInit } from '@sim';
 import { mockArchive } from '@adapters/mock/records';
+import { PLACEMENTS } from '@content/lookup';
 import { init, START } from '../../tests/acceptance/init';
 import { CALL_FFE, DESC_UNKNOWN, EOM, LOC_CLEAR, POS_SKIP } from '../../tests/acceptance/mission';
 import { MISSION, NO_ENEMY, oneMission, play } from '../../tests/acceptance/session';
@@ -113,4 +114,15 @@ test('F-31: 재생 자료 — mock 판에는 terrain이 없다', () => {
   const other = replayOf({ ...at, terrain: { ...at.terrain, id: 'x', version: 2 } }, g.session.log, g.sim.state.tick);
   expect(other.terrain).toEqual({ id: 'x', version: 2 });
   expect(validateReplay(other).ok).toBe(true);
+});
+
+test('랭킹: 가짜 순위 행이 서는 보드는 배치 목록의 전장마다 첫 배치(기본 시나리오)의 표준 보드다', async () => {
+  const archive = mockArchive(memoryStorage(), (x) => validateReplay(x).ok);
+  const basics = PLACEMENTS.filter((p, i) => PLACEMENTS.findIndex((q) => q.terrain.id === p.terrain.id) === i).map((p) => p.scenario.id);
+  expect(basics).toEqual(['base', 'base-mungyeong']);
+  for (const { scenario } of PLACEMENTS)
+    for (const mode of ['standard', 'combat'] as const) {
+      const fake = (await archive.board(mode, scenario.id, 'total')).some((r) => r.fake);
+      expect(fake, `${mode} ${scenario.id}`).toBe(mode === 'standard' && basics.includes(scenario.id));
+    }
 });

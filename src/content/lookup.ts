@@ -1,5 +1,5 @@
 import type { CombatData, GunProfile, ReplayData, Ref, Scenario } from '@sim';
-import { COMBAT } from './combat';
+import { COMBAT, COMBAT_VERSIONS } from './combat';
 import { GUNS } from './guns';
 import type { Placement } from './placement';
 import { BASE } from './scenarios/base';
@@ -24,11 +24,13 @@ export function contentOf(header: Pick<ReplayData, 'scenario' | 'guns'> & Partia
   guns: GunProfile;
   combat?: CombatData;
 } {
-  if (header.mode === 'combat' && header.combatDataVersion !== COMBAT.version)
+  // A combat header names its 실전 자료 판: an older one this build keeps is replayed under its own rules (ADR 0022).
+  const combat = COMBAT_VERSIONS.find((c) => c.version === header.combatDataVersion);
+  if (header.mode === 'combat' && !combat)
     throw new Error(`combat@${header.combatDataVersion}: unknown version (this build has combat@${COMBAT.version})`);
   return {
     scenario: find('scenario', PLACEMENTS.map((p) => p.scenario), header.scenario),
     guns: find('guns', GUNS.map((g) => g.profile), header.guns),
-    ...(header.mode === 'combat' ? { combat: COMBAT } : {}),
+    ...(header.mode === 'combat' ? { combat } : {}),
   };
 }

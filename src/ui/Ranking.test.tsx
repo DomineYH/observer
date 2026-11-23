@@ -168,5 +168,8 @@ test('랭킹: 랭킹 창 — 모드와 시나리오를 고르는 자리', async 
     '# | 호출부호 | 종합 | 탄 | 초탄 오차 | 일자 |',
   ]);
   expect(two.pressed).toEqual(['실전', '야간 중대', '종합']);
-  expect(two.lines).toContainEqual(expect.stringMatching(/^\d+ \| 두루미 목업 \| 1000점 \| 97 \| 40 m \| 10-11 \|$/));
+  // 가짜 순위 행 stand on the 표준 board of the 기본 시나리오 only (#183): this one has no run yet and says so.
+  expect(two.lines.filter((l) => l.includes('목업 |'))).toEqual([]);
+  expect(two.lines).toContain('아직 기록이 없습니다');
+  expect(one.lines).not.toContain('아직 기록이 없습니다');
 });
