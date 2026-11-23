@@ -297,7 +297,7 @@ const menuItems = (page: Page) => {
     menu.getByRole('group', { name: '모드 전환', includeHidden: true }),
     menu.getByRole('group', { name: '화질', includeHidden: true }),
     menu.getByRole('button', { name: '소리', includeHidden: true }),
-    menu.getByRole('button', { name: '음성', includeHidden: true }),
+    menu.getByRole('button', { name: '음성', exact: true, includeHidden: true }),
     menu.getByRole('textbox', { name: '호출부호', exact: true, includeHidden: true }),
     menu.getByRole('status', { name: '연결', includeHidden: true }),
     menu.getByRole('status', { name: '시드', includeHidden: true }),

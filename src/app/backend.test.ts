@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
 import type { TerrainData } from '@sim';
-import { TerrainLoadError, TERRAIN_FAILURES, type TerrainFailure, type TerrainSource } from '@adapters/index';
+import { TerrainLoadError, TERRAIN_FAILURES, VoiceInputError, type TerrainFailure, type TerrainSource } from '@adapters/index';
 import { mockTerrain } from '@adapters/mock/terrain';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE, BASE_SCENARIO, BRIEFING } from '@content/scenarios/base';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
-import { loadTerrain, placementOf, selectBackend, terrainSourceOf, type BootScreen } from './backend';
+import { loadTerrain, placementOf, selectBackend, terrainSourceOf, voiceInputOf, type BootScreen } from './backend';
 
 test('조립 지점: real을 받는다', () => {
   expect(selectBackend(undefined)).toBe('mock');
@@ -20,6 +20,18 @@ test('조립 지점: real은 문경 지형 원천', () => {
   expect(real).not.toBe(mockTerrain);
   expect(typeof real.load).toBe('function');
   expect(terrainSourceOf('real')).toBe(real); // one source per page, so its one fetch is shared
+});
+
+test('조립 지점: 음성 입력 — mock은 가짜 인식기, real은 빈 구현', async () => {
+  // mock: opens, and hears the address's ?heard= in turn; without it, nothing.
+  const mock = voiceInputOf('mock', `?seed=1&heard=${encodeURIComponent('준비 쏴|임무끝')}`);
+  await mock.open();
+  expect([await mock.listen([]).stop(), await mock.listen([]).stop(), await mock.listen([]).stop()]).toEqual([['준비 쏴'], ['임무끝'], []]);
+  expect(await voiceInputOf('mock', '').listen([]).stop()).toEqual([]);
+  // real: no 인식기 yet (M4-9), so it refuses as a browser that cannot run one, whatever ?heard= says.
+  const real = voiceInputOf('real', '?heard=x');
+  await expect(real.open()).rejects.toEqual(new VoiceInputError('unsupported'));
+  expect(await real.listen([]).stop()).toEqual([]);
 });
 
 test('배치: 조립 지점이 지형 원천과 짝지어 고른다', async () => {

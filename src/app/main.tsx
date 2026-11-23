@@ -24,6 +24,7 @@ import { owedOf, SHOWN_MS } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
+import { createVoiceSetting } from '@ui/voiceSetting';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
 import { HeadBand, ModeSwitch, pauseCovers, QualityPicker, type Speed } from '@ui/HeadBand';
@@ -32,7 +33,7 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { battlefieldOf, loadTerrain, selectBackend } from './backend';
+import { battlefieldOf, loadTerrain, selectBackend, voiceInputOf } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
@@ -111,6 +112,13 @@ const submitOnEnd = () => {
 const audio = webAudio();
 const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(), audio, NAMES);
 for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audio.unlock, { once: true });
+// 음성 입력: chosen by the backend variable, off until its setting opens it. Not offered under 768 px (#178 Q8).
+const voiceSetting = createVoiceSetting(voiceInputOf(backend, location.search), () => listeners.forEach((l) => l()));
+const NARROW = matchMedia('(width < 768px)');
+const watchNarrow = (l: () => void) => {
+  NARROW.addEventListener('change', l);
+  return () => NARROW.removeEventListener('change', l);
+};
 // 무전 기록: a new array on every append, so its identity is a valid snapshot.
 let log: readonly LogLine[] = [];
 let started = false;
@@ -231,6 +239,8 @@ function App() {
   const lines = useSyncExternalStore(subscribe, () => log);
   const callsign = useSyncExternalStore(subscribe, () => NAMES.callsign);
   const ended = useSyncExternalStore(subscribe, () => result);
+  const voiceInput = useSyncExternalStore(subscribe, () => voiceSetting.setting);
+  const narrow = useSyncExternalStore(watchNarrow, () => NARROW.matches);
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
   const prepLeft = useSyncExternalStore(subscribe, () => prepShown);
@@ -271,7 +281,7 @@ function App() {
         >
           <ModeSwitch mode={mode} paused={paused} phase={phase} onMode={chooseMode} />
           <QualityPicker quality={quality} onQuality={setQuality} />
-          <SoundToggles sound={sound} />
+          <SoundToggles sound={sound} voiceInput={narrow ? undefined : { setting: voiceInput, toggle: voiceSetting.toggle }} />
           <div>
             {/* M1 has only the mock backend: callsigns and records stay in this browser. */}
             <CallsignForm callsign={callsign} editable={phase === 'prep'} claim={claim} /> <output aria-live="off" aria-label="연결">오프라인</output>
