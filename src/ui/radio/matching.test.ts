@@ -189,6 +189,7 @@ test('F-18: 말한 문장 — 자릿수가 틀리거나 꼭 들려야 하는 것
   none('좌표 4657 3115', LOC);
   none('찰리호텔 넷여섯오칠 삼하나하나오', LOC); // 좌표 not said
   none('좌표 찰리호텔 넷여섯오칠 삼하나하나오 호텔 하나', LOC); // a ninth digit after a letter
+  none('좌표 찰리호텔 넷여섯오칠 삼하나하나오 음 하나', LOC); // or after a word not understood
   // 극좌표: 방위각 four digits, 거리 three to five; both must be heard, and not a 좌표 with them.
   none('극좌표, 방위각 넷둘공, 거리 하나오공공', LOC);
   none('극좌표, 방위각 공넷둘공공, 거리 하나오공공', LOC);
@@ -304,7 +305,9 @@ test('F-18: 말한 문장 — 수정은 방향이 없는 임무에서 방향을 
   expect(values('동제원', LATER)).toEqual({ direction: '', ...ZERO, next: 'adjust' });
   // Nothing to correct by, an axis said twice, no number, a number read another way.
   for (const heard of ['효력사', '이상', '좌로 오십 우로 오십', '좌로', '늘리기 넷', '좌로 오공', '좌로 백', '늘리기 사백']) expect(values(heard, LATER), heard).toBeNull();
-  // A number not finished is no number: a tens place without 십.
+  // More of a number after it, right there or past a word not understood: not the number that was said.
+  for (const heard of ['우로 오십 하나', '우로 하나백둘십 하나', '우로 오십 음 하나', '늘리기 넷백 십']) expect(values(heard, LATER), heard).toBeNull();
+  expect(values('우로 오십, 늘리기 넷백, 효력사', LATER)).toMatchObject({ lateral: '50', range: '400', next: 'ffe' }); // whole ones before the next words
   for (const heard of ['좌로 하나백둘 포대', '좌로 하나백둘, 늘리기 넷백', '늘리기 넷백공십']) expect(values(heard, LATER), heard).toBeNull();
   // The form, as with typing, takes only its range: 좌우 to 800 m.
   const far = values('좌로 아홉백', LATER)!;
@@ -360,5 +363,5 @@ test('F-18: 들린 글 고정 자료', () => {
   }
   // The seed, 합성 50: how many were understood, and how many of those wrongly.
   const seed = HEARD_ROWS.filter((r) => r.source === '합성');
-  expect([seed.length, seed.filter((r) => r.expect).length, seed.filter((r) => r.wrong).length]).toEqual([50, 24, 3]);
+  expect([seed.length, seed.filter((r) => r.expect).length, seed.filter((r) => r.wrong).length]).toEqual([50, 20, 0]);
 });

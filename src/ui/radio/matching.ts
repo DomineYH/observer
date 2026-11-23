@@ -117,14 +117,21 @@ function digitRun(t: readonly string[], i: number): string {
   for (let d; (d = DIGITS.indexOf(t[i++] ?? '')) >= 0; ) out += d;
   return out;
 }
+/** More of a number follows at `i`: a 숫자 낱말 or a place word, right there or past one word that was not understood.
+ * The number read up to `i` is then not the whole of what was said, and nothing is filled from it. */
+const goesOn = (t: readonly string[], i: number): boolean => {
+  const part = (w: string | undefined) => w !== undefined && (DIGITS.includes(w) || w === HUNDRED || w === TEN);
+  return part(t[i]) || (t[i] === UNKNOWN && part(t[i + 1]));
+};
 /** The digits said after `key` (음성 문자 between are passed over), when their count is one of `lengths`. */
 function digitsAfter(t: readonly string[], key: string, lengths: readonly number[]): string | null {
   let i = t.indexOf(squeeze(key));
   if (i++ < 0) return null;
   while (PHONETIC.has(t[i] ?? '')) i++;
   const d = digitRun(t, i);
-  // An 음성 문자 right after the digits: the number was cut there, and more of it may follow.
-  return lengths.includes(d.length) && !PHONETIC.has(t[i + d.length] ?? '') ? d : null;
+  // An 음성 문자 right after the digits, or digits going on past a word not understood: the number was cut there.
+  const end = i + d.length;
+  return lengths.includes(d.length) && !PHONETIC.has(t[end] ?? '') && !goesOn(t, end) ? d : null;
 }
 const gridAfter = (t: readonly string[]) => {
   const d = digitsAfter(t, '좌표', [8]);
@@ -148,11 +155,16 @@ function roundsAfter(t: readonly string[], key: string, max: number): number | n
 function hundredsAt(t: readonly string[], i: number): number | null {
   const head = digitRun(t, i);
   const j = i + head.length;
-  if (head.length === 1 && t[j] === TEN) return Number(head) * 10 || null;
-  if (!head || t[j] !== HUNDRED) return null;
-  const tens = digitRun(t, j + 1);
-  if (!tens) return Number(head) * 100 || null;
-  return tens.length === 1 && Number(tens) > 0 && t[j + 2] === TEN ? Number(head) * 100 + Number(tens) * 10 : null;
+  if (!head) return null;
+  // [the meters, where the number ends]
+  let read: [number, number] | null = null;
+  if (head.length === 1 && t[j] === TEN) read = [Number(head) * 10, j + 1];
+  else if (t[j] === HUNDRED) {
+    const tens = digitRun(t, j + 1);
+    if (!tens) read = [Number(head) * 100, j + 1];
+    else if (tens.length === 1 && Number(tens) > 0 && t[j + 2] === TEN) read = [Number(head) * 100 + Number(tens) * 10, j + 3];
+  }
+  return read && read[0] > 0 && !goesOn(t, read[1]) ? read[0] : null;
 }
 /** One axis of a 수정량: its direction word and the meters after it. undefined: not said; null: said, but not readable. */
 function axis<K extends string>(t: readonly string[], table: Record<K, { text: string }>): { dir: K; metres: number } | null | undefined {

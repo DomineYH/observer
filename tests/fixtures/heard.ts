@@ -39,8 +39,10 @@ export interface HeardRow {
   heard: string;
   /** null: 못 알아들음, the form is not touched. */
   expect: Heard;
-  /** 틀리게 들림: heard wrong, and the rules fill a value that was not said. Kept so a rule change shows. (The two
-   * 전이사격 rows, whose "전이" was heard as another word, filled the 호출 form until the review of PR #204; now they are 못 알아들음.) */
+  /** 틀리게 들림: heard wrong, and the rules fill a value that was not said. Kept so a rule change shows. The seed had
+   * five such rows; since the review of PR #204 the rules take none of them (a 전이사격 without its "전이" is no call, and a
+   * number with more of it left over is no number), at the price of one row that had been heard right (r0-pos-report,
+   * whose 끝말 came out as "이 삼"). */
   wrong?: true;
 }
 
@@ -57,15 +59,15 @@ export const HEARD_ROWS: HeardRow[] = [
   { id: 'r0-desc-mortar', source: '합성', open: 'desc', said: '사격중인 적 박격포 3문, 포대 넷발, 이상.', heard: '사격 중인 적 박격포 삼 문 포대 넷 발 이 세 한', expect: null },
   { id: 'r0-fire', source: '합성', open: 'fire', said: '준비 쏴.', heard: '준비 사', expect: null },
   { id: 'r0-corr-direction', source: '합성', open: 'corrFirst', said: '방향 하나둘오공, 우로 하나백둘십, 늘리기 넷백, 이상.', heard: '방향 현 한 로 공 우 로 하나 백 둘 쏴 늘리기 넷 백 이 한', expect: null },
-  { id: 'r0-corr-left-drop', source: '합성', open: 'corr', said: '좌로 오십, 줄이기 둘백, 이상.', heard: '잠깐 오 십 줄이기 둘 백 이 삼', expect: { fill: { form: 'corr', values: { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '200', direction: '', next: 'adjust' }, effect: null } }, wrong: true },
+  { id: 'r0-corr-left-drop', source: '합성', open: 'corr', said: '좌로 오십, 줄이기 둘백, 이상.', heard: '잠깐 오 십 줄이기 둘 백 이 삼', expect: null },
   { id: 'r0-corr-add-ffe', source: '합성', open: 'corr', said: '늘리기 하나백, 효력사, 이상.', heard: '늘리기 하나 백 효력 사 이 삼', expect: { fill: { form: 'corr', values: { lateralDir: 'left', lateral: '0', rangeDir: 'add', range: '100', direction: '', next: 'ffe' }, effect: null } } },
   { id: 'r0-corr-right-ffe', source: '합성', open: 'corr', said: '우로 삼십, 효력사, 이상.', heard: '로 삼 십 효력 사 이 한', expect: null },
-  { id: 'r0-corr-big', source: '합성', open: 'corr', said: '좌로 둘백오십, 줄이기 하나오백, 이상.', heard: '좌 로 둘 백 우 십 줄이기 하나 오 백 이상', expect: { fill: { form: 'corr', values: { lateralDir: 'left', lateral: '200', rangeDir: 'drop', range: '1500', direction: '', next: 'adjust' }, effect: null } }, wrong: true },
+  { id: 'r0-corr-big', source: '합성', open: 'corr', said: '좌로 둘백오십, 줄이기 하나오백, 이상.', heard: '좌 로 둘 백 우 십 줄이기 하나 오 백 이상', expect: null },
   { id: 'r0-repeat', source: '합성', open: 'effect', said: '적 보병소대 무력화, 재효력사, 동제원, 포대 둘발, 이상.', heard: '적 보병 소대 무력화 재 효력 사 동 제원 포대 둘 발 이상', expect: { fill: { form: 'repeat', effect: 'neutralized', rounds: 2 } } },
   { id: 'r0-eom-destroyed', source: '합성', open: 'effect', said: '임무끝, 적 장갑차 파괴.', heard: '임무 끝 적 재 장갑차 파괴', expect: { fill: { form: 'eom', effect: 'destroyed' } } },
   { id: 'r0-eom-ineffective', source: '합성', open: 'effect', said: '임무끝, 적 보병 효과 미흡.', heard: '임무 끝 적 보병 효과 미흡', expect: { fill: { form: 'eom', effect: 'ineffective' } } },
   { id: 'r0-shift', source: '합성', open: 'idleShift', said: '전이, 표적번호 알파브라보 하나공공둘, 방향 공팔공공, 좌로 둘백, 늘리기 넷백, 이동중인 적 장갑차 2대, 포대 삼발, 효력사, 이상.', heard: '찰리 표적 번호 알파 브라보 하나 공 공 둘 방향 공 팔 공 공 좌 로 둘 백 늘리기 넷 백 이동 중인 적 장갑차 두 대 포대 삼 발 효력 사 이상', expect: null },
-  { id: 'r0-pos-report', source: '합성', open: 'pos', said: '기러기, 여기는 까마귀, 관측소 이동 끝, 현 위치 좌표 찰리호텔 넷오아홉아홉 삼오공둘, 이상.', heard: '기러기 여기 는 까마귀 관측소 이동 끝 현 위치 좌표 찰리 호텔 넷 오 아홉 아홉 삼 오 공 둘 이 삼', expect: { fill: { form: 'pos', e: '4599', n: '3502' } } },
+  { id: 'r0-pos-report', source: '합성', open: 'pos', said: '기러기, 여기는 까마귀, 관측소 이동 끝, 현 위치 좌표 찰리호텔 넷오아홉아홉 삼오공둘, 이상.', heard: '기러기 여기 는 까마귀 관측소 이동 끝 현 위치 좌표 찰리 호텔 넷 오 아홉 아홉 삼 오 공 둘 이 삼', expect: null },
   { id: 'r0-readback-mto', source: '합성', open: 'mto', said: '사격지휘통보, 포대, 순발신관, 삼발, 표적번호 알파브라보 하나공공하나, 잠깐대기.', heard: '사격지휘 통보 포대 순발 신관 삼 발 표적 번호 알파 브라보 하나 공 공 하나 잠깐 대기', expect: { fill: { form: 'readback', entry: { fuze: 'quick', rounds: '3', amc: false, tn: '1001' } } } },
   { id: 'r0-readback-mto-vt-amc', source: '합성', open: 'mto', said: '사격지휘통보, 포대, 접근신관, 둘발, 지명사, 표적번호 알파브라보 하나공하나둘, 잠깐대기.', heard: '사격지휘 통보 포대 접근 신관 팔 지명 사 표적 번호 알파 브라보 하나 공 하나 둘 잠깐 대기', expect: null },
   { id: 'r0-readback-shot', source: '합성', open: 'shot', said: '하나발 떳다, 잠깐대기.', heard: '하나 발 떳다 잠깐 대기', expect: { send: { a: 'readback', v: ['shot'] } } },
@@ -82,7 +84,7 @@ export const HEARD_ROWS: HeardRow[] = [
   { id: 'r3-desc-mortar', source: '합성', open: 'desc', said: '사격중인 적 박격포 3문, 포대 넷발, 이상.', heard: '사격 중인 적 박격포 삼 문 포대 넷 발 이상', expect: null },
   { id: 'r3-fire', source: '합성', open: 'fire', said: '준비 쏴.', heard: '준비 삼', expect: null },
   { id: 'r3-corr-direction', source: '합성', open: 'corrFirst', said: '방향 하나둘오공, 우로 하나백둘십, 늘리기 넷백, 이상.', heard: '방향 탄 아홉 우 로 하나 백 둘 십 늘리기 넷 백 이상', expect: null },
-  { id: 'r3-corr-left-drop', source: '합성', open: 'corr', said: '좌로 오십, 줄이기 둘백, 이상.', heard: '잠깐 줄이기 둘 백 이 삼', expect: { fill: { form: 'corr', values: { lateralDir: 'left', lateral: '0', rangeDir: 'drop', range: '200', direction: '', next: 'adjust' }, effect: null } }, wrong: true },
+  { id: 'r3-corr-left-drop', source: '합성', open: 'corr', said: '좌로 오십, 줄이기 둘백, 이상.', heard: '잠깐 줄이기 둘 백 이 삼', expect: null },
   { id: 'r3-corr-add-ffe', source: '합성', open: 'corr', said: '늘리기 하나백, 효력사, 이상.', heard: '늘리기 하나 백 효력 사 이 삼', expect: { fill: { form: 'corr', values: { lateralDir: 'left', lateral: '0', rangeDir: 'add', range: '100', direction: '', next: 'ffe' }, effect: null } } },
   { id: 'r3-corr-right-ffe', source: '합성', open: 'corr', said: '우로 삼십, 효력사, 이상.', heard: '로 삼 십 효력 사 이상', expect: null },
   { id: 'r3-corr-big', source: '합성', open: 'corr', said: '좌로 둘백오십, 줄이기 하나오백, 이상.', heard: '좌 로 통보 십 줄이기 하나 오 백 이 삼', expect: null },
