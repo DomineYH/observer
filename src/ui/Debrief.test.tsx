@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { expect, test } from 'vitest';
-import { replay, validateReplay, type ReplayData, type Sim } from '@sim';
+import { createSim, replay, underCanopy, validateReplay, type ReplayData, type Sim } from '@sim';
 import type { StoredRun } from '@adapters/index';
 import { replayOf, submissionOf } from '@app/records';
 import { INF_RECON, FFE5, playOut } from '../../tests/acceptance/end';
@@ -11,9 +11,13 @@ import { NO_ENEMY, oneMission } from '../../tests/acceptance/session';
 import { init } from '../../tests/acceptance/init';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE } from '@content/scenarios/base';
+import { landOf } from '../../tests/golden/land';
+import { SCRIPTS } from '../../tests/golden/scripts';
 import { clock } from './clock';
 import { Debrief } from './Debrief';
-import { bracket } from './debrief';
+import { bracket, combatLine } from './debrief';
+import { postNote } from './post';
+import type { LogLine } from './RadioLog';
 import { HeadBand } from './HeadBand';
 
 /** The markup as text: a line per row or heading, cells split by ' | '. */
@@ -150,3 +154,35 @@ test('랭킹: 저장 알림 — 실전', () => {
   expect(said('daily', true)).toContain('저장했습니다 · 실전 모드 · 일일 시드: 랭킹 집계');
   expect(said('practice', false)).toContain('저장했습니다 · 연습 시드: 랭킹에서는 제외');
 });
+
+test('실전: 강평의 실전 한 줄 — 쓴 레이저·틀린 복창·적 포병 사격·진지 변환을 그 판에서 일어난 대로 세고 훈련·표준 판에는 없다', async () => {
+  // The 실전 각본 (the combat golden's script) played as the app plays it: the 무전 기록 holds what was said and the post's notices.
+  const data = SCRIPTS.find((s) => s.file === '8-combat.json')!.replay;
+  const { terrain, scenario, guns, combat } = await landOf(data);
+  const sim = createSim({ ...data, scenario, guns, terrain, combat });
+  const lines: LogLine[] = [];
+  for (let t = 0; t < data.totalTicks; t++)
+    for (const e of sim.step(data.inputs.filter((i) => i.t === t)).events) {
+      if (e.type === 'radio') lines.push(e);
+      if (e.type === 'post') for (const said of postNote(e, sim.state.platoons, underCanopy(terrain, sim.state.op.x, sim.state.op.y), scenario)) if (said) lines.push({ type: 'system', tick: sim.state.tick, text: said });
+    }
+  const limit = combat!.numbers.laserLimit;
+  // What happened in that game: all five lases, one wrong 사격지휘통보 readback, one enemy barrage, one 진지 변환.
+  expect(data.inputs.filter((i) => i.a === 'lase')).toHaveLength(5);
+  expect(combatLine(sim.state, lines, limit)).toBe('실전: 쓴 레이저 5/5 · 틀린 복창 1회 · 적 포병 사격 1회 · 진지 변환 1회');
+  const shown = text(
+    <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign="참새12" saved="pending" replay={data} briefing={BASE.briefing} lines={lines} laserLimit={limit} />,
+  );
+  expect(shown).toContain('실전: 쓴 레이저 5/5 · 틀린 복창 1회 · 적 포병 사격 1회 · 진지 변환 1회');
+  expect(shown.find((l) => l.includes('관측소 이동'))).toContain(`관측소 이동 ${sim.record().postMoves}회`); // stays on its own line
+  expect(Object.keys(sim.record())).toHaveLength(23);
+  // A game where none of it happened counts zero, with the 한도 it had.
+  const quiet = createSim({ ...data, scenario, guns, terrain, combat });
+  expect(combatLine(quiet.state, [], limit)).toBe('실전: 쓴 레이저 0/5 · 틀린 복창 0회 · 적 포병 사격 0회 · 진지 변환 0회');
+  // 훈련·표준: no such line, whatever the 무전 기록 holds.
+  for (const mode of ['training', 'standard'] as const) {
+    const other = started();
+    expect(combatLine({ mode, combat: other.state.combat }, lines, limit), mode).toBeNull();
+  }
+  expect(debrief(started()).some((l) => l.startsWith('실전:'))).toBe(false);
+}, 60000);

@@ -34,6 +34,10 @@ export const FAKE_RUNS: readonly RankRow[] = [
   fake('종다리', 648, 26840, 107, 122, 54, 6, '2026-10-26T20:17:00.000Z'),
 ];
 
+/** Where the 가짜 순위 행 stand (#183 Q1): 표준 모드 of a 전장's 기본 시나리오. Their scores were written for those games;
+ * 실전 boards and other scenarios' boards show this browser's runs only. A new 전장's 기본 시나리오 is added here. */
+const FAKE_BOARDS: readonly string[] = ['base', 'base-mungyeong'];
+
 const KEY = 'observer.runs';
 const KEEP = 20; // runs kept in this browser, newest
 const TOP = 20; // rows a board shows
@@ -139,7 +143,8 @@ export function mockArchive(storage: Pick<Storage, 'getItem' | 'setItem'>, isRep
         .map((r): RankRow => ({ callsign: r.callsign, fake: false, createdAt: r.createdAt, record: r.record }));
       // Each callsign's best run (the earlier of a tie), then best first and, on a tie, the earlier run first.
       const best = new Map<string, RankRow>();
-      for (const r of [...FAKE_RUNS, ...mine].filter((r) => ok(r.record)).sort(byTime)) {
+      const fakes = mode === 'standard' && FAKE_BOARDS.includes(scenario) ? FAKE_RUNS : [];
+      for (const r of [...fakes, ...mine].filter((r) => ok(r.record)).sort(byTime)) {
         const held = best.get(r.callsign);
         if (!held || key(r.record) < key(held.record)) best.set(r.callsign, r);
       }

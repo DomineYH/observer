@@ -2,6 +2,8 @@
 import type { Effect, ReadonlySimState } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { clock } from './clock';
+import { RANGING_NOTE } from './post';
+import type { LogLine } from './RadioLog';
 
 type Platoons = ReadonlySimState['platoons'];
 
@@ -49,4 +51,13 @@ export function missionRow(m: ReadonlySimState['missions'][number]): string[] {
     m.truth ? `${word(m.truth)} (${m.truthPct}%)` : '—',
     m.report && m.truth ? (m.report === m.truth ? '일치' : '불일치') : '',
   ];
+}
+
+/** 강평의 실전 한 줄 (#183 Q3·Q4), a combat game's only: the lases taken from the final state, the rest counted off that
+ * game's 무전 기록 (기러기's 정정, the 시사탄's line, 기러기's 진지 변환 중). The screen counts; the 판 기록 holds none of it. */
+export function combatLine(state: Pick<ReadonlySimState, 'mode' | 'combat'>, lines: readonly LogLine[], laserLimit: number): string | null {
+  if (state.mode !== 'combat') return null;
+  const said = (kind: string) => lines.filter((l) => l.type === 'radio' && l.utterance.speaker === 'fdc' && l.utterance.kind === kind).length;
+  const shelled = lines.filter((l) => l.type === 'system' && l.text === RANGING_NOTE).length;
+  return `실전: 쓴 레이저 ${state.combat?.lasesUsed ?? 0}/${laserLimit} · 틀린 복창 ${said('mto_correction')}회 · 적 포병 사격 ${shelled}회 · 진지 변환 ${said('displacing')}회`;
 }

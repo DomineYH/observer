@@ -288,7 +288,7 @@ function App() {
   // One set of panels; app.css lays them out (wide grid, or the upright view-on-top with 아래 탭 under 768 px).
   return (
     <>
-      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} briefing={briefing} />}
+      {ended && <Debrief state={sim.state} record={sim.record()} grid={terrain.grid} callsign={callsign} saved={ended.saved} replay={ended.replay} briefing={briefing} lines={lines} laserLimit={init.combat?.numbers.laserLimit} />}
       <div className="app" data-tab={tab}>
         <HeadBand
           tick={tick}

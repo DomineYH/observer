@@ -4,7 +4,8 @@ import type { StoredRun } from '@adapters/index';
 import type { Briefing } from '@content/placement';
 import { gridOf } from '@render/mapView';
 import { clock } from './clock';
-import { missionRow, unitName, unitRow } from './debrief';
+import { combatLine, missionRow, unitName, unitRow } from './debrief';
+import type { LogLine } from './RadioLog';
 import { gridLabel } from './radio/readings';
 
 const UNIT_HEAD = ['적 부대', '적정', '사상', '결과'];
@@ -42,9 +43,13 @@ interface Props {
   saved: StoredRun | 'pending' | 'failed';
   replay: ReplayData;
   briefing: Briefing; // the chosen 배치's 작전 준비 글: names the 접근로
+  /** A combat game's 무전 기록 and 레이저 한도: the 실전 한 줄 is counted from them. */
+  lines?: readonly LogLine[];
+  laserLimit?: number;
 }
 
-export function Debrief({ state: s, record: r, grid, callsign, saved, replay, briefing }: Props) {
+export function Debrief({ state: s, record: r, grid, callsign, saved, replay, briefing, lines = [], laserLimit = 0 }: Props) {
+  const combat = combatLine(s, lines, laserLimit);
   const fired = s.missions.filter((m) => m.impacts.length + m.flights.length > 0);
   const where = s.platoons
     .map((p, pid) => `${unitName(s.platoons, pid)} ${p.route ? briefing.routes[p.route] : gridLabel(grid.letters, gridOf(grid, p))}`)
@@ -78,6 +83,7 @@ export function Debrief({ state: s, record: r, grid, callsign, saved, replay, br
         {positions.length ? `${positions.join(' · ')} (손실 ${r.friendlyLosses}명)` : '아군 진지 없음'} · 관측소 이동 {r.postMoves}회 · 위험근접 미선언{' '}
         {r.dangerCloseMissed}회 · 아군 근접 탄착 {r.friendlyHits}회
       </p>
+      {combat && <p>{combat}</p>}
       <h3>기록 — {callsign}</h3>
       <p>{savedNote(saved)}</p>
       <Table head={['항목', '값']} rows={metrics} />
