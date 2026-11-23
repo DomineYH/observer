@@ -1,4 +1,4 @@
-// The ci.yml `changes` classifier: only docs/, .routing/ and top-level Markdown count as docs-only; anything else runs CI.
+// The ci.yml `changes` classifier: only docs/ and top-level Markdown count as docs-only; anything else runs CI.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 
@@ -10,7 +10,7 @@ test('classify-changes: docs-only PRs skip, everything else runs', () => {
   expect(classify(['docs/adr/x.md', 'src/a.ts'])).toBe('code=true');
   expect(classify(['terrain/README.md'])).toBe('code=true');
   expect(classify(['docs/adr/x.md'])).toBe('code=false');
-  expect(classify(['GLOSSARY.md', '.routing/repo_checks.json'])).toBe('code=false');
+  expect(classify(['GLOSSARY.md', 'docs/agents/herdr_orchestrator.md'])).toBe('code=false');
   expect(classify([])).toBe('code=true');
 });
 
