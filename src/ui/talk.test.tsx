@@ -1,12 +1,13 @@
 // 눌러서 말하기 (M4-6): the 가짜 인식기 gives the 들린 글; the forms, driven by the simulation's state, make the inputs.
 // The tests have no DOM: a press and a release are the controller's two calls, a filled form is drawn as markup.
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createSim, type Input, type Mode, type MtoSlots, type RadioEvent, type Sim, type Target } from '@sim';
 import type { VoiceInput } from '@adapters/index';
 import { silentVoice } from '@adapters/mock/voice';
 import { fakeRecogniser } from '@adapters/mock/voiceInput';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { allButtons, buttonsOf, press, recording } from '../../tests/acceptance/buttons';
 import { combatInit, START } from '../../tests/acceptance/init';
 import { answered, CALL_ADJUST, CALL_FFE, corr, DESC_AMC, DESC_UNKNOWN, ended, LOC, MOVE, openRadio, radioEvents, send, started, toAdjust, toReady, untilImpact } from '../../tests/acceptance/mission';
 import { flatTerrain } from '../../tests/acceptance/terrain';
@@ -21,6 +22,9 @@ import { RadioLog } from './RadioLog';
 import { createSound } from './sound';
 import { createTalk, talkKey, talkText } from './talk';
 import { TalkBar } from './TalkBar';
+
+vi.mock('react/jsx-dev-runtime', async (real) => recording(await real<object>()));
+vi.mock('react/jsx-runtime', async (real) => recording(await real<object>()));
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const GRID = flatTerrain().grid;
@@ -44,6 +48,16 @@ const composer = (sim: Sim, fill: Fill | null = null, mode: Mode = sim.state.mod
   renderToStaticMarkup(
     <Composer stage={sim.state.radio.stage} live platoons={platoons} names={NAMES} grid={GRID} mode={mode} send={() => {}} state={sim.state} spoken={fill} />,
   );
+/** The filled 입력기 drawn and its `nth` 송신 pressed (a button that cannot be pressed takes none): what the form sent. */
+function sendOf(sim: Sim, fill: Fill | null, nth = 0, platoons: Parameters<typeof targetOptions>[0] = sim.state.platoons): Input[] {
+  const sent: Input[] = [];
+  const draw = () =>
+    renderToStaticMarkup(
+      <Composer stage={sim.state.radio.stage} live platoons={platoons} names={NAMES} grid={GRID} mode={sim.state.mode} send={(i) => void sent.push(i)} state={sim.state} spoken={fill} />,
+    );
+  press(buttonsOf(draw, '송신')[nth]);
+  return sent;
+}
 /** The `nth` 보낼 문장 on the screen (the 전이사격 form's is the second, after the 호출's). */
 const preview = (html: string, nth = 0) => text([...html.matchAll(/<p role="status" aria-live="off" aria-label="보낼 문장">(.*?)<\/p>/g)][nth]?.[1] ?? '(없음)');
 const sendable = (html: string) => [...html.matchAll(/<button type="button"( disabled="")?>송신<\/button>/g)].map((m) => !m[1]);
@@ -193,8 +207,11 @@ test('F-18: 말로 넣은 입력은 입력기가 만든 입력과 같다', async
     const combat = composer(sim, r.fills[0], 'combat', platoons);
     for (const v of values) expect(combat, `${name} 실전 ${v}`).toContain(v);
     expect(preview(combat), name).toBe('(없음)');
-    // Sent by hand, the simulation says that same sentence: the spoken form sends the same input (F-07 holds the 보낼 문장).
-    const taken = send(sim, hand.input);
+    // The form's own 송신 pressed: it sends the input a player makes by hand, and nothing before that press.
+    const pressed = sendOf(sim, r.fills[0]!, nth, platoons);
+    expect(pressed, name).toEqual([hand.input]);
+    // The simulation takes it and says the sentence the form showed.
+    const taken = send(sim, pressed[0]!);
     expect(taken.ok, name).toBe(true);
     expect(logged(taken.events[0]!), name).toBe(preview(filled, nth));
     // 못 알아들음: nothing is filled or sent, the form stays as it was, and the line shows what was heard.
@@ -206,6 +223,8 @@ test('F-18: 말로 넣은 입력은 입력기가 만든 입력과 같다', async
     // The form was built again before the 들린 글 came: it is dropped.
     const late = await talkTo(sim2, [heard], undefined, () => false, forms);
     expect([late.fills, late.sent, late.line], name).toEqual([[], [], '']);
+    // Not filled by speech, the same press sends the form's own first values (or nothing, where they are not complete).
+    expect(sendOf(sim2, null, nth, platoons), name).not.toEqual([hand.input]);
   }
   // 범위선의 말로 넣는 입력 열 가지 가운데 복창을 뺀 아홉: these eight here and 준비 쏴 below.
   expect([...kinds, 'fire'].sort()).toEqual(['call', 'corr', 'desc', 'eom', 'fire', 'loc', 'pos', 'repeat', 'shift']);
@@ -267,14 +286,17 @@ test('F-18: 말로 넣은 입력 — 밀린 복창이 있거나 실전에서 걷
   expect(text(held)).toContain(HELD);
   expect(held).toContain('aria-label="좌우 거리" inputMode="numeric" size="4" value="50"');
   expect(sendable(held)).toEqual([false]);
-  // Read back: the same filled form can be sent.
+  expect(sendOf(sim, fill)).toEqual([]); // pressed all the same: nothing goes
+  // Read back: the same filled form can be sent, and sends the 수정 that was said.
   for (const kind of ['mto', 'shot']) expect(send(sim, rb(sim, kind)).ok, kind).toBe(true);
   expect(sendable(composer(sim, fill))).toEqual([true]);
+  expect(sendOf(sim, fill)).toEqual([corr(1250, 'left', 50, 'drop', 0, 'adjust')]);
   // Walking (임무 중 관측소 이동): held again, with the words.
   expect(send(sim, MOVE(440, 440)).ok).toBe(true);
   const walking = composer(sim, fill);
   expect(text(walking)).toContain(WALKING);
   expect(sendable(walking)).toEqual([false]);
+  expect(sendOf(sim, fill)).toEqual([]);
 
   // 효과 관측 while walking: 재효력사 and 수정 후 효력사 said are filled and held; 임무끝 said can be sent.
   const ffe = combat();
@@ -292,12 +314,15 @@ test('F-18: 말로 넣은 입력 — 밀린 복창이 있거나 실전에서 걷
   const repeat = composer(ffe, { form: 'repeat', effect: 'ineffective', rounds: 2 });
   expect(repeat).toContain('<option value="repeat" selected="">재효력사</option>');
   expect([text(repeat).includes(WALKING), sendable(repeat)]).toEqual([true, [false]]);
+  expect(sendOf(ffe, { form: 'repeat', effect: 'ineffective', rounds: 2 })).toEqual([]);
   const after = composer(ffe, { form: 'corr', values: { direction: '0800', ...ZERO, lateral: '60', next: 'ffe' }, effect: null });
   expect(after).toContain('<option value="corr" selected="">수정 후 효력사</option>');
   expect(sendable(after)).toEqual([false]);
+  expect(sendOf(ffe, { form: 'corr', values: { direction: '0800', ...ZERO, lateral: '60', next: 'ffe' }, effect: null })).toEqual([]);
   const eom = composer(ffe, { form: 'eom', effect: 'destroyed' });
   expect(eom).toContain('<option value="destroyed" selected="">파괴</option>');
   expect(sendable(eom)).toEqual([true]);
+  expect(sendOf(ffe, { form: 'eom', effect: 'destroyed' })).toEqual([{ a: 'eom', v: ['destroyed'] }]);
 });
 
 test('F-18: 말로 넣은 입력 — 준비 쏴는 맞으면 바로 나가고 F 키의 입력과 같다', async () => {
@@ -329,8 +354,9 @@ test('F-18: 말로 넣은 입력 — 보낼 교신이 없으면 눌리지 않고
   radioEvents(flying, 5);
   expect(formsOf(flying)).toEqual([]);
   // The button: pressed while listening, not pressable with no form open, absent with 음성 입력 off.
+  const idleTalk = { press: () => {}, release: async () => {}, reset: () => {} };
   const bar = (forms: Parameters<typeof TalkBar>[0]['forms'], line: Parameters<typeof TalkBar>[0]['line'] = null) =>
-    renderToStaticMarkup(<TalkBar talk={{ press: () => {}, release: async () => {} }} line={line} forms={forms} names={NAMES} formKey="k" onFill={() => {}} send={() => {}} />);
+    renderToStaticMarkup(<TalkBar talk={idleTalk} line={line} forms={forms} names={NAMES} formKey="k" openKey={{ current: 'k' }} onFill={() => {}} send={() => {}} />);
   expect(bar([{ form: 'call' }])).toBe('<p><button type="button" aria-pressed="false">눌러서 말하기 <kbd>V</kbd></button> <output aria-label="들린 글"></output></p>');
   expect(bar([])).toContain('<button type="button" disabled="" aria-pressed="false">');
   expect(text(bar([{ form: 'call' }], { state: 'working' }))).toBe('눌러서 말하기 V 알아듣는 중');
@@ -338,7 +364,7 @@ test('F-18: 말로 넣은 입력 — 보낼 교신이 없으면 눌리지 않고
   const idle = opened();
   expect(composer(idle)).not.toContain('눌러서 말하기');
   const withBar = renderToStaticMarkup(
-    <Composer stage="idle" live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={idle.state} talk={<TalkBar talk={{ press: () => {}, release: async () => {} }} line={null} forms={[{ form: 'call' }]} names={NAMES} formKey="k" onFill={() => {}} send={() => {}} />} />,
+    <Composer stage="idle" live platoons={[]} names={NAMES} grid={GRID} mode="standard" send={() => {}} state={idle.state} talk={<TalkBar talk={idleTalk} line={null} forms={[{ form: 'call' }]} names={NAMES} formKey="k" openKey={{ current: 'k' }} onFill={() => {}} send={() => {}} />} />,
   );
   expect(withBar.replace(bar([{ form: 'call' }]), '')).toBe(composer(idle)); // the button and its line are all that is new
 
@@ -412,4 +438,44 @@ test('F-18: 말로 넣은 입력 — V와 Enter는 단축키 무시 조건을 �
   for (const tag of ['INPUT', 'SELECT', 'TEXTAREA']) expect([key('v', tag), key('Enter', tag)], tag).toEqual([null, null]);
   for (const mod of ['ctrlKey', 'altKey', 'metaKey'] as const) expect([key('v', 'BODY', { [mod]: true }), key('Enter', 'BODY', { [mod]: true })], mod).toEqual([null, null]);
   for (const other of ['f', 'b', ' ', 'Escape']) expect(key(other), other).toBeNull();
+});
+
+test('F-18: 말로 넣은 입력 — 단추를 누른 뒤 양식이 다시 지어지면 들린 글을 버리고, 듣기를 시작하지 못하면 음성 출력을 되돌린다', async () => {
+  // The real 눌러서 말하기 button, pressed and let go by its own handlers; the app keeps the key of the form open now.
+  const run = async (rebuilt: boolean, heard: string) => {
+    const out = { fills: [] as Fill[], sent: [] as Input[], hushes: [] as boolean[] };
+    const talk = createTalk(fakeRecogniser([heard]), (on) => void out.hushes.push(on));
+    const openKey = { current: 'form-1' };
+    const forms: OpenForm[] = heard === '준비 쏴' ? [{ form: 'fire' }] : [{ form: 'call' }];
+    const [button] = allButtons(() =>
+      renderToStaticMarkup(<TalkBar talk={talk} line={talk.line} forms={forms} names={NAMES} formKey="form-1" openKey={openKey} onFill={(f) => void out.fills.push(f)} send={(i) => void out.sent.push(i)} />),
+    );
+    (button!.onPointerDown as () => void)();
+    if (rebuilt) openKey.current = 'form-2'; // the 교신 단계 moved on while the button was held
+    (button!.onPointerUp as () => void)();
+    for (let k = 0; k < 5 && talkText(talk.line) === '알아듣는 중'; k++) await new Promise((r) => setTimeout(r));
+    return { ...out, line: talkText(talk.line) };
+  };
+  expect(await run(false, '효력사')).toEqual({ fills: [{ form: 'call', warning: 'ffe' }], sent: [], hushes: [true, false], line: '들린 글: 효력사' });
+  expect(await run(true, '효력사')).toEqual({ fills: [], sent: [], hushes: [true, false], line: '' });
+  // 준비 쏴 held over a form change is not sent to the form that came after.
+  expect((await run(false, '준비 쏴')).sent).toEqual([fireKey('f')]);
+  expect(await run(true, '준비 쏴')).toEqual({ fills: [], sent: [], hushes: [true, false], line: '' });
+
+  // The 인식기 cannot start (a word it cannot take): nothing is held, and 기러기's voice is not left stopped.
+  const hushes: boolean[] = [];
+  const broken: VoiceInput = { open: async () => {}, close: () => {}, listen: () => { throw new TypeError('no grammar'); } };
+  const talk = createTalk(broken, (on) => void hushes.push(on));
+  talk.press({ forms: [{ form: 'call' }], names: NAMES, open: () => true, fill: () => {}, send: () => {} });
+  expect([hushes, talkText(talk.line)]).toEqual([[true, false], '']);
+  await talk.release();
+  expect(hushes).toEqual([true, false]);
+  // Let go by a reset (음성 입력 off, the button gone, the window's keys lost): 기러기 is heard again, and the 들린 글 is dropped.
+  const held: boolean[] = [];
+  const fills: Fill[] = [];
+  const live = createTalk(fakeRecogniser(['효력사']), (on) => void held.push(on));
+  live.press({ forms: [{ form: 'call' }], names: NAMES, open: () => true, fill: (f) => void fills.push(f), send: () => {} });
+  live.reset();
+  await live.release();
+  expect([held, fills, talkText(live.line)]).toEqual([[true, false], [], '']);
 });

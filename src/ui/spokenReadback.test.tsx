@@ -1,10 +1,11 @@
 // 실전의 말로 하는 복창 (M4-8, #181): what is said fills the 복창 상자, and the box makes the `readback` input as before.
 // The simulation is driven through its public interface; a press and a release are the 눌러서 말하기 controller's calls.
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createSim, type Input, type MtoSlots, type Sim } from '@sim';
 import { fakeRecogniser } from '@adapters/mock/voiceInput';
 import { BASE_SCENARIO } from '@content/scenarios/base';
+import { buttonsOf, press, recording } from '../../tests/acceptance/buttons';
 import { combatInit, START } from '../../tests/acceptance/init';
 import { corr, openRadio, radioEvents, send, toReady, untilImpact } from '../../tests/acceptance/mission';
 import { openForms } from './openForms';
@@ -13,6 +14,9 @@ import { radioSentence, spoken } from './radio/sentence';
 import { readbackInput, type Entry } from './readback';
 import { ReadbackBox, ReadbackForm } from './ReadbackBox';
 import { createTalk, talkText } from './talk';
+
+vi.mock('react/jsx-dev-runtime', async (real) => recording(await real<object>()));
+vi.mock('react/jsx-runtime', async (real) => recording(await real<object>()));
 
 const NAMES = { callsign: '갈매기', gridLetters: 'CH' };
 const UNKNOWN_ONLY = { desc: [{ targetType: 'unknown' }], shift: [{ targetType: 'unknown' }] } as const;
@@ -41,6 +45,12 @@ async function say(sim: Sim, heard: string[]) {
 const entryOf = (fill: Fill | undefined): Entry => (fill?.form === 'readback' ? fill.entry : { fuze: null, rounds: '', amc: false, tn: '' });
 /** The 복창 상자 as drawn with what was said. */
 const box = (sim: Sim, fill: Fill | null) => renderToStaticMarkup(<ReadbackBox mission={mission(sim)} queued={[]} send={() => {}} spoken={fill} />);
+/** The 복창 상자 drawn with what was said and its 복창 송신 pressed (not when it cannot be): what the box sent. */
+function sendOf(sim: Sim, fill: Fill | null, queued: Input[] = []): Input[] {
+  const sent: Input[] = [];
+  press(buttonsOf(() => renderToStaticMarkup(<ReadbackBox mission={mission(sim)} queued={queued} send={(i) => void sent.push(i)} spoken={fill} />), '복창 송신')[0]);
+  return sent;
+}
 const points = (sim: Sim) => sim.state.signature!.points;
 
 test('실전: 말로 하는 복창 — 말한 문장이 복창 상자의 네 칸을 채우고 보낸 입력은 손으로 넣은 복창과 같다', async () => {
@@ -59,10 +69,14 @@ test('실전: 말로 하는 복창 — 말한 문장이 복창 상자의 네 칸
   expect(drawn).toContain(`aria-label="표적번호" inputMode="numeric" maxLength="4" size="4" value="${right.targetNumber}"`);
   expect(drawn).toMatch(new RegExp(`<button type="button" aria-pressed="true">${right.fuze === 'quick' ? '순발신관' : '접근신관'}</button>`));
   expect(drawn).toContain('<button type="button">복창 송신</button>'); // filled in: it can be pressed
-  // The box makes the input from the fields, as from typed ones: the same input, and 기러기 takes it.
-  const input = readbackInput('mto', entryOf(r.fills[0]))!;
+  // 복창 송신 pressed: the box sends the input it makes from typed fields, and 기러기 takes it. Unfilled, or with a readback
+  // already on its way, the press sends nothing.
+  expect(sendOf(sim, null)).toEqual([]);
+  expect(sendOf(sim, r.fills[0]!, [{ a: 'readback', v: ['shot'] }])).toEqual([]);
+  const [input] = sendOf(sim, r.fills[0]!);
   expect(input).toEqual({ a: 'readback', v: ['mto', right.fuze, right.rounds, right.control, right.targetNumber] });
-  expect(send(sim, input).ok).toBe(true);
+  expect(input).toEqual(readbackInput('mto', entryOf(r.fills[0])));
+  expect(send(sim, input!).ok).toBe(true);
   expect(mission(sim).readback!.mto).toBe(false);
   expect(points(sim)).toBe(before + 1); // 보낸 것만 복창이다
 });
@@ -105,8 +119,9 @@ test('실전: 말로 하는 복창 — 틀리게 들린 값을 보내면 틀린 
   // Heard with another 발수: filled as heard, and sent as it stands it is a wrong readback like a typed one.
   const wrongRounds = right.rounds === 1 ? 2 : 1;
   const wrong = await say(sim, [sentence({ ...right, rounds: wrongRounds })]);
-  const sentWrong = readbackInput('mto', entryOf(wrong.fills[0]))!;
-  expect(send(sim, sentWrong).ok).toBe(true);
+  const [sentWrong] = sendOf(sim, wrong.fills[0]!);
+  expect(sentWrong).toEqual({ a: 'readback', v: ['mto', right.fuze, wrongRounds, right.control, right.targetNumber] });
+  expect(send(sim, sentWrong!).ok).toBe(true);
   expect(points(sim)).toBe(before + 1);
   const said = radioEvents(sim, 60);
   expect(said.filter((e) => e.utterance.speaker === 'fdc' && e.utterance.kind === 'mto_correction')).toHaveLength(1);

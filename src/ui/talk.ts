@@ -45,7 +45,12 @@ export function createTalk(input: VoiceInput, hush: (on: boolean) => void, onCha
       if (held || !target.forms.length) return;
       attempt++;
       hush(true);
-      held = { listening: input.listen(listenWords(target.forms, target.names)), target };
+      try {
+        held = { listening: input.listen(listenWords(target.forms, target.names)), target };
+      } catch {
+        hush(false); // the 인식기 could not start: nothing is held, and 기러기 is heard again
+        return set(null);
+      }
       set({ state: 'listening' });
     },
     async release(): Promise<void> {
@@ -67,7 +72,8 @@ export function createTalk(input: VoiceInput, hush: (on: boolean) => void, onCha
       }
       set({ state: 'missed', text: texts[0] ?? '' });
     },
-    /** 음성 입력 was turned off: whatever is held or being worked out is dropped. */
+    /** 음성 입력 was turned off, the button went away, or the window lost the keys: whatever is held or being worked out is
+     * dropped, and 기러기 is heard again. */
     reset(): void {
       attempt++;
       if (held) {

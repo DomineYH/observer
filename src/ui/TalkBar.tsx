@@ -6,26 +6,26 @@ import type { RadioNames } from './radio/sentence';
 import { isTalkKey, talkKey, talkText, type Talk, type TalkLine } from './talk';
 
 interface Props {
-  talk: Pick<Talk, 'press' | 'release'>;
+  talk: Pick<Talk, 'press' | 'release' | 'reset'>;
   line: TalkLine;
   /** The forms open now; with none the button cannot be pressed. */
   forms: readonly OpenForm[];
   names: RadioNames;
   /** Changes whenever the open form is built again: a 들린 글 that comes after that is dropped. */
   formKey: string;
+  /** The key of the form open now, kept by the app: this button is built again with the 입력기, so it cannot keep it. */
+  openKey: { readonly current: string };
   onFill: (fill: Fill) => void;
   send: (input: Input) => void;
 }
 
-export function TalkBar({ talk, line, forms, names, formKey, onFill, send }: Props) {
-  const key = useRef(formKey);
+export function TalkBar({ talk, line, forms, names, formKey, openKey, onFill, send }: Props) {
   const press = () => {
     const at = formKey;
-    talk.press({ forms, names, open: () => key.current === at, fill: onFill, send });
+    talk.press({ forms, names, open: () => openKey.current === at, fill: onFill, send });
   };
   const latest = useRef(press);
   useEffect(() => {
-    key.current = formKey;
     latest.current = press;
   });
   useEffect(() => {
@@ -35,11 +35,15 @@ export function TalkBar({ talk, line, forms, names, formKey, onFill, send }: Pro
     const up = (e: KeyboardEvent) => {
       if (isTalkKey(e)) void talk.release();
     };
+    // The window lost the keys while V was held: its keyup never comes, so what was held is let go.
+    const lost = () => talk.reset();
     document.addEventListener('keydown', down);
     document.addEventListener('keyup', up);
+    window.addEventListener('blur', lost);
     return () => {
       document.removeEventListener('keydown', down);
       document.removeEventListener('keyup', up);
+      window.removeEventListener('blur', lost);
     };
   }, [talk]);
   const release = () => void talk.release();

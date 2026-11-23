@@ -1,5 +1,5 @@
 // 조립 지점: reads the environment, builds the simulation, owns the frame loop and hands panels read-only state.
-import { StrictMode, useMemo, useState, useSyncExternalStore } from 'react';
+import { StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { underCanopy, validateReplay, type Mode, type ReplayData } from '@sim';
 import type { StoredRun } from '@adapters/index';
@@ -275,12 +275,25 @@ function App() {
   const composerKey = [mode, stage, sim.state.post.state, sim.state.reportDue, paused, stage === 'loc' ? lastHit?.tick : ''].join();
   // The 표적성질 choices the forms list: made when the 입력기 is built, as it makes its own (same render, same state).
   const lists = useMemo(() => ({ desc: targetOptions(sim.state.platoons), shift: shiftOptions(sim.state.platoons) }), [composerKey]);
-  // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the forms.
-  // What is said belongs to the form open at the press: the 복창 상자's asked readback while one is owed, else the 입력기's.
+  // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the
+  // forms, or once the game is over. What is said belongs to the form open at the press: the 복창 상자's asked readback
+  // while one is owed, else the 입력기's.
+  const voiceOn = !narrow && voiceInput.state === 'on';
   const asked = owedOf(mission?.readback ?? null)[0];
   const talkKey = asked ? `${games}-${sim.state.missions.length}-${asked}` : composerKey;
-  const talkBar = !narrow && voiceInput.state === 'on' && (
-    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state, lists)} names={names} formKey={talkKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
+  // The form open now, for a 들린 글 that comes later: the 입력기 (and the button in it) is built again with every form.
+  const openKey = useRef(talkKey);
+  useEffect(() => {
+    openKey.current = talkKey;
+  });
+  // The button gone (음성 입력 off, a narrow screen): what was held is let go, and 기러기 is heard again.
+  useEffect(() => {
+    if (!voiceOn) talk.reset();
+  }, [voiceOn]);
+  // What was said fills its form once: gone with that form, or with 음성 입력, it does not come back to a later one.
+  if (spoken && (!voiceOn || spoken.key !== talkKey)) setSpoken(null);
+  const talkBar = voiceOn && (
+    <TalkBar talk={talk} line={talkLine} forms={covered || phase !== 'live' ? [] : openForms(stage, sim.state, lists)} names={names} formKey={talkKey} openKey={openKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
   );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
@@ -357,14 +370,14 @@ function App() {
             gun={init.guns.id}
             onGun={changeGun}
           />
-          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} spoken={talkBar && spoken?.key === talkKey ? spoken.fill : null} />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} spoken={voiceOn && asked && spoken?.key === talkKey ? spoken.fill : null} />
           {covered ? (
             <section aria-label="입력기">
               {talkBar}
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} talk={talkBar} spoken={talkBar && spoken?.key === composerKey ? spoken.fill : null} />
+            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} talk={talkBar} spoken={voiceOn && !asked && spoken?.key === talkKey ? spoken.fill : null} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>
