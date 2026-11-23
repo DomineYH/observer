@@ -1,5 +1,5 @@
 // 수정 form and the send preview shared by the composer's forms (demo lines 986–993); 실전 shows only its hint.
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import type { Effect, Input, Mode } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
@@ -17,9 +17,10 @@ export interface PreviewProps {
   mode: Mode;
   send: (input: Input) => void;
   held?: boolean; // 실전: an owed readback holds the mission's 송신 (#121 screen rule 1)
+  sendRef?: Ref<HTMLButtonElement>; // the 송신 button, for the focus after a spoken fill
 }
 
-export function Preview({ draft, empty, names, mode, send, held }: PreviewProps) {
+export function Preview({ draft, empty, names, mode, send, held, sendRef }: PreviewProps) {
   return (
     <>
       {mode === 'combat' ? (
@@ -28,7 +29,7 @@ export function Preview({ draft, empty, names, mode, send, held }: PreviewProps)
       ) : (
         <p role="status" aria-live="off" aria-label="보낼 문장">{draft ? <Sentence utterance={draft.utterance} names={names} mode={mode} /> : empty}</p>
       )}
-      <button type="button" disabled={!draft || held} onClick={() => draft && !held && send(draft.input)}>
+      <button ref={sendRef} type="button" disabled={!draft || held} onClick={() => draft && !held && send(draft.input)}>
         송신
       </button>
     </>

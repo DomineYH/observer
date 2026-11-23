@@ -21,11 +21,18 @@ const boomDelay = (distance: number) => Math.round((distance / SOUND_SPEED) * 20
 export function createSound(voice: VoiceOutput, effects: Effects, names: RadioNames) {
   const settings: SoundSettings = { voice: false, effects: true };
   let booms: { due: number; distance: number }[] = [];
+  let hushed = false;
   return {
     settings: settings as Readonly<SoundSettings>,
     set(next: Partial<SoundSettings>): void {
       if (settings.voice && next.voice === false) voice.stop();
       Object.assign(settings, next);
+    },
+    /** 눌러서 말하기 held (#180 Q9): 기러기's voice stops and what comes meanwhile is not read, so the speaker does not feed
+     * the microphone. The 무전 기록 still shows it. */
+    hush(on: boolean): void {
+      hushed = on;
+      if (on && settings.voice) voice.stop();
     },
     /** One step's events, read with the state after that step. */
     hear(events: readonly SimEvent[], state: { tick: number; op: Point; effects: readonly FieldEffect[] }): void {
@@ -33,7 +40,7 @@ export function createSound(voice: VoiceOutput, effects: Effects, names: RadioNa
         if (e.type === 'radio') {
           if (settings.effects) effects.squelch();
           // 기러기 only, and words only: the training-mode 병기 is never read.
-          if (settings.voice && e.utterance.speaker === 'fdc') voice.speak('fdc', spoken(radioSentence(e.utterance, names)));
+          if (settings.voice && !hushed && e.utterance.speaker === 'fdc') voice.speak('fdc', spoken(radioSentence(e.utterance, names)));
         } else if (e.type === 'impact') {
           const distance = Math.hypot(e.x - state.op.x, e.y - state.op.y);
           booms.push({ due: e.tick + boomDelay(distance), distance });

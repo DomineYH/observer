@@ -20,10 +20,14 @@ import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { ReadbackBox } from '@ui/ReadbackBox';
+import { openForms } from '@ui/openForms';
+import type { Fill } from '@ui/radio/matching';
 import { owedOf, SHOWN_MS } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
+import { createTalk } from '@ui/talk';
+import { TalkBar } from '@ui/TalkBar';
 import { createVoiceSetting } from '@ui/voiceSetting';
 import { TargetList } from '@ui/TargetList';
 import { TickCounter } from '@ui/TickCounter';
@@ -113,7 +117,12 @@ const audio = webAudio();
 const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(), audio, NAMES);
 for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audio.unlock, { once: true });
 // 음성 입력: chosen by the backend variable, off until its setting opens it. Not offered under 768 px (#178 Q8).
-const voiceSetting = createVoiceSetting(voiceInputOf(backend, location.search), () => listeners.forEach((l) => l()));
+const heardBy = voiceInputOf(backend, location.search);
+const talk = createTalk(heardBy, sound.hush, () => listeners.forEach((l) => l()));
+const voiceSetting = createVoiceSetting(heardBy, () => {
+  if (voiceSetting.setting.state !== 'on') talk.reset(); // which tells the listeners
+  else listeners.forEach((l) => l());
+});
 const NARROW = matchMedia('(width < 768px)');
 const watchNarrow = (l: () => void) => {
   NARROW.addEventListener('change', l);
@@ -241,6 +250,8 @@ function App() {
   const ended = useSyncExternalStore(subscribe, () => result);
   const voiceInput = useSyncExternalStore(subscribe, () => voiceSetting.setting);
   const narrow = useSyncExternalStore(watchNarrow, () => NARROW.matches);
+  const talkLine = useSyncExternalStore(subscribe, () => talk.line);
+  const [spoken, setSpoken] = useState<{ key: string; fill: Fill } | null>(null); // what was said, for the form it was said to
   const mode = useSyncExternalStore(subscribe, () => game.sim.state.mode);
   const { speed, paused } = useSyncExternalStore(subscribe, () => pace);
   const prepLeft = useSyncExternalStore(subscribe, () => prepShown);
@@ -259,6 +270,10 @@ function App() {
   // setting off, arriving or set up, 위치 보고 owed or skipped, each pause toggle, and a lase hit at 표적위치. Never on a
   // tick: typing stands.
   const composerKey = [mode, stage, sim.state.post.state, sim.state.reportDue, paused, stage === 'loc' ? lastHit?.tick : ''].join();
+  // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the forms.
+  const talkBar = !narrow && voiceInput.state === 'on' && (
+    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state)} names={names} formKey={composerKey} onFill={(fill) => setSpoken({ key: composerKey, fill })} send={send} />
+  );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
   const point = useMemo(() => pin ?? (picked ? { ...op, ...gridOf(terrain.grid, op) } : null), [pin, picked, op]);
@@ -337,10 +352,11 @@ function App() {
           <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} />
           {covered ? (
             <section aria-label="입력기">
+              {talkBar}
               <p role="status">일시정지 — 표준 모드에서는 정지 중에 관측 화면·지도·교신을 쓸 수 없습니다. 생각할 시간은 작전 시간 안에서 쓰십시오.</p>
             </section>
           ) : (
-            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} />
+            <Composer key={composerKey} stage={stage} live={phase === 'live'} platoons={sim.state.platoons} names={names} grid={terrain.grid} mode={mode} send={send} state={sim.state} pin={point} lastHit={lastHit} help={held?.help} transfer={transfer} talk={talkBar} spoken={talkBar && spoken?.key === composerKey ? spoken.fill : null} />
           )}
         </div>
         <div data-panel="map" hidden={covered}>
