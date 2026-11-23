@@ -5,7 +5,7 @@ import { mockTerrain } from '@adapters/mock/terrain';
 import { flatTerrain } from '../../tests/acceptance/terrain';
 import { BASE, BASE_SCENARIO, BRIEFING } from '@content/scenarios/base';
 import { BASE_MUNGYEONG } from '@content/scenarios/base-mungyeong';
-import { loadTerrain, placementOf, selectBackend, terrainSourceOf, voiceInputOf, type BootScreen } from './backend';
+import { loadTerrain, placementOf, selectBackend, terrainSourceOf, voiceCreditsOf, voiceInputOf, type BootScreen } from './backend';
 
 test('조립 지점: real을 받는다', () => {
   expect(selectBackend(undefined)).toBe('mock');
@@ -28,10 +28,14 @@ test('조립 지점: 음성 입력 — mock은 가짜 인식기, real은 빈 구
   await mock.open();
   expect([await mock.listen([]).stop(), await mock.listen([]).stop(), await mock.listen([]).stop()]).toEqual([['준비 쏴'], ['임무끝'], []]);
   expect(await voiceInputOf('mock', '').listen([]).stop()).toEqual([]);
-  // real: no 인식기 yet (M4-9), so it refuses as a browser that cannot run one, whatever ?heard= says.
+  // real: the vosk 어댑터, never the 가짜 인식기 whatever ?heard= says. Here (Node: no microphone) it is the empty one, which
+  // refuses as a browser that cannot run the 인식기.
   const real = voiceInputOf('real', '?heard=x');
   await expect(real.open()).rejects.toEqual(new VoiceInputError('unsupported'));
   expect(await real.listen([]).stop()).toEqual([]);
+  // 자료 출처: the model and the library, on the build that uses them.
+  expect(voiceCreditsOf('mock')).toEqual([]);
+  expect(voiceCreditsOf('real')).toEqual(['음성 모델 vosk-model-small-ko-0.22 (Alpha Cephei, Apache-2.0)', 'vosk-browser 0.0.8 (Apache-2.0)']);
 });
 
 test('배치: 조립 지점이 지형 원천과 짝지어 고른다', async () => {

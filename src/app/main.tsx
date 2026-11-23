@@ -38,7 +38,7 @@ import { Debrief } from '@ui/Debrief';
 import { CallsignForm } from '@ui/CallsignForm';
 import { RankingDialog } from '@ui/Ranking';
 import { moveStarted, postNote, reportError, SKIPPED } from '@ui/post';
-import { battlefieldOf, loadTerrain, selectBackend, voiceInputOf } from './backend';
+import { battlefieldOf, loadTerrain, selectBackend, voiceCreditsOf, voiceInputOf } from './backend';
 import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
@@ -119,6 +119,8 @@ const sound = createSound('speechSynthesis' in window ? webSpeech : silentVoice(
 for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audio.unlock, { once: true });
 // 음성 입력: chosen by the backend variable, off until its setting opens it. Not offered under 768 px (#178 Q8).
 const heardBy = voiceInputOf(backend, location.search);
+// The 작전 준비 screen's 자료 출처 lines: the land's, then the 음성 모델's where the real 음성 입력 is used.
+const credited = { ...terrain, credits: [...terrain.credits, ...voiceCreditsOf(backend)] };
 const talk = createTalk(heardBy, sound.hush, () => listeners.forEach((l) => l()));
 const voiceSetting = createVoiceSetting(heardBy, () => {
   if (voiceSetting.setting.state !== 'on') talk.reset(); // which tells the listeners
@@ -340,7 +342,7 @@ function App() {
             state={{ phase, op, picked, reportDue }}
             scenario={scenario}
             briefing={briefing}
-            terrain={terrain}
+            terrain={credited}
             seed={seed}
             seedKind={seedKind}
             weather={init.weather}
