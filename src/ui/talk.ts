@@ -72,16 +72,17 @@ export function createTalk(input: VoiceInput, hush: (on: boolean) => void, onCha
       }
       set({ state: 'missed', text: texts[0] ?? '' });
     },
-    /** 음성 입력 was turned off, the button went away, or the window lost the keys: whatever is held or being worked out is
-     * dropped, and 기러기 is heard again. */
-    reset(): void {
+    /** 음성 입력 was turned off, the button went away, a form closed, or the window lost the keys: whatever is held or being
+     * worked out is dropped, and 기러기 is heard again. `keepHeard`: a line that is already an answer (들린 글, 알아듣지
+     * 못했습니다) stays, so what was heard can still be read after the form it went to has moved on. */
+    reset(keepHeard = false): void {
       attempt++;
       if (held) {
         held.listening.cancel();
         hush(false);
       }
       held = null;
-      set(null);
+      if (!(keepHeard && line && 'text' in line)) set(null);
     },
   };
 }

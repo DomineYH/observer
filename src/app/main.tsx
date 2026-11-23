@@ -290,7 +290,8 @@ function App() {
   // screen): what was held for it is let go, a 들린 글 still being worked out is dropped, and 기러기 is heard again. Done
   // here and not by comparing keys later: a later form can have the same key as the one that closed.
   const speakable = voiceOn && !covered && phase === 'live';
-  useEffect(() => talk.reset(), [talkKey, speakable]);
+  // While it can still be spoken to (only the form changed), a 들린 글 already shown stays to be read.
+  useEffect(() => talk.reset(speakable), [talkKey, speakable]);
   // What was said fills its form once: gone with that form, or with 음성 입력, it does not come back to a later one.
   if (spoken && (!voiceOn || spoken.key !== talkKey)) setSpoken(null);
   const talkBar = voiceOn && (

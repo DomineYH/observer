@@ -478,4 +478,17 @@ test('F-18: 말로 넣은 입력 — 단추를 누른 뒤 양식이 다시 지�
   live.reset();
   await live.release();
   expect([held, fills, talkText(live.line)]).toEqual([[true, false], [], '']);
+  // 준비 쏴 was sent at once and its form moved on: the answer already shown stays to be read, and goes with 음성 입력.
+  const sent: Input[] = [];
+  const fired = createTalk(fakeRecogniser(['준비 쏴']), () => {});
+  fired.press({ forms: [{ form: 'fire' }], names: NAMES, open: () => true, fill: () => {}, send: (i) => void sent.push(i) });
+  await fired.release();
+  fired.reset(true);
+  expect([sent, talkText(fired.line)]).toEqual([[fireKey('f')], '들린 글: 준비 쏴']);
+  // A listening or a 들린 글 still being worked out is dropped all the same when the form closes.
+  fired.press({ forms: [{ form: 'fire' }], names: NAMES, open: () => true, fill: () => {}, send: (i) => void sent.push(i) });
+  fired.reset(true);
+  expect(talkText(fired.line)).toBe('');
+  fired.reset();
+  expect(talkText(fired.line)).toBe('');
 });
