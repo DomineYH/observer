@@ -123,7 +123,8 @@ function digitsAfter(t: readonly string[], key: string, lengths: readonly number
   if (i++ < 0) return null;
   while (PHONETIC.has(t[i] ?? '')) i++;
   const d = digitRun(t, i);
-  return lengths.includes(d.length) ? d : null;
+  // An 음성 문자 right after the digits: the number was cut there, and more of it may follow.
+  return lengths.includes(d.length) && !PHONETIC.has(t[i + d.length] ?? '') ? d : null;
 }
 const gridAfter = (t: readonly string[]) => {
   const d = digitsAfter(t, '좌표', [8]);
@@ -142,14 +143,16 @@ function roundsAfter(t: readonly string[], key: string, max: number): number | n
   const n = DIGITS.indexOf(t[i + 1] ?? '');
   return i >= 0 && t[i + 2] === ROUND && n >= 1 && n <= max ? n : null;
 }
-/** 백·십 단위 backwards from `i` (둘백오십 → 250, 하나오백 → 1500, 여섯십 → 60); null when no such number starts there. */
+/** 백·십 단위 backwards from `i` (둘백오십 → 250, 하나오백 → 1500, 여섯십 → 60); null when no such number starts there, or
+ * when one starts and is not finished (하나백둘 with no 십: the tens place was not heard whole). */
 function hundredsAt(t: readonly string[], i: number): number | null {
   const head = digitRun(t, i);
   const j = i + head.length;
   if (head.length === 1 && t[j] === TEN) return Number(head) * 10 || null;
   if (!head || t[j] !== HUNDRED) return null;
-  const tens = DIGITS.indexOf(t[j + 1] ?? '');
-  return Number(head) * 100 + (tens > 0 && t[j + 2] === TEN ? tens * 10 : 0) || null;
+  const tens = digitRun(t, j + 1);
+  if (!tens) return Number(head) * 100 || null;
+  return tens.length === 1 && Number(tens) > 0 && t[j + 2] === TEN ? Number(head) * 100 + Number(tens) * 10 : null;
 }
 /** One axis of a 수정량: its direction word and the meters after it. undefined: not said; null: said, but not readable. */
 function axis<K extends string>(t: readonly string[], table: Record<K, { text: string }>): { dir: K; metres: number } | null | undefined {
@@ -165,18 +168,31 @@ function amounts(t: readonly string[]): { amount: Amount; any: boolean } | null 
   const amount: Amount = { lateralDir: lat?.dir ?? 'left', lateral: String(lat?.metres ?? 0), rangeDir: rng?.dir ?? 'drop', range: String(rng?.metres ?? 0) };
   return { amount, any: !!(lat || rng) };
 }
-/** The one choice whose every part was heard; of two, the one that says more (its 규모 too). */
+/** A 수정 was said: 효력사, or a 수정량 axis (readable or not). */
+const corrected = (t: readonly string[]) => has(t, '효력사') || amounts(t)?.any !== false;
+
+/** The one choice that was said: every part of it heard, its 규모 right after its 병종 and ending cleanly. A choice
+ * with no 규모 is not the one meant when a 규모 follows the 병종, heard or not (a 규모 the form does not list is none of
+ * its choices); nor is a choice whose 규모 runs on into words that are not the form's. */
 function targetAmong(t: readonly string[], options: readonly Target[]): Target | null {
-  const heard = options.filter((o) => targetSaid(o).every((ways) => has(t, ...ways)));
-  const most = Math.max(...heard.map((o) => targetSaid(o).length));
-  const best = heard.filter((o) => targetSaid(o).length === most);
-  return best.length === 1 ? best[0]! : null;
+  const sizes = new Set(options.flatMap((o) => sizeSaid(o).map(squeeze)));
+  if (t.filter((w) => sizes.has(w)).length > 1) return null; // two 규모 said: two choices at once
+  const said = options.filter((o) => {
+    if (!targetSaid(o).every((ways) => has(t, ...ways))) return false;
+    if (o.targetType === 'unknown') return true;
+    const type = t.indexOf(squeeze(W.targetType[o.targetType].text));
+    const sized = o.unit !== 'none';
+    if (sized && !sizeSaid(o).map(squeeze).includes(t[type + 1] ?? '')) return false;
+    const next = t[type + (sized ? 2 : 1)];
+    return next === undefined || (next !== UNKNOWN && !DIGITS.includes(next) && !sizes.has(next));
+  });
+  return said.length === 1 ? said[0]! : null;
 }
 
 interface Rule<F extends OpenForm = OpenForm> {
   /** The words that tell this form from another open with it; none for the form meant when no other's are heard. */
   keys: readonly string[];
-  match(t: readonly string[], form: F): Heard;
+  match(t: readonly string[], form: F, names: RadioNames): Heard;
 }
 const fill = (f: Fill | null | false): Heard => (f ? { fill: f } : null);
 
@@ -184,9 +200,12 @@ const fill = (f: Fill | null | false): Heard => (f ? { fill: f } : null);
 const RULES: { [K in OpenForm['form']]: Rule<Extract<OpenForm, { form: K }>> } = {
   call: {
     keys: [],
-    match: (t) => {
+    // A call holds the 호출부, one 경고명령 and the 끝말, no more: with another form's words in it (a 전이사격 whose "전이"
+    // was not heard still ends in 효력사) it is not a call.
+    match: (t, form, names) => {
+      const own = new Set(groups([form], names).map(squeeze));
       const warning = oneOf(t, W.warning);
-      return fill(warning && { form: 'call', warning });
+      return fill(t.every((w) => w === UNKNOWN || own.has(w)) && warning && { form: 'call', warning });
     },
   },
   loc: {
@@ -240,11 +259,12 @@ const RULES: { [K in OpenForm['form']]: Rule<Extract<OpenForm, { form: K }>> } =
       return { fill: { form: 'corr', values: { ...a.amount, direction: direction ?? '', next: has(t, '효력사') ? 'ffe' : 'adjust' }, effect } };
     },
   },
+  // 임무끝 and 재효력사 said with a 수정 (효력사, a 수정량) are two 다음 조치 at once: neither.
   eom: {
     keys: ['임무끝'],
     match: (t) => {
       const effect = oneOf(t, W.effect);
-      return fill(effect && { form: 'eom', effect });
+      return fill(!corrected(t) && effect && { form: 'eom', effect });
     },
   },
   repeat: {
@@ -252,7 +272,7 @@ const RULES: { [K in OpenForm['form']]: Rule<Extract<OpenForm, { form: K }>> } =
     match: (t) => {
       const effect = oneOf(t, W.effect);
       const rounds = roundsAfter(t, '포대', 3);
-      return fill(effect && rounds !== null && { form: 'repeat', effect, rounds });
+      return fill(!corrected(t) && effect && rounds !== null && { form: 'repeat', effect, rounds });
     },
   },
   shift: {
@@ -276,7 +296,7 @@ export function matchHeard(heard: readonly string[], forms: readonly OpenForm[],
     const keyed = forms.filter((f) => has(t, ...ruleOf(f).keys));
     if (keyed.length > 1) continue;
     for (const f of keyed.length ? keyed : forms.filter((f) => !ruleOf(f).keys.length)) {
-      const m = ruleOf(f).match(t, f);
+      const m = ruleOf(f).match(t, f, names);
       if (m) return m;
     }
   }

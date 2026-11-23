@@ -188,6 +188,7 @@ test('F-18: 말한 문장 — 자릿수가 틀리거나 꼭 들려야 하는 것
   none('좌표 사육오칠 삼일일오', LOC);
   none('좌표 4657 3115', LOC);
   none('찰리호텔 넷여섯오칠 삼하나하나오', LOC); // 좌표 not said
+  none('좌표 찰리호텔 넷여섯오칠 삼하나하나오 호텔 하나', LOC); // a ninth digit after a letter
   // 극좌표: 방위각 four digits, 거리 three to five; both must be heard, and not a 좌표 with them.
   none('극좌표, 방위각 넷둘공, 거리 하나오공공', LOC);
   none('극좌표, 방위각 공넷둘공공, 거리 하나오공공', LOC);
@@ -266,6 +267,13 @@ test('F-18: 말한 문장 — 표적성질은 그때 양식의 고를 것만 듣
   expect(target('공격중인 적 보병 한 개 소대, 포대 삼발', [{ targetType: 'infantry', activity: 'attacking', unit: 'none' }, INFANTRY])).toEqual(INFANTRY);
   expect(target('정지중인 적 보병 한 개 소대 마이너스, 포대 삼발')).toEqual({ targetType: 'infantry', activity: 'halted', unit: 'platoon_minus' });
   expect(target('사격중인 적 박격포 열두 문, 포대 삼발')).toEqual({ targetType: 'mortar', activity: 'firing', unit: 'tubes', count: 12 });
+  // A 규모 the form does not list is none of its choices, also beside a choice of that 병종 with no 규모 or another one.
+  const BARE: Target = { targetType: 'apc', activity: 'moving', unit: 'none' };
+  expect(target('이동중인 적 장갑차 네 대, 포대 삼발', [BARE, APC2, { targetType: 'unknown' }])).toBeNull();
+  expect(target('이동중인 적 장갑차 삼 대, 포대 삼발', [BARE, { targetType: 'unknown' }])).toBeNull();
+  expect(target('이동중인 적 장갑차, 포대 삼발', [BARE, APC2, { targetType: 'unknown' }])).toEqual(BARE);
+  expect(target('정지중인 적 보병 한 개 소대 마이너스, 포대 삼발', [{ targetType: 'infantry', activity: 'halted', unit: 'platoon' }])).toBeNull();
+  expect(target('접근신관 포대 삼발 이동중인 적 장갑차 두 대', [BARE, APC2])).toEqual(APC2); // any order, as before
   // Two choices heard at once is none.
   expect(target('이동중인 적 장갑차 두 대, 이동중인 적 장갑차 세 대, 포대 삼발')).toBeNull();
   // 포대 뒤 발수 within the form's 1–5; the rest is read when said.
@@ -296,6 +304,8 @@ test('F-18: 말한 문장 — 수정은 방향이 없는 임무에서 방향을 
   expect(values('동제원', LATER)).toEqual({ direction: '', ...ZERO, next: 'adjust' });
   // Nothing to correct by, an axis said twice, no number, a number read another way.
   for (const heard of ['효력사', '이상', '좌로 오십 우로 오십', '좌로', '늘리기 넷', '좌로 오공', '좌로 백', '늘리기 사백']) expect(values(heard, LATER), heard).toBeNull();
+  // A number not finished is no number: a tens place without 십.
+  for (const heard of ['좌로 하나백둘 포대', '좌로 하나백둘, 늘리기 넷백', '늘리기 넷백공십']) expect(values(heard, LATER), heard).toBeNull();
   // The form, as with typing, takes only its range: 좌우 to 800 m.
   const far = values('좌로 아홉백', LATER)!;
   expect(far.lateral).toBe('900');
@@ -330,6 +340,11 @@ test('F-18: 말한 문장 — 함께 열린 양식은 제 열쇠 낱말로 가�
   // 전이사격: 방향, the 표적성질 and the 발수 must be heard; the 표적번호 is no value.
   expect(heard(said.replace('표적번호 알파브라보 하나공공둘, ', ''), IDLE)).toEqual(heard(said, IDLE));
   for (const cut of ['방향 공팔공공, ', '이동중인 적 장갑차 두 대, ', '포대 삼발, ']) expect(heard(said.replace(cut, ''), IDLE), cut).toBeNull();
+  // "전이" not heard: the rest is no call, though it ends in 효력사.
+  expect(heard(said.replace('전이, ', ''), IDLE)).toBeNull();
+  expect(heard('방향 공팔공공 우로 여섯십 미상 표적 포대 삼발 효력사', IDLE)).toBeNull();
+  // 임무끝 or 재효력사 with a 수정 in it: two 다음 조치 at once.
+  for (const text of ['효력사 우로 여섯십 파괴 임무끝', '임무끝, 적 장갑차 파괴, 좌로 오십', '무력화, 재효력사, 포대 둘발, 늘리기 넷백']) expect(heard(text, EFFECT), text).toBeNull();
   expect(heard(said.replace('공팔공공', '공팔공'), IDLE)).toBeNull();
   expect(heard(`${said} 현 위치`, [...IDLE, { form: 'pos' }])).toBeNull();
 });
@@ -345,5 +360,5 @@ test('F-18: 들린 글 고정 자료', () => {
   }
   // The seed, 합성 50: how many were understood, and how many of those wrongly.
   const seed = HEARD_ROWS.filter((r) => r.source === '합성');
-  expect([seed.length, seed.filter((r) => r.expect).length, seed.filter((r) => r.wrong).length]).toEqual([50, 26, 5]);
+  expect([seed.length, seed.filter((r) => r.expect).length, seed.filter((r) => r.wrong).length]).toEqual([50, 24, 3]);
 });
