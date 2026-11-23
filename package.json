@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "proto:voice": "sh src/ui/prototype/voice/fetch-vosk.sh && vite --port 5177",
     "build": "vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",

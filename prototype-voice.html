@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PROTOTYPE · 교신 문장을 말했을 때 인식기가 듣는 글 (#177)</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; margin: 16px; max-width: 1500px; }
+      .proto { background: #b00020; color: #fff; padding: 4px 10px; font-weight: 700; }
+      #engines label { display: block; }
+      #sentence { font-size: 28px; font-weight: 700; margin: 8px 0; min-height: 84px; }
+      #talk { font-size: 22px; padding: 18px 40px; user-select: none; touch-action: none; }
+      #talk.down { background: #b00020; color: #fff; }
+      #status { margin: 8px 0; color: #555; min-height: 1.5em; }
+      table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+      th, td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; text-align: left; }
+      td.ok { background: #e3f6e3; }
+      small { display: block; color: #777; }
+      fieldset { margin: 8px 0; }
+    </style>
+  </head>
+  <body>
+    <p class="proto">PROTOTYPE — 버려도 되는 페이지. 제품 코드가 아니다. 질문: 소유자가 교신 문장을 말했을 때 후보 인식기는 무엇을 듣는가 (#177)</p>
+    <fieldset>
+      <legend>1. 잴 인식기</legend>
+      <div id="engines"></div>
+      <label>Whisper를 돌리는 곳 <select id="device"><option value="wasm">wasm (한 스레드)</option><option value="webgpu">webgpu</option></select></label>
+      <button id="load">모델 미리 받기</button>
+      <button id="install">내장·기기 안 한국어 설치 (Chrome)</button>
+    </fieldset>
+    <fieldset>
+      <legend>2. 문장을 소리 내어 읽는다 (단추나 스페이스를 누른 채 말하고 뗀다. ← → 로 문장을 넘긴다)</legend>
+      <div id="where"></div>
+      <div id="sentence"></div>
+      <button id="prev">◀</button>
+      <button id="talk">눌러서 말하기</button>
+      <button id="next">▶</button>
+      <div id="status">먼저 "모델 미리 받기"를 누르면 첫 문장의 시간이 모델 받는 시간과 섞이지 않는다.</div>
+    </fieldset>
+    <fieldset>
+      <legend>3. 남긴다</legend>
+      <label><input type="checkbox" id="with-audio" checked /> 녹음 포함 (다른 인식기를 나중에 같은 소리로 다시 잰다. 목소리가 들어 있으니 저장소에 올리지 않는다)</label>
+      <button id="download">결과 내려받기 (JSON)</button>
+      <label>녹음이 든 파일로 다시 돌리기 <input type="file" id="file" accept=".json" /></label>
+    </fieldset>
+    <table id="table"></table>
+    <script type="module" src="/src/ui/prototype/voice/main.ts"></script>
+  </body>
+</html>

@@ -12,3 +12,7 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 dist-real/
+
+# PROTOTYPE (#177): fetched models and recordings
+public/proto-voice/
+m4-voice-samples*.json
