@@ -17,21 +17,43 @@ const secondsIn = (line, pattern) => {
   return m ? Number(m[1]) * UNIT_SECONDS[m[2]] : null;
 };
 
-/** The three tool-reported times of one run's log (`gh run view --log`: job name, tab, step, tab, text), or null when a job reported none. */
+// The shard planner's own line (shard-plan.mjs, stderr): which shard this job is, of how many, and how many tests it got.
+const PLANNED = /Z shard (\d+)\/(\d+): (\d+) tests/;
+
+/** The three tool-reported times of one run's log (`gh run view --log`: job name, tab, step, tab, text), or null when
+ * the run is not whole: test or engines reported no time, or an e2e shard is missing, reported no time for the tests it
+ * was given, or reported twice. A run read in part would put a smaller number into the +60 s gate. */
 export function runTimes(log) {
-  const found = { test: [], engines: [], e2e: [] };
+  const found = { test: [], engines: [] };
+  const shards = new Map(); // job name → { index, count, tests, times }
   for (const raw of log.split('\n')) {
     const job = raw.slice(0, raw.indexOf('\t'));
     const line = raw.replace(ANSI, '');
-    if (job === 'test') found.test.push(secondsIn(line, VITEST));
-    else if (job === 'engines') found.engines.push(secondsIn(line, PLAYWRIGHT));
-    else if (job.startsWith('e2e-shard')) found.e2e.push(secondsIn(line, PLAYWRIGHT));
+    if (job === 'test' || job === 'engines') {
+      const s = secondsIn(line, job === 'test' ? VITEST : PLAYWRIGHT);
+      if (s !== null) found[job].push(s);
+    } else if (job.startsWith('e2e-shard')) {
+      const shard = shards.get(job) ?? { index: 0, count: 0, tests: 0, times: [] };
+      shards.set(job, shard);
+      const planned = PLANNED.exec(line);
+      if (planned) Object.assign(shard, { index: Number(planned[1]), count: Number(planned[2]), tests: Number(planned[3]) });
+      const s = secondsIn(line, PLAYWRIGHT);
+      if (s !== null) shard.times.push(s);
+    }
   }
-  const sum = (key) => found[key].filter((s) => s !== null);
-  const [test, engines, e2e] = [sum('test'), sum('engines'), sum('e2e')];
-  if (!test.length || !engines.length || !e2e.length) return null;
-  const total = (xs) => xs.reduce((a, b) => a + b, 0);
-  return { test: total(test), engines: total(engines), e2e: total(e2e), sum: total(test) + total(engines) + total(e2e) };
+  const all = [...shards.values()];
+  const count = all[0]?.count ?? 0;
+  const whole =
+    found.test.length === 1 &&
+    found.engines.length === 1 &&
+    count > 0 &&
+    all.length === count &&
+    new Set(all.map((s) => s.index)).size === count &&
+    all.every((s) => s.count === count && s.index >= 1 && s.index <= count && s.times.length === (s.tests ? 1 : 0));
+  if (!whole) return null;
+  const [test, engines] = [found.test[0], found.engines[0]];
+  const e2e = all.reduce((sum, s) => sum + (s.times[0] ?? 0), 0);
+  return { test, engines, e2e, sum: test + engines + e2e };
 }
 
 export function median(values) {

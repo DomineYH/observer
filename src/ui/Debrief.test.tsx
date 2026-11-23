@@ -176,6 +176,10 @@ test('실전: 강평의 실전 한 줄 — 쓴 레이저·틀린 복창·적 포
   expect(shown).toContain('실전: 쓴 레이저 5/5 · 틀린 복창 1회 · 적 포병 사격 1회 · 진지 변환 1회');
   expect(shown.find((l) => l.includes('관측소 이동'))).toContain(`관측소 이동 ${sim.record().postMoves}회`); // stays on its own line
   expect(Object.keys(sim.record())).toHaveLength(23);
+  // A wrong readback sent just before the game ends is counted though 기러기's 정정 never came; a right one is not.
+  const mto = (speaker: 'fdc' | 'observer', rounds: number): LogLine => ({ type: 'radio', tick: 1, utterance: { speaker, ending: 'wait', kind: 'mto', slots: { fuze: 'quick', rounds, control: 'ready', targetNumber: 1001 } } });
+  expect(combatLine(sim.state, [mto('fdc', 3), mto('observer', 1)], limit)).toContain('틀린 복창 1회');
+  expect(combatLine(sim.state, [mto('fdc', 3), mto('observer', 3)], limit)).toContain('틀린 복창 0회');
   // A game where none of it happened counts zero, with the 한도 it had.
   const quiet = createSim({ ...data, scenario, guns, terrain, combat });
   expect(combatLine(quiet.state, [], limit)).toBe('실전: 쓴 레이저 0/5 · 틀린 복창 0회 · 적 포병 사격 0회 · 진지 변환 0회');

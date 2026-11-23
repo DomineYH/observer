@@ -17,5 +17,9 @@ python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv
 # vosk-browser expects the archive's one top folder to be named "model".
 mv "$tmp/$name" "$tmp/model"
 mkdir -p "$out"
-tar -czf "$out/$name.tar.gz" -C "$tmp" model
+# Packed under another name and renamed when whole: a run cut short leaves no file that the next run takes for the model.
+part="$out/$name.tar.gz.part"
+trap 'rm -rf "$tmp" "$part"' EXIT
+tar -czf "$part" -C "$tmp" model
+mv "$part" "$out/$name.tar.gz"
 echo "만듦: $out/$name.tar.gz"
