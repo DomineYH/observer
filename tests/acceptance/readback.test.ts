@@ -65,8 +65,8 @@ test('실전: 복창 — 사격지휘통보·하나발 떳다·마감탄 떳다�
   expect(send(sim, RB_RC).ok).toBe(true);
   expect(send(sim, EOM('ineffective')).ok).toBe(true);
 
-  // 지명사: "준비 쏴" waits for the 사격지휘통보 readback. The readback holds no 관측소 이동: a move mid-mission is
-  // judged as in standard (refused for the mission, as before), and one after 임무끝 goes.
+  // 지명사: "준비 쏴" waits for the 사격지휘통보 readback. The readback holds no 관측소 이동: a move mid-mission goes in
+  // 실전 (임무 중 관측소 이동, 실전 자료 판 2) and is refused in standard as before; one after 임무끝 goes.
   const amc = game('combat');
   const std = game('standard');
   for (const s of [amc, std]) {
@@ -77,7 +77,7 @@ test('실전: 복창 — 사격지휘통보·하나발 떳다·마감탄 떳다�
   std.step([]);
   expect(send(amc, LASE).ok).toBe(true);
   expect(send(std, LASE).ok).toBe(true);
-  expect(send(amc, MOVE(400, 320)).ok).toBe(send(std, MOVE(400, 320)).ok);
+  expect([send(amc, MOVE(400, 320)).ok, send(std, MOVE(400, 320)).ok]).toEqual([true, false]);
   expect(send(amc, rbMto(mtoOf(amc))).ok).toBe(true);
   expect(send(amc, FIRE).ok).toBe(true);
   expect(send(sim, MOVE(400, 320)).ok).toBe(true); // after 임무끝

@@ -324,6 +324,23 @@ describe('골든', () => {
     expect(data.inputs.slice(lases.at(-1)! + 1).some((i) => i.a === 'loc' && i.v![0] === 'grid')).toBe(true);
     const fifth = data.inputs[lases.at(-1)!]!.t;
     expect(events.some((e) => e.type === 'radio' && e.utterance.speaker === 'observer' && e.utterance.kind === 'location' && e.utterance.slots.method === 'grid' && e.tick > fifth)).toBe(true);
+    // 임무 중 관측소 이동 (M4-10, 실전 자료 판 2): the first move is taken inside the third mission, which goes on.
+    const at = (a: string) => data.inputs.filter((i) => i.a === a).map((i) => i.t);
+    const [move] = at('move');
+    const [call, eom] = [at('call')[2]!, at('eom')[2]!];
+    expect(call < move! && move! < eom).toBe(true);
+    const tickOf = (e: SimEvent | undefined) => e!.tick;
+    const arrived = tickOf(notes('arrived')[0]);
+    expect(move! < arrived && arrived < eom).toBe(true);
+    // It sent 방향 with its first correction, and again with the one after the post arrived; no correction went while walking.
+    const corrections = said('observer', 'correction').filter((e) => e.tick > call);
+    expect(corrections.map((e) => e.type === 'radio' && 'slots' in e.utterance && (e.utterance.slots as { direction?: number }).direction)).toEqual([100, 120]);
+    expect(tickOf(corrections[0]) < move! && arrived < tickOf(corrections[1])).toBe(true);
+    expect(sim.state.missions.map((m) => m.corrections)).toEqual([1, 0, 2]);
+    // The 위치 보고 waited for that mission's 임무끝.
+    const reports = said('observer', 'position_report');
+    expect(reports).toHaveLength(1);
+    expect(tickOf(reports[0])).toBeGreaterThan(eom);
   }, 60000); // two runs of 18 000 ticks on the mock land
 
   test('골든: 다시 만드는 조건', () => {

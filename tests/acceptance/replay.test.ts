@@ -68,9 +68,11 @@ describe('F-31', () => {
     expect(validateReplay({ ...data(), guns: BASE_GUNS })).toEqual({ ok: false, error: 'guns: unknown key' });
     // 실전 자료 판: a combat header is replayed with the 실전 자료 of its 판 only.
     expect(replay(combat(), mock, BASE_SCENARIO, BASE_GUNS, COMBAT).record.mode).toBe('combat');
-    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS, { ...COMBAT, version: 2 })).toThrow("combat data version 2 is not the header's 1");
-    expect(() => replay({ ...combat(), combatDataVersion: 2 }, mock, BASE_SCENARIO, BASE_GUNS, COMBAT)).toThrow("combat data version 1 is not the header's 2");
-    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS)).toThrow("combat data version none is not the header's 1");
+    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS, { ...COMBAT, version: 3 })).toThrow("combat data version 3 is not the header's 2");
+    expect(() => replay({ ...combat(), combatDataVersion: 3 }, mock, BASE_SCENARIO, BASE_GUNS, COMBAT)).toThrow("combat data version 2 is not the header's 3");
+    expect(() => replay(combat(), mock, BASE_SCENARIO, BASE_GUNS)).toThrow("combat data version none is not the header's 2");
+    // A 실전 자료 판 1 game (no 임무 중 관측소 이동) is not replayed with the 판 2 data: its rules would differ (ADR 0022).
+    expect(() => replay({ ...combat(), combatDataVersion: 1 }, mock, BASE_SCENARIO, BASE_GUNS, COMBAT)).toThrow("combat data version 2 is not the header's 1");
     // A training or standard header has none to compare: what is handed over is left out of the game.
     expect(replay(data(), mock, BASE_SCENARIO, BASE_GUNS, { ...COMBAT, version: 2 })).toEqual(replay(data(), mock, BASE_SCENARIO, BASE_GUNS));
   });

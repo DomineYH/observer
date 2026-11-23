@@ -407,12 +407,16 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
     },
   },
   {
-    // 실전 각본 (#126, #155): the planned post, 실전, 일일 시드. ②'s lase and 극좌표 조정 at the mortar section with every
-    // readback (the first 사격지휘통보 one wrong: 기러기's 정정 50 ticks on), 재효력사, and the other four lases on the way;
-    // past the fifth, 효력사 by grid at the 정찰조 (halted at grid 4336 3646) and 좌표법 조정 at the mortar section. Their
-    // words reach the 노출 한도 at 임무끝 (10 935): the ranging round at 15 735, the post walks 150 m east, the barrage
-    // falls round the old post from 17 535. The 증원 sets off at 420 and 480 s; the 진지 변환 starts at 13 363 (first round
-    // 1363 + 체류 한도). Each input 100 ticks after its stage opens, a readback 40, a lase 60 (probe, SIM_VERSION 17).
+    // 실전 각본 (#126, #155, M4-10): the planned post, 실전, 일일 시드. ②'s lase and 극좌표 조정 at the mortar section with
+    // every readback (the first 사격지휘통보 one wrong: 기러기's 정정 50 ticks on), 재효력사, and the other four lases on the
+    // way; past the fifth, 효력사 by grid at the 정찰조 (halted at grid 4336 3646) and 좌표법 조정 at the mortar section.
+    // 임무 중 관측소 이동 (실전 자료 판 2): in that third mission, 20 ticks after its first correction (방향 100), the post
+    // sets off 30 m east, within the 같은 자리, so the 노출 count goes on; the second round lands while it walks; it is there
+    // at 9853 and the next correction sends 방향 again (120), 효력사; 임무끝, then the 위치 보고 (grid 4515 3180). The
+    // words reach the 노출 한도 at that second correction (10 444): the ranging round at 15 244, the post walks on to 150 m
+    // east of the planned one, the barrage falls round the planned post from 17 044. The 증원 sets off at 420 and 480 s;
+    // the 진지 변환 starts at 13 363 (first round 1363 + 체류 한도). Each input 100 ticks after its stage opens, a readback
+    // 40, a lase 60, the move 20 (probe, SIM_VERSION 17).
     file: '8-combat.json',
     replay: {
       ...HEAD,
@@ -450,11 +454,15 @@ export const SCRIPTS: { file: string; replay: ReplayData }[] = [
         { t: 7808, a: 'desc', v: [3, 'vt', 'ready', 0, 'mortar', 'halted', 'none'] },
         { t: 8047, a: 'readback', v: ['mto', 'vt', 3, 'ready', 1003] },
         { t: 8563, a: 'readback', v: ['shot'] },
-        { t: 9349, a: 'corr', v: [100, 'right', 60, 'drop', 50, 'ffe'] },
-        { t: 9728, a: 'readback', v: ['shot'] },
-        { t: 10178, a: 'readback', v: ['rounds_complete'] },
-        { t: 10935, a: 'eom', v: ['neutralized'] },
-        { t: 15795, a: 'move', v: [BASE_SCENARIO.plannedOp.x + 150, BASE_SCENARIO.plannedOp.y] },
+        { t: 9349, a: 'corr', v: [100, 'right', 60, 'drop', 50, 'adjust'] },
+        { t: 9370, a: 'move', v: [BASE_SCENARIO.plannedOp.x + 30, BASE_SCENARIO.plannedOp.y] }, // 임무 중 관측소 이동
+        { t: 9661, a: 'readback', v: ['shot'] },
+        { t: 10444, a: 'corr', v: [120, 'left', 20, 'add', 50, 'ffe'] }, // 방향 again: the post arrived at 9853
+        { t: 10858, a: 'readback', v: ['shot'] },
+        { t: 11308, a: 'readback', v: ['rounds_complete'] },
+        { t: 12067, a: 'eom', v: ['neutralized'] },
+        { t: 12168, a: 'pos', v: [4515, 3180] },
+        { t: 15304, a: 'move', v: [BASE_SCENARIO.plannedOp.x + 150, BASE_SCENARIO.plannedOp.y] },
       ],
       totalTicks: 18000,
     },

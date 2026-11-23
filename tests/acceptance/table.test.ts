@@ -272,17 +272,20 @@ const COMBAT_ROWS: [row: string, file: string, name: string, sim: boolean][] = [
   ['복창의 정정 지연', 'tests/acceptance/readback.test.ts', '실전: 틀린 복창 — 넣은 대로 나가고 2.5초 뒤 기러기가 정정과 바른 전문을 말하며 복창은 밀린 채 남는다', true],
   ['레이저 한도', 'tests/acceptance/laserLimit.test.ts', '실전: 레이저 거리측정 — 한 판에 다섯 번까지 받아들여지고 그 뒤의 레이저는 무시된다', true],
   ['레이저 한도 (실전 각본)', 'tests/golden/golden.test.ts', '골든: 실전 각본', true],
+  ['임무 중 관측소 이동', 'tests/acceptance/combatMove.test.ts', '실전: 임무 중 관측소 이동 — 임무가 이어지고 예약된 교신과 탄이 그대로 간다', true],
+  ['임무 중 관측소 이동 (실전 각본)', 'tests/golden/golden.test.ts', '골든: 실전 각본', true],
 ];
 
 test('수치표: 실전 — 모든 행에 테스트', () => {
   const root = new URL('../..', import.meta.url).pathname;
-  // The rows the PRD's 실전 구분 has, read off its table: the doc and this list name the same fourteen.
+  // The rows the PRD's 실전 구분 has, read off its table: the doc and this list name the same fifteen (the fourteen
+  // 실전 수치 and the 증원).
   const prd = readFileSync(root + 'PRD/OBSERVER_PRD_v0.2.md', 'utf8');
   const inPrd = [...prd.matchAll(/^\| 실전 \| ([^|]+?) \|/gm)].map((m) => m[1]!);
   const rowOf = (row: string) => row.replace(/ \(.*\)$/, '');
   const listed = [...new Set(COMBAT_ROWS.map(([row]) => rowOf(row)))];
   expect(inPrd).toEqual(listed);
-  expect(listed).toHaveLength(14);
+  expect(listed).toHaveLength(15);
   const missing = COMBAT_ROWS.filter(([, file, name]) => !declaredNames(readFileSync(root + file, 'utf8'), file).includes(name));
   expect(missing).toEqual([]);
   expect(listed.filter((row) => !COMBAT_ROWS.some(([r, , , sim]) => sim && rowOf(r) === row))).toEqual([]);

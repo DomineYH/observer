@@ -44,9 +44,9 @@ test('자료: 찾기 함수는 모르는 식별자와 다른 버전을 이름을
   // 실전 판의 머리: the 실전 자료 comes with it, and only with it.
   expect(found.combat).toBeUndefined();
   expect(contentOf({ scenario: base, guns: base, mode: 'standard' }).combat).toBeUndefined();
-  expect(contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 1 }).combat).toBe(COMBAT);
-  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 2 })).toThrow('combat@2: unknown version (this build has combat@1)');
-  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat' })).toThrow('combat@undefined: unknown version (this build has combat@1)');
+  expect(contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 2 }).combat).toBe(COMBAT);
+  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat', combatDataVersion: 3 })).toThrow('combat@3: unknown version (this build has combat@2)');
+  expect(() => contentOf({ scenario: base, guns: base, mode: 'combat' })).toThrow('combat@undefined: unknown version (this build has combat@2)');
 });
 
 test('자료: 내용과 버전이 어긋나지 않는다', () => {

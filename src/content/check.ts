@@ -121,7 +121,7 @@ function gunFindings(guns: readonly Gun[]): Finding[] {
   return out;
 }
 
-const WHOLE = ['radioExposure', 'laserExposure', 'exposureLimit', 'barrage.rounds', 'laserLimit'];
+const WHOLE = ['radioExposure', 'laserExposure', 'exposureLimit', 'barrage.rounds', 'laserLimit', 'moveInMission'];
 
 /** 실전 수치 rules 1 · 2: every number positive, the five counts whole, the 실전 자료 판 a whole number from 1. */
 function combatFindings(c: CombatData): Finding[] {

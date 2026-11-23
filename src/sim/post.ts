@@ -16,15 +16,17 @@ const SETUP_TICKS = 30 * TICKS_PER_S; // 장비 설치
 const after = (s: SimState, sec: number, act: Act) => schedule(s, s.tick + Math.ceil(sec * TICKS_PER_S), act);
 
 /** Why a move to `to` is refused, or null: not live, 지도 가장자리 (200 m on all four sides, B2), already moving or setting
- * up, or a 사격 임무 under way (the radio is neither before 감명 양호 nor idle). The ui shows the same reasons. */
+ * up, or a 사격 임무 under way (the radio is neither before 감명 양호 nor idle). The ui shows the same reasons.
+ * `inMission`: 실전's 임무 중 관측소 이동 (the 실전 수치's `moveInMission`, ADR 0022) lifts the last one only. */
 export type MoveBlock = 'not_live' | 'edge' | 'moving' | 'setup' | 'mission';
-export function moveCheck(s: ReadonlySimState, t: TerrainData, to: Point): MoveBlock | null {
+export function moveCheck(s: ReadonlySimState, t: TerrainData, to: Point, inMission = false): MoveBlock | null {
   if (s.phase !== 'live') return 'not_live';
   if (!onMap(t, to.x, to.y)) return 'edge';
   if (s.post.state !== 'ready') return s.post.state;
-  if (s.radio.stage !== 'off' && s.radio.stage !== 'idle') return 'mission';
+  if (!inMission && underMission(s)) return 'mission';
   return null;
 }
+const underMission = (s: ReadonlySimState) => s.radio.stage !== 'off' && s.radio.stage !== 'idle';
 
 /** 도보 이동 (demo planMove): 토블러 6·exp(−3.5·|경사 + 0.05|) km/h × 장비 휴대 0.85 × 숲 0.7, step by step. */
 export function planMove(t: TerrainData, from: Point, to: Point): MovePlan {
@@ -53,7 +55,7 @@ export function planMove(t: TerrainData, from: Point, to: Point): MovePlan {
 /** `move` [동, 북] m: sets off from where the post stands; 기러기 is told, and must be told the new place on arrival. */
 export function applyMove(s: SimState, ctx: Ctx, v: readonly number[]): boolean {
   const to = { x: v[0]!, y: v[1]! };
-  if (moveCheck(s, ctx.terrain, to)) return false;
+  if (moveCheck(s, ctx.terrain, to, ctx.combat?.moveInMission === 1)) return false;
   s.post = { state: 'moving', move: planMove(ctx.terrain, s.op, to), departed: s.tick, until: 0, moves: s.post.moves + 1 };
   s.reportDue = true;
   s.bino = false; // 이동 중에는 육안만
@@ -71,6 +73,9 @@ export function updatePost(s: SimState, ctx: Ctx): void {
     if (done >= m.total) {
       s.op = { ...m.to };
       s.post = { ...p, state: 'setup', move: null, until: s.tick + SETUP_TICKS };
+      // Arrived with a mission under way (실전's 임무 중 관측소 이동 only): the 기준선 was the old post's, so the next
+      // correction sends 방향 again. The 방향 오차 scored stays the first one's.
+      if (underMission(s)) s.missions[s.missions.length - 1]!.direction = null;
       ctx.note({ what: 'arrived' });
       return;
     }
