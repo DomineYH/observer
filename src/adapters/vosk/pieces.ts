@@ -46,7 +46,7 @@ export function toGrammar(words: readonly string[], lost: (word: string) => void
   const out = new Set<string>();
   for (const word of words) {
     if (VOCABULARY.has(word)) out.add(word);
-    else if (word in PIECES) for (const piece of PIECES[word]!.split(' ')) out.add(piece);
+    else if (Object.hasOwn(PIECES, word)) for (const piece of PIECES[word]!.split(' ')) out.add(piece);
     else lost(word);
   }
   return [...out];

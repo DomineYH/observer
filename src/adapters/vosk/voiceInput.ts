@@ -32,8 +32,9 @@ export interface VoskEnv {
   capable(): boolean;
   /** Asks for the microphone. Rejects as `getUserMedia` does. */
   microphone(): Promise<Mic>;
-  /** Fetches the model (once) and loads it. Rejects when the file is not there. */
-  model(): Promise<Model>;
+  /** Starts fetching (once) and loading the model. `ready` rejects when the file is not there; `cancel` stops the
+   * loading and frees what it took, whether or not `ready` has settled. */
+  model(): { ready: Promise<Model>; cancel(): void };
   /** A 들을 낱말 that cannot be given to the 인식기: a warning for whoever develops, nothing on screen. */
   lost(word: string): void;
 }
@@ -44,6 +45,7 @@ export function voskInput(env: VoskEnv = browserEnv()): VoiceInput {
   let mic: Mic | null = null;
   let model: Model | null = null;
   let turn = 0; // `close` ends the turn: an `open` still under way lets go of what it gets
+  let giveUp: (() => void) | null = null; // ends the wait of an `open` that is loading the model
   const release = () => {
     mic?.close();
     model?.close();
@@ -52,27 +54,33 @@ export function voskInput(env: VoskEnv = browserEnv()): VoiceInput {
   return {
     async open() {
       const mine = ++turn;
+      giveUp?.();
       release();
       if (!env.capable()) throw new VoiceInputError('unsupported');
-      // No microphone at all is this machine's lack; anything else is the permission not given.
+      // No microphone, or no way to read its sound, is this machine's lack; anything else is the permission not given.
       const got = await env.microphone().catch((e: unknown) => {
-        throw new VoiceInputError((e as { name?: string } | null)?.name === 'NotFoundError' ? 'unsupported' : 'denied', { cause: e });
+        const name = (e as { name?: string } | null)?.name;
+        throw new VoiceInputError(name === 'NotFoundError' || name === 'NotSupportedError' ? 'unsupported' : 'denied', { cause: e });
       });
       if (mine !== turn) return got.close();
       mic = got;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('180 s')), MODEL_LIMIT_MS)));
       const loading = env.model();
+      loading.ready.catch(() => {}); // a refusal after the wait was given up is nobody's
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const stopped = new Promise<never>((_, reject) => {
+        giveUp = () => reject(new Error('closed'));
+        timer = setTimeout(() => reject(new Error('180 s')), MODEL_LIMIT_MS);
+      });
       try {
-        const loaded = await Promise.race([loading, late]);
-        if (mine !== turn) return loaded.close();
-        model = loaded;
+        model = await Promise.race([loading.ready, stopped]);
       } catch (e) {
-        loading.then((m) => m.close(), () => {}); // one that still comes is let go
-        if (mine === turn) release();
+        loading.cancel(); // the fetch and the worker go, loaded or not
+        if (mine !== turn) return; // turned off meanwhile: `close` let the microphone go
+        release();
         throw new VoiceInputError('model', { cause: e });
       } finally {
         clearTimeout(timer);
+        giveUp = null;
       }
     },
     listen(words) {
@@ -97,6 +105,7 @@ export function voskInput(env: VoskEnv = browserEnv()): VoiceInput {
     },
     close() {
       turn++;
+      giveUp?.();
       release();
     },
   };
@@ -108,7 +117,8 @@ type VoskRecogniser = {
   retrieveFinalResult(): void;
   remove(): void;
 };
-type VoskModel = { KaldiRecognizer: new (rate: number, grammar: string) => VoskRecogniser; terminate(): void };
+type VoskModel = { KaldiRecognizer: new (rate: number, grammar: string) => VoskRecogniser; on(event: 'load', listener: (m: { result?: boolean }) => void): void; terminate(): void };
+type VoskModule = { Model: new (url: string) => VoskModel };
 const QUIET_MS = 500; // no event says which result is the last: it is the one no other follows this long
 const FINISH_LIMIT_MS = 10_000;
 
@@ -119,54 +129,78 @@ export function browserEnv(): VoskEnv {
     capable: () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof WebAssembly === 'object' && typeof Worker === 'function' && typeof indexedDB === 'object',
     async microphone() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-      const audio = new AudioContext({ sampleRate: RATE });
-      const source = audio.createMediaStreamSource(stream);
-      // ponytail: ScriptProcessorNode is deprecated but needs no worklet file; move to an AudioWorklet when a browser drops it.
-      const tap = audio.createScriptProcessor(4096, 1, 1);
-      const mic: Mic = {
-        heard: null,
-        close() {
-          tap.disconnect();
-          source.disconnect();
-          for (const track of stream.getTracks()) track.stop();
-          void audio.close();
-        },
+      let audio: AudioContext | undefined;
+      const stop = () => {
+        for (const track of stream.getTracks()) track.stop();
+        void audio?.close();
       };
-      tap.onaudioprocess = (e) => mic.heard?.(e.inputBuffer.getChannelData(0).slice()); // −1…1 as it comes: scaled up, vosk hears nonsense
-      source.connect(tap);
-      tap.connect(audio.destination); // it only runs while connected; its output is silence
-      return mic;
+      try {
+        audio = new AudioContext({ sampleRate: RATE });
+        const source = audio.createMediaStreamSource(stream);
+        // ponytail: ScriptProcessorNode is deprecated but needs no worklet file; move to an AudioWorklet when a browser drops it.
+        const tap = audio.createScriptProcessor(4096, 1, 1);
+        const mic: Mic = {
+          heard: null,
+          close() {
+            tap.disconnect();
+            source.disconnect();
+            stop();
+          },
+        };
+        tap.onaudioprocess = (e) => mic.heard?.(e.inputBuffer.getChannelData(0).slice()); // −1…1 as it comes: scaled up, vosk hears nonsense
+        source.connect(tap);
+        tap.connect(audio.destination); // it only runs while connected; its output is silence
+        return mic;
+      } catch (e) {
+        // The permission was given but the sound cannot be read here: the microphone is let go, and it is this browser's lack.
+        stop();
+        throw Object.assign(new Error('audio', { cause: e }), { name: 'NotSupportedError' });
+      }
     },
-    async model() {
-      // A missing file must not be the page itself: a static host answers an unknown path with its index.
-      const head = await fetch(MODEL_URL, { method: 'HEAD' });
-      if (!head.ok || (head.headers.get('content-type') ?? '').includes('text/html')) throw new Error(`${MODEL_URL}: ${head.status}`);
-      const vosk = (await import('vosk-browser')) as unknown as { createModel?: (url: string) => Promise<VoskModel>; default?: { createModel(url: string): Promise<VoskModel> } };
-      const loaded = await (vosk.createModel ?? vosk.default!.createModel)(MODEL_URL);
+    model() {
+      const abort = new AbortController();
+      let made: VoskModel | null = null;
+      const load = async (): Promise<Model> => {
+        // A missing file must not be the page itself: a static host answers an unknown path with its index.
+        const head = await fetch(MODEL_URL, { method: 'HEAD', signal: abort.signal });
+        if (!head.ok || (head.headers.get('content-type') ?? '').includes('text/html')) throw new Error(`${MODEL_URL}: ${head.status}`);
+        const vosk = (await import('vosk-browser')) as unknown as VoskModule & { default?: VoskModule };
+        if (abort.signal.aborted) throw new Error('cancelled');
+        // The model object is there before it has loaded, so its worker can be ended while it loads.
+        const loaded = (made = new (vosk.Model ?? vosk.default!.Model)(MODEL_URL));
+        await new Promise<void>((done, fail) => loaded.on('load', (m) => (m.result ? done() : fail(new Error('load')))));
+        return {
+          recogniser(grammar) {
+            const rec = new loaded.KaldiRecognizer(RATE, JSON.stringify(grammar));
+            const texts: string[] = [];
+            let quiet = () => {};
+            rec.on('result', (m) => {
+              if (m.result?.text) texts.push(m.result.text);
+              quiet();
+            });
+            return {
+              feed: (samples) => rec.acceptWaveformFloat(samples, RATE),
+              finish: () =>
+                new Promise<string>((done) => {
+                  let timer = setTimeout(() => done(texts.join(' ').trim()), FINISH_LIMIT_MS);
+                  quiet = () => {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => done(texts.join(' ').trim()), QUIET_MS);
+                  };
+                  rec.retrieveFinalResult();
+                }),
+              remove: () => rec.remove(),
+            };
+          },
+          close: () => loaded.terminate(),
+        };
+      };
       return {
-        recogniser(grammar) {
-          const rec = new loaded.KaldiRecognizer(RATE, JSON.stringify(grammar));
-          const texts: string[] = [];
-          let quiet = () => {};
-          rec.on('result', (m) => {
-            if (m.result?.text) texts.push(m.result.text);
-            quiet();
-          });
-          return {
-            feed: (samples) => rec.acceptWaveformFloat(samples, RATE),
-            finish: () =>
-              new Promise<string>((done) => {
-                let timer = setTimeout(() => done(texts.join(' ').trim()), FINISH_LIMIT_MS);
-                quiet = () => {
-                  clearTimeout(timer);
-                  timer = setTimeout(() => done(texts.join(' ').trim()), QUIET_MS);
-                };
-                rec.retrieveFinalResult();
-              }),
-            remove: () => rec.remove(),
-          };
+        ready: load(),
+        cancel() {
+          abort.abort();
+          made?.terminate();
         },
-        close: () => loaded.terminate(),
       };
     },
     lost: (word) => {
