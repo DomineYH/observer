@@ -20,7 +20,7 @@ import { ObservationView } from '@ui/ObservationView';
 import { PrepPanel, weatherChip } from '@ui/PrepPanel';
 import { RadioLog, type LogLine } from '@ui/RadioLog';
 import { ReadbackBox } from '@ui/ReadbackBox';
-import { owedOf } from '@ui/readback';
+import { owedOf, SHOWN_MS } from '@ui/readback';
 import { webAudio } from '@ui/audio';
 import { createSound } from '@ui/sound';
 import { SoundToggles } from '@ui/SoundToggles';
@@ -37,7 +37,7 @@ import { bootScreen } from './boot';
 import type { WeatherPreset } from '@adapters/index';
 import { mockWeather } from '@adapters/mock/weather';
 import { newGame, regunned, remade, type Game } from './game';
-import { startLoop, timescaleOf } from './loop';
+import { startLoop, stretchOf, timescaleOf } from './loop';
 import { prepLimit } from './prepLimit';
 import { submissionOf } from './records';
 import { chooseSeed, dailyCandidates, dailyScenario, dailySeed, kstDate, placementFor } from './seed';
@@ -114,7 +114,9 @@ for (const gesture of ['pointerdown', 'keydown']) addEventListener(gesture, audi
 // 무전 기록: a new array on every append, so its identity is a valid snapshot.
 let log: readonly LogLine[] = [];
 let started = false;
-const limit = prepLimit();
+// test aid, read each time so a test can switch it mid-game; never an input
+const timescale = () => timescaleOf(location.search, seedKind === 'practice');
+const limit = prepLimit(Date.now, () => stretchOf(timescale()));
 let prepShown: number | null = null; // the ms left in whole seconds, read at the publish rate
 const step = () => {
   limit.check(game);
@@ -163,8 +165,7 @@ startLoop(
     prepShown = left === null ? null : Math.ceil(left / 1000) * 1000;
     listeners.forEach((l) => l());
   },
-  // test aid, read each frame so a test can switch it mid-game; never an input
-  () => (pace.paused ? 0 : pace.speed * timescaleOf(location.search)),
+  () => (pace.paused ? 0 : pace.speed * timescale()),
 );
 
 const TRAINING_WARNING = '표준 모드 작전 중에 훈련 모드를 켜면 이 판은 저장만 되고 랭킹에서 제외됩니다. 계속할까요?';
@@ -355,7 +356,7 @@ function App() {
           <TargetList platoons={sim.state.platoons} mode={mode} op={op} /* re-rendered with the tick above */ />
         </div>
         <div data-panel="log">
-          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} />
+          <RadioLog lines={lines} callsign={callsign} gridLetters={terrain.grid.letters} mode={mode} now={performance.now()} shownMs={SHOWN_MS * stretchOf(timescale())} />
         </div>
       </div>
     </>

@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest';
 import { createSim, type Input } from '@sim';
 import { init, START } from '../../tests/acceptance/init';
-import { frameSteps, timescaleOf } from './loop';
+import { hiddenLines, SHOWN_MS } from '@ui/readback';
+import { combatInit } from '../../tests/acceptance/init';
+import { frameSteps, stretchOf, timescaleOf } from './loop';
+import { prepLimit, PREP_LIMIT_MS } from './prepLimit';
 import { createSession } from './session';
 
 const run = (frames: number[]) => {
@@ -103,4 +106,50 @@ test('F-14: 배속과 일시정지는 기록되지 않는다', () => {
   expect(simB.hash()).toBe(simA.hash());
   expect(b.log).toEqual(a.log);
   expect(b.log.map((i) => i.a)).toEqual(['start', 'bino', 'cam', 'mode', 'bino', 'mode']);
+});
+
+test('timescale: 0.25·0.5·2·4만 받는다', () => {
+  const practice = (v: string) => timescaleOf(`?seed=1&timescale=${v}`, true);
+  expect(['0.25', '0.5', '2', '4'].map(practice)).toEqual([0.25, 0.5, 2, 4]);
+  // Exact text only: another spelling of the same number, or another number, is 1.
+  for (const v of ['.25', '0.250', '.5', '0.50', '1/4', '0.75', '0.125', '0', '1', '8', '2.0', '%200.5', '0.5x', '']) expect(practice(v), v).toBe(1);
+});
+
+test('timescale: 0.25에서 네 프레임에 한 틱', () => {
+  const acc = { ms: 0 };
+  const scale = timescaleOf('?seed=1&timescale=0.25', true);
+  // 50 ms frames at ×1: a quarter of a tick each. At ×2 (the screen's 배속 is multiplied) every second frame steps.
+  expect(Array.from({ length: 8 }, () => frameSteps(acc, 50, scale))).toEqual([0, 0, 0, 1, 0, 0, 0, 1]);
+  expect(Array.from({ length: 4 }, () => frameSteps(acc, 50, 2 * scale))).toEqual([0, 1, 0, 1]);
+  expect(sum(Array.from({ length: 1000 }, () => frameSteps(acc, 16, timescaleOf('?seed=1&timescale=0.5', true))))).toBe(160);
+});
+
+test('timescale: 일일 판에서는 느린 배속을 듣지 않는다', () => {
+  for (const v of ['0.25', '0.5']) expect(timescaleOf(`?timescale=${v}`), v).toBe(1);
+  // 2 and 4 are heard on any game, as before.
+  expect([timescaleOf('?timescale=2'), timescaleOf('?timescale=4')]).toEqual([2, 4]);
+});
+
+test('timescale: 느린 배속은 준비 시간 제한과 가림 시간을 같은 비율로 늘리고 2·4는 그대로 둔다', () => {
+  expect([0.25, 0.5, 1, 2, 4].map(stretchOf)).toEqual([4, 2, 1, 1, 1]);
+  // 작전 준비 시간 제한: the clock is turned by hand; 실전 in 작전 준비.
+  const prep = createSim(combatInit(7)).state;
+  const leftAfter = (search: string, ms: number) => {
+    let now = 0;
+    const limit = prepLimit(() => now, () => stretchOf(timescaleOf(search, true)));
+    limit.chose('combat');
+    now = ms;
+    return limit.left(prep);
+  };
+  expect(leftAfter('?seed=1&timescale=0.25', 0)).toBe(4 * PREP_LIMIT_MS);
+  expect(leftAfter('?seed=1&timescale=0.25', 1_199_000)).toBe(1000);
+  expect(leftAfter('?seed=1&timescale=0.25', 1_200_000)).toBe(0);
+  expect(leftAfter('?seed=1&timescale=0.5', PREP_LIMIT_MS)).toBe(PREP_LIMIT_MS);
+  for (const v of ['1', '2', '4']) expect(leftAfter(`?seed=1&timescale=${v}`, PREP_LIMIT_MS - 1000), v).toBe(1000);
+  // 가림: a 교신 to read back that came in at 0 is covered 16 s later at 0.25, 4 s later otherwise.
+  const line = { type: 'radio', tick: 0, at: 0, utterance: { speaker: 'fdc', kind: 'shot' } } as Parameters<typeof hiddenLines>[0][number];
+  const covered = (search: string, now: number) => hiddenLines([line], now, SHOWN_MS * stretchOf(timescaleOf(search, true))).has(0);
+  expect([covered('?seed=1&timescale=0.25', 15_999), covered('?seed=1&timescale=0.25', 16_000)]).toEqual([false, true]);
+  expect([covered('?seed=1&timescale=0.5', 7999), covered('?seed=1&timescale=0.5', 8000)]).toEqual([false, true]);
+  for (const v of ['2', '4']) expect([covered(`?seed=1&timescale=${v}`, 3999), covered(`?seed=1&timescale=${v}`, 4000)], v).toEqual([false, true]);
 });

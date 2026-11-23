@@ -6,11 +6,12 @@ import type { Game } from './game';
 
 export const PREP_LIMIT_MS = 300_000; // 설계
 
-export function prepLimit(now: () => number = Date.now) {
+/** `stretch` is the 느린 배속's stretch of real time (`stretchOf`), read each time: 1 leaves the 300 s. */
+export function prepLimit(now: () => number = Date.now, stretch: () => number = () => 1) {
   let since: number | null = null;
   /** The ms left of 실전's 작전 준비; null when no limit applies (훈련·표준, or after 작전 개시). */
   const left = ({ mode, phase }: Pick<ReadonlySimState, 'mode' | 'phase'>) =>
-    mode === 'combat' && phase === 'prep' && since !== null ? Math.max(0, PREP_LIMIT_MS - (now() - since)) : null;
+    mode === 'combat' && phase === 'prep' && since !== null ? Math.max(0, PREP_LIMIT_MS * stretch() - (now() - since)) : null;
   return {
     left,
     /** Counting starts the first time 실전 is chosen and goes on through new games and leaving 실전. */
