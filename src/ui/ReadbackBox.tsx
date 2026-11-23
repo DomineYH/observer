@@ -1,10 +1,12 @@
 // 복창 상자 (실전, #120 Q1 "숫자만 받아 적기", #121): the fixed words are written; the player taps the 신관 and types the
 // numbers. It asks the first owed readback, and keeps what was put in until the mission ends.
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 import type { Fuze, Input, Mission, MtoSlots } from '@sim';
 import { RADIO_GRAMMAR } from '@content/radio/grammar';
 import { Sentence } from './RadioLog';
+import type { Fill } from './radio/matching';
 import { owedOf, readbackInput, wrongFields, type Entry } from './readback';
+import { useSpokenSend } from './talk';
 
 const W = RADIO_GRAMMAR.tables;
 const AB = RADIO_GRAMMAR.phonetic.words.A + RADIO_GRAMMAR.phonetic.words.B;
@@ -18,27 +20,37 @@ interface Props {
   /** Inputs sent and not yet stepped (the session's, live): a readback there is not judged yet. */
   queued: readonly Input[];
   send: (input: Input) => void;
+  /** 말로 하는 복창: the 사격지휘통보 readback as it was said fills the four fields whole (#181). */
+  spoken?: Fill | null;
 }
 
 /** Mounted per mission (keyed by the mission count), so a new mission starts empty. */
-export function ReadbackBox({ mission, queued, send }: Props) {
+export function ReadbackBox({ mission, queued, send, spoken = null }: Props) {
   const [entry, setEntry] = useState<Entry>({ fuze: null, rounds: '', amc: false, tn: '' });
+  const [lastSpoken, setLastSpoken] = useState<Fill | null>(null);
+  if (spoken !== lastSpoken) {
+    setLastSpoken(spoken);
+    if (spoken?.form === 'readback') setEntry(spoken.entry);
+  }
+  // Enter presses 복창 송신 as it stands: held or not filled in, it does nothing.
+  const sendRef = useSpokenSend(spoken?.form === 'readback' ? spoken : null, () => sendRef.current?.click());
   const [sent, setSent] = useState<MtoSlots | null>(null); // the last 사격지휘통보 readback sent
   const onSend = (input: Input) => {
     send(input);
     if (input.v![0] === 'mto') setSent(readbackSlots(input));
   };
-  return <ReadbackForm mission={mission} entry={entry} sent={sent} queued={queued} onEntry={setEntry} onSend={onSend} />;
+  return <ReadbackForm mission={mission} entry={entry} sent={sent} queued={queued} onEntry={setEntry} onSend={onSend} sendRef={sendRef} />;
 }
 
-interface FormProps extends Omit<Props, 'send'> {
+interface FormProps extends Omit<Props, 'send' | 'spoken'> {
   entry: Entry; // what is put in: kept after sending, so a wrong readback is mended field by field
   sent: MtoSlots | null;
   onEntry: (e: Entry) => void;
   onSend: (input: Input) => void;
+  sendRef?: Ref<HTMLButtonElement>;
 }
 
-export function ReadbackForm({ mission, queued, entry, sent, onEntry, onSend }: FormProps) {
+export function ReadbackForm({ mission, queued, entry, sent, onEntry, onSend, sendRef }: FormProps) {
   const r = mission?.readback;
   const owed = owedOf(r ?? null);
   if (!r || !owed.length) return null;
@@ -80,6 +92,7 @@ export function ReadbackForm({ mission, queued, entry, sent, onEntry, onSend }: 
       )}
       {wrong.length > 0 && <p role="alert">틀린 칸: {wrong.join(' · ')}</p>}
       <button
+        ref={sendRef}
         type="button"
         disabled={!input || held}
         onClick={() => {

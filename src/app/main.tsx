@@ -274,8 +274,11 @@ function App() {
   // The 표적성질 choices the forms list: made when the 입력기 is built, as it makes its own (same render, same state).
   const lists = useMemo(() => ({ desc: targetOptions(sim.state.platoons), shift: shiftOptions(sim.state.platoons) }), [composerKey]);
   // 눌러서 말하기: only while 음성 입력 is on, on a screen that offers it. Nothing to say to while 표준's pause covers the forms.
+  // What is said belongs to the form open at the press: the 복창 상자's asked readback while one is owed, else the 입력기's.
+  const asked = owedOf(mission?.readback ?? null)[0];
+  const talkKey = asked ? `${games}-${sim.state.missions.length}-${asked}` : composerKey;
   const talkBar = !narrow && voiceInput.state === 'on' && (
-    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state, lists)} names={names} formKey={composerKey} onFill={(fill) => setSpoken({ key: composerKey, fill })} send={send} />
+    <TalkBar talk={talk} line={talkLine} forms={covered ? [] : openForms(stage, sim.state, lists)} names={names} formKey={talkKey} onFill={(fill) => setSpoken({ key: talkKey, fill })} send={send} />
   );
   // The map's last point: a move takes a press, so without one the post still stands on the 관측소 후보 (demo 1416, 1427).
   // Memoized: the map redraws when its identity changes.
@@ -352,7 +355,7 @@ function App() {
             gun={init.guns.id}
             onGun={changeGun}
           />
-          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} />
+          <ReadbackBox key={`${games}-${sim.state.missions.length}`} mission={mission} queued={game.session.queued} send={send} spoken={talkBar && spoken?.key === talkKey ? spoken.fill : null} />
           {covered ? (
             <section aria-label="입력기">
               {talkBar}

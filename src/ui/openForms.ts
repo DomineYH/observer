@@ -34,11 +34,14 @@ export function openForms(stage: RadioStage, state: State, lists: TargetLists): 
   const o = offered(stage, state);
   const mission = state.missions.at(-1);
   const needsDirection = mission?.direction === null;
+  // 실전: while a readback is owed, what is said goes to the 복창 상자 only, to the one it asks first (#181 Q8).
+  const owed = owedOf(mission?.readback ?? null);
+  if (owed.length) return [{ form: 'readback', asked: owed[0]! }];
   if (o.reporting) return [{ form: 'pos' }];
   if (o.callable) return [{ form: 'call' }, ...(mission?.mto ? [{ form: 'shift' as const, options: lists.shift }] : [])];
   if (stage === 'loc') return [{ form: 'loc' }];
   if (stage === 'desc') return [{ form: 'desc', options: lists.desc }];
-  if (o.amc && !o.held) return [{ form: 'fire' }];
+  if (o.amc) return [{ form: 'fire' }];
   if (stage === 'adjust' && mission) return [{ form: 'corr', needsDirection }];
   if (stage === 'effect' && mission) return [{ form: 'eom' }, { form: 'repeat' }, { form: 'corr', needsDirection, after: true }];
   return [];
