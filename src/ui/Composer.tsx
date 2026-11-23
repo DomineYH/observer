@@ -9,6 +9,7 @@ import type { Fill } from './radio/matching';
 import type { RadioNames } from './radio/sentence';
 import { prefillDirection, type suggestion } from './correction';
 import { CorrectionForm, Preview } from './CorrectionForm';
+import { waitClock } from './clock';
 import { casualtyNote } from './effect';
 import { EffectForm } from './EffectForm';
 import { offered } from './openForms';
@@ -43,7 +44,7 @@ interface Props {
   mode: Mode;
   send: (input: Input) => void;
   /** The simulation's state, read for the current mission. */
-  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'post' | 'reportDue' | 'tick' | 'knownOp'>;
+  state: Pick<ReadonlySimState, 'missions' | 'op' | 'aim' | 'platoons' | 'post' | 'reportDue' | 'tick' | 'knownOp'> & Partial<Pick<ReadonlySimState, 'battery'>>;
   /** The map's last point (좌표자 or 관측소 후보): what the location grid and the 위치 보고 start from (demo 942, 958–959). */
   pin?: { e: number; n: number } | null;
   /** The last lase that met something: it fills 극좌표, and in training the grid too (demo 958–966). */
@@ -106,6 +107,9 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
   const { ready, reporting, callable, amc, held } = offered(stage, state);
   // 실전의 임무 중 관측소 이동: while the post walks no 수정 and no 재효력사 goes (the simulation refuses them).
   const walking = state.post.state === 'moving';
+  // 실전의 포대 진지 변환 (#183 Q5): until it is over no 사격준비 끝 comes; the screen says how long that is. The battery's
+  // own state: the length is the simulation's (진지 변환 시간 × 배율).
+  const displacing = state.battery && state.battery.until >= 0 ? state.battery.until - state.tick : null;
   useEffect(() => {
     if (!amc || held) return;
     const down = (e: KeyboardEvent) => {
@@ -131,6 +135,7 @@ export function Composer({ stage, live, platoons, names, grid: gridRef, mode, se
     <>
       <section aria-label="입력기">
         {talk}
+        {displacing !== null && <p role="status">포대 진지 변환 중 · 사격준비 끝까지 약 {waitClock(displacing)}</p>}
         {stage === 'off' && live && <p>기러기 통신 점검 대기…</p>}
         {stage === 'wait' && <p>기러기 응답 대기…</p>}
         {stage === 'idle' && !ready && (
