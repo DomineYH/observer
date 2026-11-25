@@ -83,6 +83,8 @@ test('#207: 사후강평 뒤에도 작전 개시 한 줄만', () => {
   expect(ended).not.toContain('판 정보');
   expect(ended).not.toContain('<button');
   expect(ended.replace(/<[^>]*>/g, '')).toBe('작전 개시 — 알파브라보 4512 3180 점령.');
+  // A pending 위치 보고 is not asked for: the ended game takes no more input.
+  expect(text(20261106, 'daily', { ...PREP, phase: 'ended', reportDue: true }, 'AB')).toBe('작전 개시 — 알파브라보 4512 3180 점령.');
 });
 
 test('F-30: 연습의 시나리오 — 카드의 시나리오 줄', () => {
