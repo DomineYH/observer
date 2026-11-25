@@ -36,6 +36,8 @@ const MODES: { mode: RankedMode; name: string }[] = [
   { mode: 'combat', name: '실전' },
 ];
 const MINE_SHOWN = 10;
+/** A stored UTC ISO time as an ISO string in Korea time (UTC+9, no daylight saving), to be sliced for display. */
+const kst = (iso: string) => new Date(Date.parse(iso) + 9 * 3600_000).toISOString();
 
 /** The board the dialog opens on: 실전 when the game is 실전, otherwise 표준. */
 export const firstMode = (m: Mode): RankedMode => (m === 'combat' ? 'combat' : 'standard');
@@ -60,7 +62,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard, placements, mode
   return (
     <>
       <h2 id="ranking-title">랭킹</h2>
-      <p>{MODES.find((m) => m.mode === mode)!.name} 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개 · 목업 표시는 가상의 예시 데이터입니다.</p>
+      <p>{MODES.find((m) => m.mode === mode)!.name} 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개{mode === 'standard' && ' · 목업 표시는 가상의 예시 데이터입니다.'}</p>
       <div>
         {MODES.map((m) => (
           <button key={m.mode} type="button" aria-pressed={m.mode === mode} onClick={() => onMode(m.mode)}>
@@ -101,7 +103,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard, placements, mode
               <td>{shown.value(r.record)}</td>
               <td>{r.record.roundsTotal}</td>
               <td>{error(r.record.firstErrorAvg)}</td>
-              <td>{r.createdAt.slice(5, 10)}</td>
+              <td>{kst(r.createdAt).slice(5, 10)}</td>
             </tr>
           ))}
         </tbody>
@@ -118,7 +120,7 @@ export function Ranking({ board, rows, mine, callsign, onBoard, placements, mode
         <tbody>
           {mine.slice(0, MINE_SHOWN).map((r) => (
             <tr key={r.createdAt}>
-              <td>{r.createdAt.slice(5, 16).replace('T', ' ')}</td>
+              <td>{kst(r.createdAt).slice(5, 16).replace('T', ' ')}</td>
               <td>{r.callsign}</td>
               <td>{modeOf(r, placements)}</td>
               <td>{resultOf(r)}</td>

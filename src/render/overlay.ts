@@ -197,7 +197,14 @@ export function drawOverlay(
   c.fillStyle = 'rgba(232,176,74,.95)';
   c.fillText(text, pad, top);
   c.textAlign = 'right';
-  if (fps !== null) c.fillText(`${fps} fps`, W - pad, top);
+  if (fps !== null) {
+    const f = `${fps} fps`;
+    const w = c.measureText(f).width;
+    c.fillStyle = 'rgba(0,0,0,.55)';
+    c.fillRect(W - pad - w - 4 * dpr, top - 10 * dpr, w + 8 * dpr, 20 * dpr);
+    c.fillStyle = 'rgba(232,176,74,.95)';
+    c.fillText(f, W - pad, top);
+  }
   if (splash) {
     c.fillStyle = splash.urgent ? 'rgba(226,96,74,1)' : 'rgba(232,176,74,.95)';
     c.fillText(`탄착까지 ${splash.sec}초${splash.urgent ? ' — 관측!' : ''}`, W - pad, top + 20 * dpr);

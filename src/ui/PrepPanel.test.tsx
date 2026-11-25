@@ -78,6 +78,15 @@ test('F-22: 판 정보 카드 — 시드 줄과 기상 바꾸기를 담는다', 
   expect(markup(20261106, 'daily', { ...PREP, phase: 'live' })).not.toContain('판 정보');
 });
 
+test('#207: 사후강평 뒤에도 작전 개시 한 줄만', () => {
+  const ended = markup(20261106, 'daily', { ...PREP, phase: 'ended' }, 'AB');
+  expect(ended).not.toContain('판 정보');
+  expect(ended).not.toContain('<button');
+  expect(ended.replace(/<[^>]*>/g, '')).toBe('작전 개시 — 알파브라보 4512 3180 점령.');
+  // A pending 위치 보고 is not asked for: the ended game takes no more input.
+  expect(text(20261106, 'daily', { ...PREP, phase: 'ended', reportDue: true }, 'AB')).toBe('작전 개시 — 알파브라보 4512 3180 점령.');
+});
+
 test('F-30: 연습의 시나리오 — 카드의 시나리오 줄', () => {
   const card = (html: string) => html.match(/<section aria-label="판 정보"[^>]*>(.*?)<\/section>/)?.[1] ?? '';
   // Every game shows its 배치's name; the button says where it leads, and the list stays folded until it is pressed.
