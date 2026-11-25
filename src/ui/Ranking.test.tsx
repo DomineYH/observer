@@ -161,7 +161,7 @@ test('랭킹: 랭킹 창 — 모드와 시나리오를 고르는 자리', async 
   const two = await view('combat', 'night', dailyCandidates(20261201, 'mock', LIST));
   expect(two.lines.slice(0, 6)).toEqual([
     '랭킹',
-    '실전 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개 · 목업 표시는 가상의 예시 데이터입니다.',
+    '실전 모드·일일 시드 기록만 집계 · 호출부호당 최고 기록 1개',
     '표준 실전',
     '보병 중대 야간 중대',
     '종합 섬멸 시간 사용 탄 정확도',
@@ -172,4 +172,14 @@ test('랭킹: 랭킹 창 — 모드와 시나리오를 고르는 자리', async 
   expect(two.lines.filter((l) => l.includes('목업 |'))).toEqual([]);
   expect(two.lines).toContain('아직 기록이 없습니다');
   expect(one.lines).not.toContain('아직 기록이 없습니다');
+});
+
+test('랭킹: 일자와 일시는 한국 시각 (#208)', () => {
+  const g = oneMission();
+  const sub = submissionOf('참새12', g.sim, { ...init(20261106), scenario: NO_ENEMY }, g.session.log);
+  const createdAt = '2026-11-24T15:30:00.000Z'; // 2026-11-25 00:30 in Korea
+  const rows = [{ callsign: '참새12', fake: false, createdAt, record: sub.record }];
+  const lines = text(<Ranking board="total" rows={rows} mine={[{ ...sub, createdAt, ranked: true }]} callsign="참새12" onBoard={() => {}} placements={PLACEMENTS} {...STANDARD_BASE} />);
+  expect(lines).toContainEqual(expect.stringMatching(/^1 \| 참새12 \| .* \| 11-25 \|$/));
+  expect(lines).toContainEqual(expect.stringMatching(/^11-25 00:30 \| 참새12 \| /));
 });
