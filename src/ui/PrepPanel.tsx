@@ -50,7 +50,7 @@ export function pressStart({ live, queued, send }: Pick<PrepPanelProps, 'state' 
 export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, weather, send, queued, live, preset, onPreset, scenarios, mode, onMode, gun, onGun }: PrepPanelProps) {
   const grid = terrain.grid;
   const at = (p: Point) => gridLabel(grid.letters, gridOf(grid, p));
-  if (state.phase === 'live')
+  if (state.phase !== 'prep')
     return (
       <section aria-label="작전 준비">
         <p>
