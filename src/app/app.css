@@ -50,6 +50,22 @@ input {
   border-radius: 4px;
   padding: 4px 6px;
 }
+table {
+  border-collapse: collapse;
+}
+th,
+td {
+  padding: 2px 8px;
+  text-align: left;
+}
+th:first-child,
+td:first-child {
+  padding-left: 0;
+}
+th:last-child,
+td:last-child {
+  padding-right: 0;
+}
 /* No layout rule below may show what a component hid (표준 일시정지 hides the view and the map). */
 [hidden] {
   display: none !important;
@@ -286,5 +302,12 @@ input {
   }
   .hb-menu:not([data-open]) {
     display: none;
+  }
+  table {
+    font-size: 12px;
+  }
+  th,
+  td {
+    padding: 2px 5px;
   }
 }
