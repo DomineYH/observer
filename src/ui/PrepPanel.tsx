@@ -54,7 +54,7 @@ export function PrepPanel({ state, scenario, briefing, terrain, seed, seedKind, 
     return (
       <section aria-label="작전 준비">
         <p>
-          작전 개시 — {at(state.op)} 점령.{state.reportDue && ' 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.'}
+          작전 개시 — {at(state.op)} 점령.{state.phase === 'live' && state.reportDue && ' 계획과 다른 위치이므로 기러기에게 위치를 보고하십시오.'}
         </p>
       </section>
     );
