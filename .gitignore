@@ -10,3 +10,8 @@ playwright-report/
 dist-real/
 # 음성 모델 (npm run voice:fetch)
 public/voice/
+
+# jev_task_routing: local task records
+.routing/tasks/*.json
+.routing/evidence/*.json
+.routing/hook_log.jsonl

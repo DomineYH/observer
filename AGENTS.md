@@ -1,2 +1,1 @@
-## Rules
-`CLAUDE.md`를 따를 것
+'CLAUDE.md' 를 따를 것. 

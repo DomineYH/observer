@@ -1,0 +1,56 @@
+{
+  "_comment": "The host copies these into verification_plan entries with required_by=repository (VER-5). Commands are the npm scripts CI runs after `npm ci` (Node 24). CI skips the steps of all five jobs on docs-only PRs (.github/scripts/changes.sh). engines and e2e run in mcr.microsoft.com/playwright:v1.65.0-noble. e2e: CI splits the suite into 12 shards (`npm run test:e2e -- <args>` from .github/scripts/shard-plan.mjs); the bare command runs the same tests, locally with more workers and reused servers. There is no README or CONTRIBUTING; ci.yml and package.json are the only sources for checks. Review: the owner does the required review personally, after the PR is opened and CI is green; workers and the host never approve or merge.",
+  "generated_by": "claude-code (claude-opus-5-5)",
+  "generated_on": "2026-11-25",
+  "sources": [
+    ".routing/repo_checks.schema.json",
+    ".routing/repo_checks.example.json",
+    ".github/workflows/ci.yml",
+    "package.json",
+    "playwright.e2e.config.ts",
+    "playwright.engines.config.ts",
+    "tests/smoke/*.spec.ts (test titles only)",
+    "gh api repos/DomineYH/observer/branches/main/protection",
+    "gh api repos/DomineYH/observer/rules/branches/main",
+    "CLAUDE.md"
+  ],
+  "required_ci": [
+    "typecheck",
+    "lint",
+    "test",
+    "engines",
+    "e2e"
+  ],
+  "commands": {
+    "typecheck": "npm run typecheck",
+    "lint": "npm run lint",
+    "test": "npm test",
+    "engines": "npm run test:engines",
+    "e2e": "npm run test:e2e"
+  },
+  "branch_protection": {
+    "require_review": true,
+    "required_status_checks": [
+      "typecheck",
+      "lint",
+      "test",
+      "engines",
+      "e2e"
+    ],
+    "source": "gh api repos/DomineYH/observer/branches/main/protection (required_approving_review_count=1, enforce_admins=false, strict=false); rulesets: none. Owner decision 2026-11-25: the owner reviews every PR after CI completes, so require_review stays true."
+  },
+  "e2e": {
+    "command": "npm run test:e2e",
+    "critical_flows": [
+      "관측소 선택 후 작전 개시, 틱이 흐른다 (tests/smoke/smoke.spec.ts:4)",
+      "보이는 적을 눌러 표적 탭에 표적 생성 (tests/smoke/smoke.spec.ts:283)",
+      "통신 점검 → 사격요구 세 송신 → 사격준비 끝 → 수정 (tests/smoke/smoke.spec.ts:418)",
+      "효력사 · 재효력사 · 임무끝으로 임무 종료 (tests/smoke/smoke.spec.ts:441, :469)",
+      "훈련 모드 한 판 완주 (tests/smoke/game.spec.ts:10)",
+      "실전 개시와 복창 (tests/smoke/combat.spec.ts:6)",
+      "키보드만으로 사격요구 (tests/smoke/keyboard.spec.ts:201)",
+      "real 빌드 스모크 (tests/smoke/real.spec.ts:12)"
+    ]
+  },
+  "unknowns": []
+}
