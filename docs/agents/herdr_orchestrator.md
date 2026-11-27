@@ -27,14 +27,14 @@ Release resources created for this task when they are no longer needed. Preserve
 | E2E testing | tester | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
 | External research | researcher | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
 
-Harness, model and effort live only in `.routing/models.json`. Look them up with `python3 .routing/resolve_models.py --role <routing role>` and pass them to `herdr agent start --kind <harness>`. Put the model flags after `--`:
+Harness, model and effort come from `.routing/models.json`, which holds the repository defaults. Resolve them per role with `python3 .routing/resolve_models.py --role <routing role>`. If the request or work order overrides a role's settings, write those overrides to a file and add `--overrides <file>`; overrides take precedence (MODEL-1). Start the worker with the resolved harness as `--kind`, and pass only the resolved model and effort after `--`. Leave out a flag whose value is unresolved. Flag forms by harness:
 
-```bash
-# claude: -- --model <model> --effort <effort>
-# codex:  -- -m <model> -c model_reasoning_effort="<effort>"
-# agy:    -- --model <model> --effort <effort>
-herdr agent start reviewer --kind <harness> --pane "$review_pane" -- <model flags>
-```
+| Harness | Flags after `--` |
+| --- | --- |
+| claude | `--model MODEL --effort EFFORT` |
+| codex | `-m MODEL -c model_reasoning_effort="EFFORT"` |
+| agy | `--model MODEL --effort EFFORT` |
+
 
 - Implementation: send the work order itself as the instructions, and include: "Write the code yourself, no subagents or PR, commit and then report." If the implementation worker requests external facts or additional work in its report, decide what is needed and assign it to the appropriate worker.
 - Review: All code changes receive an independent review. Skip commits that change only documentation. Specify a commit SHA and have the reviewer inspect only that version. Alongside bugs, security, and missing tests, check that code and test names match `GLOSSARY.md` terminology, that existing decisions in `docs/adr/` are not violated, and that new terms or decisions are not missing from the records.
@@ -62,7 +62,9 @@ wt=$(herdr worktree create --branch feat/order-cancel --no-focus)
 impl_pane=$(printf '%s\n' "$wt" | jq -r '.result.root_pane.pane_id')
 impl_ws=$(printf '%s\n' "$wt" | jq -r '.result.workspace.workspace_id')
 impl_dir=$(printf '%s\n' "$wt" | jq -r '.result.worktree.path')
-herdr agent start impl --kind claude --pane "$impl_pane"
+impl=$(python3 .routing/resolve_models.py --role implementer --json)   # add --overrides FILE if the order overrides it
+field() { printf '%s\n' "$impl" | jq -r ".roles.implementer.resolved.$1.value"; }
+herdr agent start impl --kind "$(field harness)" --pane "$impl_pane" -- --model "$(field model)" --effort "$(field effort)"   # claude flag form
 
 # 2) Read-only worker: create a sibling pane and read its ID from the JSON response
 split=$(herdr pane split --current --direction right --cwd "$impl_dir" --no-focus)
