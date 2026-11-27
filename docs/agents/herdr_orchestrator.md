@@ -20,25 +20,27 @@ Release resources created for this task when they are no longer needed. Preserve
 
 ## Roles and models
 
-| Role | Agent | Model / effort | Write access | Deliverable |
-| --- | --- | --- | --- | --- |
-| Implementation | Claude Code + pstack `/pstack:poteto-mode` | User-specified (session model) | Own worktree only | Commit, test results, `impl.md` |
-| Review | Codex | gpt-6.2-sol / high | None (report file only) | `review.md` |
-| E2E testing | Antigravity CLI (agy) | gemini-4-hydrogen / xhigh | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
-| External research | Antigravity CLI (agy) | gemini-4-hydrogen / xhigh | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
+| Role | Routing role | Write access | Deliverable |
+| --- | --- | --- | --- |
+| Implementation | implementer | Own worktree only | Commit, test results, `impl.md` |
+| Review | task-verifier | None (report file only) | `review.md` |
+| E2E testing | tester | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
+| External research | researcher | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
 
-```bash
-herdr agent start impl       --kind claude --pane "$impl_pane"
-herdr agent start reviewer   --kind codex  --pane "$review_pane"   -- -m gpt-6.2-sol -c model_reasoning_effort="high"
-herdr agent start tester     --kind agy    --pane "$e2e_pane"      -- --model gemini-4-hydrogen --effort xhigh
-herdr agent start researcher --kind agy    --pane "$research_pane" -- --model gemini-4-hydrogen --effort xhigh
-```
+Harness, model and effort come from `.routing/models.json`, which holds the repository defaults. Resolve them per role with `python3 .routing/resolve_models.py --role <routing role>`. If the request or work order overrides a role's settings, write those overrides to a file and add `--overrides <file>`; overrides take precedence (MODEL-1). Start the worker with the resolved harness as `--kind`, and pass only the resolved model and effort after `--`. Leave out a flag whose value is unresolved. If the resolver exits non-zero or reports BLOCKED, do not start the worker; fix the settings or ask the user. Flag forms by harness:
 
-- Implementation: Start instructions with `/pstack:poteto-mode` and include: "Follow the implementation rules in section 1 of CLAUDE.md: write the code yourself, no subagents or PR, commit and then report." If the implementation worker requests external facts or additional work in its report, decide what is needed and assign it to the appropriate worker.
-- Review: All code changes receive Codex review. Skip commits that change only documentation. Specify a commit SHA and have the reviewer inspect only that version. Alongside bugs, security, and missing tests, check that code and test names match `GLOSSARY.md` terminology, that existing decisions in `docs/adr/` are not violated, and that new terms or decisions are not missing from the records.
+| Harness | Flags after `--` |
+| --- | --- |
+| claude | `--model MODEL --effort EFFORT` |
+| codex | `-m MODEL -c model_reasoning_effort="EFFORT"` |
+| agy | `--model MODEL --effort EFFORT` |
+
+
+- Implementation: send the work order itself as the instructions, and include: "Write the code yourself, no subagents or PR, commit and then report." If the implementation worker requests external facts or additional work in its report, decide what is needed and assign it to the appropriate worker.
+- Review: All code changes receive an independent review. Skip commits that change only documentation. Specify a commit SHA and have the reviewer inspect only that version. Alongside bugs, security, and missing tests, check that code and test names match `GLOSSARY.md` terminology, that existing decisions in `docs/adr/` are not violated, and that new terms or decisions are not missing from the records.
 - E2E: Use only for changes to the UI or user flows. Turn the spec issue's acceptance criteria into scenarios and have the worker verify them by clicking and typing in a real browser (such as Playwright MCP). Include the app startup command and target URL in the instructions.
 - External research (official documentation, third-party APIs, specs, source code, and other material outside the working directory): When `/research` is invoked, a `wayfinder:research` ticket is being handled, or a worker requests an external fact, delegate to a research worker instead of starting a subagent within the session. Independent questions may be handled in parallel in multiple research worker panes (for example, `researcher-auth` and `researcher-billing`). You post results to a ticket or push them on a branch only after user approval.
-- In-repository exploration (code structure, call relationships, root-cause investigation) is handled by the implementation worker using Investigation (`/pstack:poteto-mode … do not change code yet`).
+- In-repository exploration (code structure, call relationships, root-cause investigation) is handled by the implementation worker with an order that says not to change code yet.
 - Review and E2E workers use the implementation worktree as their working directory. They use it read-only while the implementation worker is stopped.
 - After fixes, the same review and E2E workers recheck the revised commit. Repeat fixes and rechecks at most twice; if Blocking findings or FAILs remain, report them to the user.
 
@@ -60,7 +62,8 @@ wt=$(herdr worktree create --branch feat/order-cancel --no-focus)
 impl_pane=$(printf '%s\n' "$wt" | jq -r '.result.root_pane.pane_id')
 impl_ws=$(printf '%s\n' "$wt" | jq -r '.result.workspace.workspace_id')
 impl_dir=$(printf '%s\n' "$wt" | jq -r '.result.worktree.path')
-herdr agent start impl --kind claude --pane "$impl_pane"
+# impl_harness and impl_flags (a Bash array) hold the implementer's resolved settings; see "Roles and models"
+herdr agent start impl --kind "$impl_harness" --pane "$impl_pane" -- "${impl_flags[@]}"
 
 # 2) Read-only worker: create a sibling pane and read its ID from the JSON response
 split=$(herdr pane split --current --direction right --cwd "$impl_dir" --no-focus)
