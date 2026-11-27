@@ -20,22 +20,24 @@ Release resources created for this task when they are no longer needed. Preserve
 
 ## Roles and models
 
-| Role | Agent | Model / effort | Write access | Deliverable |
-| --- | --- | --- | --- | --- |
-| Implementation | Claude Code | `.routing/models.json` (implementer) | Own worktree only | Commit, test results, `impl.md` |
-| Review | Codex | gpt-6.2-sol / high | None (report file only) | `review.md` |
-| E2E testing | Antigravity CLI (agy) | gemini-4-hydrogen / xhigh | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
-| External research | Antigravity CLI (agy) | gemini-4-neon / xhigh | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
+| Role | Routing role | Write access | Deliverable |
+| --- | --- | --- | --- |
+| Implementation | implementer | Own worktree only | Commit, test results, `impl.md` |
+| Review | task-verifier | None (report file only) | `review.md` |
+| E2E testing | tester | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
+| External research | researcher | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
+
+Harness, model and effort live only in `.routing/models.json`. Look them up with `python3 .routing/resolve_models.py --role <routing role>` and pass them to `herdr agent start --kind <harness>`. Put the model flags after `--`:
 
 ```bash
-herdr agent start impl       --kind claude --pane "$impl_pane"
-herdr agent start reviewer   --kind codex  --pane "$review_pane"   -- -m gpt-6.2-sol -c model_reasoning_effort="high"
-herdr agent start tester     --kind agy    --pane "$e2e_pane"      -- --model gemini-4-hydrogen --effort xhigh
-herdr agent start researcher --kind agy    --pane "$research_pane" -- --model gemini-4-neon --effort xhigh
+# claude: -- --model <model> --effort <effort>
+# codex:  -- -m <model> -c model_reasoning_effort="<effort>"
+# agy:    -- --model <model> --effort <effort>
+herdr agent start reviewer --kind <harness> --pane "$review_pane" -- <model flags>
 ```
 
 - Implementation: send the work order itself as the instructions, and include: "Write the code yourself, no subagents or PR, commit and then report." If the implementation worker requests external facts or additional work in its report, decide what is needed and assign it to the appropriate worker.
-- Review: All code changes receive Codex review. Skip commits that change only documentation. Specify a commit SHA and have the reviewer inspect only that version. Alongside bugs, security, and missing tests, check that code and test names match `GLOSSARY.md` terminology, that existing decisions in `docs/adr/` are not violated, and that new terms or decisions are not missing from the records.
+- Review: All code changes receive an independent review. Skip commits that change only documentation. Specify a commit SHA and have the reviewer inspect only that version. Alongside bugs, security, and missing tests, check that code and test names match `GLOSSARY.md` terminology, that existing decisions in `docs/adr/` are not violated, and that new terms or decisions are not missing from the records.
 - E2E: Use only for changes to the UI or user flows. Turn the spec issue's acceptance criteria into scenarios and have the worker verify them by clicking and typing in a real browser (such as Playwright MCP). Include the app startup command and target URL in the instructions.
 - External research (official documentation, third-party APIs, specs, source code, and other material outside the working directory): When `/research` is invoked, a `wayfinder:research` ticket is being handled, or a worker requests an external fact, delegate to a research worker instead of starting a subagent within the session. Independent questions may be handled in parallel in multiple research worker panes (for example, `researcher-auth` and `researcher-billing`). You post results to a ticket or push them on a branch only after user approval.
 - In-repository exploration (code structure, call relationships, root-cause investigation) is handled by the implementation worker with an order that says not to change code yet.
