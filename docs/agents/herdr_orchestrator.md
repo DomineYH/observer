@@ -27,7 +27,7 @@ Release resources created for this task when they are no longer needed. Preserve
 | E2E testing | tester | None (report file and screenshots only) | `e2e.md`, `screenshots/` |
 | External research | researcher | None (report file only) | `research-<topic>.md` (cite sources for every claim) |
 
-Harness, model and effort come from `.routing/models.json`, which holds the repository defaults. Resolve them per role with `python3 .routing/resolve_models.py --role <routing role>`. If the request or work order overrides a role's settings, write those overrides to a file and add `--overrides <file>`; overrides take precedence (MODEL-1). Start the worker with the resolved harness as `--kind`, and pass only the resolved model and effort after `--`. Leave out a flag whose value is unresolved. Flag forms by harness:
+Harness, model and effort come from `.routing/models.json`, which holds the repository defaults. Resolve them per role with `python3 .routing/resolve_models.py --role <routing role>`. If the request or work order overrides a role's settings, write those overrides to a file and add `--overrides <file>`; overrides take precedence (MODEL-1). Start the worker with the resolved harness as `--kind`, and pass only the resolved model and effort after `--`. Leave out a flag whose value is unresolved. If the resolver exits non-zero or reports BLOCKED, do not start the worker; fix the settings or ask the user. Flag forms by harness:
 
 | Harness | Flags after `--` |
 | --- | --- |
@@ -62,9 +62,8 @@ wt=$(herdr worktree create --branch feat/order-cancel --no-focus)
 impl_pane=$(printf '%s\n' "$wt" | jq -r '.result.root_pane.pane_id')
 impl_ws=$(printf '%s\n' "$wt" | jq -r '.result.workspace.workspace_id')
 impl_dir=$(printf '%s\n' "$wt" | jq -r '.result.worktree.path')
-impl=$(python3 .routing/resolve_models.py --role implementer --json)   # add --overrides FILE if the order overrides it
-field() { printf '%s\n' "$impl" | jq -r ".roles.implementer.resolved.$1.value"; }
-herdr agent start impl --kind "$(field harness)" --pane "$impl_pane" -- --model "$(field model)" --effort "$(field effort)"   # claude flag form
+# impl_harness and impl_flags (a Bash array) hold the implementer's resolved settings; see "Roles and models"
+herdr agent start impl --kind "$impl_harness" --pane "$impl_pane" -- "${impl_flags[@]}"
 
 # 2) Read-only worker: create a sibling pane and read its ID from the JSON response
 split=$(herdr pane split --current --direction right --cwd "$impl_dir" --no-focus)
